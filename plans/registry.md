@@ -2,7 +2,7 @@
 
 Status: active
 
-Last implementation baseline reviewed: `8f6ce48cda5bdeb593939077bcca452cdd5f2800`
+Last implementation baseline reviewed: `889a234cbe7f461d92def3df45c83c06a7d257e5`
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -23,115 +23,149 @@ This file is the compact control surface for active Eggup planning. Detailed req
 | `plans/adrs/ADR-0002-multi-artifact-transaction-and-rollback.md` | ArtifactSet is the mutation unit; rollback and post-commit policy are explicit |
 | `plans/adrs/ADR-0003-verification-layers-and-transport-neutrality.md` | integrity/authenticity/candidate identity are distinct; core has no mandatory transport |
 
-## Recently closed work (this wave)
+## Recently closed foundation
 
 | Workstream | Closed work | Evidence |
 |---|---|---|
 | Verified update core | M001-M006 | `plans/closure/verified-update-core/` |
-| Acquisition transport | M001-M002 plus M003 corrective | `plans/closure/acquisition-transport/` |
-| Service lifecycle | M001 contract plus M002 Unix adapters | `plans/closure/service-lifecycle/` |
-| Distribution/bootstrap | M001 schema | `plans/closure/distribution-bootstrap/001-status.md` |
+| Acquisition transport | M001-M003 | `plans/closure/acquisition-transport/` |
+| Service lifecycle | M001-M002 | `plans/closure/service-lifecycle/` |
+| Distribution/bootstrap | M001 | `plans/closure/distribution-bootstrap/001-status.md` |
 | Consumer adoption | M001 eggsact + M002 stegoeggo | `plans/closure/consumer-adoption/` |
 
-Published 0.1.0 crates:
+Implementation wave `889a234c` added/closed acquisition M003, service M002, and distribution M001. Hosted CI at that exact SHA passed stable fmt/clippy/test/doc, Rust 1.89 check, macOS tests, and Windows workspace check.
+
+Published 0.1.0 crates remain:
 
 - `eggup-acquisition`
 - `eggup-core`
 - `eggup-eggfetch`
 - `eggup-service`
 
-New (unpublished) workspace crate:
+`eggup-dist` exists in the workspace but remains unpublished.
 
-- `eggup-dist` (release-time tooling; never a runtime dependency)
-
-Two independent consumers are live on the shared simple-update path without an Eggup API fork:
+Existing simple consumers:
 
 - eggsact at `eggstack/eggsact@576f4b0`;
 - stegoeggo at `eggstack/stegoeggo@10d8448`.
 
-## Current post-adoption findings
+## Post-closure review findings
 
-The 0.1.0 core safety corrective remains closed with no known medium-or-higher core defect.
+The core remains qualified with no newly identified medium-or-higher defect.
 
-Acquisition M003 corrective is closed with no medium-or-higher issue remaining:
+Three corrective gates were identified after reviewing implementation SHA `889a234c`.
 
-- effective `min(request, adapter ceiling)` timeouts via Eggfetch request overrides;
-- exclusive owner-private temp files with no-clobber promotion;
-- category-only diagnostics (no upstream/proxy secret echo).
+### Acquisition
 
-Eggsact (25 updater tests) and stegoeggo (33 updater tests) stay green against the corrective. The broader updater-bearing migration gate is lifted (service/distribution gates still apply per plan).
+M003 fixed request timeout use, temp-file ownership, no-clobber promotion, and diagnostic redaction, but two narrower contract gaps remain:
+
+- `FetchLimits` fields are public, so direct struct literals can bypass `FetchLimits::new` validation unless transports revalidate at entry;
+- `__promote_no_clobber` can create a complete destination and then return ordinary `Err` if redundant temp unlink fails.
+
+Tracked by acquisition M004.
+
+### Service
+
+M002 established useful Unix adapters, but post-closure review found:
+
+- launchd restart can return `completed=true` after an incomplete stop/start subtransition;
+- caller timeout is not consistently an end-to-end wall-clock budget;
+- production manager execution uses bare program names through ambient PATH and inherits the full environment;
+- `ServiceSpec.config` is not faithfully represented in systemd/launchd ownership observations.
+
+Tracked by service M003.
+
+### Distribution
+
+M001 established TOML schema v1, but:
+
+- distinct bundle/archive declarations can collapse to duplicate expanded asset, sidecar, or install names;
+- malformed brace/template grammar is not always rejected until expansion.
+
+Tracked by distribution M002.
+
+These findings supersede the prior registry statement that eggsearch/validators were planning-ready.
 
 ## Active subsystem roadmaps
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
 | Verified update core | qualified 0.1.0 | broader bundle/platform evidence later |
-| Acquisition transport | M001-M003 closed | optional M004 lightweight (evidence-driven) |
-| Service lifecycle | M001-M002 closed | M003 Windows SCM (planning-ready) |
-| Distribution/bootstrap | M001 closed | M002 validators (planning-ready) |
-| Consumer adoption | simple tier closed | eggsearch M003 planning-ready; Gregg measurement-ready |
+| Acquisition transport | active corrective | M004 validated-limits/promotion-state corrective |
+| Service lifecycle | active corrective | M003 Unix adapter correctness/security corrective |
+| Distribution/bootstrap | active corrective | M002 schema uniqueness/template corrective |
+| Consumer adoption | simple tier closed | blocked on current acquisition/service correctives |
 
 ## Dependency-ready implementation work
 
-No ready-for-handoff implementation plan remains from this wave; all three are closed (see above). Newly planning-ready work (plans intentionally unwritten until this evidence) is tracked below and may now be authored — but no downstream plan is authored in this pass.
+| Subsystem | Milestone | Status | Plan | Dependencies |
+|---|---|---|---|---|
+| Acquisition transport | M004 | **ready for handoff** | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | M003 closed + post-closure review |
+| Service lifecycle | M003 | **ready for handoff** | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | M002 closed + post-closure review |
+| Distribution/bootstrap | M002 | **ready for handoff** | `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md` | M001 closed + post-closure review |
 
-## Planned / newly unblocked work
+The three corrective passes are independent enough to execute in parallel.
 
-| Subsystem | Milestone | State | Blocker / planning rule |
+## Planned / blocked work
+
+| Subsystem | Milestone | State | Blocker |
 |---|---|---|---|
-| Acquisition transport | M004 lightweight/curl adapter | deferred/evidence-driven | remeasure corrected Eggfetch path, especially Gregg (gate lifted; measurement may proceed) |
-| Service lifecycle | M003 Windows SCM | planning-ready (unblocked by M002) | detailed plan may now be authored; do not freeze surface without M002 evidence review |
-| Service lifecycle | M004 update-lifecycle integration | plan intentionally unwritten | service M003 + core (M002 closed) |
-| Distribution/bootstrap | M002 validators | planning-ready (unblocked by M001) | detailed plan may now be authored against stable v1 |
-| Distribution/bootstrap | M003 generators/adoptions | plan intentionally unwritten | distribution M002 |
-| Consumer adoption | M003 eggsearch | planning-ready (gates lifted: acquisition M003 + service M002 closed) | detailed plan may now be authored; no migration begins without its own plan/closure |
-| Consumer adoption | M004 Gregg | measurement-ready (acquisition gate lifted) | corrected-path footprint decision still required before planning |
-| Consumer adoption | M005 CodeGG | later | mature bundle + distribution M002 evidence |
-| Consumer adoption | M006 Egress | later | archive/distribution M002 evidence |
+| Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected M004 footprint evidence, especially Gregg |
+| Service lifecycle | M004 Windows SCM | blocked / plan intentionally unwritten | service M003 corrective |
+| Service lifecycle | M005 update-lifecycle integration | blocked / plan intentionally unwritten | service M003 + M004 + core |
+| Distribution/bootstrap | M003 validators | blocked / plan intentionally unwritten | distribution M002 corrective |
+| Distribution/bootstrap | M004 generators/adoptions | blocked / plan intentionally unwritten | distribution M003 |
+| Consumer adoption | M003 eggsearch | blocked / plan intentionally unwritten | acquisition M004 + service M003 |
+| Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | acquisition M004 + service M003 + corrected-path footprint decision |
+| Consumer adoption | M005 CodeGG | later / blocked | mature bundle core + distribution M003 evidence |
+| Consumer adoption | M006 Egress | later / blocked | archive contract + distribution M003 evidence |
 | Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
 | Authenticity/signatures | future | ADR required | trust standard not selected |
 
 ## Immediate execution graph
 
 ```text
-acquisition M003 (closed) --+
-                            +--> eggsearch M003 planning (now allowed)
-service M002 (closed) ------+
-                            +--> Gregg corrected-path measurement (now allowed)
+acquisition M004 corrective -----------+
+                                       +--> eggsearch M003 planning
+service M003 corrective ---------------+
+                 |
+                 +-------------------------> Gregg corrected-path measurement/planning
+                                            (plus acquisition M004)
 
-distribution M001 (closed) --> distribution M002 planning (now allowed)
-                           --> later CodeGG/Egress contract evidence
+distribution M002 corrective -----------> distribution M003 validators
+                                           |
+                                           +--> later CodeGG/Egress evidence
 ```
+
+No new service-aware/updater-bearing consumer migration should begin until its relevant corrective gates close.
 
 ## Current project state
 
 - Rust baseline: 1.89.
-- Workspace crates: four published 0.1.0 crates listed above plus new unpublished `eggup-dist`.
-- Hosted CI at implementation baseline `8f6ce48`: stable checks, MSRV 1.89, macOS tests, and Windows check all passed.
-- Core: verified multi-artifact transaction, ownership proof, staged digest revalidation, rollback/recovery receipts.
-- Acquisition: M003 corrective closed; eggsact/stegoeggo green; no medium-or-higher issue.
-- Service: M002 Unix adapters closed; M001 contract intact; no consumer migrated.
-- Distribution: M001 schema closed (TOML v1); no runtime depends on `eggup-dist`.
-- Consumer adoption: eggsact/stegoeggo closed; eggsearch/Gregg planning gates lifted (no migration started).
-- Release process: manual crates.io publication only. Version decision: next release is workspace lockstep 0.1.1 patch when directed (seam-then-adapter order). No publication performed.
+- Core: verified multi-artifact transaction/ownership/rollback boundary remains qualified.
+- Acquisition: M003 implementation exists; M004 corrective is the active safety/contract gate.
+- Service: M002 Unix adapters exist; M003 corrective is the active service-adoption gate.
+- Distribution: TOML v1 crate exists; M002 corrective is the validator gate.
+- Consumer adoption: eggsact/stegoeggo remain the only completed consumers.
+- Release process: manual crates.io publication only.
+- Previously planned 0.1.1 publication must wait until acquisition/service corrective disposition is known; never publish known-contract defects merely to preserve the old version plan.
 
 ## Next handoff
 
-Downstream planning now allowed (no implementation plan authored in this pass):
+Ready now, any order:
 
-- `Distribution M002 validators` (against stable v1 schema);
-- `Service M003 Windows SCM` (against M002 adapter evidence);
-- `Consumer eggsearch M003` planning (gates lifted);
-- Gregg corrected-path footprint remeasurement (evidence for M004 decision).
+- `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md`
+- `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md`
+- `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md`
 
-After each implementation pass:
+After each corrective:
 
-1. create the matching closure record;
+1. create the matching closure record with the actual implementation SHA;
 2. update the source subsystem roadmap;
 3. update this registry;
-4. write a new corrective instead of closing work with a medium-or-higher unresolved finding;
-5. only then author the newly dependency-ready downstream implementation plan.
+4. keep downstream work blocked if any medium-or-higher issue remains;
+5. only then author the newly dependency-ready downstream plan.
 
 ## Registry update rule
 
-Keep this file limited to active/ready work, recent closure context, blockers, and the next dependency transitions. Detailed requirements belong in the implementation plans and subsystem roadmaps.
+Keep this file limited to active/ready work, recent closure context, blockers, and next dependency transitions. Detailed requirements belong in the implementation plans and subsystem roadmaps.
