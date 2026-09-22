@@ -131,8 +131,9 @@ These depend on evidence from the corrected core and first two consumers. Writin
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Active work: eggsact adoption M001 (ready; blocked on publication decision — see below).
+- Active work: eggsact adoption M001 (dependency-ready: core M006 + transport M002 closed; operationally gated on publication/release decision — no crates published, no release process; adoption requires versioned Eggup dependencies per plan).
 - Second consumer migration (stegoeggo): blocked on adoption M001.
+- Publication gate: M006 qualified without publishing (by design). Consumer migration must not begin via path/git workarounds without an explicit release-direction decision. Awaiting reassessment before adoption handoff.
 
 ## Next handoff
 
