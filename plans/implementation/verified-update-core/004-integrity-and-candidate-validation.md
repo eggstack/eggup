@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 004 — Integrity and Candidate Validation
 
-Status: ready for handoff
+Status: implemented
 
 Repository baseline for planning: `f5765a5`
 

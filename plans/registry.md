@@ -2,7 +2,7 @@
 
 Status: active
 
-Last planning baseline reviewed: `f5765a5`
+Last planning baseline reviewed: `d4f3459`
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -27,9 +27,9 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 | Subsystem | Status | Next dependency-ready milestone |
 |---|---|---|
-| Verified update core | active | M004 integrity/candidate validation |
-| Acquisition transport | proposed / blocked | M001 after core M002 interface |
-| Service lifecycle | proposed / blocked | M001 after core M003 |
+| Verified update core | active | M005 package qualification (plan not written) |
+| Acquisition transport | proposed / ready to plan | M001 after core M002 interface |
+| Service lifecycle | proposed / ready to plan | M001 after core M003 |
 | Distribution/bootstrap | proposed / later phase | M001 after first consumer adoption evidence |
 | Consumer adoption | proposed / blocked | eggsact + stegoeggo after core M003/M004 and transport M002 |
 
@@ -37,15 +37,12 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Verified update core | M004 | **ready for handoff** | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | M003 closed; M002 closed |
-| Verified update core | M004 | **ready for handoff** | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | M002 closed |
+| Verified update core | M005 | **ready to plan; implementation plan not written** | — | M001-M004 closed |
 
 ## Planned but blocked implementation work
 
 | Subsystem | Milestone | Status | Plan | Blocker |
 |---|---|---|---|---|
-| Acquisition transport | M001 | blocked | not yet written | stable core M002 stage/acquisition interface |
-| Service lifecycle | M001 | blocked | not yet written | stable core transaction semantics |
 | Consumer adoption | eggsact / stegoeggo | blocked | not yet written | core transaction + verification + Eggfetch adapter |
 
 ## External interface motivation
@@ -87,20 +84,22 @@ acquisition M001/M002
 ## Current project state
 
 - Planning system: established.
-- Production Rust workspace: foundation present; live update behavior remains unimplemented.
+- Production Rust workspace: verified local core M001-M004 complete; transport, services, and consumer integrations remain unimplemented.
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Closure records: M001-M003 closed; M004 not yet closed.
+- Closure records: M001-M004 closed.
 - Corrective plans: none.
 
 ## Next handoff
 
 Hand only this plan to the next implementation agent:
 
-`plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md`
+No next core implementation plan is written yet; M005 is ready for planning.
 
-M001-M003 are closed. Continue with M004; M005 remains blocked until both M003 and M004 are closed.
+M001-M004 are closed. Acquisition transport and service lifecycle planning are
+unblocked at their interface gates; consumer adoption remains blocked on
+transport work.
 
 ## Registry update rule
 
