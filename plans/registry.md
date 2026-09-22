@@ -43,14 +43,14 @@ The historical records remain valid evidence of what was implemented and tested 
 | Verified update core | M005-M006 closed; qualified | broader consumer API qualification after first adoptions |
 | Acquisition transport | M001-M002 closed | lightweight M003 only if footprint evidence requires |
 | Service lifecycle | M001 closed | M002 Unix adapters (no detailed plan yet) |
-| Distribution/bootstrap | proposed / later phase | wait for first consumer evidence |
-| Consumer adoption | M001 closed; M002 ready | stegoeggo second adoption (same qualified Eggup 0.1.0) |
+| Distribution/bootstrap | proposed / later phase | wait for first consumer evidence (two adopters now live) |
+| Consumer adoption | M001-M002 closed | eggsearch/Gregg per roadmap (no detailed plans yet) |
 
 ## Dependency-ready implementation work
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Consumer adoption | M002 stegoeggo | **ready for handoff** | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | adoption M001 closed |
+| *(none — all seven handed-off milestones closed)* | — | — | — | — |
 
 ## Planned but blocked implementation work
 
@@ -130,8 +130,8 @@ These depend on evidence from the corrected core and first two consumers. Writin
 - Hosted CI: lanes defined for stable, MSRV 1.89, macOS, and Windows-check; local verification green.
 - Published crates: `eggup-acquisition 0.1.0`, `eggup-core 0.1.0`, `eggup-service 0.1.0`, `eggup-eggfetch 0.1.0` (manual `cargo publish`, seam → core/service → adapter order).
 - Release process: manual publication only; no automation.
-- Consumer integrations: `eggsact` adopted (`eggstack/eggsact@576f4b0` on Eggup 0.1.0; +1.7% binary, single stack, full suite green).
-- Active work: stegoeggo adoption M002 (ready; same qualified Eggup 0.1.0).
+- Consumer integrations: `eggsact` (`eggstack/eggsact@576f4b0`, +1.7%) and `stegoeggo` (`eggstack/stegoeggo@10d8448`, +2.9%) adopted on Eggup 0.1.0; single stack each; full suites green; no eggsact-specific leakage (only argv/expectation/bound config differs).
+- Active work: none — all seven handed-off milestones closed. Next: eggsearch/Gregg/bundle tiers per roadmaps (no detailed plans yet, by discipline).
 
 ## Next handoff
 

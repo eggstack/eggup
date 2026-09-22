@@ -1,6 +1,6 @@
 # Consumer Adoption Milestone 002 — Stegoeggo Second Adoption
 
-Status: ready for handoff (unblocked by adoption M001 closure; refreshed against stegoeggo HEAD at execution time)
+Status: implemented (closed; see `plans/closure/consumer-adoption/002-status.md`)
 
 Repository baseline for Eggup planning: `9f527beb20da585bc3cf56f45f1fd96fd418c124`
 
