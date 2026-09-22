@@ -325,5 +325,5 @@ The roadmap closes when eggup-core safely supports one- and multi-member verifie
 | M002 | closed | `plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md` | `plans/closure/verified-update-core/002-status.md` | — |
 | M003 | closed | `plans/implementation/verified-update-core/003-transaction-commit-rollback.md` | `plans/closure/verified-update-core/003-status.md` | — |
 | M004 | closed; post-closure findings feed M005 | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | `plans/closure/verified-update-core/004-status.md` | — |
-| M005 | **ready for handoff** | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | — | — |
-| M006 | blocked | `plans/implementation/verified-update-core/006-core-package-qualification.md` | — | M005 |
+| M005 | closed | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | `plans/closure/verified-update-core/005-status.md` | — |
+| M006 | **ready for handoff** | `plans/implementation/verified-update-core/006-core-package-qualification.md` | — | — |

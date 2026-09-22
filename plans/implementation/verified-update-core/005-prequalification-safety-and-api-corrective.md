@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 005 — Pre-Qualification Safety and API Corrective
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/verified-update-core/005-status.md`)
 
 Repository baseline: `9f527beb20da585bc3cf56f45f1fd96fd418c124`
 

@@ -136,6 +136,6 @@ Two real consumers successfully acquire artifacts through the same adapter while
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 | blocked | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | — | core M005 |
+| M001 | **ready for handoff** | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | — | — (core M005 closed) |
 | M002 | blocked | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | — | transport M001 |
 | M003 | deferred/evidence-driven | — | — | real footprint evidence |

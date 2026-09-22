@@ -5,7 +5,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::domain::MemberId;
+use crate::domain::{CommitOwnership, MemberId};
 use crate::error::{Error, Result};
 use crate::integrity::{IntegrityStatus, VerifiedTransaction};
 use crate::transaction::TransactionReceipt;
@@ -423,8 +423,46 @@ impl VerifiedTransaction {
 }
 
 impl ValidatedTransaction {
+    /// Returns the validated artifact set.
+    pub fn artifacts(&self) -> &crate::domain::ArtifactSet {
+        self.verified.artifacts()
+    }
+
+    /// Returns a validated member's private staged path.
+    ///
+    /// Exposed so consumers and tests can inspect staged bytes; mutating the
+    /// staged copy after validation causes the final digest revalidation in
+    /// [`Self::commit`] to fail before any live mutation.
+    pub fn staged_path(&self, member: &MemberId) -> Result<std::path::PathBuf> {
+        self.verified.staged_path(member)
+    }
+
     /// Commits only after integrity and candidate validation have passed.
-    pub fn commit(self) -> Result<TransactionReceipt> {
-        self.verified.prepared.commit()
+    ///
+    /// Destination ownership is proven again under the mutation lock via
+    /// `ownership`, and every staged member is re-hashed against the digest
+    /// recorded at [`VerifiedTransaction`](crate::integrity::VerifiedTransaction)
+    /// time before any live destination is mutated. `NotRequired` integrity
+    /// state can never reach this path: validation rejects it, and the final
+    /// revalidation requires a verified digest for every member.
+    pub fn commit(self, ownership: CommitOwnership<'_>) -> Result<TransactionReceipt> {
+        let digests = self.verified.verified_digests();
+        self.verified
+            .prepared
+            .commit_inner(ownership, &digests, None)
+    }
+
+    /// Test-only commit with injected faults. The ownership and staged
+    /// revalidation contracts are identical to [`Self::commit`].
+    #[cfg(test)]
+    pub(crate) fn commit_with_fault(
+        self,
+        ownership: CommitOwnership<'_>,
+        fault: crate::transaction::CommitFault,
+    ) -> Result<TransactionReceipt> {
+        let digests = self.verified.verified_digests();
+        self.verified
+            .prepared
+            .commit_inner(ownership, &digests, Some(fault))
     }
 }

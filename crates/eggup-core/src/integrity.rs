@@ -237,4 +237,12 @@ impl VerifiedTransaction {
     pub fn integrity(&self, member: &MemberId) -> Option<&IntegrityResult> {
         self.results.iter().find(|result| result.member() == member)
     }
+
+    pub(crate) fn verified_digests(&self) -> std::collections::HashMap<MemberId, [u8; 32]> {
+        self.results
+            .iter()
+            .filter(|r| r.status() == IntegrityStatus::Verified)
+            .map(|r| (r.member().clone(), *r.digest()))
+            .collect()
+    }
 }

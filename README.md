@@ -1,14 +1,19 @@
 # Eggup
 
-Eggup is the planned shared library for safe, verified local updates of one or
-more application artifacts. Its core owns local staging, verification,
-destination ownership, locking, replacement, rollback, and recovery evidence.
+Eggup is the shared library for safe, verified local updates of one or more
+application artifacts. Its core owns local staging, SHA-256 integrity
+verification, bounded candidate validation, destination ownership
+revalidation, locking, replacement, rollback, and recovery evidence.
 Transport, release discovery, service management, installers, and consumer
 policy remain outside the core boundary.
 
-The repository is currently in foundation stage. `eggup-core` has a Rust 1.89
-workspace and deterministic test support, but it does not yet claim production
-updater capability. Work is sequenced by the [implementation plans](plans/implementation/README.md)
+`eggup-core` implements a verified local transaction
+(`PreparedTransaction -> VerifiedTransaction -> ValidatedTransaction ->
+commit`) with explicit `Absent | Owned | Foreign | Unknown` destination
+ownership, owner-private transaction state, staged-digest revalidation under
+lock, structured failure reports, and truthful fail-closed lock semantics.
+Integrity is checksum evidence only; no authenticity or signature claim is
+made. Work is sequenced by the [implementation plans](plans/implementation/README.md)
 and their [closure records](plans/closure/README.md).
 
 See [architecture/overview.md](architecture/overview.md) for the ownership

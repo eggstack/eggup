@@ -10,6 +10,7 @@ static NEXT_STAGE_ID: AtomicU64 = AtomicU64::new(0);
 #[derive(Debug)]
 pub(crate) struct Stage {
     path: PathBuf,
+    parent: PathBuf,
 }
 
 impl Stage {
@@ -32,8 +33,8 @@ impl Stage {
 
     fn prepare_inner(plan: InstallPlan, failure: Option<FailureAt>) -> Result<PreparedTransaction> {
         check_failure(failure, FailureAt::Create)?;
-        let path = create_stage_directory(plan.installation_root())?;
-        let stage = Self { path };
+        let (path, parent) = create_stage_directory(plan.installation_root())?;
+        let stage = Self { path, parent };
         if let Err(error) = stage.copy_members(&plan, failure) {
             drop(stage);
             return Err(error);
@@ -48,6 +49,13 @@ impl Stage {
             if let Some(parent) = destination.parent() {
                 fs::create_dir_all(parent)
                     .map_err(|source| Error::io("creating private stage directory", source))?;
+                #[cfg(unix)]
+                {
+                    // Stage subdirectories stay owner-private; intermediate
+                    // parents created here are transaction-owned.
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o700));
+                }
             }
             fs::copy(member.source(), &destination)
                 .map_err(|source| Error::io("copying artifact into private stage", source))?;
@@ -108,22 +116,60 @@ impl PreparedTransaction {
 
 impl Drop for Stage {
     fn drop(&mut self) {
+        // Only remove what we own: the path must still be a real directory
+        // under the recorded parent with the expected transaction prefix, and
+        // must not have become a symlink.
+        let file_name = self.path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if !file_name.starts_with(".eggup-stage-") {
+            return;
+        }
+        let Ok(meta) = fs::symlink_metadata(&self.path) else {
+            return;
+        };
+        if meta.file_type().is_symlink() || !meta.is_dir() {
+            return;
+        }
+        if self.path.parent() != Some(self.parent.as_path()) {
+            return;
+        }
         let _ = fs::remove_dir_all(&self.path);
     }
 }
 
-fn create_stage_directory(installation_root: &Path) -> Result<PathBuf> {
-    let sequence = NEXT_STAGE_ID.fetch_add(1, Ordering::Relaxed);
+fn create_stage_directory(installation_root: &Path) -> Result<(PathBuf, PathBuf)> {
+    use std::time::{SystemTime, UNIX_EPOCH};
     let parent = installation_root
         .parent()
-        .ok_or_else(|| Error::invalid("installation root has no stage parent"))?;
+        .ok_or_else(|| Error::invalid("installation root has no stage parent"))?
+        .to_path_buf();
     let root_name = installation_root
         .file_name()
         .ok_or_else(|| Error::invalid("installation root has no name"))?
         .to_string_lossy();
-    let path = parent.join(format!(".eggup-stage-{root_name}-{sequence}"));
-    fs::create_dir(&path).map_err(|source| Error::io("creating private stage", source))?;
-    Ok(path)
+    for _ in 0..32 {
+        let sequence = NEXT_STAGE_ID.fetch_add(1, Ordering::Relaxed);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let path = parent.join(format!(
+            ".eggup-stage-{root_name}-{}-{sequence}-{nanos}",
+            std::process::id()
+        ));
+        match fs::create_dir(&path) {
+            Ok(()) => {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o700));
+                }
+                return Ok((path, parent));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(source) => return Err(Error::io("creating private stage", source)),
+        }
+    }
+    Err(Error::invalid("could not create a unique stage directory"))
 }
 
 fn apply_permissions(member: &ArtifactMember, destination: &Path) -> Result<()> {
@@ -131,16 +177,25 @@ fn apply_permissions(member: &ArtifactMember, destination: &Path) -> Result<()> 
     {
         use std::os::unix::fs::PermissionsExt;
 
-        let mut permissions = fs::metadata(destination)
-            .map_err(|source| Error::io("reading staged permissions", source))?
-            .permissions();
-        let mode = permissions.mode();
+        // Staged files are always owner-private. Explicit executable intent
+        // forces 0700. Preserve maps the source executable bit to a private
+        // equivalent: executable sources become 0700, others 0600. Broad
+        // source modes (group/other read/write) are never inherited.
         let mode = match member.permissions() {
-            PermissionsIntent::Preserve => mode,
-            PermissionsIntent::Executable => mode | 0o111,
+            PermissionsIntent::Executable => 0o700,
+            PermissionsIntent::Preserve => {
+                let staged_mode = fs::metadata(destination)
+                    .map_err(|source| Error::io("reading staged permissions", source))?
+                    .permissions()
+                    .mode();
+                if staged_mode & 0o111 != 0 {
+                    0o700
+                } else {
+                    0o600
+                }
+            }
         };
-        permissions.set_mode(mode);
-        fs::set_permissions(destination, permissions)
+        fs::set_permissions(destination, fs::Permissions::from_mode(mode))
             .map_err(|source| Error::io("setting staged permissions", source))?;
     }
     #[cfg(not(unix))]

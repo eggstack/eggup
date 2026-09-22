@@ -1,11 +1,20 @@
 # eggup-core
 
 `eggup-core` is the policy-neutral local substrate for verified, multi-artifact
-updates. It is intentionally transport-neutral: callers acquire artifacts and
-choose release, authenticity, and service policies; the core provides bounded
-local validation, staging, and transaction mechanics.
+updates. It is intentionally transport-neutral: callers acquire artifacts,
+prove destination ownership, and choose release and service policies; the core
+provides bounded local validation, private staging, SHA-256 integrity
+verification, bounded candidate validation, locked ownership and staged-digest
+revalidation, and synchronous commit/rollback with structured receipts.
 
-The crate is foundation-stage software. The initial release establishes the
-workspace boundary and test contract; it does not yet implement a production
-updater.
+Ownership uses `Absent | Owned | Foreign | Unknown`. Destructive replacement
+requires `Owned`, or `Absent` with explicit creation authorization;
+`Foreign` and `Unknown` fail closed. No destination parent is created
+automatically. Staged bytes are re-hashed under lock before any live mutation.
+Terminal receipts preserve failure phase, category, member, and real recovery
+evidence. Locks are fail-closed with inspection only and no automatic stale
+removal.
+
+Integrity is checksum evidence only. No authenticity or signature verification
+exists in this crate.
 

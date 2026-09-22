@@ -22,10 +22,14 @@ consumer/release policy  ->  acquisition/transport  ->  eggup-core
                                                        local mechanics
 ```
 
-Only the workspace and crate boundary are implemented in the foundation
-milestone. The domain/preparation milestone now also validates explicit plans
-and copies local inputs into private stage state; no live installation, service,
-or network behavior is present. Commit/rollback mechanics are documented in
+`eggup-core` implements validated plans, owner-private staging (0700/0600),
+SHA-256 integrity verification, bounded candidate execution, explicit
+`Absent | Owned | Foreign | Unknown` ownership proofs, locked ownership and
+staged-digest revalidation, mutation locking with inspection-only stale
+handling, and commit/rollback with structured failure reports. No live
+destination parent is created automatically, and no authenticity claim is
+made. Commit/rollback mechanics are documented in
 the [transaction contract](../crates/eggup-core/docs/transaction.md); service
 and transport layers remain outside the crate. Verification ordering and
 bounded candidate execution are defined in the [verification contract](../crates/eggup-core/docs/verification.md).
+Domain preparation rules are defined in the [domain contract](../crates/eggup-core/docs/domain.md).

@@ -29,18 +29,19 @@ This file is the compact control surface for active Eggup planning. Detailed req
 |---|---|---|
 | Core M001 foundation | closed | `plans/closure/verified-update-core/001-status.md` |
 | Core M002 domain/preparation | closed | `plans/closure/verified-update-core/002-status.md` |
-| Core M003 transaction/rollback | closed; post-closure findings feed M005 | `plans/closure/verified-update-core/003-status.md` |
-| Core M004 integrity/candidate validation | closed; post-closure findings feed M005 | `plans/closure/verified-update-core/004-status.md` |
+| Core M003 transaction/rollback | closed; post-closure findings fed M005 | `plans/closure/verified-update-core/003-status.md` |
+| Core M004 integrity/candidate validation | closed; post-closure findings fed M005 | `plans/closure/verified-update-core/004-status.md` |
+| Core M005 safety/API corrective | closed | `plans/closure/verified-update-core/005-status.md` |
 
-The historical records remain valid evidence of what was implemented and tested at those points. They do not override the later pre-adoption safety findings recorded in M005.
+The historical records remain valid evidence of what was implemented and tested at those points. M005 corrects the pre-adoption contract defects found after M002-M004.
 
 ## Active subsystem roadmaps
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
-| Verified update core | active corrective | M005 safety/API corrective |
-| Acquisition transport | plans written / blocked | M001 after core M005 |
-| Service lifecycle | first plan written / blocked | M001 after core M005 |
+| Verified update core | M005 closed; M006 ready | M006 package qualification |
+| Acquisition transport | M001 ready | M001 seam + fixture transport |
+| Service lifecycle | M001 ready | M001 manager-neutral ownership |
 | Distribution/bootstrap | proposed / later phase | wait for first consumer evidence |
 | Consumer adoption | first two plans written / blocked | eggsact after core M006 + transport M002 |
 
@@ -48,22 +49,21 @@ The historical records remain valid evidence of what was implemented and tested 
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Verified update core | M005 | **ready for handoff** | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | M001-M004 historical closure complete |
+| Verified update core | M006 | **ready for handoff** | `plans/implementation/verified-update-core/006-core-package-qualification.md` | core M005 closed |
+| Acquisition transport | M001 | **ready for handoff** | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | core M005 closed |
+| Service lifecycle | M001 | **ready for handoff** | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | core M005 closed |
 
 ## Planned but blocked implementation work
 
 | Subsystem | Milestone | Status | Plan | Blocker |
 |---|---|---|---|---|
-| Verified update core | M006 | blocked | `plans/implementation/verified-update-core/006-core-package-qualification.md` | core M005 |
-| Acquisition transport | M001 | blocked | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | core M005 |
 | Acquisition transport | M002 | blocked | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | transport M001 |
-| Service lifecycle | M001 | blocked | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | core M005 |
 | Consumer adoption | M001 eggsact | blocked | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | core M006 + transport M002 |
 | Consumer adoption | M002 stegoeggo | blocked | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | adoption M001 |
 
-## Core M005 corrective scope
+## Core M005 corrective scope (closed)
 
-M005 is the release/adoption gate for the post-M004 review findings:
+M005 was the release/adoption gate for the post-M004 review findings and is now closed (`plans/closure/verified-update-core/005-status.md`):
 
 - explicit `Absent | Owned | Foreign | Unknown` destination ownership;
 - no unchecked destination-parent creation;
@@ -76,7 +76,7 @@ M005 is the release/adoption gate for the post-M004 review findings:
 - truthful stale-lock support/documentation;
 - current capability documentation.
 
-Do not begin package publication or consumer migration until M005 closes.
+Do not begin package publication or consumer migration until M006 qualifies the corrected API.
 
 ## Immediate execution order
 
@@ -129,28 +129,28 @@ These depend on evidence from the corrected core and first two consumers. Writin
 ## Current project state
 
 - Planning system: established.
-- Production Rust workspace: core M001-M004 implemented.
-- Hosted CI: current reviewed implementation HEAD passed stable checks and Rust 1.89 MSRV.
+- Production Rust workspace: core M001-M005 implemented and verified (37/37 tests, stable + 1.89).
+- Hosted CI: lanes defined for stable, MSRV 1.89, macOS, and Windows-check; local verification green.
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Active corrective: core M005.
-- Next package qualification: core M006, blocked.
-- Transport implementation: planned, blocked.
-- Service implementation: first contract plan written, blocked.
-- First consumer migrations: planned, blocked.
+- Active work: core M006, acquisition M001, service M001 (all ready).
+- Transport Eggfetch adapter: blocked on acquisition M001.
+- First consumer migrations: blocked on core M006 + transport M002.
 
 ## Next handoff
 
-Hand only:
+Hand (any order; service M001 may run in parallel):
 
-`plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md`
+- `plans/implementation/verified-update-core/006-core-package-qualification.md`
+- `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md`
+- `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md`
 
-After M005 implementation:
+After each implementation:
 
-1. create `plans/closure/verified-update-core/005-status.md`;
-2. reconcile the verified-update-core roadmap and this registry;
-3. if closed, unblock M006, acquisition M001, and service-lifecycle M001;
+1. create the matching closure record;
+2. reconcile the source subsystem roadmap and this registry;
+3. only then mark dependent milestones ready (M002 after transport M001; adoption M001 after core M006 + transport M002; adoption M002 after adoption M001);
 4. if any medium-or-higher safety/API issue remains, write a new corrective rather than beginning adoption.
 
 ## Registry update rule

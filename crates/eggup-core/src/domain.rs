@@ -97,14 +97,27 @@ pub enum PermissionsIntent {
     Executable,
 }
 
-/// The ownership policy for a destination, without selecting a consumer policy.
+/// The canonical ownership classification for a live destination.
+///
+/// `Owned` is never inferred from an [`InstallPlan`]. It is returned only by a
+/// consumer-supplied [`OwnershipVerifier`] that proves the destination belongs
+/// to the intended deployment. `Foreign` and `Unknown` always fail closed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ownership {
-    /// The caller owns and explicitly describes this destination.
-    Managed,
+    /// No filesystem object exists at the destination.
+    Absent,
+    /// The destination provably belongs to this deployment and may be replaced.
+    Owned,
+    /// The destination belongs to another deployment and must not be mutated.
+    Foreign,
+    /// Ownership cannot be proven; mutation is denied.
+    Unknown,
 }
 
-/// A declared integrity requirement. Computation is provided by the verification milestone.
+/// A declared integrity requirement. Computation is provided by the verification layer.
+///
+/// Only `Sha256` members are commit-capable. `None` is visible during
+/// preparation but can never reach candidate execution or commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntegrityRequirement {
     /// No integrity evidence is attached at this stage.
@@ -113,16 +126,149 @@ pub enum IntegrityRequirement {
     Sha256([u8; 32]),
 }
 
-/// An authenticity requirement descriptor reserved for a later policy layer.
+/// Consumer-supplied proof that a live destination belongs to this deployment.
+///
+/// Implementations MUST be synchronous, deterministic for a fixed filesystem
+/// state, free of application-specific version types, and treat verifier
+/// errors or ambiguity as [`Ownership::Unknown`] or a hard failure — never
+/// [`Ownership::Owned`].
+///
+/// The verifier runs again immediately before destructive mutation while the
+/// [`crate::MutationLock`] is held. A change between preflight and locked
+/// classification fails the transaction.
+pub trait OwnershipVerifier {
+    /// Classifies one live destination for one artifact member.
+    fn verify(&self, member: &MemberId, destination: &Path) -> Ownership;
+}
+
+/// Authorization to create a destination that is currently [`Ownership::Absent`].
+///
+/// This is distinct from authorization to replace an [`Ownership::Owned`]
+/// destination. Replacement of `Owned` never requires this flag; creation of
+/// `Absent` always does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AuthenticityRequirement {
-    /// No authenticity claim is made by core.
-    None,
-    /// The caller requires an authenticity validator before commit.
-    Required,
+pub enum AbsentPolicy {
+    /// Installing into an absent destination is permitted.
+    AllowCreate,
+    /// Only replacement of an already-`Owned` destination is permitted.
+    DenyCreate,
+}
+
+/// Commit-time ownership contract: who proves ownership and whether absent
+/// destinations may be created.
+#[derive(Clone, Copy)]
+pub struct CommitOwnership<'a> {
+    /// Consumer verifier consulted under lock before any live mutation.
+    pub verifier: &'a dyn OwnershipVerifier,
+    /// Whether `Absent` destinations may be created.
+    pub absent: AbsentPolicy,
+}
+
+impl<'a> CommitOwnership<'a> {
+    /// Creates an ownership contract from a verifier and an absent policy.
+    pub fn new(verifier: &'a dyn OwnershipVerifier, absent: AbsentPolicy) -> Self {
+        Self { verifier, absent }
+    }
+}
+
+impl std::fmt::Debug for CommitOwnership<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CommitOwnership")
+            .field("absent", &self.absent)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A verifier that permits creation only: `Absent` when missing, `Foreign`
+/// when anything exists. Useful for first-install flows that must never
+/// replace an existing file.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AbsentOnlyVerifier;
+
+impl OwnershipVerifier for AbsentOnlyVerifier {
+    fn verify(&self, _member: &MemberId, destination: &Path) -> Ownership {
+        match std::fs::symlink_metadata(destination) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ownership::Absent,
+            Ok(_) => Ownership::Foreign,
+            Err(_) => Ownership::Unknown,
+        }
+    }
+}
+
+/// A verifier that treats an existing regular file as owned.
+///
+/// This helper exists only for deterministic tests and examples that do not
+/// model real deployment identity. Production consumers SHOULD use
+/// [`ExactDigestVerifier`] or a deployment-specific identity check instead of
+/// this permissive mapping.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ExistingAsOwnedVerifier;
+
+impl OwnershipVerifier for ExistingAsOwnedVerifier {
+    fn verify(&self, _member: &MemberId, destination: &Path) -> Ownership {
+        match std::fs::symlink_metadata(destination) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ownership::Absent,
+            Ok(m) if m.is_file() => Ownership::Owned,
+            Ok(_) => Ownership::Foreign,
+            Err(_) => Ownership::Unknown,
+        }
+    }
+}
+
+/// A verifier that proves ownership by exact prior SHA-256 content.
+///
+/// Returns `Absent` when nothing exists, `Owned` when the live file hashes to
+/// the expected digest for that member, `Foreign` when content differs, and
+/// `Unknown` when the destination cannot be read unambiguously.
+#[derive(Debug, Clone)]
+pub struct ExactDigestVerifier {
+    expected: std::collections::HashMap<MemberId, [u8; 32]>,
+}
+
+impl ExactDigestVerifier {
+    /// Creates a verifier from `(member, expected_live_digest)` pairs.
+    pub fn new(expected: Vec<(MemberId, [u8; 32])>) -> Self {
+        Self {
+            expected: expected.into_iter().collect(),
+        }
+    }
+}
+
+impl OwnershipVerifier for ExactDigestVerifier {
+    fn verify(&self, member: &MemberId, destination: &Path) -> Ownership {
+        let expected = match self.expected.get(member) {
+            Some(d) => d,
+            None => return Ownership::Unknown,
+        };
+        match std::fs::symlink_metadata(destination) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ownership::Absent,
+            Err(_) => Ownership::Unknown,
+            Ok(m) => {
+                if !m.is_file() {
+                    return Ownership::Foreign;
+                }
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::MetadataExt;
+                    if m.nlink() != 1 {
+                        return Ownership::Foreign;
+                    }
+                }
+                match crate::integrity::hash_file(destination) {
+                    Ok(d) if &d == expected => Ownership::Owned,
+                    Ok(_) => Ownership::Foreign,
+                    Err(_) => Ownership::Unknown,
+                }
+            }
+        }
+    }
 }
 
 /// One explicitly acquired local artifact and its intended destination.
+///
+/// The member declares where bytes come from and where they should be
+/// installed. It never authorizes replacement: destination ownership is proven
+/// separately at commit time by an [`OwnershipVerifier`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactMember {
     id: MemberId,
@@ -130,9 +276,7 @@ pub struct ArtifactMember {
     destination: PathBuf,
     file_kind: FileKind,
     permissions: PermissionsIntent,
-    ownership: Ownership,
     integrity: IntegrityRequirement,
-    authenticity: AuthenticityRequirement,
 }
 
 impl ArtifactMember {
@@ -149,9 +293,7 @@ impl ArtifactMember {
             destination,
             file_kind: FileKind::Regular,
             permissions: PermissionsIntent::Preserve,
-            ownership: Ownership::Managed,
             integrity: IntegrityRequirement::None,
-            authenticity: AuthenticityRequirement::None,
         })
     }
 
@@ -161,21 +303,13 @@ impl ArtifactMember {
         self
     }
 
-    /// Sets the destination ownership policy.
-    pub fn with_ownership(mut self, ownership: Ownership) -> Self {
-        self.ownership = ownership;
-        self
-    }
-
     /// Attaches a declared integrity requirement without computing it.
+    ///
+    /// Only `Sha256` members can be committed. `None` is permitted during
+    /// preparation so callers can observe the missing-evidence failure mode,
+    /// but verification and commit reject it.
     pub fn with_integrity(mut self, integrity: IntegrityRequirement) -> Self {
         self.integrity = integrity;
-        self
-    }
-
-    /// Attaches an authenticity requirement without claiming that it passed.
-    pub fn with_authenticity(mut self, authenticity: AuthenticityRequirement) -> Self {
-        self.authenticity = authenticity;
         self
     }
 
@@ -204,19 +338,9 @@ impl ArtifactMember {
         self.permissions
     }
 
-    /// Returns the ownership policy.
-    pub fn ownership(&self) -> Ownership {
-        self.ownership
-    }
-
     /// Returns the declared integrity requirement.
     pub fn integrity(&self) -> IntegrityRequirement {
         self.integrity
-    }
-
-    /// Returns the declared authenticity requirement.
-    pub fn authenticity(&self) -> AuthenticityRequirement {
-        self.authenticity
     }
 }
 
