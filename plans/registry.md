@@ -30,7 +30,7 @@ This file is the compact control surface for active Eggup planning. Detailed req
 | Verified update core | M001-M006 | `plans/closure/verified-update-core/` |
 | Acquisition transport | M001-M004 | `plans/closure/acquisition-transport/` |
 | Service lifecycle | M001-M002 | `plans/closure/service-lifecycle/` |
-| Distribution/bootstrap | M001 | `plans/closure/distribution-bootstrap/001-status.md` |
+| Distribution/bootstrap | M001-M002 | `plans/closure/distribution-bootstrap/` |
 | Consumer adoption | M001 eggsact + M002 stegoeggo | `plans/closure/consumer-adoption/` |
 
 Implementation wave `889a234c` added/closed acquisition M003, service M002, and distribution M001. Hosted CI at that exact SHA passed stable fmt/clippy/test/doc, Rust 1.89 check, macOS tests, and Windows workspace check.
@@ -53,7 +53,8 @@ Existing simple consumers:
 
 The core remains qualified with no newly identified medium-or-higher defect.
 
-Three corrective gates were identified after reviewing implementation SHA `889a234c`.
+Corrective work identified after reviewing implementation SHA `889a234c` is
+being closed sequentially; only the service M003 gate remains active.
 
 ### Acquisition
 
@@ -76,12 +77,10 @@ Tracked by service M003.
 
 ### Distribution
 
-M001 established TOML schema v1, but:
-
-- distinct bundle/archive declarations can collapse to duplicate expanded asset, sidecar, or install names;
-- malformed brace/template grammar is not always rejected until expansion.
-
-Tracked by distribution M002.
+M002 closed the schema-v1 findings: template grammar is strict at parse time,
+and expanded release/install filename namespaces reject exact and ASCII-case
+collisions. Distribution M003 validators are now dependency-ready for plan
+authoring. See `plans/closure/distribution-bootstrap/002-status.md`.
 
 These findings supersede the prior registry statement that eggsearch/validators were planning-ready.
 
@@ -92,7 +91,7 @@ These findings supersede the prior registry statement that eggsearch/validators 
 | Verified update core | qualified 0.1.0 | broader bundle/platform evidence later |
 | Acquisition transport | corrected | M004 closed; optional M005 footprint evidence |
 | Service lifecycle | active corrective | M003 Unix adapter correctness/security corrective |
-| Distribution/bootstrap | active corrective | M002 schema uniqueness/template corrective |
+| Distribution/bootstrap | corrected | M003 validators dependency-ready for plan authoring |
 | Consumer adoption | simple tier closed | blocked on current acquisition/service correctives |
 
 ## Dependency-ready implementation work
@@ -100,9 +99,8 @@ These findings supersede the prior registry statement that eggsearch/validators 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
 | Service lifecycle | M003 | **ready for handoff** | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | M002 closed + post-closure review |
-| Distribution/bootstrap | M002 | **ready for handoff** | `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md` | M001 closed + post-closure review |
 
-The remaining service and distribution correctives are independent and ready.
+The service M003 corrective is the only remaining ready corrective. Distribution M003 is unblocked for plan authoring.
 
 ## Planned / blocked work
 
@@ -111,7 +109,7 @@ The remaining service and distribution correctives are independent and ready.
 | Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
 | Service lifecycle | M004 Windows SCM | blocked / plan intentionally unwritten | service M003 corrective |
 | Service lifecycle | M005 update-lifecycle integration | blocked / plan intentionally unwritten | service M003 + M004 + core |
-| Distribution/bootstrap | M003 validators | blocked / plan intentionally unwritten | distribution M002 corrective |
+| Distribution/bootstrap | M003 validators | dependency-ready / plan needed | corrected schema M002 closed |
 | Distribution/bootstrap | M004 generators/adoptions | blocked / plan intentionally unwritten | distribution M003 |
 | Consumer adoption | M003 eggsearch | blocked / plan intentionally unwritten | service M003 |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | service M003 + corrected-path footprint decision |
@@ -130,7 +128,7 @@ service M003 corrective ---------------+
                  +-------------------------> Gregg corrected-path measurement/planning
                                             (plus footprint decision)
 
-distribution M002 corrective -----------> distribution M003 validators
+distribution M002 corrective [closed] --> distribution M003 validator planning
                                            |
                                            +--> later CodeGG/Egress evidence
 ```
@@ -143,7 +141,7 @@ No new service-aware/updater-bearing consumer migration should begin until its r
 - Core: verified multi-artifact transaction/ownership/rollback boundary remains qualified.
 - Acquisition: M004 validation/promotion corrective is closed; optional M005 still needs corrected-path footprint evidence.
 - Service: M002 Unix adapters exist; M003 corrective is the active service-adoption gate.
-- Distribution: TOML v1 crate exists; M002 corrective is the validator gate.
+- Distribution: TOML v1 uniqueness/template corrective M002 is closed; M003 validators are ready for plan authoring.
 - Consumer adoption: eggsact/stegoeggo remain the only completed consumers.
 - Release process: manual crates.io publication only.
 - Previously planned 0.1.1 publication must wait until acquisition/service corrective disposition is known; never publish known-contract defects merely to preserve the old version plan.
@@ -153,7 +151,6 @@ No new service-aware/updater-bearing consumer migration should begin until its r
 Ready now:
 
 - `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md`
-- `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md`
 
 Acquisition M004 is closed with its closure record. After each remaining corrective:
 

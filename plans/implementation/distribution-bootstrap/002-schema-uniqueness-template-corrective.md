@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Milestone 002 — Schema Uniqueness and Template Grammar Corrective
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/distribution-bootstrap/002-status.md`)
 
 Repository baseline: `889a234cbe7f461d92def3df45c83c06a7d257e5`
 

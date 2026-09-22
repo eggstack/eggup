@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Roadmap
 
-Status: active corrective; M001 schema closed, M002 schema-uniqueness corrective ready for handoff
+Status: M001-M002 closed; M003 validators dependency-ready for planning
 
 Long-term references:
 
@@ -128,6 +128,6 @@ At least two consumers derive or validate runtime and bootstrap asset policy fro
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
 | M001 | closed; post-closure findings feed M002 | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | `plans/closure/distribution-bootstrap/001-status.md` | — |
-| M002 | **ready for handoff** | `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md` | — | — |
-| M003 | planned / blocked | — | — | dist M002 corrective |
+| M002 | closed | `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md` | `plans/closure/distribution-bootstrap/002-status.md` | — |
+| M003 | dependency-ready; implementation plan needed | — | — | corrected schema M002 closed |
 | M004 | planned / blocked | — | — | dist M003 |
