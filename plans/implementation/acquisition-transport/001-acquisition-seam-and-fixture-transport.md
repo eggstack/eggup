@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 001 — Acquisition Seam and Deterministic Fixture Transport
 
-Status: ready for handoff (unblocked by core M005 closure)
+Status: implemented (closed; see `plans/closure/acquisition-transport/001-status.md`)
 
 Repository baseline for planning: `9f527beb20da585bc3cf56f45f1fd96fd418c124`
 

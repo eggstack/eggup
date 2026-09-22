@@ -47,6 +47,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "eggup-acquisition"
+version = "0.1.0"
+
+[[package]]
 name = "eggup-core"
 version = "0.1.0"
 dependencies = [

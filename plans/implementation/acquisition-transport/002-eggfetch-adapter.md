@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 002 — Eggfetch Adapter
 
-Status: blocked on acquisition-transport M001 closure
+Status: ready for handoff (unblocked by transport M001 closure)
 
 Repository baseline for planning: `9f527beb20da585bc3cf56f45f1fd96fd418c124`
 

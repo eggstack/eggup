@@ -1,0 +1,23 @@
+[package]
+name = "eggup-acquisition"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage = "https://github.com/eggstack/eggup"
+documentation = "https://docs.rs/eggup-acquisition"
+description = "Transport-neutral acquisition seam and deterministic fixture transport (no release policy, no execution)"
+readme = "README.md"
+authors = ["David Bowman"]
+keywords = ["update", "http", "fetch", "transport"]
+categories = ["network-programming"]
+exclude = [
+    "tests/",
+    "benches/",
+]
+
+[lints]
+workspace = true
+
+[dependencies]

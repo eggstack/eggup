@@ -41,7 +41,7 @@ The historical records remain valid evidence of what was implemented and tested 
 | Subsystem | Status | Next milestone |
 |---|---|---|
 | Verified update core | M005-M006 closed; qualified | broader consumer API qualification after first adoptions |
-| Acquisition transport | M001 ready | M001 seam + fixture transport |
+| Acquisition transport | M001 closed; M002 ready | M002 Eggfetch adapter |
 | Service lifecycle | M001 ready | M001 manager-neutral ownership |
 | Distribution/bootstrap | proposed / later phase | wait for first consumer evidence |
 | Consumer adoption | first two plans written / blocked | eggsact after transport M002 (core M006 closed) |
@@ -50,15 +50,14 @@ The historical records remain valid evidence of what was implemented and tested 
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Acquisition transport | M001 | **ready for handoff** | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | core M005 closed |
+| Acquisition transport | M002 | **ready for handoff** | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | transport M001 closed |
 | Service lifecycle | M001 | **ready for handoff** | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | core M005 closed |
 
 ## Planned but blocked implementation work
 
 | Subsystem | Milestone | Status | Plan | Blocker |
 |---|---|---|---|---|
-| Acquisition transport | M002 | blocked | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | transport M001 |
-| Consumer adoption | M001 eggsact | blocked | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | core M006 + transport M002 |
+| Consumer adoption | M001 eggsact | blocked | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | transport M002 (core M006 closed) |
 | Consumer adoption | M002 stegoeggo | blocked | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | adoption M001 |
 
 ## Core M005 corrective scope (closed)
@@ -129,13 +128,12 @@ These depend on evidence from the corrected core and first two consumers. Writin
 ## Current project state
 
 - Planning system: established.
-- Production Rust workspace: core M001-M006 implemented, verified (37/37 tests, stable + 1.89), and package-qualified (no publication).
+- Production Rust workspace: core M001-M006 + acquisition M001 implemented, verified (49 tests: 37 core + 12 acquisition, stable + 1.89), core package-qualified (no publication).
 - Hosted CI: lanes defined for stable, MSRV 1.89, macOS, and Windows-check; local verification green.
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Active work: acquisition M001, service M001 (both ready).
-- Transport Eggfetch adapter: blocked on acquisition M001.
+- Active work: acquisition M002, service M001 (both ready).
 - First consumer migrations: blocked on transport M002 (core M006 closed).
 
 ## Next handoff
