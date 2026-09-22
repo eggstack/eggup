@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: proposed; implementation blocked on verified-update-core M002 interface
+Status: active planning; implementation blocked on verified-update-core M005 corrective closure
 
 Long-term references:
 
@@ -75,7 +75,7 @@ A test adapter/local fixture path must exist so correctness never requires publi
 ## 6. Dependency graph
 
 ```text
-verified-update-core M002 interface
+verified-update-core M005 corrected public boundary
           |
           v
 M001 acquisition seam + deterministic test adapter
@@ -94,13 +94,19 @@ M002 eggup-eggfetch
 
 Class: infrastructure.
 
-Hard/interface dependency: stable M002 local-stage contract from verified-update-core.
+Hard dependency: verified-update-core M005 corrective closure.
 
-Exit: transport contract can write a staged artifact without knowing release policy.
+Plan: `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md`.
+
+Exit: transport contract can write an acquired artifact into the corrected staging boundary without knowing release policy.
 
 ### M002 — Eggfetch acquisition adapter
 
 Class: capability/infrastructure.
+
+Plan: `plans/implementation/acquisition-transport/002-eggfetch-adapter.md`.
+
+Hard dependency: M001 closure.
 
 Exit: strict HTTPS/redirect/proxy/timeout behavior is locally tested and dependency impact measured.
 
@@ -130,6 +136,6 @@ Two real consumers successfully acquire artifacts through the same adapter while
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 | blocked | — | — | core M002 |
-| M002 | planned | — | — | transport M001 |
+| M001 | blocked | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | — | core M005 |
+| M002 | blocked | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | — | transport M001 |
 | M003 | deferred/evidence-driven | — | — | real footprint evidence |
