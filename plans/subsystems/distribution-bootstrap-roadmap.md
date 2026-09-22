@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Roadmap
 
-Status: proposed; later-phase
+Status: active planning; M001 schema ready for handoff
 
 Long-term references:
 
@@ -57,7 +57,9 @@ It owns release-time schema/tooling, not release cadence or hosting.
 
 ## 4. Current state evidence
 
-Gregg already uses a machine-readable target table checked against runtime constants. Eggsearch, eggsact, stegoeggo, Egress, and CodeGG duplicate shell/PowerShell target mapping and checksum logic. CodeGG demonstrates a multi-runfile bundle installer; Egress demonstrates archive-based pair installation.
+The roadmap's first-consumer evidence gate is satisfied: eggsact and stegoeggo are live on the same Eggup 0.1.0 core/acquisition contracts without generic API changes.
+
+Gregg already uses a machine-readable target table checked against runtime constants. Eggsearch, eggsact, stegoeggo, Egress, and CodeGG duplicate shell/PowerShell target mapping and checksum logic. CodeGG demonstrates a multi-runfile bundle installer; Egress demonstrates archive-based pair installation. These provide the three concrete layout classes needed to define schema v1 without inventing a generic package language.
 
 ## 5. Target architecture
 
@@ -80,11 +82,19 @@ M003 generator/templates + two consumer adoptions
 
 ## 7. Milestones
 
-M001 defines the schema from real eggsearch/CodeGG/Egress layouts.
+### M001 — Versioned DistributionContract schema
 
-M002 validates target mapping, asset completeness, checksum names, archive members, and bootstrap fixtures.
+Plan: `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md`.
 
-M003 optionally generates installer bodies or checked fragments once validation proves the schema is sufficiently expressive.
+Define schema v1 from real simple, CodeGG bundle, and Egress archive/pair layouts. Parse and structurally validate target/alias, asset, checksum, and archive-member mappings. No network, extraction, or installer generation.
+
+### M002 — Release and installer conformance validators
+
+Validate target mapping, release asset completeness, checksum names, archive members, and bootstrap fixtures against the M001 contract.
+
+### M003 — Generator/templates and two consumer adoptions
+
+Optionally generate installer bodies or checked fragments once validation proves the schema is sufficiently expressive.
 
 ## 8. Cross-cutting requirements
 
@@ -106,6 +116,6 @@ At least two consumers derive or validate runtime and bootstrap asset policy fro
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 | planned | — | — | first consumer core adoptions |
+| M001 | **ready for handoff** | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | — | — |
 | M002 | planned | — | — | dist M001 |
 | M003 | planned | — | — | dist M002 |
