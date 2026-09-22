@@ -78,8 +78,7 @@ and expanded release/install filename namespaces reject exact and ASCII-case
 collisions. Distribution M003 validators are now dependency-ready for plan
 authoring. See `plans/closure/distribution-bootstrap/002-status.md`.
 
-Eggsearch and distribution validators are now dependency-ready for plan
-authoring. Gregg remains gated on corrected-path footprint evidence.
+Eggsearch M003, distribution M003 validators, and service M004 Windows SCM now have executable implementation plans. Gregg remains gated on corrected-path footprint evidence.
 
 ## Active subsystem roadmaps
 
@@ -87,19 +86,19 @@ authoring. Gregg remains gated on corrected-path footprint evidence.
 |---|---|---|
 | Verified update core | qualified 0.1.0 | broader bundle/platform evidence later |
 | Acquisition transport | corrected | M004 closed; optional M005 footprint evidence |
-| Service lifecycle | corrected | M003 closed; Windows SCM is next |
-| Distribution/bootstrap | corrected | M003 validators dependency-ready for plan authoring |
-| Consumer adoption | simple tier closed | eggsearch planning-ready; Gregg awaits footprint evidence |
+| Service lifecycle | corrected | M004 Windows SCM ready for handoff |
+| Distribution/bootstrap | corrected | M003 validators ready for handoff |
+| Consumer adoption | simple tier closed | eggsearch M003 ready for handoff; Gregg awaits footprint evidence |
 
 ## Dependency-ready implementation work
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Service lifecycle | M004 | dependency-ready / plan needed | — | service M003 closed |
-| Distribution/bootstrap | M003 | dependency-ready / plan needed | — | distribution M002 closed |
-| Consumer adoption | M003 | dependency-ready / plan needed | — | acquisition M004 + service M003 closed |
+| Service lifecycle | M004 | **ready for handoff** | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | service M003 closed |
+| Distribution/bootstrap | M003 | **ready for handoff** | `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md` | distribution M002 closed |
+| Consumer adoption | M003 | **ready for handoff** | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | acquisition M004 + service M003 closed |
 
-Distribution M003, service M004, and eggsearch M003 are dependency-ready for plan authoring.
+All three plans may execute in parallel. Eggsearch M003 deliberately excludes Windows SCM migration, so it does not race service M004.
 
 ## Planned / blocked work
 
@@ -107,9 +106,7 @@ Distribution M003, service M004, and eggsearch M003 are dependency-ready for pla
 |---|---|---|---|
 | Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
 | Service lifecycle | M005 update-lifecycle integration | blocked / plan intentionally unwritten | service M004 + corrected core |
-| Distribution/bootstrap | M003 validators | dependency-ready / plan needed | corrected schema M002 closed |
 | Distribution/bootstrap | M004 generators/adoptions | blocked / plan intentionally unwritten | distribution M003 |
-| Consumer adoption | M003 eggsearch | dependency-ready / plan needed | acquisition M004 + service M003 closed |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
 | Consumer adoption | M005 CodeGG | later / blocked | mature bundle core + distribution M003 evidence |
 | Consumer adoption | M006 Egress | later / blocked | archive contract + distribution M003 evidence |
@@ -119,47 +116,54 @@ Distribution M003, service M004, and eggsearch M003 are dependency-ready for pla
 ## Immediate execution graph
 
 ```text
-acquisition M004 corrective [closed] --+
-                                       +--> eggsearch M003 planning (after service M003)
-service M003 corrective [closed] --------+
-                 |
-                 +-------------------------> Gregg corrected-path measurement/planning
-                                            (plus footprint decision)
+acquisition M004 [closed] --+
+                            +--> eggsearch M003 [ready]
+service M003 [closed] ------+          |
+                                       +--> first service-aware adoption evidence
 
-distribution M002 corrective [closed] --> distribution M003 validator planning
-                                           |
-                                           +--> later CodeGG/Egress evidence
+service M003 [closed] ----------> service M004 Windows SCM [ready]
+                                      |
+                                      +--> service M005 orchestration planning
+
+distribution M002 [closed] -----> distribution M003 validators [ready]
+                                      |
+                                      +--> distribution M004 + stronger CodeGG/Egress evidence
+
+Gregg M004 remains separate: corrected Eggfetch footprint measurement -> adopt directly
+                                                            \-> acquisition M005 only if justified
 ```
 
-No new service-aware/updater-bearing consumer migration should begin until its relevant corrective gates close.
+The corrective gates are closed. The three linked implementation plans are now the authoritative handoffs; downstream work remains blocked until their closure evidence is reviewed.
 
 ## Current project state
 
 - Rust baseline: 1.89.
 - Core: verified multi-artifact transaction/ownership/rollback boundary remains qualified.
 - Acquisition: M004 validation/promotion corrective is closed; optional M005 still needs corrected-path footprint evidence.
-- Service: M003 Unix adapter corrective is closed; M004 Windows SCM can be planned, and eggsearch planning is unblocked.
-- Distribution: TOML v1 uniqueness/template corrective M002 is closed; M003 validators are ready for plan authoring.
-- Consumer adoption: eggsact/stegoeggo remain the only completed consumers.
+- Service: M003 Unix adapter corrective is closed; M004 Windows SCM is ready for handoff.
+- Distribution: corrected TOML v1 M002 is closed; M003 conformance validators are ready for handoff.
+- Consumer adoption: eggsact/stegoeggo remain completed; eggsearch M003 is ready as the first service-aware adoption.
 - Release process: manual crates.io publication only.
-- Previously planned 0.1.1 publication must wait until acquisition/service corrective disposition is known; never publish known-contract defects merely to preserve the old version plan.
+- The previously selected lockstep 0.1.1 patch is now eligible for separate qualification/publication when directed because the corrective gates are closed. Eggsearch M003 may use an immutable path/git source for local qualification until that release exists; no publication is implicit in these plans.
 
 ## Next handoff
 
-Ready now:
+Ready for implementation now:
 
-- Service M004 Windows SCM implementation-plan authoring.
-- Consumer M003 eggsearch adoption-plan authoring.
-- Distribution M003 validator plan authoring.
+- `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md`
+- `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md`
+- `plans/implementation/service-lifecycle/004-windows-scm-adapter.md`
 
-Acquisition M004, distribution M002, and service M003 are closed with closure
-records. After each future corrective:
+Planning baseline for this batch: `4495df6241b3fac9e396553727cf8d3d497ff3cd`.
+Eggsearch evidence baseline captured by its plan: `eggstack/eggsearch@30d597f6b9eadff20e5569a1034312004c248de8`.
 
-1. create the matching closure record with the actual implementation SHA;
+After each implementation pass:
+
+1. create the matching closure record with the actual implementation SHA(s);
 2. update the source subsystem roadmap;
 3. update this registry;
-4. keep downstream work blocked if any medium-or-higher issue remains;
-5. only then author the newly dependency-ready downstream plan.
+4. write a new corrective if any medium-or-higher issue remains;
+5. only then author newly dependency-ready downstream work.
 
 ## Registry update rule
 
