@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple-consumer tier closed, service-aware tier gated on acquisition M004 + service M003 correctives
+Status: active; simple tier closed, eggsearch adoption planning-ready, Gregg awaits footprint evidence
 
 Long-term references:
 
@@ -167,8 +167,8 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 |---|---|---|---|---|
 | M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
-| M003 eggsearch | blocked / plan intentionally unwritten | — | — | acquisition M004 + service M003 correctives |
-| M004 Gregg | blocked / plan intentionally unwritten | — | — | acquisition M004 + service M003 + corrected-path footprint decision |
+| M003 eggsearch | dependency-ready / plan needed | — | — | acquisition M004 + service M003 closed |
+| M004 Gregg | blocked / plan intentionally unwritten | — | — | corrected-path footprint decision |
 | M005 CodeGG | planned / blocked | — | — | mature multi-artifact core + distribution M003 validator evidence |
 | M006 Egress | planned / blocked | — | — | core/archive contract + distribution M003 validator evidence |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |

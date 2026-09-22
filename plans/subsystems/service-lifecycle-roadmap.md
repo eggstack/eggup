@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: active corrective; M001-M002 closed, M003 Unix-adapter corrective ready for handoff
+Status: M001-M003 closed; Windows SCM and lifecycle integration remain planned
 
 Long-term references:
 
@@ -144,6 +144,6 @@ At least two service-bearing consumers share the manager mechanics without losin
 |---|---|---|---|---|
 | M001 | closed | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | `plans/closure/service-lifecycle/001-status.md` | — |
 | M002 | closed; post-closure findings feed M003 | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
-| M003 | **ready for handoff** | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | — | — |
-| M004 | planned / blocked | — | — | service M003 corrective |
-| M005 | planned / blocked | — | — | service M003/M004 + corrected core |
+| M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
+| M004 | dependency-ready / plan needed | — | — | M003 closed |
+| M005 | planned / blocked | — | — | service M004 + corrected core |

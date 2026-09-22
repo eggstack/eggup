@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 003 — Unix Adapter Correctness and Execution Hardening Corrective
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/service-lifecycle/003-status.md`)
 
 Repository baseline: `889a234cbe7f461d92def3df45c83c06a7d257e5`
 
