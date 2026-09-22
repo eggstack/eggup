@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+- M002 Unix service adapters (`eggup-service` capability): `SystemdManager`,
+  `LaunchdManager`, and `CronManager` on the closed M001 contract with
+  bounded literal-argv command execution (no shell, kill/reap, output
+  bounds, fake executor), exact ownership (ambiguous outputs yield
+  `Unknown`, foreign never mutated), atomic definition writes, cron
+  byte-preservation, explicit privilege/scope handling (no sudo, no EUID
+  guessing), and host fact vs candidate-policy separation. No consumer
+  migrated; manager-specific types are new 0.1.x API. No publication
+  performed.
+
+- M001 distribution schema (new `eggup-dist` release-time crate, TOML v1):
+  versioned `DistributionContract` with direct/bundle/archive asset forms,
+  unambiguous target/alias mappings, small `{product}/{version}/{target}/
+  {alias}(/{asset} for sidecars)` template expansion, explicit SHA-256
+  sidecar naming (integrity only), and traversal-free archive member
+  validation. Fixtures prove simple, CodeGG-like bundle, and Egress-like
+  archive layouts. No runtime crate depends on `eggup-dist`; no network,
+  extraction, or installer generation. Serialization choice: TOML (readable
+  in review, clean for tagged `direct|bundle|archive` via explicit `kind`
+  tables). No publication performed.
+
+- M003 acquisition corrective (patch, no signature break): authoritative
+  `min(request, adapter ceiling)` effective timeouts via Eggfetch
+  request-level overrides; `FetchLimits::new` and adapter construction now
+  require `connect <= total`; exclusive owner-private (`0600` Unix)
+  temp siblings with bounded collision retry and no symlink following;
+  race-safe no-clobber artifact promotion (existing/raced `dest` fails
+  explicitly, never overwritten); owned-temp-only cleanup; category-only
+  transport diagnostics (no upstream/proxy error echo, userinfo/query/
+  fragment redaction). Eggsact (10s/120s) unchanged; stegoeggo total
+  tightens 120s -> 60s (request wins). Version decision: next release is
+  workspace lockstep 0.1.1 patch (acquisition + eggfetch fix, no API break);
+  publish order seam-then-adapter when directed. No publication performed.
+
 - Added the Rust 1.89 `eggup-core` workspace foundation and deterministic test
   fixture support.
 - Documented the transport-neutral ownership boundary. No production updater

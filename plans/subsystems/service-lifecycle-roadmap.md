@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: active; M001 closed, M002 Unix adapters ready for handoff
+Status: active; M001-M002 closed, M003 Windows SCM planning-ready
 
 Long-term references:
 
@@ -130,6 +130,6 @@ At least two service-bearing consumers share the manager mechanics without losin
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
 | M001 | closed | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | `plans/closure/service-lifecycle/001-status.md` | — |
-| M002 | **ready for handoff** | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | — | — |
-| M003 | planned | — | — | service M001; detailed plan waits for M002 evidence |
+| M002 | closed | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
+| M003 | planned (planning-ready) | — | — | service M002 closed; detailed plan may now be authored |
 | M004 | planned | — | — | service M002/M003 + corrected core |

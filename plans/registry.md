@@ -23,13 +23,14 @@ This file is the compact control surface for active Eggup planning. Detailed req
 | `plans/adrs/ADR-0002-multi-artifact-transaction-and-rollback.md` | ArtifactSet is the mutation unit; rollback and post-commit policy are explicit |
 | `plans/adrs/ADR-0003-verification-layers-and-transport-neutrality.md` | integrity/authenticity/candidate identity are distinct; core has no mandatory transport |
 
-## Recently closed foundation
+## Recently closed work (this wave)
 
 | Workstream | Closed work | Evidence |
 |---|---|---|
 | Verified update core | M001-M006 | `plans/closure/verified-update-core/` |
-| Acquisition transport | M001-M002 | `plans/closure/acquisition-transport/` |
-| Service lifecycle | M001 manager-neutral contract | `plans/closure/service-lifecycle/001-status.md` |
+| Acquisition transport | M001-M002 plus M003 corrective | `plans/closure/acquisition-transport/` |
+| Service lifecycle | M001 contract plus M002 Unix adapters | `plans/closure/service-lifecycle/` |
+| Distribution/bootstrap | M001 schema | `plans/closure/distribution-bootstrap/001-status.md` |
 | Consumer adoption | M001 eggsact + M002 stegoeggo | `plans/closure/consumer-adoption/` |
 
 Published 0.1.0 crates:
@@ -38,6 +39,10 @@ Published 0.1.0 crates:
 - `eggup-core`
 - `eggup-eggfetch`
 - `eggup-service`
+
+New (unpublished) workspace crate:
+
+- `eggup-dist` (release-time tooling; never a runtime dependency)
 
 Two independent consumers are live on the shared simple-update path without an Eggup API fork:
 
@@ -48,88 +53,76 @@ Two independent consumers are live on the shared simple-update path without an E
 
 The 0.1.0 core safety corrective remains closed with no known medium-or-higher core defect.
 
-Acquisition post-adoption review identified a new corrective gate:
+Acquisition M003 corrective is closed with no medium-or-higher issue remaining:
 
-- per-request `FetchLimits` timeout values are not currently authoritative in the Eggfetch adapter;
-- artifact temp files are generated but not exclusively created;
-- artifact promotion relies on platform rename behavior when the destination already exists/races in;
-- upstream transport/proxy error detail requires an explicit credential-redaction audit.
+- effective `min(request, adapter ceiling)` timeouts via Eggfetch request overrides;
+- exclusive owner-private temp files with no-clobber promotion;
+- category-only diagnostics (no upstream/proxy secret echo).
 
-These are tracked by acquisition M003 and gate additional updater-bearing consumer migrations.
+Eggsact (25 updater tests) and stegoeggo (33 updater tests) stay green against the corrective. The broader updater-bearing migration gate is lifted (service/distribution gates still apply per plan).
 
 ## Active subsystem roadmaps
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
 | Verified update core | qualified 0.1.0 | broader bundle/platform evidence later |
-| Acquisition transport | active corrective | M003 contract/temp-file hardening |
-| Service lifecycle | active | M002 Unix manager adapters |
-| Distribution/bootstrap | active planning | M001 versioned DistributionContract schema |
-| Consumer adoption | simple tier closed | eggsearch/Gregg after shared-layer gates |
+| Acquisition transport | M001-M003 closed | optional M004 lightweight (evidence-driven) |
+| Service lifecycle | M001-M002 closed | M003 Windows SCM (planning-ready) |
+| Distribution/bootstrap | M001 closed | M002 validators (planning-ready) |
+| Consumer adoption | simple tier closed | eggsearch M003 planning-ready; Gregg measurement-ready |
 
 ## Dependency-ready implementation work
 
-| Subsystem | Milestone | Status | Plan | Dependencies |
-|---|---|---|---|---|
-| Acquisition transport | M003 | **ready for handoff — primary gate** | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | M001-M002 closed |
-| Service lifecycle | M002 | **ready for handoff** | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | service M001 closed |
-| Distribution/bootstrap | M001 | **ready for handoff** | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | first-consumer evidence satisfied |
+No ready-for-handoff implementation plan remains from this wave; all three are closed (see above). Newly planning-ready work (plans intentionally unwritten until this evidence) is tracked below and may now be authored — but no downstream plan is authored in this pass.
 
-Service M002 and distribution M001 may run in parallel with acquisition M003. Additional updater-bearing consumer migration must wait for acquisition M003 closure.
-
-## Planned but blocked / intentionally unwritten work
+## Planned / newly unblocked work
 
 | Subsystem | Milestone | State | Blocker / planning rule |
 |---|---|---|---|
-| Acquisition transport | M004 lightweight/curl adapter | deferred/evidence-driven | remeasure corrected Eggfetch path, especially Gregg |
-| Service lifecycle | M003 Windows SCM | plan intentionally unwritten | use M002 adapter evidence before freezing platform surface |
-| Service lifecycle | M004 update-lifecycle integration | plan intentionally unwritten | service M002/M003 + core |
-| Distribution/bootstrap | M002 validators | plan intentionally unwritten | distribution M001 schema closure |
+| Acquisition transport | M004 lightweight/curl adapter | deferred/evidence-driven | remeasure corrected Eggfetch path, especially Gregg (gate lifted; measurement may proceed) |
+| Service lifecycle | M003 Windows SCM | planning-ready (unblocked by M002) | detailed plan may now be authored; do not freeze surface without M002 evidence review |
+| Service lifecycle | M004 update-lifecycle integration | plan intentionally unwritten | service M003 + core (M002 closed) |
+| Distribution/bootstrap | M002 validators | planning-ready (unblocked by M001) | detailed plan may now be authored against stable v1 |
 | Distribution/bootstrap | M003 generators/adoptions | plan intentionally unwritten | distribution M002 |
-| Consumer adoption | M003 eggsearch | blocked / unwritten | acquisition M003 + service M002 |
-| Consumer adoption | M004 Gregg | blocked / unwritten | acquisition M003 + corrected-path footprint decision |
-| Consumer adoption | M005 CodeGG | later | mature bundle + distribution evidence |
-| Consumer adoption | M006 Egress | later | archive/distribution contract evidence |
+| Consumer adoption | M003 eggsearch | planning-ready (gates lifted: acquisition M003 + service M002 closed) | detailed plan may now be authored; no migration begins without its own plan/closure |
+| Consumer adoption | M004 Gregg | measurement-ready (acquisition gate lifted) | corrected-path footprint decision still required before planning |
+| Consumer adoption | M005 CodeGG | later | mature bundle + distribution M002 evidence |
+| Consumer adoption | M006 Egress | later | archive/distribution M002 evidence |
 | Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
 | Authenticity/signatures | future | ADR required | trust standard not selected |
 
 ## Immediate execution graph
 
 ```text
-                         +--> service M002 Unix adapters --------+
-                         |                                       |
-acquisition M003 --------+--> broader consumer migration gate    +--> eggsearch M003 planning
-(primary corrective)     |                                       |
-                         +--> Gregg corrected-path measurement ---+--> Gregg M004 planning
-                         
-distribution M001 schema --> distribution M002 planning
-                         --> later CodeGG/Egress contract evidence
-```
+acquisition M003 (closed) --+
+                            +--> eggsearch M003 planning (now allowed)
+service M002 (closed) ------+
+                            +--> Gregg corrected-path measurement (now allowed)
 
-The three current plans are independent enough to execute concurrently, but acquisition M003 remains the safety gate for any new updater-bearing consumer adoption.
+distribution M001 (closed) --> distribution M002 planning (now allowed)
+                           --> later CodeGG/Egress contract evidence
+```
 
 ## Current project state
 
 - Rust baseline: 1.89.
-- Workspace crates: four published 0.1.0 crates listed above.
+- Workspace crates: four published 0.1.0 crates listed above plus new unpublished `eggup-dist`.
 - Hosted CI at implementation baseline `8f6ce48`: stable checks, MSRV 1.89, macOS tests, and Windows check all passed.
 - Core: verified multi-artifact transaction, ownership proof, staged digest revalidation, rollback/recovery receipts.
-- Acquisition: published and proven by two consumers; M003 corrective pending.
-- Service: manager-neutral contract published; real Unix adapters pending.
-- Distribution: no crate yet; M001 schema is now evidence-ready.
-- Consumer adoption: eggsact/stegoeggo closed; no second-tier migration should begin before the relevant gates close.
-- Release process: manual crates.io publication only.
+- Acquisition: M003 corrective closed; eggsact/stegoeggo green; no medium-or-higher issue.
+- Service: M002 Unix adapters closed; M001 contract intact; no consumer migrated.
+- Distribution: M001 schema closed (TOML v1); no runtime depends on `eggup-dist`.
+- Consumer adoption: eggsact/stegoeggo closed; eggsearch/Gregg planning gates lifted (no migration started).
+- Release process: manual crates.io publication only. Version decision: next release is workspace lockstep 0.1.1 patch when directed (seam-then-adapter order). No publication performed.
 
 ## Next handoff
 
-Primary:
+Downstream planning now allowed (no implementation plan authored in this pass):
 
-`plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md`
-
-Safe parallel handoffs:
-
-- `plans/implementation/service-lifecycle/002-unix-manager-adapters.md`
-- `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md`
+- `Distribution M002 validators` (against stable v1 schema);
+- `Service M003 Windows SCM` (against M002 adapter evidence);
+- `Consumer eggsearch M003` planning (gates lifted);
+- Gregg corrected-path footprint remeasurement (evidence for M004 decision).
 
 After each implementation pass:
 

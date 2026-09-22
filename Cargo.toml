@@ -5,6 +5,7 @@ members = [
     "crates/eggup-acquisition",
     "crates/eggup-eggfetch",
     "crates/eggup-service",
+    "crates/eggup-dist",
 ]
 
 [workspace.package]

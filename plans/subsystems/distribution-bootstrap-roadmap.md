@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Roadmap
 
-Status: active planning; M001 schema ready for handoff
+Status: active; M001 schema closed, M002 validators planning-ready
 
 Long-term references:
 
@@ -116,6 +116,6 @@ At least two consumers derive or validate runtime and bootstrap asset policy fro
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 | **ready for handoff** | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | — | — |
-| M002 | planned | — | — | dist M001 |
+| M001 | closed | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | `plans/closure/distribution-bootstrap/001-status.md` | — |
+| M002 | planned (planning-ready) | — | — | dist M001 closed |
 | M003 | planned | — | — | dist M002 |

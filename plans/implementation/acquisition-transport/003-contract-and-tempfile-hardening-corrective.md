@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 003 — Contract and Temporary-File Hardening Corrective
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/acquisition-transport/003-status.md`)
 
 Repository baseline: `8f6ce48cda5bdeb593939077bcca452cdd5f2800`
 

@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 002 — Unix Manager Adapters
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/service-lifecycle/002-status.md`)
 
 Repository baseline: `8f6ce48cda5bdeb593939077bcca452cdd5f2800`
 

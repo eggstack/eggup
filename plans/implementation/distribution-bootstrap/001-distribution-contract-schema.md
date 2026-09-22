@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Milestone 001 — Versioned DistributionContract Schema
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/distribution-bootstrap/001-status.md`)
 
 Repository baseline: `8f6ce48cda5bdeb593939077bcca452cdd5f2800`
 

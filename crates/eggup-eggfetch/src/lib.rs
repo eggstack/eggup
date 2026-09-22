@@ -86,7 +86,13 @@ impl EggfetchConfig {
         self
     }
 
-    /// Sets connect/total timeouts.
+    /// Sets connect/total adapter ceilings.
+    ///
+    /// These are ceilings, not defaults: the effective deadline for one fetch
+    /// is `min(request, adapter ceiling)` (see [`FetchLimits::effective`]).
+    /// A stricter adapter tightens a deadline; it never extends one.
+    /// Invalid values (zero or `connect > total`) fail closed in
+    /// [`EggfetchTransport::strict`].
     pub fn timeouts(mut self, connect: Duration, total: Duration) -> Self {
         self.connect_timeout = connect;
         self.total_timeout = total;
@@ -105,6 +111,15 @@ impl EggfetchConfig {
         self
     }
 
+    /// Derives the authoritative effective deadlines for one fetch.
+    ///
+    /// A stricter adapter ceiling wins; the adapter never extends a caller
+    /// deadline. Both metadata and artifact operations use this derivation,
+    /// and the effective total covers headers plus body streaming.
+    pub fn effective_timeouts(&self, limits: FetchLimits) -> (Duration, Duration) {
+        limits.effective(self.connect_timeout, self.total_timeout)
+    }
+
     fn timeout(&self) -> Timeout {
         Timeout::builder()
             .connect(self.connect_timeout)
@@ -112,15 +127,41 @@ impl EggfetchConfig {
             .build()
     }
 
+    fn effective_request_timeout(&self, limits: FetchLimits) -> Timeout {
+        let (connect, total) = self.effective_timeouts(limits);
+        Timeout::builder().connect(connect).total(total).build()
+    }
+
+    fn validate_timeouts(&self) -> Result<(), AcquisitionError> {
+        if self.connect_timeout.is_zero() || self.total_timeout.is_zero() {
+            return Err(AcquisitionError::InvalidInput(bound(
+                "adapter timeouts must be positive".to_string(),
+            )));
+        }
+        if self.connect_timeout > self.total_timeout {
+            return Err(AcquisitionError::InvalidInput(bound(
+                "adapter connect timeout must not exceed total timeout".to_string(),
+            )));
+        }
+        Ok(())
+    }
+
     fn redirect_policy(&self) -> RedirectPolicy {
         RedirectPolicy::strict(self.max_redirects)
     }
 
     fn build_client(&self) -> Result<Client, AcquisitionError> {
+        self.validate_timeouts()?;
         let env = self
             .proxy
             .environment()
-            .map_err(|e| AcquisitionError::Transport(bound(e)))?;
+            // ProxyEnvironment construction is infallible for our decisions;
+            // never echo environment content on failure.
+            .map_err(|_| {
+                AcquisitionError::Transport(bound(
+                    "proxy configuration/routing failure".to_string(),
+                ))
+            })?;
         let builder = Client::builder()
             .user_agent(&self.user_agent)
             .http_version_policy(HttpVersionPolicy::Http1Only)
@@ -130,10 +171,12 @@ impl EggfetchConfig {
         builder
             .proxy_environment(&env)
             .map(|b| b.build())
-            .map_err(|e| {
-                AcquisitionError::Transport(bound(format!(
-                    "proxy configuration/routing failure: {e}"
-                )))
+            .map_err(|_| {
+                // Never embed upstream proxy error display: it may contain
+                // proxy URLs with credentials. Use category-only diagnostics.
+                AcquisitionError::Transport(bound(
+                    "proxy configuration/routing failure".to_string(),
+                ))
             })
     }
 }
@@ -194,13 +237,18 @@ impl AcquisitionTransport for EggfetchTransport {
             return Err(AcquisitionError::Cancelled);
         }
         // Per-fetch byte bound is authoritative; Content-Length is advisory only.
+        // Effective time bounds are min(request, adapter ceiling) and enforced
+        // via a real Eggfetch request-level timeout override, never a
+        // post-hoc elapsed check.
         let max = limits.max_metadata_bytes;
         let url = request.url().to_string();
+        let effective = self.config.effective_request_timeout(limits);
         let result = self.block_on(async {
             let mut response = self
                 .client
                 .get(&url)
                 .map_err(|e| map_request_error(&e, request))?
+                .timeout(effective)
                 .max_decoded_body_size(max)
                 .send()
                 .await
@@ -261,9 +309,19 @@ impl AcquisitionTransport for EggfetchTransport {
                 "artifact parent must be an existing real directory".into(),
             )));
         }
+        // Fast-fail when the destination already exists. The race-safe
+        // guarantee comes from `__promote_no_clobber` after streaming.
+        if fs::symlink_metadata(dest).is_ok() {
+            return Err(AcquisitionError::InvalidInput(bound(
+                "artifact destination already exists; refusing to overwrite".into(),
+            )));
+        }
         let url = request.url().to_string();
         let max_artifact = limits.max_artifact_bytes;
         let redacted = request.redacted();
+        let effective = self.config.effective_request_timeout(limits);
+        let parent_owned = parent.to_path_buf();
+        let dest_owned = dest.to_path_buf();
         let result: Result<FetchOutcome<ArtifactEvidence>, AcquisitionError> =
             self.block_on(async {
                 use futures_util::StreamExt;
@@ -272,6 +330,7 @@ impl AcquisitionTransport for EggfetchTransport {
                     .client
                     .get(&url)
                     .map_err(|e| map_request_error(&e, request))?
+                    .timeout(effective)
                     .send()
                     .await
                     .map_err(|e| map_fetch_error(&e, request, None))?;
@@ -285,30 +344,27 @@ impl AcquisitionTransport for EggfetchTransport {
                     }
                     StatusClass::Success => {}
                 }
-                // Atomic promotion via temp sibling; cleaned on any failure.
-                let tmp = parent.join(format!(
-                    ".eggup-eggfetch-{}-{}.part",
-                    std::process::id(),
-                    nanos()
-                ));
-                struct Guard<'a> {
-                    path: &'a Path,
+                // Exclusive owner-private temp plus race-safe no-clobber
+                // promotion. The temp lives in the exact destination parent
+                // so promotion stays on the same filesystem.
+                let (std_file, tmp) =
+                    eggup_acquisition::__acquire_exclusive_temp(&parent_owned, "eggup-eggfetch")?;
+                struct Guard {
+                    path: std::path::PathBuf,
                     disarm: bool,
                 }
-                impl Drop for Guard<'_> {
+                impl Drop for Guard {
                     fn drop(&mut self) {
                         if !self.disarm {
-                            let _ = fs::remove_file(self.path);
+                            eggup_acquisition::__remove_owned_temp(&self.path);
                         }
                     }
                 }
                 let mut guard = Guard {
-                    path: &tmp,
+                    path: tmp.clone(),
                     disarm: false,
                 };
-                let mut file = tokio::fs::File::create(&tmp)
-                    .await
-                    .map_err(|e| AcquisitionError::Io(bound(format!("creating part file: {e}"))))?;
+                let mut file = tokio::fs::File::from_std(std_file);
                 let mut stream = response
                     .bytes_stream()
                     .map_err(|e| map_fetch_error(&e, request, None))?;
@@ -337,22 +393,25 @@ impl AcquisitionTransport for EggfetchTransport {
                     .await
                     .map_err(|e| AcquisitionError::Io(bound(format!("flushing part file: {e}"))))?;
                 drop(file);
-                fs::rename(&tmp, dest)
-                    .map_err(|e| AcquisitionError::Io(bound(format!("promoting artifact: {e}"))))?;
-                guard.disarm = true;
-                Ok(FetchOutcome::Success(
-                    eggup_acquisition::__adapter_artifact(written),
-                ))
+                if cancel.is_cancelled() {
+                    return Err(AcquisitionError::Cancelled);
+                }
+                match eggup_acquisition::__promote_no_clobber(&tmp, &dest_owned) {
+                    Ok(()) => {
+                        guard.disarm = true;
+                        Ok(FetchOutcome::Success(
+                            eggup_acquisition::__adapter_artifact(written),
+                        ))
+                    }
+                    Err(e) => {
+                        eggup_acquisition::__remove_owned_temp(&tmp);
+                        guard.disarm = true;
+                        Err(e)
+                    }
+                }
             });
         result
     }
-}
-
-fn nanos() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0)
 }
 
 fn bound(s: String) -> String {
@@ -381,12 +440,22 @@ fn classify(status: u16) -> StatusClass {
 fn map_request_error(e: &eggfetch_core::Error, request: &AcquisitionRequest) -> AcquisitionError {
     use eggfetch_core::Error as E;
     match e {
-        E::InvalidProxyUrl(detail) => AcquisitionError::Transport(bound(format!(
-            "proxy configuration/routing failure: {detail}"
-        ))),
+        // Never embed upstream proxy/detail display: it may contain proxy
+        // URLs with credentials. Use category-only diagnostics.
+        E::InvalidProxyUrl(_) => {
+            AcquisitionError::Transport(bound("proxy configuration/routing failure".to_string()))
+        }
+        E::Timeout { phase, .. } => AcquisitionError::Timeout {
+            phase: match phase {
+                eggfetch_core::TimeoutPhase::Connect => "connect",
+                eggfetch_core::TimeoutPhase::Total => "total",
+                _ => "total",
+            },
+        },
         _ => AcquisitionError::Transport(bound(format!(
-            "request build failed for {}: {e}",
-            request.redacted()
+            "request build failed for {}: {}",
+            request.redacted(),
+            e.kind()
         ))),
     }
 }
@@ -408,17 +477,19 @@ fn map_fetch_error(
                 _ => "total",
             },
         },
-        E::InvalidProxyUrl(detail) => AcquisitionError::Transport(bound(format!(
-            "proxy configuration/routing failure: {detail}"
-        ))),
-        _ => {
-            let msg = format!("{e}");
-            // Never leak credential material: only the redacted URL is embedded.
-            AcquisitionError::Transport(bound(format!(
-                "fetch failed for {}: {msg}",
-                request.redacted()
-            )))
+        // TransportIoTimeout is an inactivity timeout on an established
+        // connection; classify as Timeout so caller deadlines stay truthful.
+        E::TransportIoTimeout { .. } => AcquisitionError::Timeout { phase: "total" },
+        // Never embed upstream error display or proxy detail: it may contain
+        // credential-bearing URLs. Use structured category text only.
+        E::InvalidProxyUrl(_) => {
+            AcquisitionError::Transport(bound("proxy configuration/routing failure".to_string()))
         }
+        _ => AcquisitionError::Transport(bound(format!(
+            "fetch failed for {}: {}",
+            request.redacted(),
+            e.kind()
+        ))),
     }
 }
 
@@ -767,5 +838,294 @@ mod tests {
             )
             .unwrap();
         assert!(out.is_not_found());
+    }
+
+    // ---- M003 corrective: authoritative effective timeouts ----
+
+    fn request_limits(connect: Duration, total: Duration) -> FetchLimits {
+        FetchLimits {
+            max_metadata_bytes: 64 * 1024,
+            max_artifact_bytes: Some(256 * 1024),
+            connect_timeout: connect,
+            total_timeout: total,
+        }
+    }
+
+    #[test]
+    fn request_stricter_than_adapter_wins() {
+        // Adapter allows 5 s; request allows 50 ms. The request bound must win
+        // via a real Eggfetch per-request override, not a post-hoc check.
+        let body = b"too-late".to_vec();
+        let base = serve_once(
+            200,
+            vec![("Content-Length".into(), body.len().to_string())],
+            body,
+            false,
+            3000,
+            false,
+        );
+        let cfg = EggfetchConfig::strict().timeouts(Duration::from_secs(5), Duration::from_secs(5));
+        let t = EggfetchTransport::strict(cfg).unwrap();
+        let err = t
+            .fetch_metadata(
+                &req(&format!("{base}/slow")),
+                request_limits(Duration::from_millis(50), Duration::from_millis(50)),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(
+            matches!(err, AcquisitionError::Timeout { .. }),
+            "request-stricter must time out, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn adapter_stricter_than_request_wins() {
+        // Request allows 5 s; adapter allows 50 ms. The adapter ceiling must
+        // win, proving min(request, adapter) enforcement in both directions.
+        let body = b"too-late".to_vec();
+        let base = serve_once(
+            200,
+            vec![("Content-Length".into(), body.len().to_string())],
+            body,
+            false,
+            3000,
+            false,
+        );
+        let cfg =
+            EggfetchConfig::strict().timeouts(Duration::from_millis(50), Duration::from_millis(50));
+        let t = EggfetchTransport::strict(cfg).unwrap();
+        let err = t
+            .fetch_metadata(
+                &req(&format!("{base}/slow")),
+                request_limits(Duration::from_secs(5), Duration::from_secs(5)),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(
+            matches!(err, AcquisitionError::Timeout { .. }),
+            "adapter-stricter must time out, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn connect_exceeding_total_is_rejected_in_both_layers() {
+        // Seam layer.
+        assert!(FetchLimits::new(
+            1024,
+            Some(1024),
+            Duration::from_secs(5),
+            Duration::from_secs(1),
+        )
+        .is_err());
+        // Adapter layer fails closed at construction.
+        let cfg = EggfetchConfig::strict().timeouts(Duration::from_secs(5), Duration::from_secs(1));
+        assert!(EggfetchTransport::strict(cfg).is_err());
+        // Zero deadlines also fail closed.
+        let zero = EggfetchConfig::strict().timeouts(Duration::ZERO, Duration::from_secs(1));
+        assert!(EggfetchTransport::strict(zero).is_err());
+    }
+
+    #[test]
+    fn metadata_body_stall_times_out_without_fallback() {
+        let body = b"stalled-metadata".to_vec();
+        let base = serve_once(
+            200,
+            vec![("Content-Length".into(), body.len().to_string())],
+            body,
+            false,
+            2000,
+            false,
+        );
+        let t = strict_transport();
+        let err = t
+            .fetch_metadata(
+                &req(&format!("{base}/stall")),
+                request_limits(Duration::from_millis(300), Duration::from_millis(300)),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(err, AcquisitionError::Timeout { .. }));
+    }
+
+    /// Server that sends headers + partial body, then stalls past the deadline.
+    fn serve_partial_then_stall(partial: Vec<u8>, total_len: usize, stall_ms: u64) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().unwrap();
+        thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+                stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+                let mut buf = [0u8; 8192];
+                let _ = stream.read(&mut buf);
+                let head = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {total_len}\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n"
+                );
+                let _ = stream.write_all(head.as_bytes());
+                let _ = stream.write_all(&partial);
+                thread::sleep(Duration::from_millis(stall_ms));
+                // Close without sending the remainder: client must time out,
+                // not promote a partial artifact.
+            }
+        });
+        format!("http://{addr}")
+    }
+
+    #[test]
+    fn artifact_body_stall_after_partial_data_times_out() {
+        let partial = vec![7u8; 1024];
+        let base = serve_partial_then_stall(partial, 8192, 3000);
+        let t = strict_transport();
+        let dir = temp_dir("eggfetch-artifact-stall");
+        let dest = dir.join("app");
+        let err = t
+            .fetch_artifact(
+                &req(&format!("{base}/app")),
+                &dest,
+                request_limits(Duration::from_millis(300), Duration::from_millis(300)),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(
+            matches!(err, AcquisitionError::Timeout { .. }),
+            "artifact stall must be Timeout, got {err:?}"
+        );
+        assert!(!dest.exists(), "partial artifact must not promote");
+        let leftovers: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".part"))
+            .collect();
+        assert!(leftovers.is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn timeout_never_becomes_not_found() {
+        let body = b"late".to_vec();
+        let base = serve_once(
+            200,
+            vec![("Content-Length".into(), body.len().to_string())],
+            body,
+            false,
+            2000,
+            false,
+        );
+        let t = strict_transport();
+        let err = t
+            .fetch_metadata(
+                &req(&format!("{base}/x")),
+                request_limits(Duration::from_millis(100), Duration::from_millis(100)),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(err, AcquisitionError::Timeout { .. }));
+        assert!(!matches!(err, AcquisitionError::InvalidInput(_)));
+    }
+
+    // ---- M003 corrective: exclusive temp + no-clobber ----
+
+    #[test]
+    fn artifact_refuses_existing_destination_without_overwrite() {
+        let body: Vec<u8> = (0..256).map(|i| i as u8).collect();
+        let base = ok_server(body);
+        let t = strict_transport();
+        let dir = temp_dir("eggfetch-noclobber");
+        let dest = dir.join("app");
+        fs::write(&dest, b"FOREIGN-EGGFETCH").unwrap();
+        let err = t
+            .fetch_artifact(
+                &req(&format!("{base}/app")),
+                &dest,
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            AcquisitionError::InvalidInput(_) | AcquisitionError::Io(_)
+        ));
+        assert_eq!(fs::read(&dest).unwrap(), b"FOREIGN-EGGFETCH");
+        let leftovers: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".part"))
+            .collect();
+        assert!(leftovers.is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exclusive_temp_helper_is_owner_private_for_eggfetch_prefix() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = temp_dir("eggfetch-mode");
+        let (f, tmp) = eggup_acquisition::__acquire_exclusive_temp(&dir, "eggup-eggfetch").unwrap();
+        let mode = f.metadata().unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        drop(f);
+        eggup_acquisition::__remove_owned_temp(&tmp);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // ---- M003 corrective: redaction ----
+
+    #[test]
+    fn error_diagnostics_never_expose_credential_sentinels() {
+        let userinfo = "S3CR3T-USERINFO-8841";
+        let query = "TOKEN-QUERY-7734";
+        let proxy_pw = "HUNTER2-PROXY-9902";
+        // Request URL with sentinels: any error must embed only the redacted URL.
+        let url = format!("https://alice:{userinfo}@127.0.0.1:9/app?token={query}");
+        let t = strict_transport();
+        // Unroutable port gives a fast transport failure without network wait.
+        // Use a short deadline so the test stays fast even if it dials.
+        let err = t
+            .fetch_metadata(
+                &req(&url),
+                request_limits(Duration::from_millis(300), Duration::from_millis(300)),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        let msg = format!("{err}");
+        let dbg = format!("{err:?}");
+        assert!(!msg.contains(userinfo), "userinfo leaked: {msg}");
+        assert!(!msg.contains(query), "query leaked: {msg}");
+        assert!(!dbg.contains(userinfo));
+        assert!(!dbg.contains(query));
+        // Upstream error strings must map to category-only text.
+        let fake = eggfetch_core::Error::InvalidProxyUrl(format!(
+            "http://proxy:{proxy_pw}@example.com:8080"
+        ));
+        assert!(fake.to_string().contains(proxy_pw));
+        // Our mapper must not echo that detail.
+        let req2 = req("https://example.com/x");
+        let mapped = super::map_fetch_error(&fake, &req2, None);
+        let mapped_msg = format!("{mapped}");
+        assert!(
+            !mapped_msg.contains(proxy_pw),
+            "proxy pw leaked: {mapped_msg}"
+        );
+        // Invalid proxy construction also stays generic.
+        let bad_cfg = EggfetchConfig::strict().proxy(ProxyDecision::Custom(vec![(
+            "HTTPS_PROXY".into(),
+            format!("http://user:{proxy_pw}@example.com:8080"),
+        )]));
+        // Either construction fails closed with a generic message, or a later
+        // fetch fails without echoing the password. Both are acceptable as
+        // long as the password never appears.
+        if let Err(e) = EggfetchTransport::strict(bad_cfg) {
+            assert!(!format!("{e}").contains(proxy_pw));
+        }
+    }
+
+    #[test]
+    fn effective_formula_is_minimum_per_phase() {
+        let cfg =
+            EggfetchConfig::strict().timeouts(Duration::from_secs(1), Duration::from_secs(10));
+        let req_limits = request_limits(Duration::from_secs(5), Duration::from_secs(5));
+        let (c, t) = cfg.effective_timeouts(req_limits);
+        assert_eq!(c, Duration::from_secs(1));
+        assert_eq!(t, Duration::from_secs(5));
     }
 }
