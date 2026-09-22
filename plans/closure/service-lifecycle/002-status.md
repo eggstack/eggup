@@ -10,7 +10,7 @@ Reviewed repository baseline: `8f6ce48cda5bdeb593939077bcca452cdd5f2800` (plan b
 
 ## Implementation commits/PRs
 
-- M002 service commit (this pass): `feat: add Unix manager adapters (M002)` (pending SHA; see git log)
+- M002 implementation landed in aggregate implementation commit `889a234cbe7f461d92def3df45c83c06a7d257e5` (`feat: close acquisition M003, distribution M001, service M002 with verification`).
 - Prior: `892d6cc` (`planning: register post-adoption implementation wave`)
 - No PR was required for this local implementation pass. No publication was performed. No consumer migrated.
 
@@ -239,3 +239,14 @@ caller-owned privilege violation, and no substantial M001 break.
 - Service M002 → closed.
 - Service M003 → planning-ready (detailed plan waits for this M002 evidence; may now be authored).
 - eggsearch service portion → dependency-ready (migration still out of scope).
+
+## Post-closure review addendum
+
+A subsequent source review of implementation SHA `889a234cbe7f461d92def3df45c83c06a7d257e5` identified four gaps outside the original happy-path closure coverage:
+
+- launchd restart can return `completed=true` after an incomplete stop/start result;
+- caller transition timeouts are not consistently enforced as one end-to-end wall-clock budget;
+- production manager execution relies on bare program names/ambient PATH and inherits the full parent environment;
+- systemd/launchd observations do not faithfully represent a non-`None` `ServiceSpec.config` identity.
+
+The historical M002 evidence remains useful, but service-bearing consumer adoption and Windows/shared-executor expansion are re-blocked on `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md`.
