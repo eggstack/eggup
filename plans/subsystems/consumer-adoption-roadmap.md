@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: proposed; depends on core and transport milestones
+Status: active planning; first adoption blocked on corrected core qualification and Eggfetch adapter
 
 Long-term references:
 
@@ -75,7 +75,7 @@ Each consumer contains only a thin adapter translating its release policy into E
 ## 6. Dependency graph
 
 ```text
-core M003 + M004 + transport M002
+core M005 corrective + M006 qualification + transport M002
             |
             +--> M001 eggsact
             |
@@ -103,9 +103,17 @@ M007 EggPool selective adoption is independent/evidence-driven after core maturi
 
 ### M001 — eggsact adoption
 
+Plan: `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md`.
+
+Hard dependencies: verified-update-core M006 and acquisition-transport M002.
+
 Delete local generic updater mechanics in favor of Eggup core + Eggfetch while retaining eggsact release/fallback policy.
 
 ### M002 — stegoeggo adoption
+
+Plan: `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md`.
+
+Hard dependency: M001 eggsact adoption closure.
 
 Second independent single-binary consumer; use it to identify accidental eggsact assumptions.
 
@@ -149,8 +157,8 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 eggsact | blocked | — | — | core M003/M004, transport M002 |
-| M002 stegoeggo | blocked | — | — | core M003/M004, transport M002 |
+| M001 eggsact | blocked | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | — | core M006, transport M002 |
+| M002 stegoeggo | blocked | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | — | adoption M001 |
 | M003 eggsearch | planned | — | — | first adoptions, service roadmap |
 | M004 Gregg | planned | — | — | first adoptions |
 | M005 CodeGG | planned | — | — | mature multi-artifact core |
