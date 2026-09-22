@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Roadmap
 
-Status: M001-M002 closed; M003 validators dependency-ready for planning
+Status: M001-M002 closed; M003 validators ready for handoff
 
 Long-term references:
 
@@ -59,7 +59,7 @@ It owns release-time schema/tooling, not release cadence or hosting.
 
 The roadmap's first-consumer evidence gate is satisfied: eggsact and stegoeggo are live on the same Eggup 0.1.0 core/acquisition contracts without generic API changes.
 
-M001 established TOML schema v1, but post-closure review found that valid individual templates can still collapse onto duplicate release filenames, checksum sidecars, or install names after expansion, and malformed brace grammar is not always rejected until expansion. M002 corrects those invariants before validators are built on top of v1.
+M001 established TOML schema v1. M002 then closed the post-closure ambiguity findings by enforcing strict template grammar and portable expanded-name uniqueness. The corrected v1 contract is now stable enough for M003 conformance validators.
 
 Gregg already uses a machine-readable target table checked against runtime constants. Eggsearch, eggsact, stegoeggo, Egress, and CodeGG duplicate shell/PowerShell target mapping and checksum logic. CodeGG demonstrates a multi-runfile bundle installer; Egress demonstrates archive-based pair installation.
 
@@ -101,7 +101,9 @@ Reject malformed template grammar and any expanded release/install namespace col
 
 ### M003 — Release and installer conformance validators
 
-Validate target mapping, release asset completeness, checksum names, archive members, and bootstrap fixtures against the corrected v1 contract.
+Plan: `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md`.
+
+Validate target mapping, release asset completeness, checksum names, caller-supplied archive member inventories, and runtime/bootstrap mapping observations against corrected v1 without network, extraction, or language parsing.
 
 ### M004 — Generator/templates and two consumer adoptions
 
@@ -129,5 +131,5 @@ At least two consumers derive or validate runtime and bootstrap asset policy fro
 |---|---|---|---|---|
 | M001 | closed; post-closure findings feed M002 | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | `plans/closure/distribution-bootstrap/001-status.md` | — |
 | M002 | closed | `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md` | `plans/closure/distribution-bootstrap/002-status.md` | — |
-| M003 | dependency-ready; implementation plan needed | — | — | corrected schema M002 closed |
+| M003 | **ready for handoff** | `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md` | — | corrected schema M002 closed |
 | M004 | planned / blocked | — | — | dist M003 |
