@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: active planning; implementation blocked on verified-update-core M005 corrective closure
+Status: active corrective; M001-M002 closed, M003 ready for handoff
 
 Long-term references:
 
@@ -57,12 +57,16 @@ This subsystem owns bounded byte acquisition adapters. It does not choose releas
 
 ## 4. Current state
 
-Eggstack has two relevant transport families:
+M001 and M002 are closed. `eggup-acquisition 0.1.0` and `eggup-eggfetch 0.1.0` are published, and both eggsact and stegoeggo use the shared acquisition path.
 
-- eggsact, stegoeggo, eggsearch, and CodeGG already use Eggfetch or are natural Eggfetch consumers;
-- Gregg deliberately retained external curl after measuring substantial binary-size growth from an Eggfetch/TLS adoption experiment.
+Post-adoption review found two contract/safety issues before broader migration:
 
-The subsystem must support both realities.
+- caller `FetchLimits` carry per-request connect/total deadlines, but the Eggfetch adapter currently enforces its adapter-level timeout configuration instead of the per-call bounds;
+- fixture and Eggfetch artifact downloads create generated sibling temp files with ordinary create/truncate semantics and rely on platform rename behavior for promotion.
+
+A related diagnostic audit is also required because upstream Eggfetch/proxy error strings may contain URL/proxy material that Eggup has not independently proven redacted.
+
+Gregg still provides evidence for a possible lightweight transport after this corrective, but that remains optional and footprint-driven.
 
 ## 5. Target architecture
 
@@ -83,9 +87,14 @@ M001 acquisition seam + deterministic test adapter
           v
 M002 eggup-eggfetch
           |
-          +--> consumer adoption eggsact/stegoeggo
+          +--> first adopters eggsact/stegoeggo [closed]
           |
-          `--> optional M003 lightweight/curl adapter (evidence-driven)
+          v
+M003 contract/temp-file hardening corrective
+          |
+          +--> broader updater-bearing adoption
+          |
+          `--> optional M004 lightweight/curl adapter (evidence-driven)
 ```
 
 ## 7. Milestones
@@ -110,11 +119,19 @@ Hard dependency: M001 closure.
 
 Exit: strict HTTPS/redirect/proxy/timeout behavior is locally tested and dependency impact measured.
 
-### M003 — Lightweight acquisition adapter
+### M003 — Acquisition contract and temporary-file hardening corrective
+
+Class: invariant/corrective.
+
+Plan: `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md`.
+
+Correct per-request timeout enforcement, exclusive/private temporary files, no-clobber promotion, cleanup ownership, and diagnostic redaction before broader adoption.
+
+### M004 — Lightweight acquisition adapter
 
 Class: optional infrastructure.
 
-Create only if Gregg or another real consumer still demonstrates a footprint requirement after Eggfetch integration is remeasured.
+Create only if Gregg or another real consumer still demonstrates a footprint requirement after the M003-corrected Eggfetch path is remeasured.
 
 ## 8. Cross-cutting requirements
 
@@ -130,12 +147,13 @@ Eggfetch version/feature choice may materially affect binary size. Measure rathe
 
 ## 11. Completion definition
 
-Two real consumers successfully acquire artifacts through the same adapter while core remains transport-neutral.
+The subsystem's primary path is complete when two real consumers remain green on the corrected M003 acquisition contract, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. The lightweight M004 adapter is optional and evidence-driven.
 
 ## 12. Milestone status
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
 | M001 | closed | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | `plans/closure/acquisition-transport/001-status.md` | — |
-| M002 | closed | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | `plans/closure/acquisition-transport/002-status.md` | — |
-| M003 | deferred/evidence-driven | — | — | real footprint evidence |
+| M002 | closed; post-closure findings feed M003 | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | `plans/closure/acquisition-transport/002-status.md` | — |
+| M003 | **ready for handoff** | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | — | — |
+| M004 | deferred/evidence-driven | — | — | corrected-path footprint evidence |
