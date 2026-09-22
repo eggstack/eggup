@@ -1,0 +1,14 @@
+[package]
+name = "eggup-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Policy-neutral local mechanics for verified multi-artifact updates"
+readme = "README.md"
+authors = ["David Bowman"]
+
+[lints]
+workspace = true
+
