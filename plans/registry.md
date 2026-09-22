@@ -2,7 +2,7 @@
 
 Status: active
 
-Last planning baseline reviewed: `adaada4`
+Last planning baseline reviewed: `f5765a5`
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -27,7 +27,7 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 | Subsystem | Status | Next dependency-ready milestone |
 |---|---|---|
-| Verified update core | active | M003 transaction commit/rollback |
+| Verified update core | active | M004 integrity/candidate validation |
 | Acquisition transport | proposed / blocked | M001 after core M002 interface |
 | Service lifecycle | proposed / blocked | M001 after core M003 |
 | Distribution/bootstrap | proposed / later phase | M001 after first consumer adoption evidence |
@@ -37,7 +37,7 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Verified update core | M003 | **ready for handoff** | `plans/implementation/verified-update-core/003-transaction-commit-rollback.md` | M002 closed |
+| Verified update core | M004 | **ready for handoff** | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | M003 closed; M002 closed |
 | Verified update core | M004 | **ready for handoff** | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | M002 closed |
 
 ## Planned but blocked implementation work
@@ -91,16 +91,16 @@ acquisition M001/M002
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Closure records: M001-M002 closed; M003-M004 not yet closed.
+- Closure records: M001-M003 closed; M004 not yet closed.
 - Corrective plans: none.
 
 ## Next handoff
 
 Hand only this plan to the next implementation agent:
 
-`plans/implementation/verified-update-core/003-transaction-commit-rollback.md`
+`plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md`
 
-M001-M002 are closed. Continue with M003; M004 is also dependency-ready but is being executed after M003 in this sequential pass.
+M001-M003 are closed. Continue with M004; M005 remains blocked until both M003 and M004 are closed.
 
 ## Registry update rule
 

@@ -2,7 +2,7 @@
 
 Status: ready for handoff
 
-Repository baseline for planning: `adaada4`
+Repository baseline for planning: `f5765a5`
 
 Source roadmap:
 
@@ -27,7 +27,7 @@ Implement local integrity and bounded candidate verification so a staged file ca
 
 ## 2. Why this milestone is not yet ready
 
-Hard dependency: M002 closure, because verification must attach to the actual ArtifactMember/PreparedTransaction model rather than invent parallel structures. M002 is closed at `adaada4`.
+Hard dependency: M002 closure, because verification must attach to the actual ArtifactMember/PreparedTransaction model rather than invent parallel structures. M002 is closed at `adaada4`; the latest reconciled implementation baseline is M003 at `f5765a5`.
 
 M003 may proceed in parallel after M002, but final core qualification requires both.
 

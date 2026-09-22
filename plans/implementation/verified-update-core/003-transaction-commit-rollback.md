@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 003 — Transaction Commit, Rollback, and Recovery
 
-Status: ready for handoff
+Status: implemented
 
 Repository baseline for planning: `adaada4`
 
