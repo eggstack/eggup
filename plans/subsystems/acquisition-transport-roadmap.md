@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: active; M001-M003 closed, broader adoption unblocked (M004 deferred/evidence-driven)
+Status: active corrective; M001-M003 closed, M004 corrective ready for handoff
 
 Long-term references:
 
@@ -59,14 +59,14 @@ This subsystem owns bounded byte acquisition adapters. It does not choose releas
 
 M001 and M002 are closed. `eggup-acquisition 0.1.0` and `eggup-eggfetch 0.1.0` are published, and both eggsact and stegoeggo use the shared acquisition path.
 
-Post-adoption review found two contract/safety issues before broader migration:
+M003 closed the original timeout/temp-file/redaction findings and the corrected path remains green in eggsact and stegoeggo.
 
-- caller `FetchLimits` carry per-request connect/total deadlines, but the Eggfetch adapter currently enforces its adapter-level timeout configuration instead of the per-call bounds;
-- fixture and Eggfetch artifact downloads create generated sibling temp files with ordinary create/truncate semantics and rely on platform rename behavior for promotion.
+Post-closure review then found two narrower correctness gaps tracked by M004:
 
-A related diagnostic audit is also required because upstream Eggfetch/proxy error strings may contain URL/proxy material that Eggup has not independently proven redacted.
+- `FetchLimits::new` validates limits, but the struct fields remain public, so direct struct literals can bypass validation unless each transport revalidates at its trust boundary;
+- no-clobber promotion hard-links the complete temp to `dest` and then returns `Err` if unlinking the redundant temp fails, which can report ordinary failure after a complete destination already exists.
 
-Gregg still provides evidence for a possible lightweight transport after this corrective, but that remains optional and footprint-driven.
+Broader updater-bearing adoption is gated on M004. Gregg still provides evidence for a possible lightweight transport after this corrective, but that remains optional and footprint-driven.
 
 ## 5. Target architecture
 
@@ -90,11 +90,14 @@ M002 eggup-eggfetch
           +--> first adopters eggsact/stegoeggo [closed]
           |
           v
-M003 contract/temp-file hardening corrective
+M003 contract/temp-file hardening corrective [closed]
+          |
+          v
+M004 validated-limits/promotion-state corrective
           |
           +--> broader updater-bearing adoption
           |
-          `--> optional M004 lightweight/curl adapter (evidence-driven)
+          `--> optional M005 lightweight/curl adapter (evidence-driven)
 ```
 
 ## 7. Milestones
@@ -127,11 +130,19 @@ Plan: `plans/implementation/acquisition-transport/003-contract-and-tempfile-hard
 
 Correct per-request timeout enforcement, exclusive/private temporary files, no-clobber promotion, cleanup ownership, and diagnostic redaction before broader adoption.
 
-### M004 — Lightweight acquisition adapter
+### M004 — Validated limits and promotion-state corrective
+
+Class: invariant/corrective.
+
+Plan: `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md`.
+
+Require boundary revalidation of public `FetchLimits` values and truthful post-promotion terminal state before broader updater-bearing adoption.
+
+### M005 — Lightweight acquisition adapter
 
 Class: optional infrastructure.
 
-Create only if Gregg or another real consumer still demonstrates a footprint requirement after the M003-corrected Eggfetch path is remeasured.
+Create only if Gregg or another real consumer still demonstrates a footprint requirement after the M004-corrected Eggfetch path is remeasured.
 
 ## 8. Cross-cutting requirements
 
@@ -147,7 +158,7 @@ Eggfetch version/feature choice may materially affect binary size. Measure rathe
 
 ## 11. Completion definition
 
-The subsystem's primary path is complete when two real consumers remain green on the corrected M003 acquisition contract, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. The lightweight M004 adapter is optional and evidence-driven.
+The subsystem's primary path is complete when two real consumers remain green on the corrected M004 acquisition contract, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. The lightweight M005 adapter is optional and evidence-driven.
 
 ## 12. Milestone status
 
@@ -155,5 +166,6 @@ The subsystem's primary path is complete when two real consumers remain green on
 |---|---|---|---|---|
 | M001 | closed | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | `plans/closure/acquisition-transport/001-status.md` | — |
 | M002 | closed; post-closure findings fed M003 | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | `plans/closure/acquisition-transport/002-status.md` | — |
-| M003 | closed | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | `plans/closure/acquisition-transport/003-status.md` | — |
-| M004 | deferred/evidence-driven | — | — | corrected-path footprint evidence |
+| M003 | closed; post-closure findings feed M004 | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | `plans/closure/acquisition-transport/003-status.md` | — |
+| M004 | **ready for handoff** | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | — | — |
+| M005 | deferred/evidence-driven | — | — | corrected-path footprint evidence |
