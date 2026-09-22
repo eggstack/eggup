@@ -92,16 +92,22 @@ It does not own:
 
 ## 4. Current state
 
-The Eggup repository starts without production code.
+M001-M004 are historically closed and the repository now contains a functional local transaction core: validated plans/private staging, multi-artifact commit/rollback, native SHA-256 integrity checks, bounded candidate execution, and typed terminal disposition.
 
-Relevant proven source patterns exist across Eggstack:
+A post-closure review at `9f527be` found pre-adoption contract defects that must be corrected before package qualification:
 
-- Gregg's `gregg-update` demonstrates a useful shared updater boundary, private staging, checksum verification, candidate identity checks, and self replacement.
-- EggPool has stronger mutation-lock, ownership revalidation, rollback, and post-install self-check behavior.
-- Egress already treats two binaries as one logical transaction with backup/restore.
-- eggsact, stegoeggo, and eggsearch duplicate local integrity/candidate/staging behaviors.
+- existing-destination ownership is not independently proven;
+- destination-parent creation occurs before final containment revalidation;
+- staged bytes are not re-hashed immediately before commit;
+- an unenforced authenticity-required state is public;
+- cleanup disposition is misnamed as `PostCommitFailurePolicy`;
+- rollback/recovery receipts discard the triggering phase/cause;
+- cleanup failure can report a synthetic non-existent recovery path;
+- transaction-owned Unix permissions are not explicitly private;
+- stale-lock handling is fail-closed but planning language implied stronger recovery;
+- root/crate architecture documentation still contains foundation-era capability statements.
 
-The subsystem should extract the common mechanics rather than copy any one consumer wholesale.
+These are tracked in M005. M001-M004 closure records remain historical evidence and are not rewritten to conceal the findings.
 
 ## 5. Target architecture
 
@@ -148,14 +154,18 @@ M003 commit/rollback      M004 integrity/candidate validation
         +---------+---------+
                   |
                   v
-M005 core package qualification
+M005 pre-qualification safety/API corrective
+                  |
+                  v
+M006 core package qualification
 ```
 
 - M001 -> M002: hard.
 - M002 -> M003: hard.
 - M002 -> M004: hard.
 - M003 + M004 -> M005: hard.
-- Acquisition adapter can begin against M002's stable local-artifact interface as an interface dependency.
+- M005 -> M006: hard.
+- Acquisition and service implementation-plan execution MUST use the corrected M005 public boundary even though their conceptual interfaces became visible earlier.
 
 ## 7. Milestones
 
@@ -215,11 +225,35 @@ Exit conditions:
 - custom validator composition;
 - unverified bytes cannot execute.
 
-### M005 — Core package qualification
+### M005 — Pre-qualification safety and API corrective
+
+Class: invariant/corrective.
+
+Plan: `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md`.
+
+Objective: correct ownership proof, path-parent mutation ordering, verification-to-commit continuity, authenticity API truthfulness, transaction-result semantics, recovery evidence, transaction-owned permissions, lock-contract documentation, and stale capability docs before any consumer freezes the API.
+
+Exit conditions:
+
+- destructive replacement requires explicit `Owned` classification and foreign/unknown fail closed;
+- absent-destination creation is explicit;
+- no unchecked `create_dir_all` occurs on a live destination path;
+- all staged members are revalidated/re-hashed under lock before backup;
+- no unenforced authenticity-required state is commit-capable;
+- cleanup disposition is no longer named as post-commit policy;
+- rolled-back/recovery outcomes preserve phase/cause;
+- recovery paths identify real retained evidence;
+- Unix transaction state is explicitly private;
+- stale-lock behavior is implemented or documented truthfully;
+- docs match current capability.
+
+### M006 — Core package qualification
 
 Class: polish/infrastructure.
 
-Objective: qualify eggup-core as an independently consumable package.
+Plan: `plans/implementation/verified-update-core/006-core-package-qualification.md`.
+
+Objective: qualify the corrected eggup-core as an independently consumable package.
 
 Exit conditions:
 
@@ -229,7 +263,8 @@ Exit conditions:
 - dependency tree reviewed;
 - no consumer-specific constants;
 - no HTTP/TLS/service-manager dependency;
-- representative single/bundle examples compile.
+- representative single/bundle examples compile;
+- platform-support claims match actual CI/native evidence.
 
 ## 8. Cross-cutting requirements
 
@@ -289,5 +324,6 @@ The roadmap closes when eggup-core safely supports one- and multi-member verifie
 | M001 | closed | `plans/implementation/verified-update-core/001-repository-workspace-foundation.md` | `plans/closure/verified-update-core/001-status.md` | — |
 | M002 | closed | `plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md` | `plans/closure/verified-update-core/002-status.md` | — |
 | M003 | closed | `plans/implementation/verified-update-core/003-transaction-commit-rollback.md` | `plans/closure/verified-update-core/003-status.md` | — |
-| M004 | closed | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | `plans/closure/verified-update-core/004-status.md` | — |
-| M005 | ready for planning | — | — | — |
+| M004 | closed; post-closure findings feed M005 | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | `plans/closure/verified-update-core/004-status.md` | — |
+| M005 | **ready for handoff** | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | — | — |
+| M006 | blocked | `plans/implementation/verified-update-core/006-core-package-qualification.md` | — | M005 |
