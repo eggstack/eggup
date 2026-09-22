@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: active planning; implementation blocked on verified-update-core M005 corrective closure
+Status: active; M001 closed, M002 Unix adapters ready for handoff
 
 Long-term references:
 
@@ -59,7 +59,9 @@ It does not own application health semantics, service hardening content, artifac
 
 ## 4. Current state evidence
 
-Eggsearch and greggd each contain mature but separate manager logic. Both already demonstrate the key rules Eggup should preserve: native manager selection, ownership checks, bounded transitions, health distinct from manager state, cron fallback, and Windows SCM-specific handling.
+M001 is closed and `eggup-service 0.1.0` is published with the manager-neutral ownership/lifecycle contract and deterministic test double.
+
+Eggsearch and greggd each contain mature but separate Unix manager logic. Both demonstrate the rules M002 should extract: native manager selection, exact ownership checks, bounded manager commands/transitions, health distinct from manager state, cron fallback, and no hidden elevation. Windows SCM remains a separate M003 concern.
 
 ## 5. Target architecture
 
@@ -95,7 +97,9 @@ Define ServiceSpec, registration/state, canonical ownership classification, conf
 
 ### M002 — Unix manager adapters
 
-Systemd, launchd, and cron/watchdog mechanics with bounded execution and exact ownership.
+Plan: `plans/implementation/service-lifecycle/002-unix-manager-adapters.md`.
+
+Systemd, launchd, and cron/watchdog mechanics with bounded execution, exact ownership, caller-owned definitions, and no implicit elevation.
 
 ### M003 — Windows SCM adapter
 
@@ -126,6 +130,6 @@ At least two service-bearing consumers share the manager mechanics without losin
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
 | M001 | closed | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | `plans/closure/service-lifecycle/001-status.md` | — |
-| M002 | planned | — | — | service M001 |
-| M003 | planned | — | — | service M001 |
+| M002 | **ready for handoff** | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | — | — |
+| M003 | planned | — | — | service M001; detailed plan waits for M002 evidence |
 | M004 | planned | — | — | service M002/M003 + corrected core |
