@@ -8,6 +8,15 @@ Source roadmap:
 
 - `plans/subsystems/service-lifecycle-roadmap.md`
 
+Long-term requirements:
+
+- `plans/000-long-term-specification.md`
+- `plans/001-terminology-and-domain-model.md`
+
+Applicable ADRs:
+
+- `plans/adrs/ADR-0001-layered-mechanism-and-policy-ownership.md`
+
 Primary class: infrastructure / capability
 
 ## 1. Objective
