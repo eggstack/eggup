@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active planning; first adoption blocked on corrected core qualification and Eggfetch adapter
+Status: active; simple-consumer tier closed, service-aware tier gated on current corrective/adapter work
 
 Long-term references:
 
@@ -119,11 +119,11 @@ Second independent single-binary consumer; use it to identify accidental eggsact
 
 ### M003 — eggsearch adoption
 
-Adopt core first, then service substrate after service roadmap qualifies.
+Adopt core/acquisition plus Unix service substrate after acquisition M003 and service M002 close. Detailed implementation plan intentionally waits for those closure findings.
 
 ### M004 — Gregg adoption
 
-Replace `gregg-update` with Eggup mechanics while allowing measured lightweight transport.
+Replace `gregg-update` with Eggup mechanics after acquisition M003 closes and remeasure the corrected Eggfetch path against Gregg's footprint budget. Create lightweight acquisition M004 only if the evidence still justifies it. Detailed adoption plan waits for that decision.
 
 ### M005 — CodeGG bundle adoption
 
@@ -159,8 +159,8 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 |---|---|---|---|---|
 | M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
-| M003 eggsearch | planned | — | — | first adoptions, service roadmap |
-| M004 Gregg | planned | — | — | first adoptions |
+| M003 eggsearch | blocked / plan intentionally unwritten | — | — | acquisition M003 + service M002 |
+| M004 Gregg | blocked / plan intentionally unwritten | — | — | acquisition M003 + corrected-path footprint decision |
 | M005 CodeGG | planned | — | — | mature multi-artifact core |
 | M006 Egress | planned | — | — | core/archive contract |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
