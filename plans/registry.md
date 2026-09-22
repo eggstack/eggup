@@ -44,19 +44,19 @@ The historical records remain valid evidence of what was implemented and tested 
 | Acquisition transport | M001-M002 closed | lightweight M003 only if footprint evidence requires |
 | Service lifecycle | M001 closed | M002 Unix adapters (no detailed plan yet) |
 | Distribution/bootstrap | proposed / later phase | wait for first consumer evidence |
-| Consumer adoption | M001 ready | eggsact first adoption (core M006 + transport M002 closed) |
+| Consumer adoption | M001 closed; M002 ready | stegoeggo second adoption (same qualified Eggup 0.1.0) |
 
 ## Dependency-ready implementation work
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Consumer adoption | M001 eggsact | **ready for handoff** | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | core M006 + transport M002 closed |
+| Consumer adoption | M002 stegoeggo | **ready for handoff** | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | adoption M001 closed |
 
 ## Planned but blocked implementation work
 
 | Subsystem | Milestone | Status | Plan | Blocker |
 |---|---|---|---|---|
-| Consumer adoption | M002 stegoeggo | blocked | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | adoption M001 |
+| *(none active)* | — | — | — | — |
 
 ## Core M005 corrective scope (closed)
 
@@ -130,9 +130,8 @@ These depend on evidence from the corrected core and first two consumers. Writin
 - Hosted CI: lanes defined for stable, MSRV 1.89, macOS, and Windows-check; local verification green.
 - Published crates: `eggup-acquisition 0.1.0`, `eggup-core 0.1.0`, `eggup-service 0.1.0`, `eggup-eggfetch 0.1.0` (manual `cargo publish`, seam → core/service → adapter order).
 - Release process: manual publication only; no automation.
-- Consumer integrations: none yet; adoption M001 handed off against published versions.
-- Active work: eggsact adoption M001 (proceeding against `eggup-core 0.1.0` + `eggup-eggfetch 0.1.0`).
-- Second consumer migration (stegoeggo): blocked on adoption M001.
+- Consumer integrations: `eggsact` adopted (`eggstack/eggsact@576f4b0` on Eggup 0.1.0; +1.7% binary, single stack, full suite green).
+- Active work: stegoeggo adoption M002 (ready; same qualified Eggup 0.1.0).
 
 ## Next handoff
 

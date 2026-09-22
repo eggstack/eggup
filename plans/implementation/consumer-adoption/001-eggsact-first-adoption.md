@@ -1,6 +1,6 @@
 # Consumer Adoption Milestone 001 — Eggsact First Adoption
 
-Status: ready for handoff (unblocked: core M006 + transport M002 closed)
+Status: implemented (closed; see `plans/closure/consumer-adoption/001-status.md`)
 
 Repository baseline for Eggup planning: `9f527beb20da585bc3cf56f45f1fd96fd418c124`
 

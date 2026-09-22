@@ -157,8 +157,8 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 eggsact | blocked | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | — | core M006, transport M002 |
-| M002 stegoeggo | blocked | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | — | adoption M001 |
+| M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
+| M002 stegoeggo | **ready for handoff** | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | — | — (adoption M001 closed) |
 | M003 eggsearch | planned | — | — | first adoptions, service roadmap |
 | M004 Gregg | planned | — | — | first adoptions |
 | M005 CodeGG | planned | — | — | mature multi-artifact core |
