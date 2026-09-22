@@ -10,7 +10,7 @@ Reviewed repository baseline: `8f6ce48cda5bdeb593939077bcca452cdd5f2800` (plan b
 
 ## Implementation commits/PRs
 
-- M001 dist commit (this pass): `feat: add versioned distribution contract schema (M001)` (pending SHA; see git log)
+- M001 implementation landed in aggregate implementation commit `889a234cbe7f461d92def3df45c83c06a7d257e5` (`feat: close acquisition M003, distribution M001, service M002 with verification`).
 - Prior: `892d6cc` (`planning: register post-adoption implementation wave`)
 - No PR was required for this local implementation pass. No publication was performed.
 
@@ -197,3 +197,9 @@ dependency was required and none is created.
 
 - Distribution M001 → closed.
 - Distribution M002 → planning-ready (plan may now be authored).
+
+## Post-closure review addendum
+
+A subsequent source review of implementation SHA `889a234cbe7f461d92def3df45c83c06a7d257e5` found that schema-v1 validation does not yet guarantee uniqueness after template expansion: bundle/archive declarations can collapse onto duplicate asset, sidecar, or install names, and malformed brace grammar can survive parse-time validation until expansion.
+
+The M001 schema/model evidence remains valid, but release/installer validators are re-blocked on `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md`.
