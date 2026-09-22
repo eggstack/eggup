@@ -42,7 +42,7 @@ The historical records remain valid evidence of what was implemented and tested 
 |---|---|---|
 | Verified update core | M005-M006 closed; qualified | broader consumer API qualification after first adoptions |
 | Acquisition transport | M001-M002 closed | lightweight M003 only if footprint evidence requires |
-| Service lifecycle | M001 ready | M001 manager-neutral ownership |
+| Service lifecycle | M001 closed | M002 Unix adapters (no detailed plan yet) |
 | Distribution/bootstrap | proposed / later phase | wait for first consumer evidence |
 | Consumer adoption | M001 ready | eggsact first adoption (core M006 + transport M002 closed) |
 
@@ -50,7 +50,6 @@ The historical records remain valid evidence of what was implemented and tested 
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Service lifecycle | M001 | **ready for handoff** | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | core M005 closed |
 | Consumer adoption | M001 eggsact | **ready for handoff** | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | core M006 + transport M002 closed |
 
 ## Planned but blocked implementation work
@@ -127,12 +126,12 @@ These depend on evidence from the corrected core and first two consumers. Writin
 ## Current project state
 
 - Planning system: established.
-- Production Rust workspace: core M001-M006 + acquisition M001-M002 implemented, verified (62 tests: 37 core + 12 acquisition + 13 eggfetch, stable + 1.89), core + acquisition packages qualified (no publication; eggfetch packaging awaits seam publication order).
+- Production Rust workspace: core M001-M006 + acquisition M001-M002 + service M001 implemented, verified (72 tests: 37 core + 12 acquisition + 13 eggfetch + 10 service, stable + 1.89), packages qualified (no publication; eggfetch packaging awaits seam publication order).
 - Hosted CI: lanes defined for stable, MSRV 1.89, macOS, and Windows-check; local verification green.
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Active work: service M001, eggsact adoption M001 (both ready).
+- Active work: eggsact adoption M001 (ready; blocked on publication decision — see below).
 - Second consumer migration (stegoeggo): blocked on adoption M001.
 
 ## Next handoff

@@ -1,0 +1,23 @@
+[package]
+name = "eggup-service"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage = "https://github.com/eggstack/eggup"
+documentation = "https://docs.rs/eggup-service"
+description = "Manager-neutral service registration, ownership, and lifecycle snapshot contract (no adapters, no escalation)"
+readme = "README.md"
+authors = ["David Bowman"]
+keywords = ["service", "systemd", "launchd", "lifecycle"]
+categories = ["os"]
+exclude = [
+    "tests/",
+    "benches/",
+]
+
+[lints]
+workspace = true
+
+[dependencies]

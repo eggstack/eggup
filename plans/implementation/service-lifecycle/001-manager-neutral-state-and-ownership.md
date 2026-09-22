@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 001 — Manager-Neutral State and Ownership Contract
 
-Status: ready for handoff (unblocked by core M005 closure)
+Status: implemented (closed; see `plans/closure/service-lifecycle/001-status.md`)
 
 Repository baseline for planning: `9f527beb20da585bc3cf56f45f1fd96fd418c124`
 

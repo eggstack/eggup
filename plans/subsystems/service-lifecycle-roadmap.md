@@ -125,7 +125,7 @@ At least two service-bearing consumers share the manager mechanics without losin
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 | **ready for handoff** | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | — | — (core M005 closed) |
+| M001 | closed | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | `plans/closure/service-lifecycle/001-status.md` | — |
 | M002 | planned | — | — | service M001 |
 | M003 | planned | — | — | service M001 |
 | M004 | planned | — | — | service M002/M003 + corrected core |
