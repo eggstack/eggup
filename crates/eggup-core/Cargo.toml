@@ -5,9 +5,18 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Policy-neutral local mechanics for verified multi-artifact updates"
+homepage = "https://github.com/eggstack/eggup"
+documentation = "https://docs.rs/eggup-core"
+description = "Policy-neutral local mechanics for verified multi-artifact updates (checksum integrity only, no transport or service manager)"
 readme = "README.md"
 authors = ["David Bowman"]
+keywords = ["update", "installer", "integrity", "rollback", "deployment"]
+categories = ["os", "filesystem"]
+exclude = [
+    "docs/",
+    "tests/",
+    "benches/",
+]
 
 [lints]
 workspace = true

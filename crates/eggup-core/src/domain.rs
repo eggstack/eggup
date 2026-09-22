@@ -83,15 +83,21 @@ fn validate_identifier(kind: &str, value: String) -> Result<String> {
 
 /// The file kind expected for an artifact member.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FileKind {
     /// A regular file; directories, links, devices, sockets, and FIFOs are rejected.
     Regular,
 }
 
 /// The permission intent to apply to a staged member.
+///
+/// Staged output is always owner-private (`0600`, or `0700` when executable).
+/// `Preserve` maps an executable source to `0700` and anything else to
+/// `0600`; broad source modes are never inherited.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PermissionsIntent {
-    /// Retain the source file's permissions where the platform exposes them.
+    /// Retain executable intent privately where the platform exposes it.
     Preserve,
     /// Mark the staged member executable where the platform exposes executable bits.
     Executable,
@@ -117,8 +123,10 @@ pub enum Ownership {
 /// A declared integrity requirement. Computation is provided by the verification layer.
 ///
 /// Only `Sha256` members are commit-capable. `None` is visible during
-/// preparation but can never reach candidate execution or commit.
+/// preparation but can never reach candidate execution or commit. Checksum
+/// evidence only; not an authenticity or signature claim.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum IntegrityRequirement {
     /// No integrity evidence is attached at this stage.
     None,

@@ -10,6 +10,9 @@
 #![doc = ""]
 #![doc = "Integrity here is checksum evidence only. No authenticity or signature"]
 #![doc = "claim is made: there is no authenticity verifier in this crate."]
+#![doc = ""]
+#![doc = "Runnable flows live in `examples/`: one-member, multi-member, custom"]
+#![doc = "validator, ownership verifier, and receipt interpretation."]
 
 mod candidate;
 mod domain;

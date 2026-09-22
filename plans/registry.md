@@ -32,6 +32,7 @@ This file is the compact control surface for active Eggup planning. Detailed req
 | Core M003 transaction/rollback | closed; post-closure findings fed M005 | `plans/closure/verified-update-core/003-status.md` |
 | Core M004 integrity/candidate validation | closed; post-closure findings fed M005 | `plans/closure/verified-update-core/004-status.md` |
 | Core M005 safety/API corrective | closed | `plans/closure/verified-update-core/005-status.md` |
+| Core M006 package qualification | closed | `plans/closure/verified-update-core/006-status.md` |
 
 The historical records remain valid evidence of what was implemented and tested at those points. M005 corrects the pre-adoption contract defects found after M002-M004.
 
@@ -39,17 +40,16 @@ The historical records remain valid evidence of what was implemented and tested 
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
-| Verified update core | M005 closed; M006 ready | M006 package qualification |
+| Verified update core | M005-M006 closed; qualified | broader consumer API qualification after first adoptions |
 | Acquisition transport | M001 ready | M001 seam + fixture transport |
 | Service lifecycle | M001 ready | M001 manager-neutral ownership |
 | Distribution/bootstrap | proposed / later phase | wait for first consumer evidence |
-| Consumer adoption | first two plans written / blocked | eggsact after core M006 + transport M002 |
+| Consumer adoption | first two plans written / blocked | eggsact after transport M002 (core M006 closed) |
 
 ## Dependency-ready implementation work
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Verified update core | M006 | **ready for handoff** | `plans/implementation/verified-update-core/006-core-package-qualification.md` | core M005 closed |
 | Acquisition transport | M001 | **ready for handoff** | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | core M005 closed |
 | Service lifecycle | M001 | **ready for handoff** | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | core M005 closed |
 
@@ -129,14 +129,14 @@ These depend on evidence from the corrected core and first two consumers. Writin
 ## Current project state
 
 - Planning system: established.
-- Production Rust workspace: core M001-M005 implemented and verified (37/37 tests, stable + 1.89).
+- Production Rust workspace: core M001-M006 implemented, verified (37/37 tests, stable + 1.89), and package-qualified (no publication).
 - Hosted CI: lanes defined for stable, MSRV 1.89, macOS, and Windows-check; local verification green.
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Active work: core M006, acquisition M001, service M001 (all ready).
+- Active work: acquisition M001, service M001 (both ready).
 - Transport Eggfetch adapter: blocked on acquisition M001.
-- First consumer migrations: blocked on core M006 + transport M002.
+- First consumer migrations: blocked on transport M002 (core M006 closed).
 
 ## Next handoff
 

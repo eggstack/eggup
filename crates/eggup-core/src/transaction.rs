@@ -12,6 +12,9 @@ use crate::stage::PreparedTransaction;
 static NEXT_BACKUP_NONCE: AtomicU64 = AtomicU64::new(0);
 
 /// The terminal disposition of a commit attempt.
+///
+/// A rolled-back or recovery-required result is never equivalent to success;
+/// see `examples/receipts.rs`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransactionDisposition {
     /// Every member was installed and the live set is coherent.
@@ -41,6 +44,7 @@ pub enum CleanupDisposition {
 ///
 /// Phases are ordered by first occurrence in a commit attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FailurePhase {
     /// Mutation-lock acquisition or inspection.
     Lock,
@@ -75,6 +79,7 @@ impl FailurePhase {
 
 /// A stable machine-readable failure category.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FailureCategory {
     /// Another transaction or ambiguous lock owns the domain.
     LockContention,

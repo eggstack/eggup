@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 006 — Core Package Qualification
 
-Status: ready for handoff (unblocked by M005 closure)
+Status: implemented (closed; see `plans/closure/verified-update-core/006-status.md`)
 
 Repository baseline for planning: `9f527beb20da585bc3cf56f45f1fd96fd418c124`
 
