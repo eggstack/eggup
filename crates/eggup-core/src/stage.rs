@@ -32,7 +32,7 @@ impl Stage {
 
     fn prepare_inner(plan: InstallPlan, failure: Option<FailureAt>) -> Result<PreparedTransaction> {
         check_failure(failure, FailureAt::Create)?;
-        let path = create_stage_directory()?;
+        let path = create_stage_directory(plan.installation_root())?;
         let stage = Self { path };
         if let Err(error) = stage.copy_members(&plan, failure) {
             drop(stage);
@@ -112,9 +112,16 @@ impl Drop for Stage {
     }
 }
 
-fn create_stage_directory() -> Result<PathBuf> {
+fn create_stage_directory(installation_root: &Path) -> Result<PathBuf> {
     let sequence = NEXT_STAGE_ID.fetch_add(1, Ordering::Relaxed);
-    let path = std::env::temp_dir().join(format!("eggup-stage-{}-{sequence}", std::process::id()));
+    let parent = installation_root
+        .parent()
+        .ok_or_else(|| Error::invalid("installation root has no stage parent"))?;
+    let root_name = installation_root
+        .file_name()
+        .ok_or_else(|| Error::invalid("installation root has no name"))?
+        .to_string_lossy();
+    let path = parent.join(format!(".eggup-stage-{root_name}-{sequence}"));
     fs::create_dir(&path).map_err(|source| Error::io("creating private stage", source))?;
     Ok(path)
 }

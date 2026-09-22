@@ -128,14 +128,21 @@ mod tests {
 
         assert!(result.is_err());
         assert!(!install.path().join("eggup").exists());
-        assert!(std::env::temp_dir()
+        let stage_prefix = format!(
+            ".eggup-stage-{}-",
+            install.path().file_name().unwrap().to_string_lossy()
+        );
+        assert!(install
+            .path()
+            .parent()
+            .unwrap()
             .read_dir()
             .unwrap()
             .filter_map(std::result::Result::ok)
             .all(|entry| !entry
                 .file_name()
                 .to_string_lossy()
-                .starts_with("eggup-stage-")));
+                .starts_with(&stage_prefix)));
     }
 
     #[test]
