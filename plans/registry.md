@@ -2,7 +2,7 @@
 
 Status: active
 
-Last planning baseline reviewed: `5b6cf13ed7e6e2bd40951216f29ea68d7333aadf`
+Last planning baseline reviewed: `4ae7642`
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -27,7 +27,7 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 | Subsystem | Status | Next dependency-ready milestone |
 |---|---|---|
-| Verified update core | active | M001 repository/workspace foundation |
+| Verified update core | active | M002 domain/prepared transaction |
 | Acquisition transport | proposed / blocked | M001 after core M002 interface |
 | Service lifecycle | proposed / blocked | M001 after core M003 |
 | Distribution/bootstrap | proposed / later phase | M001 after first consumer adoption evidence |
@@ -37,13 +37,12 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Verified update core | M001 | **ready for handoff** | `plans/implementation/verified-update-core/001-repository-workspace-foundation.md` | none |
+| Verified update core | M002 | **ready for handoff** | `plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md` | M001 closed |
 
 ## Planned but blocked implementation work
 
 | Subsystem | Milestone | Status | Plan | Blocker |
 |---|---|---|---|---|
-| Verified update core | M002 | blocked | `plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md` | M001 closure |
 | Verified update core | M003 | blocked | `plans/implementation/verified-update-core/003-transaction-commit-rollback.md` | M002 closure |
 | Verified update core | M004 | blocked | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | M002 closure |
 | Acquisition transport | M001 | blocked | not yet written | stable core M002 stage/acquisition interface |
@@ -89,20 +88,20 @@ acquisition M001/M002
 ## Current project state
 
 - Planning system: established.
-- Production Rust workspace: absent by design; owned by core M001.
+- Production Rust workspace: foundation present; live update behavior remains unimplemented.
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Closure records: none.
+- Closure records: M001 closed; M002-M004 not yet closed.
 - Corrective plans: none.
 
 ## Next handoff
 
-Hand only this plan to the first implementation agent:
+Hand only this plan to the next implementation agent:
 
-`plans/implementation/verified-update-core/001-repository-workspace-foundation.md`
+`plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md`
 
-Do not hand M002-M004 concurrently before M001 closure because their repository baselines and concrete module layout must be reconciled against what M001 actually establishes.
+M001 is closed. Continue with M002; do not hand M003 or M004 concurrently before M002 closure because their concrete domain and prepared-transaction contracts must be reconciled against what M002 actually establishes.
 
 ## Registry update rule
 

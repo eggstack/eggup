@@ -1,8 +1,8 @@
 # Verified Update Core Milestone 002 — Domain and Prepared Transaction Contract
 
-Status: blocked on M001 closure
+Status: ready for handoff
 
-Repository baseline for planning: `5b6cf13ed7e6e2bd40951216f29ea68d7333aadf`
+Repository baseline for planning: `4ae7642`
 
 Source roadmap:
 
@@ -30,7 +30,9 @@ Define the policy-neutral Rust domain and a preparation phase that can validate 
 
 Hard dependency: M001 accepted closure.
 
-At handoff time, update this plan's repository baseline to the M001 closure commit and reconcile file/module names with the actual workspace.
+M001 is closed at `4ae7642`; the implementation below must reconcile module names
+with the actual workspace rather than assuming the roadmap's illustrative file
+layout.
 
 ## 3. Current implementation evidence
 
