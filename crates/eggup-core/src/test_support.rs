@@ -9,6 +9,8 @@ static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(0);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FailurePoint {
     Prepare,
+    StageCreate,
+    StageCopy,
     Commit,
 }
 
