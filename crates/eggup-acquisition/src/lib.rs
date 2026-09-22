@@ -563,6 +563,24 @@ impl AcquisitionTransport for FixtureTransport {
 /// Shared ownership helper for tests that need a transport behind `Arc`.
 pub type SharedTransport = Arc<FixtureTransport>;
 
+/// Adapter-only constructor for metadata bytes.
+///
+/// `#[doc(hidden)]`: not part of the consumer contract; allows verified
+/// adapters (`eggup-eggfetch`) to return seam types without widening the
+/// public seam with a general constructor.
+#[doc(hidden)]
+pub fn __adapter_metadata(bytes: Vec<u8>) -> MetadataBytes {
+    MetadataBytes { bytes }
+}
+
+/// Adapter-only constructor for artifact evidence.
+///
+/// `#[doc(hidden)]`: see `__adapter_metadata`.
+#[doc(hidden)]
+pub fn __adapter_artifact(bytes_written: u64) -> ArtifactEvidence {
+    ArtifactEvidence { bytes_written }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

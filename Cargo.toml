@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/eggup-core", "crates/eggup-acquisition"]
+members = [
+    "crates/eggup-core",
+    "crates/eggup-acquisition",
+    "crates/eggup-eggfetch",
+]
 
 [workspace.package]
 version = "0.1.0"

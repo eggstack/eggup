@@ -1,0 +1,31 @@
+[package]
+name = "eggup-eggfetch"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage = "https://github.com/eggstack/eggup"
+documentation = "https://docs.rs/eggup-eggfetch"
+description = "Native Eggfetch HTTP acquisition adapter for Eggup (bounded, no release policy)"
+readme = "README.md"
+authors = ["David Bowman"]
+keywords = ["update", "http", "fetch", "tls"]
+categories = ["network-programming"]
+exclude = [
+    "tests/",
+    "benches/",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+eggup-acquisition = { version = "0.1.0", path = "../eggup-acquisition" }
+eggfetch-core = { version = "0.2.0", default-features = false, features = ["http1", "tls-rustls", "tls-native-roots", "proxy"] }
+tokio = { version = "1", default-features = false, features = ["rt", "time", "fs", "io-util", "net"] }
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "time", "net", "macros", "io-util", "fs"] }
+url = "2"
