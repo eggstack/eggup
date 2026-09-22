@@ -8,14 +8,18 @@
 
 mod domain;
 mod error;
+mod lock;
 mod stage;
+mod transaction;
 
 pub use domain::{
     ArtifactMember, ArtifactSet, AuthenticityRequirement, FileKind, InstallPlan,
     IntegrityRequirement, MemberId, Ownership, PermissionsIntent, ProductId, ReleaseId,
 };
 pub use error::{Error, Result};
+pub use lock::MutationLock;
 pub use stage::PreparedTransaction;
+pub use transaction::{PostCommitFailurePolicy, TransactionDisposition, TransactionReceipt};
 
 #[cfg(test)]
 mod test_support;
@@ -23,7 +27,11 @@ mod test_support;
 #[cfg(test)]
 mod tests {
     use super::test_support::{FailureInjector, FailurePoint, InstallationRoot};
-    use super::{ArtifactMember, ArtifactSet, InstallPlan, MemberId, ProductId, ReleaseId};
+    use super::transaction::CommitFault;
+    use super::{
+        ArtifactMember, ArtifactSet, Error, InstallPlan, MemberId, MutationLock, ProductId,
+        ReleaseId, TransactionDisposition,
+    };
     use std::fs;
 
     #[test]
@@ -242,5 +250,275 @@ mod tests {
         .permissions()
         .mode();
         assert_ne!(mode & 0o111, 0);
+    }
+
+    fn prepared_bundle(
+        existing: bool,
+    ) -> (
+        InstallationRoot,
+        InstallationRoot,
+        super::PreparedTransaction,
+    ) {
+        let inputs = InstallationRoot::new().expect("inputs");
+        let install = InstallationRoot::new().expect("install");
+        inputs.write_file("main", b"new-main").expect("write");
+        inputs.write_file("helper", b"new-helper").expect("write");
+        if existing {
+            install
+                .write_file("bin/main", b"old-main")
+                .expect("old main");
+            install
+                .write_file("bin/helper", b"old-helper")
+                .expect("old helper");
+        }
+        let members = ArtifactSet::new(vec![
+            ArtifactMember::new(
+                MemberId::new("main").unwrap(),
+                inputs.path().join("main"),
+                "bin/main",
+            )
+            .unwrap(),
+            ArtifactMember::new(
+                MemberId::new("helper").unwrap(),
+                inputs.path().join("helper"),
+                "bin/helper",
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let prepared = InstallPlan::new(
+            ProductId::new("bundle").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            members,
+        )
+        .unwrap()
+        .prepare()
+        .unwrap();
+        (inputs, install, prepared)
+    }
+
+    #[test]
+    fn commits_a_complete_multi_member_generation_and_releases_lock() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+
+        let receipt = prepared.commit().expect("commit");
+
+        assert_eq!(receipt.disposition(), TransactionDisposition::Committed);
+        assert_eq!(receipt.cleanup(), super::PostCommitFailurePolicy::Cleaned);
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"new-main"
+        );
+        assert_eq!(
+            fs::read(install.path().join("bin/helper")).unwrap(),
+            b"new-helper"
+        );
+        assert!(!install.path().join(".eggup-mutation.lock").exists());
+        assert!(install
+            .path()
+            .read_dir()
+            .unwrap()
+            .filter_map(std::result::Result::ok)
+            .all(|entry| !entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".eggup-backup-")));
+    }
+
+    #[test]
+    fn partial_commit_failure_restores_every_old_member() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+
+        let receipt = prepared
+            .commit_with_fault(CommitFault::Commit(MemberId::new("helper").unwrap()))
+            .expect("receipt");
+
+        assert_eq!(receipt.disposition(), TransactionDisposition::RolledBack);
+        assert!(receipt.rollback_performed());
+        assert!(receipt.rollback_verified());
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"old-main"
+        );
+        assert_eq!(
+            fs::read(install.path().join("bin/helper")).unwrap(),
+            b"old-helper"
+        );
+    }
+
+    #[test]
+    fn rollback_removes_new_members_that_were_absent_before_commit() {
+        let inputs = InstallationRoot::new().unwrap();
+        let install = InstallationRoot::new().unwrap();
+        inputs.write_file("main", b"new-main").unwrap();
+        inputs.write_file("helper", b"new-helper").unwrap();
+        install.write_file("bin/main", b"old-main").unwrap();
+        let prepared = InstallPlan::new(
+            ProductId::new("bundle").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::new(vec![
+                ArtifactMember::new(
+                    MemberId::new("main").unwrap(),
+                    inputs.path().join("main"),
+                    "bin/main",
+                )
+                .unwrap(),
+                ArtifactMember::new(
+                    MemberId::new("helper").unwrap(),
+                    inputs.path().join("helper"),
+                    "bin/helper",
+                )
+                .unwrap(),
+            ])
+            .unwrap(),
+        )
+        .unwrap()
+        .prepare()
+        .unwrap();
+
+        let receipt = prepared
+            .commit_with_fault(CommitFault::Commit(MemberId::new("helper").unwrap()))
+            .unwrap();
+
+        assert_eq!(receipt.disposition(), TransactionDisposition::RolledBack);
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"old-main"
+        );
+        assert!(!install.path().join("bin/helper").exists());
+    }
+
+    #[test]
+    fn lock_contention_and_malformed_lock_fail_closed() {
+        let (_inputs, install, prepared) = prepared_bundle(false);
+        let product = ProductId::new("bundle").unwrap();
+        let release = ReleaseId::new("r1").unwrap();
+        let _lock = MutationLock::acquire(install.path(), &product, &release).unwrap();
+
+        let error = prepared.commit().unwrap_err();
+        assert!(matches!(error, Error::UpdateInProgress { .. }));
+        drop(_lock);
+
+        fs::write(install.path().join(".eggup-mutation.lock"), b"malformed").unwrap();
+        let (_inputs, _install, prepared) = prepared_bundle(false);
+        let lock = _install.path().join(".eggup-mutation.lock");
+        fs::write(&lock, b"malformed").unwrap();
+        let error = prepared.commit().unwrap_err();
+        assert!(matches!(error, Error::UpdateInProgress { .. }));
+        assert!(lock.exists());
+    }
+
+    #[test]
+    fn rollback_failure_returns_recovery_required_and_retains_evidence() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+
+        let receipt = prepared
+            .commit_with_fault(CommitFault::CommitThenRollback(
+                MemberId::new("helper").unwrap(),
+                MemberId::new("main").unwrap(),
+            ))
+            .unwrap();
+
+        assert_eq!(
+            receipt.disposition(),
+            TransactionDisposition::RecoveryRequired
+        );
+        assert!(!receipt.rollback_verified());
+        assert!(receipt.recovery_path().is_some());
+        assert!(install.path().join(".eggup-mutation.lock").exists());
+        let recovery = receipt.recovery_path().unwrap();
+        assert!(recovery.exists());
+        let _ = fs::remove_dir_all(recovery);
+        let _ = fs::remove_file(install.path().join(".eggup-mutation.lock"));
+    }
+
+    #[test]
+    fn precommit_and_backup_failures_restore_old_state() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+        let receipt = prepared
+            .commit_with_fault(CommitFault::BeforeFirstCommit)
+            .unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::RolledBack);
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"old-main"
+        );
+
+        let (_inputs, install, prepared) = prepared_bundle(true);
+        let receipt = prepared
+            .commit_with_fault(CommitFault::Backup(MemberId::new("helper").unwrap()))
+            .unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::RolledBack);
+        assert_eq!(
+            fs::read(install.path().join("bin/helper")).unwrap(),
+            b"old-helper"
+        );
+    }
+
+    #[test]
+    fn injected_lock_creation_failure_performs_no_mutation() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+
+        let error = prepared
+            .commit_with_fault(CommitFault::LockCreation)
+            .unwrap_err();
+
+        assert!(matches!(error, Error::InvalidInput(_)));
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"old-main"
+        );
+        assert!(!install.path().join(".eggup-mutation.lock").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn destination_links_fail_immediately_before_backup() {
+        use std::fs::hard_link;
+        use std::os::unix::fs::symlink;
+
+        let inputs = InstallationRoot::new().unwrap();
+        let install = InstallationRoot::new().unwrap();
+        inputs.write_file("main", b"new-main").unwrap();
+        install.write_file("bin/real", b"old-main").unwrap();
+        symlink(install.path().join("real"), install.path().join("bin/main")).unwrap();
+        let prepared = InstallPlan::new(
+            ProductId::new("bundle").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(
+                ArtifactMember::new(
+                    MemberId::new("main").unwrap(),
+                    inputs.path().join("main"),
+                    "bin/main",
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .prepare()
+        .unwrap();
+        let receipt = prepared.commit().unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::RolledBack);
+        assert_eq!(
+            fs::read(install.path().join("bin/real")).unwrap(),
+            b"old-main"
+        );
+
+        let (_inputs, install, prepared) = prepared_bundle(true);
+        hard_link(
+            install.path().join("bin/main"),
+            install.path().join("bin/linked"),
+        )
+        .unwrap();
+        let receipt = prepared.commit().unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::RolledBack);
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"old-main"
+        );
     }
 }

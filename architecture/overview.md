@@ -25,4 +25,6 @@ consumer/release policy  ->  acquisition/transport  ->  eggup-core
 Only the workspace and crate boundary are implemented in the foundation
 milestone. The domain/preparation milestone now also validates explicit plans
 and copies local inputs into private stage state; no live installation, service,
-or network behavior is present. See the [domain contract](../crates/eggup-core/docs/domain.md).
+or network behavior is present. Commit/rollback mechanics are documented in
+the [transaction contract](../crates/eggup-core/docs/transaction.md); service
+and transport layers remain outside the crate.

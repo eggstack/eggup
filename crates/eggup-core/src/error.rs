@@ -18,6 +18,16 @@ pub enum Error {
         /// The underlying operating-system error.
         source: io::Error,
     },
+    /// Another process or an ambiguous lock record owns the installation domain.
+    UpdateInProgress {
+        /// The lock path that prevented acquisition.
+        lock: std::path::PathBuf,
+    },
+    /// A live destination failed the immediate pre-mutation ownership check.
+    DestinationConflict {
+        /// The destination path that failed revalidation.
+        destination: std::path::PathBuf,
+    },
 }
 
 impl Error {
@@ -36,6 +46,18 @@ impl fmt::Display for Error {
             Self::InvalidInput(message) => write!(formatter, "invalid update input: {message}"),
             Self::UnknownMember(member) => write!(formatter, "unknown artifact member: {member}"),
             Self::Io { operation, source } => write!(formatter, "{operation}: {source}"),
+            Self::UpdateInProgress { lock } => {
+                write!(
+                    formatter,
+                    "installation update already in progress: {}",
+                    lock.display()
+                )
+            }
+            Self::DestinationConflict { destination } => write!(
+                formatter,
+                "destination failed ownership revalidation: {}",
+                destination.display()
+            ),
         }
     }
 }
@@ -44,7 +66,10 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io { source, .. } => Some(source),
-            Self::InvalidInput(_) | Self::UnknownMember(_) => None,
+            Self::InvalidInput(_)
+            | Self::UnknownMember(_)
+            | Self::UpdateInProgress { .. }
+            | Self::DestinationConflict { .. } => None,
         }
     }
 }
