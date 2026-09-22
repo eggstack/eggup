@@ -62,9 +62,18 @@ Small placeholder vocabulary only:
 
 Unknown placeholders fail; `{alias}` requires lookup via that alias;
 `{asset}` requires a checksum context. No shell, conditionals, formatting
-code, or environment expansion. Asset/install/sidecar names are flat file
-names (no `/` or `\`). Versions are opaque but filesystem-safe
-(non-empty, no separators/controls).
+code, escaping, nested/double braces, or environment expansion. Template
+literals use only ASCII letters, digits, `-`, `_`, and `.`. Malformed braces
+and placeholders fail while parsing the contract.
+
+After expansion, release assets and checksum sidecars must have unique names
+within one target/version; install names must also be unique. Exact and
+ASCII-case-only collisions fail with `DistError::NameCollision`, including
+cross-collisions between an asset and a sidecar. ASCII case folding is
+portable and locale-independent; Unicode case folding is not performed.
+Expansion never returns a partially valid or ambiguous target.
+Asset/install/sidecar names are flat file names (no `/` or `\`). Versions
+remain opaque but filesystem-safe (non-empty, no separators/controls).
 
 ### Target resolution
 

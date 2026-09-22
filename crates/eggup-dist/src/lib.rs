@@ -20,6 +20,24 @@ const MAX_NAME_LEN: usize = 128;
 const MAX_TEMPLATE_LEN: usize = 256;
 const MAX_DETAIL_LEN: usize = 512;
 
+/// Namespace in which an expanded filename collision occurred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NameNamespace {
+    /// Release assets and checksum sidecars share one flat namespace.
+    ReleaseFiles,
+    /// Installed filenames share one flat namespace.
+    InstallNames,
+}
+
+impl fmt::Display for NameNamespace {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ReleaseFiles => f.write_str("release-file"),
+            Self::InstallNames => f.write_str("install-name"),
+        }
+    }
+}
+
 /// Typed distribution errors. Parsing never guesses or falls back.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -43,6 +61,15 @@ pub enum DistError {
     MissingInput(String),
     /// An archive member path is unsafe.
     InvalidMemberPath(String),
+    /// Two logical filename fields collide after portable case folding.
+    NameCollision {
+        /// The filename namespace that contains the collision.
+        namespace: NameNamespace,
+        /// Bounded logical field label; no arbitrary filename is included.
+        first: String,
+        /// Bounded logical field label; no arbitrary filename is included.
+        second: String,
+    },
 }
 
 impl DistError {
@@ -66,6 +93,14 @@ impl fmt::Display for DistError {
             }
             Self::MissingInput(m) => write!(f, "missing template input: {m}"),
             Self::InvalidMemberPath(p) => write!(f, "unsafe archive member path: {p}"),
+            Self::NameCollision {
+                namespace,
+                first,
+                second,
+            } => write!(
+                f,
+                "expanded {namespace} filename collision between {first} and {second}"
+            ),
         }
     }
 }
@@ -246,7 +281,9 @@ impl DistributionContract {
     /// `version` is opaque (no SemVer ordering) but must be filesystem-safe
     /// (non-empty, no `/`, `\\`, or control characters). `{alias}` templates
     /// require looking up via that alias; looking up via the triple when the
-    /// template needs `{alias}` fails with [`DistError::MissingInput`].
+    /// template needs `{alias}` fails with [`DistError::MissingInput`]. The
+    /// expanded result is rejected if any release or install filename
+    /// collides, including ASCII case-only collisions.
     pub fn expand(
         &self,
         target_or_alias: &str,
@@ -313,10 +350,12 @@ impl DistributionContract {
                 })
             }
         };
-        Ok(ExpandedTarget {
+        let expanded = ExpandedTarget {
             triple: target.triple.clone(),
             assets,
-        })
+        };
+        validate_expanded_names(&expanded)?;
+        Ok(expanded)
     }
 
     fn from_raw(raw: RawContract) -> Result<Self, DistError> {
@@ -471,6 +510,20 @@ fn convert_asset(raw: RawAsset) -> Result<AssetForm, DistError> {
                 validate_file_template(&e.asset, false)?;
                 validate_file_template(&e.install, false)?;
             }
+            ensure_unique_raw_templates(
+                NameNamespace::ReleaseFiles,
+                entries
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| (e.asset.as_str(), format!("entries[{i}].asset"))),
+            )?;
+            ensure_unique_raw_templates(
+                NameNamespace::InstallNames,
+                entries
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| (e.install.as_str(), format!("entries[{i}].install"))),
+            )?;
             Ok(AssetForm::Bundle { entries })
         }
         "archive" => {
@@ -505,6 +558,13 @@ fn convert_asset(raw: RawAsset) -> Result<AssetForm, DistError> {
                     )));
                 }
             }
+            ensure_unique_raw_templates(
+                NameNamespace::InstallNames,
+                members
+                    .iter()
+                    .enumerate()
+                    .map(|(i, m)| (m.install.as_str(), format!("members[{i}].install"))),
+            )?;
             Ok(AssetForm::Archive { asset, members })
         }
         other => Err(DistError::invalid(format!(
@@ -622,18 +682,11 @@ fn validate_file_template(template: &str, allow_asset: bool) -> Result<(), DistE
             "name template must be a flat file name without directories",
         ));
     }
-    for ph in placeholders_in(template) {
-        match ph.as_str() {
-            "product" | "version" | "target" | "alias" => {}
-            "asset" if allow_asset => {}
-            _ => return Err(DistError::UnknownPlaceholder(bound(ph))),
-        }
-    }
+    parse_template(template, allow_asset)?;
     Ok(())
 }
 
-fn validate_checksum_template(asset: &AssetForm, sidecar: &str) -> Result<(), DistError> {
-    let _ = asset;
+fn validate_checksum_template(_asset: &AssetForm, sidecar: &str) -> Result<(), DistError> {
     validate_file_template(sidecar, true)
 }
 
@@ -686,6 +739,78 @@ fn validate_member_source(source: &str) -> Result<(), DistError> {
 
 // ---- Template expansion ----
 
+#[derive(Debug, Clone, Copy)]
+enum Placeholder {
+    Product,
+    Version,
+    Target,
+    Alias,
+    Asset,
+}
+
+enum TemplatePart<'a> {
+    Literal(&'a str),
+    Placeholder(Placeholder),
+}
+
+/// Parses the complete v1 grammar. Braces are reserved exclusively for exact
+/// placeholder names; there is no escaping, nesting, or deferred syntax.
+fn parse_template(template: &str, allow_asset: bool) -> Result<Vec<TemplatePart<'_>>, DistError> {
+    let bytes = template.as_bytes();
+    let mut parts = Vec::new();
+    let mut cursor = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'{' => {
+                if cursor < i {
+                    parts.push(TemplatePart::Literal(&template[cursor..i]));
+                }
+                let Some(relative_end) = template[i + 1..].find('}') else {
+                    return Err(DistError::invalid(
+                        "unmatched opening brace in name template",
+                    ));
+                };
+                let end = i + 1 + relative_end;
+                let name = &template[i + 1..end];
+                if name.is_empty() {
+                    return Err(DistError::invalid("empty placeholder in name template"));
+                }
+                if name.contains(['{', '}']) {
+                    return Err(DistError::invalid("nested braces in name template"));
+                }
+                if !name.bytes().all(|b| b.is_ascii_alphanumeric()) {
+                    return Err(DistError::invalid("malformed placeholder in name template"));
+                }
+                let placeholder = match name {
+                    "product" => Placeholder::Product,
+                    "version" => Placeholder::Version,
+                    "target" => Placeholder::Target,
+                    "alias" => Placeholder::Alias,
+                    "asset" if allow_asset => Placeholder::Asset,
+                    _ => return Err(DistError::UnknownPlaceholder(bound(name.to_string()))),
+                };
+                parts.push(TemplatePart::Placeholder(placeholder));
+                i = end + 1;
+                cursor = i;
+            }
+            b'}' => return Err(DistError::invalid("stray closing brace in name template")),
+            byte => {
+                if !is_safe_name_char(char::from(byte)) {
+                    return Err(DistError::invalid(
+                        "name template literal must use [A-Za-z0-9-_.] only",
+                    ));
+                }
+                i += 1;
+            }
+        }
+    }
+    if cursor < bytes.len() {
+        parts.push(TemplatePart::Literal(&template[cursor..]));
+    }
+    Ok(parts)
+}
+
 struct ExpansionCtx<'a> {
     product: &'a str,
     version: &'a str,
@@ -693,64 +818,42 @@ struct ExpansionCtx<'a> {
     alias: Option<&'a str>,
 }
 
-fn placeholders_in(template: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let bytes = template.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'{' {
-            if let Some(end) = template[i..].find('}') {
-                let name = template[i + 1..i + end].to_string();
-                if !name.is_empty() {
-                    out.push(name);
-                }
-                i += end + 1;
-                continue;
-            }
-            break;
-        }
-        i += 1;
-    }
-    out
-}
-
 fn expand_template(
     template: &str,
     ctx: &ExpansionCtx<'_>,
     asset: Option<&str>,
 ) -> Result<String, DistError> {
-    let mut out = template.to_string();
-    // Validate placeholders first so typos fail even when an input is missing.
-    for ph in placeholders_in(template) {
-        match ph.as_str() {
-            "product" | "version" | "target" | "alias" => {}
-            "asset" if asset.is_some() => {}
-            "asset" => {
-                return Err(DistError::MissingInput(bound(
-                    "`{asset}` requires a checksum context".to_string(),
-                )));
+    let parts = parse_template(template, asset.is_some())?;
+    let mut out = String::with_capacity(template.len());
+    for part in parts {
+        match part {
+            TemplatePart::Literal(literal) => out.push_str(literal),
+            TemplatePart::Placeholder(Placeholder::Product) => out.push_str(ctx.product),
+            TemplatePart::Placeholder(Placeholder::Version) => out.push_str(ctx.version),
+            TemplatePart::Placeholder(Placeholder::Target) => out.push_str(ctx.target),
+            TemplatePart::Placeholder(Placeholder::Alias) => {
+                let alias = ctx.alias.ok_or_else(|| {
+                    DistError::MissingInput(bound(
+                        "`{alias}` requires lookup via that alias".to_string(),
+                    ))
+                })?;
+                out.push_str(alias);
             }
-            _ => return Err(DistError::UnknownPlaceholder(bound(ph))),
+            TemplatePart::Placeholder(Placeholder::Asset) => {
+                let asset = asset.ok_or_else(|| {
+                    DistError::MissingInput(bound(
+                        "`{asset}` requires a checksum context".to_string(),
+                    ))
+                })?;
+                out.push_str(asset);
+            }
         }
-    }
-    out = out.replace("{product}", ctx.product);
-    out = out.replace("{version}", ctx.version);
-    out = out.replace("{target}", ctx.target);
-    if let Some(alias) = ctx.alias {
-        out = out.replace("{alias}", alias);
-    } else if template.contains("{alias}") {
-        return Err(DistError::MissingInput(bound(
-            "`{alias}` requires lookup via that alias".to_string(),
-        )));
-    }
-    if let Some(asset) = asset {
-        out = out.replace("{asset}", asset);
-    }
-    if out.contains('{') || out.contains('}') {
-        return Err(DistError::invalid("unexpanded placeholder remains"));
     }
     if out.is_empty() || out.len() > MAX_TEMPLATE_LEN {
         return Err(DistError::invalid("expanded name is empty or overlong"));
+    }
+    if out.contains(['{', '}']) {
+        return Err(DistError::invalid("expanded name contains reserved braces"));
     }
     if out.contains(['/', '\\']) {
         return Err(DistError::invalid(
@@ -758,6 +861,77 @@ fn expand_template(
         ));
     }
     Ok(out)
+}
+
+fn ensure_unique_names(
+    namespace: NameNamespace,
+    names: impl IntoIterator<Item = (String, String)>,
+) -> Result<(), DistError> {
+    let mut seen: HashMap<String, String> = HashMap::new();
+    for (name, field) in names {
+        let key = name.to_ascii_lowercase();
+        if let Some(first) = seen.get(&key) {
+            return Err(DistError::NameCollision {
+                namespace,
+                first: bound(first.clone()),
+                second: bound(field),
+            });
+        }
+        seen.insert(key, field);
+    }
+    Ok(())
+}
+
+fn ensure_unique_raw_templates<'a>(
+    namespace: NameNamespace,
+    templates: impl IntoIterator<Item = (&'a str, String)>,
+) -> Result<(), DistError> {
+    ensure_unique_names(
+        namespace,
+        templates
+            .into_iter()
+            .map(|(template, field)| (template.to_string(), field)),
+    )
+}
+
+fn validate_expanded_names(target: &ExpandedTarget) -> Result<(), DistError> {
+    let mut release_names = Vec::new();
+    let mut install_names = Vec::new();
+    match &target.assets {
+        ExpandedAssets::Direct(direct) => {
+            release_names.push((direct.asset_file.clone(), "asset_file".to_string()));
+            release_names.push((direct.sidecar_file.clone(), "sidecar_file".to_string()));
+            install_names.push((direct.install_name.clone(), "install_name".to_string()));
+        }
+        ExpandedAssets::Bundle(bundle) => {
+            for (index, entry) in bundle.entries.iter().enumerate() {
+                release_names.push((
+                    entry.asset_file.clone(),
+                    format!("entries[{index}].asset_file"),
+                ));
+                release_names.push((
+                    entry.sidecar_file.clone(),
+                    format!("entries[{index}].sidecar_file"),
+                ));
+                install_names.push((
+                    entry.install_name.clone(),
+                    format!("entries[{index}].install_name"),
+                ));
+            }
+        }
+        ExpandedAssets::Archive(archive) => {
+            release_names.push((archive.archive_file.clone(), "archive_file".to_string()));
+            release_names.push((archive.sidecar_file.clone(), "sidecar_file".to_string()));
+            for (index, member) in archive.members.iter().enumerate() {
+                install_names.push((
+                    member.install_name.clone(),
+                    format!("members[{index}].install_name"),
+                ));
+            }
+        }
+    }
+    ensure_unique_names(NameNamespace::ReleaseFiles, release_names)?;
+    ensure_unique_names(NameNamespace::InstallNames, install_names)
 }
 
 // ---- Expanded model ----
@@ -898,6 +1072,56 @@ install = "egress-helper"
 sidecar = "{asset}.sha256"
 "#;
 
+    fn bundle_with(
+        asset0: &str,
+        asset1: &str,
+        install0: &str,
+        install1: &str,
+        sidecar: &str,
+    ) -> Result<DistributionContract, DistError> {
+        let source = BUNDLE
+            .replacen(
+                "asset = \"{product}-{version}-{target}\"",
+                &format!("asset = \"{asset0}\""),
+                1,
+            )
+            .replacen(
+                "asset = \"{product}-helper-{version}-{target}\"",
+                &format!("asset = \"{asset1}\""),
+                1,
+            )
+            .replacen(
+                "install = \"{product}\"",
+                &format!("install = \"{install0}\""),
+                1,
+            )
+            .replacen(
+                "install = \"{product}-helper\"",
+                &format!("install = \"{install1}\""),
+                1,
+            )
+            .replace(
+                "sidecar = \"{asset}.sha256\"",
+                &format!("sidecar = \"{sidecar}\""),
+            );
+        DistributionContract::parse_toml_str(&source)
+    }
+
+    fn archive_with(install0: &str, install1: &str) -> Result<DistributionContract, DistError> {
+        let source = ARCHIVE
+            .replacen(
+                "install = \"egress\"",
+                &format!("install = \"{install0}\""),
+                1,
+            )
+            .replacen(
+                "install = \"egress-helper\"",
+                &format!("install = \"{install1}\""),
+                1,
+            );
+        DistributionContract::parse_toml_str(&source)
+    }
+
     #[test]
     fn parse_minimal_valid_v1() {
         let c = DistributionContract::parse_toml_str(SIMPLE).unwrap();
@@ -993,6 +1217,213 @@ sidecar = "{asset}.sha256"
         let s = SIMPLE.replace("{product}-{version}-{target}", "{product}-{env}-x");
         let err = DistributionContract::parse_toml_str(&s).unwrap_err();
         assert!(matches!(err, DistError::UnknownPlaceholder(_)));
+    }
+
+    #[test]
+    fn malformed_template_grammar_is_rejected_during_parse() {
+        for bad in [
+            "{product",
+            "product}",
+            "{}",
+            "{product{version}}",
+            "{ bad}",
+            "{{product}}",
+            "file name",
+            "{asset}",
+        ] {
+            let source = SIMPLE.replace(
+                "asset = \"{product}-{version}-{target}\"",
+                &format!("asset = \"{bad}\""),
+            );
+            assert!(
+                DistributionContract::parse_toml_str(&source).is_err(),
+                "accepted malformed template {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn repeated_known_placeholders_remain_valid() {
+        let source = SIMPLE.replace(
+            "asset = \"{product}-{version}-{target}\"",
+            "asset = \"{product}-{product}-{version}\"",
+        );
+        let contract = DistributionContract::parse_toml_str(&source).unwrap();
+        let expanded = contract
+            .expand("x86_64-unknown-linux-gnu", "1.2.3")
+            .unwrap();
+        match expanded.assets {
+            ExpandedAssets::Direct(direct) => {
+                assert_eq!(direct.asset_file, "eggsact-eggsact-1.2.3")
+            }
+            _ => panic!("expected direct"),
+        }
+    }
+
+    #[test]
+    fn bundle_expansion_rejects_release_asset_and_sidecar_collisions() {
+        let contract = bundle_with("same", "same", "app", "helper", "{asset}.sha256")
+            .expect_err("identical raw assets should fail early");
+        assert!(matches!(
+            contract,
+            DistError::NameCollision {
+                namespace: NameNamespace::ReleaseFiles,
+                ..
+            }
+        ));
+
+        let contract =
+            bundle_with("{version}", "1.2.3", "app", "helper", "{asset}.sha256").unwrap();
+        assert!(matches!(
+            contract.expand("x86_64-unknown-linux-gnu", "1.2.3"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::ReleaseFiles,
+                ..
+            })
+        ));
+
+        let contract = bundle_with("one", "two", "app", "helper", "constant.sha256").unwrap();
+        assert!(matches!(
+            contract.expand("x86_64-unknown-linux-gnu", "1.2.3"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::ReleaseFiles,
+                ..
+            })
+        ));
+
+        let contract = bundle_with("first", "second", "app", "helper", "first").unwrap();
+        assert!(matches!(
+            contract.expand("x86_64-unknown-linux-gnu", "1.2.3"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::ReleaseFiles,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn direct_and_archive_asset_sidecar_collisions_are_rejected() {
+        let direct = SIMPLE.replace(
+            "sidecar = \"{asset}.sha256\"",
+            "sidecar = \"{product}-{version}-{target}\"",
+        );
+        let contract = DistributionContract::parse_toml_str(&direct).unwrap();
+        assert!(matches!(
+            contract.expand("x86_64-unknown-linux-gnu", "1.2.3"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::ReleaseFiles,
+                ..
+            })
+        ));
+
+        let archive = ARCHIVE.replace("sidecar = \"{asset}.sha256\"", "sidecar = \"{asset}\"");
+        let contract = DistributionContract::parse_toml_str(&archive).unwrap();
+        assert!(matches!(
+            contract.expand("aarch64-apple-darwin", "1.2.3"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::ReleaseFiles,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn bundle_and_archive_install_names_must_be_unique_and_portable() {
+        let contract = bundle_with("one", "two", "same", "same", "{asset}.sha256")
+            .expect_err("identical raw install names should fail early");
+        assert!(matches!(
+            contract,
+            DistError::NameCollision {
+                namespace: NameNamespace::InstallNames,
+                ..
+            }
+        ));
+
+        let contract = bundle_with("one", "two", "App", "app", "{asset}.sha256")
+            .expect_err("ASCII case-only raw install names should fail early");
+        assert!(matches!(
+            contract,
+            DistError::NameCollision {
+                namespace: NameNamespace::InstallNames,
+                ..
+            }
+        ));
+
+        let contract = bundle_with("one", "two", "{version}", "APP", "{asset}.sha256").unwrap();
+        assert!(matches!(
+            contract.expand("x86_64-unknown-linux-gnu", "app"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::InstallNames,
+                ..
+            })
+        ));
+
+        let contract = bundle_with(
+            "one",
+            "two",
+            "member-{version}",
+            "member-1.2.3",
+            "{asset}.sha256",
+        )
+        .unwrap();
+        assert!(matches!(
+            contract.expand("x86_64-unknown-linux-gnu", "1.2.3"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::InstallNames,
+                ..
+            })
+        ));
+
+        let contract = archive_with("tool", "tool").expect_err("duplicate archive install name");
+        assert!(matches!(
+            contract,
+            DistError::NameCollision {
+                namespace: NameNamespace::InstallNames,
+                ..
+            }
+        ));
+        let contract = archive_with("Tool", "tool")
+            .expect_err("ASCII case-only raw archive install names should fail early");
+        assert!(matches!(
+            contract,
+            DistError::NameCollision {
+                namespace: NameNamespace::InstallNames,
+                ..
+            }
+        ));
+        let contract = archive_with("{version}", "TOOL").unwrap();
+        assert!(matches!(
+            contract.expand("aarch64-apple-darwin", "tool"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::InstallNames,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn release_and_install_case_only_collisions_are_rejected() {
+        let source = SIMPLE.replace(
+            "sidecar = \"{asset}.sha256\"",
+            "sidecar = \"EGGSACT-1.2.3-X86_64-UNKNOWN-LINUX-GNU\"",
+        );
+        let contract = DistributionContract::parse_toml_str(&source).unwrap();
+        assert!(matches!(
+            contract.expand("x86_64-unknown-linux-gnu", "1.2.3"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::ReleaseFiles,
+                ..
+            })
+        ));
+
+        let contract = bundle_with("one", "two", "{version}", "APP", "{asset}.sha256").unwrap();
+        assert!(matches!(
+            contract.expand("x86_64-unknown-linux-gnu", "app"),
+            Err(DistError::NameCollision {
+                namespace: NameNamespace::InstallNames,
+                ..
+            })
+        ));
     }
 
     #[test]

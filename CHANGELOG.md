@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- M002 distribution schema corrective: TOML v1 templates now use a strict
+  lexer that rejects malformed/stray/nested braces and unsupported syntax at
+  parse time. Expanded release assets and checksum sidecars share a unique
+  namespace, and expanded install names are unique; exact and ASCII-case-only
+  collisions fail with a bounded typed error. No publication or consumer
+  migration performed.
+
 - M004 acquisition corrective: `FetchLimits::validate` is shared by its
   constructor and re-run at every fixture/Eggfetch transport boundary while
   public fields remain source-compatible for 0.1.x. Invalid direct literals
