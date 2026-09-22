@@ -1,8 +1,8 @@
 # Verified Update Core Milestone 003 — Transaction Commit, Rollback, and Recovery
 
-Status: blocked on M002 closure
+Status: ready for handoff
 
-Repository baseline for planning: `5b6cf13ed7e6e2bd40951216f29ea68d7333aadf`
+Repository baseline for planning: `adaada4`
 
 Source roadmap:
 
@@ -26,7 +26,7 @@ Implement the first live-mutation state machine: exclusive mutation lock, destin
 
 ## 2. Why this milestone is not yet ready
 
-Hard dependency: M002 closure defining PreparedTransaction and destination ownership.
+Hard dependency: M002 closure defining PreparedTransaction and destination ownership is closed at `adaada4`.
 
 Before handoff, update the repository baseline and reconcile the fault-injection surface created by M001/M002.
 

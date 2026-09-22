@@ -2,7 +2,7 @@
 
 Status: active
 
-Last planning baseline reviewed: `4ae7642`
+Last planning baseline reviewed: `adaada4`
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -27,7 +27,7 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 | Subsystem | Status | Next dependency-ready milestone |
 |---|---|---|
-| Verified update core | active | M002 domain/prepared transaction |
+| Verified update core | active | M003 transaction commit/rollback |
 | Acquisition transport | proposed / blocked | M001 after core M002 interface |
 | Service lifecycle | proposed / blocked | M001 after core M003 |
 | Distribution/bootstrap | proposed / later phase | M001 after first consumer adoption evidence |
@@ -37,14 +37,13 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Verified update core | M002 | **ready for handoff** | `plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md` | M001 closed |
+| Verified update core | M003 | **ready for handoff** | `plans/implementation/verified-update-core/003-transaction-commit-rollback.md` | M002 closed |
+| Verified update core | M004 | **ready for handoff** | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | M002 closed |
 
 ## Planned but blocked implementation work
 
 | Subsystem | Milestone | Status | Plan | Blocker |
 |---|---|---|---|---|
-| Verified update core | M003 | blocked | `plans/implementation/verified-update-core/003-transaction-commit-rollback.md` | M002 closure |
-| Verified update core | M004 | blocked | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | M002 closure |
 | Acquisition transport | M001 | blocked | not yet written | stable core M002 stage/acquisition interface |
 | Service lifecycle | M001 | blocked | not yet written | stable core transaction semantics |
 | Consumer adoption | eggsact / stegoeggo | blocked | not yet written | core transaction + verification + Eggfetch adapter |
@@ -92,16 +91,16 @@ acquisition M001/M002
 - Published crates: none.
 - Release process: none.
 - Consumer integrations: none.
-- Closure records: M001 closed; M002-M004 not yet closed.
+- Closure records: M001-M002 closed; M003-M004 not yet closed.
 - Corrective plans: none.
 
 ## Next handoff
 
 Hand only this plan to the next implementation agent:
 
-`plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md`
+`plans/implementation/verified-update-core/003-transaction-commit-rollback.md`
 
-M001 is closed. Continue with M002; do not hand M003 or M004 concurrently before M002 closure because their concrete domain and prepared-transaction contracts must be reconciled against what M002 actually establishes.
+M001-M002 are closed. Continue with M003; M004 is also dependency-ready but is being executed after M003 in this sequential pass.
 
 ## Registry update rule
 

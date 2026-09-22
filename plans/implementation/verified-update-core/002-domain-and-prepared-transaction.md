@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 002 — Domain and Prepared Transaction Contract
 
-Status: ready for handoff
+Status: implemented
 
 Repository baseline for planning: `4ae7642`
 
@@ -26,11 +26,11 @@ Primary class: infrastructure / invariant
 
 Define the policy-neutral Rust domain and a preparation phase that can validate and privately stage a one- or multi-member deployment without mutating live destinations.
 
-## 2. Why this milestone is not yet ready
+## 2. Why this milestone was ready
 
 Hard dependency: M001 accepted closure.
 
-M001 is closed at `4ae7642`; the implementation below must reconcile module names
+M001 is closed at `4ae7642`; the implementation reconciled module names
 with the actual workspace rather than assuming the roadmap's illustrative file
 layout.
 

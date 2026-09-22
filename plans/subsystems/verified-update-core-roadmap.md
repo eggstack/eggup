@@ -287,7 +287,7 @@ The roadmap closes when eggup-core safely supports one- and multi-member verifie
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
 | M001 | closed | `plans/implementation/verified-update-core/001-repository-workspace-foundation.md` | `plans/closure/verified-update-core/001-status.md` | — |
-| M002 | ready | `plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md` | — | — |
-| M003 | blocked on M002 | `plans/implementation/verified-update-core/003-transaction-commit-rollback.md` | — | M002 |
-| M004 | blocked on M002 | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | — | M002 |
+| M002 | closed | `plans/implementation/verified-update-core/002-domain-and-prepared-transaction.md` | `plans/closure/verified-update-core/002-status.md` | — |
+| M003 | ready | `plans/implementation/verified-update-core/003-transaction-commit-rollback.md` | — | — |
+| M004 | ready | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | — | — |
 | M005 | planned | — | — | M003, M004 |

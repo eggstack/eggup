@@ -1,8 +1,8 @@
 # Verified Update Core Milestone 004 — Integrity and Candidate Validation
 
-Status: blocked on M002 closure
+Status: ready for handoff
 
-Repository baseline for planning: `5b6cf13ed7e6e2bd40951216f29ea68d7333aadf`
+Repository baseline for planning: `adaada4`
 
 Source roadmap:
 
@@ -27,7 +27,7 @@ Implement local integrity and bounded candidate verification so a staged file ca
 
 ## 2. Why this milestone is not yet ready
 
-Hard dependency: M002 closure, because verification must attach to the actual ArtifactMember/PreparedTransaction model rather than invent parallel structures.
+Hard dependency: M002 closure, because verification must attach to the actual ArtifactMember/PreparedTransaction model rather than invent parallel structures. M002 is closed at `adaada4`.
 
 M003 may proceed in parallel after M002, but final core qualification requires both.
 
