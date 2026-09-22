@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple tier closed, eggsearch adoption planning-ready, Gregg awaits footprint evidence
+Status: active; simple tier closed, eggsearch M003 ready for handoff, Gregg awaits footprint evidence
 
 Long-term references:
 
@@ -127,11 +127,13 @@ Second independent single-binary consumer; use it to identify accidental eggsact
 
 ### M003 — eggsearch adoption
 
-Adopt core/acquisition plus Unix service substrate after acquisition M003 and service M002 close. Detailed implementation plan intentionally waits for those closure findings.
+Plan: `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md`.
+
+Adopt corrected core/acquisition plus the Unix service substrate after acquisition M004 and service M003 closure. Preserve eggsearch-owned release/Cargo fallback, health, cron watchdog, and Windows-specific behavior until the corresponding shared layers are qualified.
 
 ### M004 — Gregg adoption
 
-Replace `gregg-update` with Eggup mechanics after acquisition M003 closes and remeasure the corrected Eggfetch path against Gregg's footprint budget. Create lightweight acquisition M004 only if the evidence still justifies it. Detailed adoption plan waits for that decision.
+Replace `gregg-update` with Eggup mechanics after remeasuring the acquisition-M004-corrected Eggfetch path against Gregg's footprint budget. Create lightweight acquisition M005 only if the evidence still justifies it. Detailed adoption plan waits for that decision.
 
 ### M005 — CodeGG bundle adoption
 
@@ -167,7 +169,7 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 |---|---|---|---|---|
 | M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
-| M003 eggsearch | dependency-ready / plan needed | — | — | acquisition M004 + service M003 closed |
+| M003 eggsearch | **ready for handoff** | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | — | acquisition M004 + service M003 closed |
 | M004 Gregg | blocked / plan intentionally unwritten | — | — | corrected-path footprint decision |
 | M005 CodeGG | planned / blocked | — | — | mature multi-artifact core + distribution M003 validator evidence |
 | M006 Egress | planned / blocked | — | — | core/archive contract + distribution M003 validator evidence |
