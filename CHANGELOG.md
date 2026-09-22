@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- M003 service corrective: launchd restart now propagates incomplete stop/start
+  results; systemd/launchd transitions share one end-to-end monotonic deadline;
+  production manager commands use trusted absolute paths and a cleared,
+  documented environment; config identity is reconciled against exact argv;
+  manager mutation exit statuses are checked. No consumer migration or
+  publication performed.
+
 - M002 distribution schema corrective: TOML v1 templates now use a strict
   lexer that rejects malformed/stray/nested braces and unsupported syntax at
   parse time. Expanded release assets and checksum sidecars share a unique

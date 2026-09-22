@@ -557,12 +557,23 @@ impl ServiceManager for TestDoubleManager {
     ) -> Result<TransitionResult, ServiceError> {
         let (ownership, _) = self.snapshot_for(spec);
         require_owned(spec.id(), ownership)?;
-        self.stop(spec, timeout)?;
-        self.start(spec, timeout)?;
+        let stopped = self.stop(spec, timeout)?;
+        if !stopped.completed {
+            return Ok(TransitionResult {
+                operation: ServiceOperation::Restart,
+                completed: false,
+                detail: ServiceError::bounded("restart stop phase incomplete"),
+            });
+        }
+        let started = self.start(spec, timeout)?;
         Ok(TransitionResult {
             operation: ServiceOperation::Restart,
-            completed: true,
-            detail: ServiceError::bounded("restarted"),
+            completed: started.completed,
+            detail: ServiceError::bounded(if started.completed {
+                "restarted"
+            } else {
+                "restart start phase incomplete"
+            }),
         })
     }
 
@@ -637,8 +648,9 @@ pub trait CommandExecutor: fmt::Debug {
 
 /// Production bounded command runner (literal argv, no shell).
 ///
-/// Environment: inherits the parent process environment and adds nothing;
-/// no secrets are injected. Stdin is null unless the caller supplies bounded
+/// Manager names resolve only through trusted absolute platform paths. The
+/// child environment is cleared; user-scoped systemd receives only explicit
+/// session-bus variables. Stdin is null unless the caller supplies bounded
 /// input. Stdout/stderr are each bounded by `max_output_bytes`; overflow
 /// fails closed without assuming state. Deadlines kill and reap the child.
 #[derive(Debug, Clone)]
@@ -691,12 +703,17 @@ impl CommandExecutor for SystemExecutor {
                 return Err(ServiceError::invalid("manager stdin exceeds bound"));
             }
         }
-        let program = argv[0].clone();
-        let mut cmd = std::process::Command::new(&program);
+        let command_deadline = Instant::now() + timeout;
+        let program_path = resolve_manager_program(&argv[0])?;
+        let program = program_path.to_string_lossy().into_owned();
+        let mut cmd = std::process::Command::new(&program_path);
         if argv.len() > 1 {
             cmd.args(&argv[1..]);
         }
-        // Documented environment: inherit, add nothing, never interpolate.
+        cmd.env_clear();
+        for (key, value) in filtered_manager_environment(argv, std::env::vars_os()) {
+            cmd.env(key, value);
+        }
         if stdin_data.is_some() {
             cmd.stdin(std::process::Stdio::piped());
         } else {
@@ -744,16 +761,23 @@ impl CommandExecutor for SystemExecutor {
             let out = read_bounded_generic(stderr_pipe, max);
             let _ = tx_err.send(out);
         });
-        let start = Instant::now();
         loop {
             match child.try_wait() {
                 Ok(Some(status)) => {
-                    let (stdout, out_overflow) = rx_out
-                        .recv_timeout(Duration::from_secs(5))
-                        .unwrap_or((Vec::new(), true));
-                    let (stderr, err_overflow) = rx_err
-                        .recv_timeout(Duration::from_secs(5))
-                        .unwrap_or((Vec::new(), true));
+                    let remaining = command_deadline
+                        .checked_duration_since(Instant::now())
+                        .filter(|d| !d.is_zero())
+                        .ok_or_else(|| ServiceError::manager("manager command timed out"))?;
+                    let (stdout, out_overflow) = rx_out.recv_timeout(remaining).map_err(|_| {
+                        ServiceError::manager("manager output collection timed out")
+                    })?;
+                    let remaining = command_deadline
+                        .checked_duration_since(Instant::now())
+                        .filter(|d| !d.is_zero())
+                        .ok_or_else(|| ServiceError::manager("manager command timed out"))?;
+                    let (stderr, err_overflow) = rx_err.recv_timeout(remaining).map_err(|_| {
+                        ServiceError::manager("manager output collection timed out")
+                    })?;
                     if out_overflow || err_overflow {
                         return Err(ServiceError::manager(format!(
                             "manager output exceeded bound for {program}"
@@ -766,14 +790,19 @@ impl CommandExecutor for SystemExecutor {
                     });
                 }
                 Ok(None) => {
-                    if start.elapsed() > timeout {
+                    if Instant::now() >= command_deadline {
                         let _ = child.kill();
                         let _ = child.wait();
                         return Err(ServiceError::manager(format!(
                             "manager command timed out for {program}"
                         )));
                     }
-                    std::thread::sleep(Duration::from_millis(5));
+                    std::thread::sleep(
+                        command_deadline
+                            .checked_duration_since(Instant::now())
+                            .unwrap_or_default()
+                            .min(Duration::from_millis(5)),
+                    );
                 }
                 Err(e) => {
                     let _ = child.kill();
@@ -785,6 +814,79 @@ impl CommandExecutor for SystemExecutor {
             }
         }
     }
+}
+
+fn resolve_manager_program(program: &str) -> Result<PathBuf, ServiceError> {
+    let requested = Path::new(program);
+    if requested.is_absolute() {
+        return validate_executable_path(requested, program);
+    }
+    let candidates: &[&str] = match program {
+        "systemctl" => &["/usr/bin/systemctl", "/bin/systemctl"],
+        "launchctl" => &["/bin/launchctl", "/usr/bin/launchctl"],
+        "crontab" => &["/usr/bin/crontab", "/bin/crontab"],
+        _ => {
+            return Err(ServiceError::invalid(
+                "manager program must be absolute or allowlisted",
+            ))
+        }
+    };
+    for candidate in candidates {
+        let path = Path::new(candidate);
+        if validate_executable_path(path, program).is_err() {
+            continue;
+        }
+        return Ok(path.to_path_buf());
+    }
+    Err(ServiceError::manager(format!(
+        "trusted manager binary missing: {program}"
+    )))
+}
+
+fn validate_executable_path(path: &Path, display: &str) -> Result<PathBuf, ServiceError> {
+    if !path.is_absolute() {
+        return Err(ServiceError::invalid(
+            "manager program override must be absolute",
+        ));
+    }
+    let metadata = std::fs::metadata(path)
+        .map_err(|_| ServiceError::manager(format!("manager binary missing: {display}")))?;
+    if !metadata.is_file() {
+        return Err(ServiceError::invalid(
+            "manager program is not a regular file",
+        ));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o111 == 0 {
+            return Err(ServiceError::invalid("manager program is not executable"));
+        }
+    }
+    Ok(path.to_path_buf())
+}
+
+fn filtered_manager_environment(
+    argv: &[String],
+    source: impl IntoIterator<Item = (std::ffi::OsString, std::ffi::OsString)>,
+) -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
+    let user_systemd = argv
+        .first()
+        .is_some_and(|p| Path::new(p).file_name().is_some_and(|n| n == "systemctl"))
+        && argv.iter().any(|arg| arg == "--user");
+    let allow: &[&std::ffi::OsStr] = if user_systemd {
+        &[
+            std::ffi::OsStr::new("DBUS_SESSION_BUS_ADDRESS"),
+            std::ffi::OsStr::new("XDG_RUNTIME_DIR"),
+            std::ffi::OsStr::new("SYSTEMD_BUS_ADDRESS"),
+        ]
+    } else {
+        &[]
+    };
+    source
+        .into_iter()
+        .filter(|(key, _)| allow.contains(&key.as_os_str()))
+        .collect()
 }
 
 fn read_bounded_generic(
@@ -1206,19 +1308,32 @@ impl<E: CommandExecutor> SystemdManager<E> {
         &self,
         spec: &ServiceSpec,
     ) -> Result<(Ownership, LifecycleState), ServiceError> {
-        // Ownership for systemd uses exe + args only; `config` must be encoded
-        // in args (or None). An observed record never carries a separate
-        // config, so a spec with `Some(config)` is Foreign by the neutral rule.
-        let out = self.executor.run(
-            &self.show_argv(),
-            None,
-            bounded_timeout(self.install.transition_timeout),
-        )?;
+        self.ownership_until(
+            spec,
+            OperationDeadline::new(self.install.transition_timeout)?,
+        )
+    }
+
+    fn ownership_until(
+        &self,
+        spec: &ServiceSpec,
+        deadline: OperationDeadline,
+    ) -> Result<(Ownership, LifecycleState), ServiceError> {
+        let out = self
+            .executor
+            .run(&self.show_argv(), None, deadline.command_timeout()?)?;
+        if out.status != Some(0) {
+            return Ok((Ownership::Unknown, LifecycleState::Unknown));
+        }
         let (ownership, state, _) = systemd_ownership(&out.stdout_text(), spec)?;
         Ok((ownership, state))
     }
 
-    fn run_unit(&self, verb: &str, timeout: Duration) -> Result<CommandOutput, ServiceError> {
+    fn run_unit(
+        &self,
+        verb: &str,
+        deadline: OperationDeadline,
+    ) -> Result<CommandOutput, ServiceError> {
         let argv = vec![
             "systemctl".to_string(),
             self.install.scope.flag().to_string(),
@@ -1227,7 +1342,7 @@ impl<E: CommandExecutor> SystemdManager<E> {
         ];
         let out = self
             .executor
-            .run(&argv, None, bounded_timeout(timeout))
+            .run(&argv, None, deadline.command_timeout()?)
             .map_err(permission_hint)?;
         if out.status != Some(0) {
             return Err(permission_hint(ServiceError::manager(format!(
@@ -1239,8 +1354,11 @@ impl<E: CommandExecutor> SystemdManager<E> {
         Ok(out)
     }
 
-    fn poll_active(&self, want_active: bool, timeout: Duration) -> Result<bool, ServiceError> {
-        let start = Instant::now();
+    fn poll_active(
+        &self,
+        want_active: bool,
+        deadline: OperationDeadline,
+    ) -> Result<bool, ServiceError> {
         loop {
             let argv = vec![
                 "systemctl".to_string(),
@@ -1250,30 +1368,95 @@ impl<E: CommandExecutor> SystemdManager<E> {
             ];
             let out = self
                 .executor
-                .run(&argv, None, Duration::from_secs(5))
+                .run(&argv, None, deadline.command_timeout()?)
                 .map_err(permission_hint)?;
             let state = out.stdout_text().trim().to_string();
-            let active = state == "active";
-            if active == want_active {
-                return Ok(true);
+            let confirmed = if want_active {
+                state == "active" && out.status == Some(0)
+            } else {
+                state == "inactive" && out.status == Some(3)
+            };
+            if confirmed {
+                return Ok(!deadline.expired());
             }
-            // `activating`/`deactivating` are transitioning; keep polling.
-            // `failed`/`unknown`/`inactive` that mismatches want means keep
-            // polling until the deadline (never assume).
-            if start.elapsed() > timeout {
+            if deadline.expired() {
                 return Ok(false);
             }
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(
+                deadline
+                    .remaining()
+                    .unwrap_or_default()
+                    .min(Duration::from_millis(100)),
+            );
         }
     }
 }
 
-fn bounded_timeout(t: Duration) -> Duration {
-    if t.is_zero() {
-        Duration::from_secs(10)
-    } else {
-        std::cmp::min(t, MAX_TRANSITION_TIMEOUT)
+#[derive(Debug, Clone, Copy)]
+struct OperationDeadline(Instant);
+
+impl OperationDeadline {
+    fn new(timeout: Duration) -> Result<Self, ServiceError> {
+        if timeout.is_zero() || timeout > MAX_TRANSITION_TIMEOUT {
+            return Err(ServiceError::invalid("transition timeout out of range"));
+        }
+        Ok(Self(Instant::now() + timeout))
     }
+
+    fn remaining(self) -> Option<Duration> {
+        self.0
+            .checked_duration_since(Instant::now())
+            .filter(|duration| !duration.is_zero())
+    }
+
+    fn command_timeout(self) -> Result<Duration, ServiceError> {
+        self.remaining().ok_or_else(|| {
+            ServiceError::manager("transition deadline exhausted before manager command")
+        })
+    }
+
+    fn expired(self) -> bool {
+        self.remaining().is_none()
+    }
+}
+
+fn bounded_timeout(t: Duration) -> Duration {
+    std::cmp::min(t, MAX_TRANSITION_TIMEOUT)
+}
+
+fn reconcile_config_identity(
+    mut observed: RegistrationSnapshot,
+    spec: &ServiceSpec,
+) -> RegistrationSnapshot {
+    let Some(config) = spec.config() else {
+        return observed;
+    };
+    let Some(config_text) = config.to_str() else {
+        observed.malformed = true;
+        return observed;
+    };
+    let expected_count = spec
+        .args()
+        .iter()
+        .filter(|arg| arg.as_str() == config_text)
+        .count();
+    let observed_count = observed
+        .args
+        .iter()
+        .filter(|arg| arg.as_str() == config_text)
+        .count();
+    if observed_count == 0 {
+        // A parseable registration without the specified config is Foreign.
+        return observed;
+    }
+    if expected_count > 1 || observed_count > 1 {
+        observed.malformed = true;
+        return observed;
+    }
+    if expected_count == 1 && observed_count == 1 {
+        observed.config = Some(config.to_path_buf());
+    }
+    observed
 }
 
 fn truncate(s: &str) -> String {
@@ -1298,6 +1481,18 @@ fn permission_hint(e: ServiceError) -> ServiceError {
             }
         }
         other => other,
+    }
+}
+
+fn ensure_mutation_success(out: &CommandOutput, command: &str) -> Result<(), ServiceError> {
+    if out.status == Some(0) {
+        Ok(())
+    } else {
+        Err(permission_hint(ServiceError::manager(format!(
+            "{command} exited {}: {}",
+            out.status.unwrap_or(-1),
+            truncate(&out.stderr_text()),
+        ))))
     }
 }
 
@@ -1387,13 +1582,16 @@ fn systemd_ownership(
     let Some((exe, args)) = parse_exec_start(execstarts[0]) else {
         return Ok((Ownership::Unknown, state, true));
     };
-    let observed = RegistrationSnapshot {
-        present: true,
-        executable: Some(exe),
-        args,
-        config: None,
-        malformed: false,
-    };
+    let observed = reconcile_config_identity(
+        RegistrationSnapshot {
+            present: true,
+            executable: Some(exe),
+            args,
+            config: None,
+            malformed: false,
+        },
+        spec,
+    );
     Ok((observed.ownership(spec), state, true))
 }
 
@@ -1404,7 +1602,11 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
             None,
             bounded_timeout(self.install.transition_timeout),
         )?;
-        let (ownership, state, present) = systemd_ownership(&out.stdout_text(), spec)?;
+        let (ownership, state, present) = if out.status == Some(0) {
+            systemd_ownership(&out.stdout_text(), spec)?
+        } else {
+            (Ownership::Unknown, LifecycleState::Unknown, true)
+        };
         Ok(LifecycleSnapshot {
             id: spec.id().clone(),
             ownership,
@@ -1452,17 +1654,18 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
         spec: &ServiceSpec,
         timeout: Duration,
     ) -> Result<TransitionResult, ServiceError> {
-        let (ownership, state) = self.ownership_of(spec)?;
+        let deadline = OperationDeadline::new(timeout)?;
+        let (ownership, state) = self.ownership_until(spec, deadline)?;
         require_owned(spec.id(), ownership)?;
         if state == LifecycleState::Running {
             return Ok(TransitionResult {
                 operation: ServiceOperation::Start,
-                completed: true,
+                completed: !deadline.expired(),
                 detail: ServiceError::bounded("already running"),
             });
         }
-        self.run_unit("start", timeout)?;
-        let completed = self.poll_active(true, bounded_timeout(timeout))?;
+        self.run_unit("start", deadline)?;
+        let completed = self.poll_active(true, deadline)?;
         Ok(TransitionResult {
             operation: ServiceOperation::Start,
             completed,
@@ -1479,17 +1682,18 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
         spec: &ServiceSpec,
         timeout: Duration,
     ) -> Result<TransitionResult, ServiceError> {
-        let (ownership, state) = self.ownership_of(spec)?;
+        let deadline = OperationDeadline::new(timeout)?;
+        let (ownership, state) = self.ownership_until(spec, deadline)?;
         require_owned(spec.id(), ownership)?;
         if state == LifecycleState::Stopped {
             return Ok(TransitionResult {
                 operation: ServiceOperation::Stop,
-                completed: true,
+                completed: !deadline.expired(),
                 detail: ServiceError::bounded("already stopped"),
             });
         }
-        self.run_unit("stop", timeout)?;
-        let completed = self.poll_active(false, bounded_timeout(timeout))?;
+        self.run_unit("stop", deadline)?;
+        let completed = self.poll_active(false, deadline)?;
         Ok(TransitionResult {
             operation: ServiceOperation::Stop,
             completed,
@@ -1506,10 +1710,11 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
         spec: &ServiceSpec,
         timeout: Duration,
     ) -> Result<TransitionResult, ServiceError> {
-        let (ownership, _) = self.ownership_of(spec)?;
+        let deadline = OperationDeadline::new(timeout)?;
+        let (ownership, _) = self.ownership_until(spec, deadline)?;
         require_owned(spec.id(), ownership)?;
-        self.run_unit("restart", timeout)?;
-        let completed = self.poll_active(true, bounded_timeout(timeout))?;
+        self.run_unit("restart", deadline)?;
+        let completed = self.poll_active(true, deadline)?;
         Ok(TransitionResult {
             operation: ServiceOperation::Restart,
             completed,
@@ -1536,16 +1741,29 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
             "disable".to_string(),
             self.install.unit_name.clone(),
         ];
-        if let Err(e) = self.executor.run(
+        match self.executor.run(
             &disable_argv,
             None,
             bounded_timeout(self.install.transition_timeout),
         ) {
-            return Ok(TransitionResult {
-                operation: ServiceOperation::Uninstall,
-                completed: false,
-                detail: ServiceError::bounded(format!("disable failed: {e}")),
-            });
+            Ok(out) if out.status == Some(0) => {}
+            Ok(out) => {
+                return Ok(TransitionResult {
+                    operation: ServiceOperation::Uninstall,
+                    completed: false,
+                    detail: ServiceError::bounded(format!(
+                        "disable failed with exit status {}",
+                        out.status.unwrap_or(-1)
+                    )),
+                });
+            }
+            Err(e) => {
+                return Ok(TransitionResult {
+                    operation: ServiceOperation::Uninstall,
+                    completed: false,
+                    detail: ServiceError::bounded(format!("disable failed: {e}")),
+                });
+            }
         }
         std::fs::remove_file(&self.install.unit_path)
             .map_err(|e| ServiceError::manager(format!("removing owned unit: {e}")))?;
@@ -1555,16 +1773,31 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
                 self.install.scope.flag().to_string(),
                 "daemon-reload".to_string(),
             ];
-            if let Err(e) = self.executor.run(
+            match self.executor.run(
                 &reload_argv,
                 None,
                 bounded_timeout(self.install.transition_timeout),
             ) {
-                return Ok(TransitionResult {
-                    operation: ServiceOperation::Uninstall,
-                    completed: false,
-                    detail: ServiceError::bounded(format!("removed unit but reload failed: {e}")),
-                });
+                Ok(out) if out.status == Some(0) => {}
+                Ok(out) => {
+                    return Ok(TransitionResult {
+                        operation: ServiceOperation::Uninstall,
+                        completed: false,
+                        detail: ServiceError::bounded(format!(
+                            "removed unit but reload exited {}",
+                            out.status.unwrap_or(-1)
+                        )),
+                    });
+                }
+                Err(e) => {
+                    return Ok(TransitionResult {
+                        operation: ServiceOperation::Uninstall,
+                        completed: false,
+                        detail: ServiceError::bounded(format!(
+                            "removed unit but reload failed: {e}"
+                        )),
+                    });
+                }
             }
         }
         Ok(TransitionResult {
@@ -1583,13 +1816,15 @@ impl<E: CommandExecutor> SystemdManager<E> {
                 self.install.scope.flag().to_string(),
                 "daemon-reload".to_string(),
             ];
-            self.executor
+            let out = self
+                .executor
                 .run(
                     &argv,
                     None,
                     bounded_timeout(self.install.transition_timeout),
                 )
                 .map_err(permission_hint)?;
+            ensure_mutation_success(&out, "systemctl daemon-reload")?;
         }
         if self.install.enable {
             let argv = vec![
@@ -1598,13 +1833,15 @@ impl<E: CommandExecutor> SystemdManager<E> {
                 "enable".to_string(),
                 self.install.unit_name.clone(),
             ];
-            self.executor
+            let out = self
+                .executor
                 .run(
                     &argv,
                     None,
                     bounded_timeout(self.install.transition_timeout),
                 )
                 .map_err(permission_hint)?;
+            ensure_mutation_success(&out, "systemctl enable")?;
         }
         Ok(())
     }
@@ -1745,7 +1982,10 @@ impl<E: CommandExecutor> LaunchdManager<E> {
         }
     }
 
-    fn loaded_and_running(&self) -> Result<(bool, LifecycleState), ServiceError> {
+    fn loaded_and_running(
+        &self,
+        deadline: OperationDeadline,
+    ) -> Result<(bool, LifecycleState), ServiceError> {
         let argv = vec![
             "launchctl".to_string(),
             "list".to_string(),
@@ -1753,11 +1993,7 @@ impl<E: CommandExecutor> LaunchdManager<E> {
         ];
         let out = self
             .executor
-            .run(
-                &argv,
-                None,
-                bounded_timeout(self.install.transition_timeout),
-            )
+            .run(&argv, None, deadline.command_timeout()?)
             .map_err(permission_hint)?;
         if out.status != Some(0) {
             return Ok((false, LifecycleState::Stopped));
@@ -1790,17 +2026,29 @@ impl<E: CommandExecutor> LaunchdManager<E> {
         &self,
         spec: &ServiceSpec,
     ) -> Result<(Ownership, LifecycleState, bool, bool), ServiceError> {
+        self.ownership_until(
+            spec,
+            OperationDeadline::new(self.install.transition_timeout)?,
+        )
+    }
+
+    fn ownership_until(
+        &self,
+        spec: &ServiceSpec,
+        deadline: OperationDeadline,
+    ) -> Result<(Ownership, LifecycleState, bool, bool), ServiceError> {
         let observed = self.read_plist_observation()?;
         if !observed.present {
             return Ok((Ownership::Absent, LifecycleState::Stopped, false, false));
         }
+        let observed = reconcile_config_identity(observed, spec);
         let ownership = observed.ownership(spec);
         if ownership != Ownership::Owned {
             // Foreign/Unknown files are never probed for loaded state beyond
             // what is needed to report Stopped (no destructive calls).
             return Ok((ownership, LifecycleState::Unknown, true, false));
         }
-        match self.loaded_and_running() {
+        match self.loaded_and_running(deadline) {
             Ok((loaded, state)) => Ok((ownership, state, true, loaded)),
             Err(_) => Ok((ownership, LifecycleState::Unknown, true, false)),
         }
@@ -1943,7 +2191,7 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
                 let _ = present;
                 atomic_write_definition(&self.install.plist_path, &self.install.definition, false)?;
                 if self.install.bootstrap_on_install {
-                    self.bootstrap()?;
+                    self.bootstrap(OperationDeadline::new(self.install.transition_timeout)?)?;
                 }
                 Ok(TransitionResult {
                     operation: ServiceOperation::Install,
@@ -1958,7 +2206,7 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
                 }
                 atomic_write_definition(&self.install.plist_path, &self.install.definition, true)?;
                 if self.install.bootstrap_on_install {
-                    self.bootstrap()?;
+                    self.bootstrap(OperationDeadline::new(self.install.transition_timeout)?)?;
                 }
                 Ok(TransitionResult {
                     operation: ServiceOperation::Install,
@@ -1977,29 +2225,7 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
         spec: &ServiceSpec,
         timeout: Duration,
     ) -> Result<TransitionResult, ServiceError> {
-        let (ownership, state, _, loaded) = self.ownership_of(spec)?;
-        require_owned(spec.id(), ownership)?;
-        if state == LifecycleState::Running {
-            return Ok(TransitionResult {
-                operation: ServiceOperation::Start,
-                completed: true,
-                detail: ServiceError::bounded("already running"),
-            });
-        }
-        if !loaded {
-            self.bootstrap()?;
-        }
-        self.kickstart()?;
-        let completed = self.confirm_running(timeout)?;
-        Ok(TransitionResult {
-            operation: ServiceOperation::Start,
-            completed,
-            detail: ServiceError::bounded(if completed {
-                "started"
-            } else {
-                "start incomplete; state unconfirmed"
-            }),
-        })
+        self.start_until(spec, OperationDeadline::new(timeout)?)
     }
 
     fn stop(
@@ -2007,34 +2233,7 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
         spec: &ServiceSpec,
         timeout: Duration,
     ) -> Result<TransitionResult, ServiceError> {
-        let (ownership, state, _, _) = self.ownership_of(spec)?;
-        require_owned(spec.id(), ownership)?;
-        if state == LifecycleState::Stopped {
-            return Ok(TransitionResult {
-                operation: ServiceOperation::Stop,
-                completed: true,
-                detail: ServiceError::bounded("already stopped"),
-            });
-        }
-        // `launchctl stop` keeps the job loaded but stops the process.
-        let argv = vec![
-            "launchctl".to_string(),
-            "stop".to_string(),
-            self.install.label.clone(),
-        ];
-        self.executor
-            .run(&argv, None, bounded_timeout(timeout))
-            .map_err(permission_hint)?;
-        let completed = self.confirm_stopped(timeout)?;
-        Ok(TransitionResult {
-            operation: ServiceOperation::Stop,
-            completed,
-            detail: ServiceError::bounded(if completed {
-                "stopped"
-            } else {
-                "stop incomplete; state unconfirmed"
-            }),
-        })
+        self.stop_until(spec, OperationDeadline::new(timeout)?)
     }
 
     fn restart(
@@ -2042,14 +2241,24 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
         spec: &ServiceSpec,
         timeout: Duration,
     ) -> Result<TransitionResult, ServiceError> {
-        let (ownership, _, _, _) = self.ownership_of(spec)?;
-        require_owned(spec.id(), ownership)?;
-        self.stop(spec, timeout)?;
-        self.start(spec, timeout)?;
+        let deadline = OperationDeadline::new(timeout)?;
+        let stopped = self.stop_until(spec, deadline)?;
+        if !stopped.completed {
+            return Ok(TransitionResult {
+                operation: ServiceOperation::Restart,
+                completed: false,
+                detail: ServiceError::bounded("restart stop phase incomplete; start not attempted"),
+            });
+        }
+        let started = self.start_until(spec, deadline)?;
         Ok(TransitionResult {
             operation: ServiceOperation::Restart,
-            completed: true,
-            detail: ServiceError::bounded("restarted"),
+            completed: started.completed,
+            detail: ServiceError::bounded(if started.completed {
+                "restarted"
+            } else {
+                "restart start phase incomplete; state unconfirmed"
+            }),
         })
     }
 
@@ -2067,16 +2276,29 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
                 self.install.target.clone(),
                 self.install.plist_path.to_string_lossy().into_owned(),
             ];
-            if let Err(e) = self.executor.run(
+            match self.executor.run(
                 &argv,
                 None,
                 bounded_timeout(self.install.transition_timeout),
             ) {
-                return Ok(TransitionResult {
-                    operation: ServiceOperation::Uninstall,
-                    completed: false,
-                    detail: ServiceError::bounded(format!("bootout failed: {e}")),
-                });
+                Ok(out) if out.status == Some(0) => {}
+                Ok(out) => {
+                    return Ok(TransitionResult {
+                        operation: ServiceOperation::Uninstall,
+                        completed: false,
+                        detail: ServiceError::bounded(format!(
+                            "bootout exited {}",
+                            out.status.unwrap_or(-1)
+                        )),
+                    });
+                }
+                Err(e) => {
+                    return Ok(TransitionResult {
+                        operation: ServiceOperation::Uninstall,
+                        completed: false,
+                        detail: ServiceError::bounded(format!("bootout failed: {e}")),
+                    });
+                }
             }
         }
         std::fs::remove_file(&self.install.plist_path)
@@ -2090,69 +2312,135 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
 }
 
 impl<E: CommandExecutor> LaunchdManager<E> {
-    fn bootstrap(&self) -> Result<(), ServiceError> {
+    fn start_until(
+        &self,
+        spec: &ServiceSpec,
+        deadline: OperationDeadline,
+    ) -> Result<TransitionResult, ServiceError> {
+        let (ownership, state, _, loaded) = self.ownership_until(spec, deadline)?;
+        require_owned(spec.id(), ownership)?;
+        if state == LifecycleState::Running {
+            return Ok(TransitionResult {
+                operation: ServiceOperation::Start,
+                completed: !deadline.expired(),
+                detail: ServiceError::bounded("already running"),
+            });
+        }
+        if !loaded {
+            self.bootstrap(deadline)?;
+        }
+        self.kickstart(deadline)?;
+        let completed = self.confirm_running(deadline)?;
+        Ok(TransitionResult {
+            operation: ServiceOperation::Start,
+            completed,
+            detail: ServiceError::bounded(if completed {
+                "started"
+            } else {
+                "start incomplete; state unconfirmed"
+            }),
+        })
+    }
+
+    fn stop_until(
+        &self,
+        spec: &ServiceSpec,
+        deadline: OperationDeadline,
+    ) -> Result<TransitionResult, ServiceError> {
+        let (ownership, state, _, _) = self.ownership_until(spec, deadline)?;
+        require_owned(spec.id(), ownership)?;
+        if state == LifecycleState::Stopped {
+            return Ok(TransitionResult {
+                operation: ServiceOperation::Stop,
+                completed: !deadline.expired(),
+                detail: ServiceError::bounded("already stopped"),
+            });
+        }
+        let argv = vec![
+            "launchctl".to_string(),
+            "stop".to_string(),
+            self.install.label.clone(),
+        ];
+        let out = self
+            .executor
+            .run(&argv, None, deadline.command_timeout()?)
+            .map_err(permission_hint)?;
+        ensure_mutation_success(&out, "launchctl stop")?;
+        let completed = self.confirm_stopped(deadline)?;
+        Ok(TransitionResult {
+            operation: ServiceOperation::Stop,
+            completed,
+            detail: ServiceError::bounded(if completed {
+                "stopped"
+            } else {
+                "stop incomplete; state unconfirmed"
+            }),
+        })
+    }
+
+    fn bootstrap(&self, deadline: OperationDeadline) -> Result<(), ServiceError> {
         let argv = vec![
             "launchctl".to_string(),
             "bootstrap".to_string(),
             self.install.target.clone(),
             self.install.plist_path.to_string_lossy().into_owned(),
         ];
-        self.executor
-            .run(
-                &argv,
-                None,
-                bounded_timeout(self.install.transition_timeout),
-            )
+        let out = self
+            .executor
+            .run(&argv, None, deadline.command_timeout()?)
             .map_err(permission_hint)?;
-        Ok(())
+        ensure_mutation_success(&out, "launchctl bootstrap")
     }
 
-    fn kickstart(&self) -> Result<(), ServiceError> {
+    fn kickstart(&self, deadline: OperationDeadline) -> Result<(), ServiceError> {
         let argv = vec![
             "launchctl".to_string(),
             "kickstart".to_string(),
             "-k".to_string(),
             format!("{}/{}", self.install.target, self.install.label),
         ];
-        self.executor
-            .run(
-                &argv,
-                None,
-                bounded_timeout(self.install.transition_timeout),
-            )
+        let out = self
+            .executor
+            .run(&argv, None, deadline.command_timeout()?)
             .map_err(permission_hint)?;
-        Ok(())
+        ensure_mutation_success(&out, "launchctl kickstart")
     }
 
-    fn confirm_running(&self, timeout: Duration) -> Result<bool, ServiceError> {
-        let start = Instant::now();
-        let timeout = bounded_timeout(timeout);
+    fn confirm_running(&self, deadline: OperationDeadline) -> Result<bool, ServiceError> {
         loop {
-            match self.loaded_and_running() {
-                Ok((_, LifecycleState::Running)) => return Ok(true),
+            match self.loaded_and_running(deadline) {
+                Ok((_, LifecycleState::Running)) => return Ok(!deadline.expired()),
                 Ok(_) => {}
                 Err(e) => return Err(e),
             }
-            if start.elapsed() > timeout {
+            if deadline.expired() {
                 return Ok(false);
             }
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(
+                deadline
+                    .remaining()
+                    .unwrap_or_default()
+                    .min(Duration::from_millis(100)),
+            );
         }
     }
 
-    fn confirm_stopped(&self, timeout: Duration) -> Result<bool, ServiceError> {
-        let start = Instant::now();
-        let timeout = bounded_timeout(timeout);
+    fn confirm_stopped(&self, deadline: OperationDeadline) -> Result<bool, ServiceError> {
         loop {
-            match self.loaded_and_running() {
-                Ok((_, LifecycleState::Stopped)) => return Ok(true),
+            match self.loaded_and_running(deadline) {
+                Ok((_, LifecycleState::Stopped)) => return Ok(!deadline.expired()),
                 Ok(_) => {}
                 Err(e) => return Err(e),
             }
-            if start.elapsed() > timeout {
+            if deadline.expired() {
                 return Ok(false);
             }
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(
+                deadline
+                    .remaining()
+                    .unwrap_or_default()
+                    .min(Duration::from_millis(100)),
+            );
         }
     }
 }
@@ -3029,15 +3317,73 @@ mod unix_tests {
 
     #[test]
     fn command_environment_adds_nothing() {
-        // Documented behavior: inherit parent, add nothing, never interpolate.
-        // Prove argv is passed literally even when it looks like assignment.
+        // The child environment is cleared for a system-scoped command.
         let ex = SystemExecutor::new();
         let output = ex
             .run(&["/usr/bin/env".to_string()], None, Duration::from_secs(5))
             .unwrap();
         assert_eq!(output.status, Some(0));
-        // No `EGGUP_INJECTED_SECRET` should appear (we never set it).
-        assert!(!output.stdout_text().contains("EGGUP_INJECTED_SECRET"));
+        assert!(
+            output.stdout_text().is_empty(),
+            "system scope starts env-free"
+        );
+    }
+
+    #[test]
+    fn manager_resolution_ignores_ambient_path_and_environment_filters_sentinels() {
+        let dir = temp_dir("manager-path");
+        let fake = dir.join("systemctl");
+        std::fs::write(&fake, b"#!/bin/sh\nexit 0\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        match resolve_manager_program("systemctl") {
+            Ok(resolved) => {
+                assert_ne!(resolved, fake, "ambient PATH candidate must be ignored");
+                assert!(resolved.is_absolute());
+            }
+            Err(ServiceError::Manager(message)) => {
+                assert!(message.contains("trusted manager binary missing"));
+            }
+            Err(other) => panic!("unexpected resolver error: {other}"),
+        }
+
+        let source = [
+            ("PATH".into(), "/tmp/attacker".into()),
+            ("EGGUP_SENTINEL".into(), "secret".into()),
+            ("LD_PRELOAD".into(), "/tmp/inject.so".into()),
+            (
+                "DBUS_SESSION_BUS_ADDRESS".into(),
+                "unix:path=/run/user/1/bus".into(),
+            ),
+            ("XDG_RUNTIME_DIR".into(), "/run/user/1".into()),
+        ];
+        let system =
+            filtered_manager_environment(&["systemctl".into(), "start".into()], source.clone());
+        assert!(system.is_empty());
+        let user = filtered_manager_environment(
+            &["systemctl".into(), "--user".into(), "start".into()],
+            source,
+        );
+        let keys: Vec<_> = user
+            .iter()
+            .map(|(key, _)| key.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(keys, ["DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn transition_deadline_rejects_zero_and_only_shrinks() {
+        assert!(OperationDeadline::new(Duration::ZERO).is_err());
+        let deadline = OperationDeadline::new(Duration::from_millis(80)).unwrap();
+        let first = deadline.command_timeout().unwrap();
+        std::thread::sleep(Duration::from_millis(10));
+        let second = deadline.command_timeout().unwrap();
+        assert!(second < first);
+        assert!(second <= Duration::from_millis(70));
     }
 
     // ---- systemd ----
@@ -3206,6 +3552,32 @@ mod unix_tests {
         let s = spec("my-daemon.service", "/opt/app/bin", &["%n"]);
         let (ownership, _, _) = systemd_ownership(text, &s).unwrap();
         assert_eq!(ownership, Ownership::Unknown);
+    }
+
+    #[test]
+    fn systemd_config_identity_requires_one_exact_argv_match() {
+        let with_config = ServiceSpec::new(
+            ServiceId::new("my-daemon.service").unwrap(),
+            PathBuf::from("/opt/app/bin"),
+            vec!["--config".into(), "/etc/app.toml".into()],
+            Some(PathBuf::from("/etc/app.toml")),
+        )
+        .unwrap();
+        let exact = "LoadState=loaded\nActiveState=inactive\nExecStart={ path=/opt/app/bin ; argv[]=/opt/app/bin --config /etc/app.toml ; ignore_errors=no }\n";
+        assert_eq!(
+            systemd_ownership(exact, &with_config).unwrap().0,
+            Ownership::Owned
+        );
+        let absent = "LoadState=loaded\nActiveState=inactive\nExecStart={ path=/opt/app/bin ; argv[]=/opt/app/bin --serve ; ignore_errors=no }\n";
+        assert_eq!(
+            systemd_ownership(absent, &with_config).unwrap().0,
+            Ownership::Foreign
+        );
+        let ambiguous = "LoadState=loaded\nActiveState=inactive\nExecStart={ path=/opt/app/bin ; argv[]=/opt/app/bin /etc/app.toml /etc/app.toml ; ignore_errors=no }\n";
+        assert_eq!(
+            systemd_ownership(ambiguous, &with_config).unwrap().0,
+            Ownership::Unknown
+        );
     }
 
     #[test]
@@ -3493,6 +3865,69 @@ mod unix_tests {
     }
 
     #[test]
+    fn launchd_restart_does_not_start_after_incomplete_stop() {
+        #[derive(Debug, Default)]
+        struct StaysRunning {
+            calls: std::sync::Arc<Mutex<Vec<Vec<String>>>>,
+        }
+        impl CommandExecutor for StaysRunning {
+            fn run(
+                &self,
+                argv: &[String],
+                _stdin: Option<&[u8]>,
+                timeout: Duration,
+            ) -> Result<CommandOutput, ServiceError> {
+                self.calls.lock().unwrap().push(argv.to_vec());
+                if argv.first().is_some_and(|arg| arg == "launchctl")
+                    && argv.get(1).is_some_and(|arg| arg == "list")
+                {
+                    std::thread::sleep(Duration::from_millis(2).min(timeout));
+                    return Ok(out(0, "\"PID\" = 42;\n"));
+                }
+                if argv.get(1).is_some_and(|arg| arg == "stop") {
+                    return Ok(out(0, ""));
+                }
+                Err(ServiceError::manager("unexpected launchctl command"))
+            }
+        }
+
+        let executor = StaysRunning::default();
+        let observed_calls = executor.calls.clone();
+        let dir = temp_dir("ld-restart-incomplete");
+        let plist_path = dir.join("com.example.daemon.plist");
+        std::fs::write(&plist_path, plist("/opt/app/bin", &["--serve"])).unwrap();
+        let install = LaunchdInstall::new(
+            "com.example.daemon".into(),
+            LaunchdDomain::UserAgent,
+            "gui/501".into(),
+            plist_path,
+            plist("/opt/app/bin", &["--serve"]),
+            false,
+            Duration::from_secs(1),
+        )
+        .unwrap();
+        let mut manager = LaunchdManager::new(executor, install);
+        let service = spec("com.example.daemon", "/opt/app/bin", &["--serve"]);
+        let started_at = Instant::now();
+        let result = manager.restart(&service, Duration::from_millis(35));
+        assert!(match result {
+            Ok(result) => !result.completed,
+            Err(ServiceError::Manager(message)) => message.contains("deadline exhausted"),
+            Err(_) => false,
+        });
+        assert!(started_at.elapsed() < Duration::from_millis(150));
+        let calls = observed_calls.lock().unwrap();
+        assert!(calls
+            .iter()
+            .any(|argv| argv.get(1).is_some_and(|arg| arg == "stop")));
+        assert!(!calls.iter().any(|argv| {
+            argv.get(1)
+                .is_some_and(|arg| arg == "bootstrap" || arg == "kickstart")
+        }));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn launchd_no_label_only_ownership() {
         // Even when `launchctl list` reports loaded, a missing plist file is
         // Absent (label alone never proves ownership).
@@ -3506,6 +3941,44 @@ mod unix_tests {
         let s = spec("com.example.daemon", "/opt/app/bin", &[]);
         // No file → Absent, regardless of list output (file gates ownership).
         assert_eq!(m.inspect(&s).unwrap().ownership, Ownership::Absent);
+    }
+
+    #[test]
+    fn launchd_config_identity_reconciles_exact_missing_and_ambiguous_argv() {
+        let service = ServiceSpec::new(
+            ServiceId::new("com.example.daemon").unwrap(),
+            PathBuf::from("/opt/app/bin"),
+            vec!["--settings".into(), "/etc/app.toml".into()],
+            Some(PathBuf::from("/etc/app.toml")),
+        )
+        .unwrap();
+        let observed = |args: &[&str]| {
+            reconcile_config_identity(
+                RegistrationSnapshot {
+                    present: true,
+                    executable: Some(PathBuf::from("/opt/app/bin")),
+                    args: args.iter().map(|arg| (*arg).to_string()).collect(),
+                    config: None,
+                    malformed: false,
+                },
+                &service,
+            )
+            .ownership(&service)
+        };
+        assert_eq!(observed(&["--settings", "/etc/app.toml"]), Ownership::Owned);
+        assert_eq!(observed(&["--serve"]), Ownership::Foreign);
+        assert_eq!(
+            observed(&["/etc/app.toml", "/etc/app.toml"]),
+            Ownership::Unknown
+        );
+    }
+
+    #[test]
+    fn mutation_status_requires_zero_exit() {
+        assert!(ensure_mutation_success(&out(0, ""), "mutation").is_ok());
+        let err = ensure_mutation_success(&out(7, ""), "mutation").unwrap_err();
+        assert!(matches!(err, ServiceError::Manager(_)));
+        assert!(err.to_string().contains("exited 7"));
     }
 
     // ---- cron ----

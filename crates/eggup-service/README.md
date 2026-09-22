@@ -17,6 +17,17 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
   `HealthProbe` seam is consumer-supplied and never mutates manager state.
 - Bounded `TransitionResult` with conflict diagnostics; no automatic privilege
   elevation; no updater/release/network policy.
+- M003 hardening: each start/stop/restart validates one monotonic caller
+  deadline shared by ownership queries, manager commands, and state polling.
+  Zero transition timeouts are rejected; expiry is returned as an incomplete
+  transition or a manager timeout.
+- Production `SystemExecutor` resolves `systemctl`, `launchctl`, and `crontab`
+  only from fixed absolute platform paths, never ambient `PATH`. It clears the
+  child environment; only user-scoped systemd retains `DBUS_SESSION_BUS_ADDRESS`,
+  `XDG_RUNTIME_DIR`, and `SYSTEMD_BUS_ADDRESS` when present.
+- systemd/launchd config ownership is proven by one exact config path occurrence
+  in canonical argv. Missing identity is `Foreign`; repeated/ambiguous identity
+  is `Unknown`.
 - M002 Unix adapters (`SystemdManager`, `LaunchdManager`, `CronManager`)
   implement `ServiceManager` on top of the M001 contract:
   - shared bounded command runner (literal argv, no shell, null/controlled
@@ -40,8 +51,8 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
     never creates privileged parents);
   - `inspect_host` facts vs `candidate_managers` policy (Linux systemd or
     cron; macOS launchd or cron; detection failure distinct from absent).
-- Ownership for systemd/launchd uses exact executable plus critical args
-  (config paths belong in args; a separate `config` field with no observed
-  counterpart is `Foreign` by the neutral rule). Consumer unit/plist bodies,
+- Ownership for systemd/launchd uses exact executable plus critical args and
+  reconciles optional config identity against those exact args. Consumer
+  unit/plist bodies,
   usernames, paths, hardening text, health checks, and CLI messages stay
   consumer-owned. No consumer is migrated here.
