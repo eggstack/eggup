@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M003 closed; Windows SCM and lifecycle integration remain planned
+Status: M001-M003 closed; M004 Windows SCM ready for handoff
 
 Long-term references:
 
@@ -61,9 +61,9 @@ It does not own application health semantics, service hardening content, artifac
 
 M001 is closed and `eggup-service 0.1.0` is published with the manager-neutral ownership/lifecycle contract and deterministic test double.
 
-M002 implemented systemd/launchd/cron adapters, but post-closure review found four correctness/security gaps tracked by M003: launchd restart can report complete after an incomplete subtransition, caller timeouts are not consistently end-to-end budgets, production manager execution trusts ambient PATH/full inherited environment, and `ServiceSpec.config` is not faithfully represented by systemd/launchd observations.
+M002 implemented systemd/launchd/cron adapters. M003 closed the follow-up restart truthfulness, end-to-end deadline, trusted execution environment, mutation-status, and config-identity findings. Unix service mechanics are therefore ready for consumer adoption.
 
-Eggsearch and greggd remain the primary consumer evidence. No service-bearing consumer should migrate until M003 closes. Windows SCM moves to M004 so it can reuse the corrected shared executor/deadline/identity semantics.
+Windows SCM is the remaining native manager family. Eggsearch provides concrete evidence for SCM create/query/start/stop/delete behavior without requiring its product policy to move into Eggup.
 
 ## 5. Target architecture
 
@@ -116,7 +116,9 @@ Correct composed transition truthfulness, end-to-end deadline semantics, trusted
 
 ### M004 — Windows SCM adapter
 
-Native SCM registration/state/transition behavior and running-image ownership checks, built on the corrected M003 shared execution/identity semantics.
+Plan: `plans/implementation/service-lifecycle/004-windows-scm-adapter.md`.
+
+Native SCM registration/state/transition behavior and exact executable/argv/config ownership, built on the corrected M003 deadline/identity semantics. Use a typed SCM API rather than `sc.exe` parsing and keep product service policy caller-owned.
 
 ### M005 — Prepared-transaction lifecycle integration
 
@@ -145,5 +147,5 @@ At least two service-bearing consumers share the manager mechanics without losin
 | M001 | closed | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | `plans/closure/service-lifecycle/001-status.md` | — |
 | M002 | closed; post-closure findings feed M003 | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
-| M004 | dependency-ready / plan needed | — | — | M003 closed |
+| M004 | **ready for handoff** | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | — | M003 closed |
 | M005 | planned / blocked | — | — | service M004 + corrected core |
