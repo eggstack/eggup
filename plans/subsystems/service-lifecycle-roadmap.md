@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: proposed; not dependency-ready
+Status: active planning; implementation blocked on verified-update-core M005 corrective closure
 
 Long-term references:
 
@@ -70,7 +70,7 @@ Update orchestration composes service lifecycle with a prepared core transaction
 ## 6. Dependency graph
 
 ```text
-core M003 transaction semantics
+core M005 corrected ownership/transaction semantics
        |
        v
 M001 lifecycle model + ownership contract
@@ -87,7 +87,11 @@ M001 lifecycle model + ownership contract
 
 ### M001 — Manager-neutral state and ownership
 
-Define ServiceSpec, registration/state, ownership, conflict semantics, lifecycle snapshot, and test adapters.
+Plan: `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md`.
+
+Hard dependency: verified-update-core M005 closure.
+
+Define ServiceSpec, registration/state, canonical ownership classification, conflict semantics, lifecycle snapshot, health seam, and test adapters.
 
 ### M002 — Unix manager adapters
 
@@ -121,7 +125,7 @@ At least two service-bearing consumers share the manager mechanics without losin
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 | planned | — | — | core M003 |
+| M001 | blocked | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | — | core M005 |
 | M002 | planned | — | — | service M001 |
 | M003 | planned | — | — | service M001 |
-| M004 | planned | — | — | service M002/M003 + core |
+| M004 | planned | — | — | service M002/M003 + corrected core |
