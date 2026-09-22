@@ -27,4 +27,5 @@ milestone. The domain/preparation milestone now also validates explicit plans
 and copies local inputs into private stage state; no live installation, service,
 or network behavior is present. Commit/rollback mechanics are documented in
 the [transaction contract](../crates/eggup-core/docs/transaction.md); service
-and transport layers remain outside the crate.
+and transport layers remain outside the crate. Verification ordering and
+bounded candidate execution are defined in the [verification contract](../crates/eggup-core/docs/verification.md).

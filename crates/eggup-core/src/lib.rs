@@ -6,17 +6,27 @@
 #![doc = "The public API exposes validated domain and preparation layers; it does not yet mutate"]
 #![doc = "live destinations. Verification and commit layers are added in later milestones."]
 
+mod candidate;
 mod domain;
 mod error;
+mod integrity;
 mod lock;
 mod stage;
 mod transaction;
 
+pub use candidate::{
+    run_bounded, AllValidators, CandidateValidator, CommandOutput, CommandSpec,
+    CrossMemberAgreementValidator, ExactIdentityValidator, ValidatedTransaction,
+};
 pub use domain::{
     ArtifactMember, ArtifactSet, AuthenticityRequirement, FileKind, InstallPlan,
     IntegrityRequirement, MemberId, Ownership, PermissionsIntent, ProductId, ReleaseId,
 };
 pub use error::{Error, Result};
+pub use integrity::{
+    hash_file, parse_sha256_sidecar, verify_file, IntegrityResult, IntegrityStatus, Sha256Manifest,
+    VerifiedTransaction,
+};
 pub use lock::MutationLock;
 pub use stage::PreparedTransaction;
 pub use transaction::{PostCommitFailurePolicy, TransactionDisposition, TransactionReceipt};
@@ -29,10 +39,11 @@ mod tests {
     use super::test_support::{FailureInjector, FailurePoint, InstallationRoot};
     use super::transaction::CommitFault;
     use super::{
-        ArtifactMember, ArtifactSet, Error, InstallPlan, MemberId, MutationLock, ProductId,
-        ReleaseId, TransactionDisposition,
+        ArtifactMember, ArtifactSet, Error, ExactIdentityValidator, InstallPlan, MemberId,
+        MutationLock, ProductId, ReleaseId, TransactionDisposition,
     };
     use std::fs;
+    use std::time::Duration;
 
     #[test]
     fn fixture_writes_and_reads_exact_bytes() {
@@ -520,5 +531,197 @@ mod tests {
             fs::read(install.path().join("bin/main")).unwrap(),
             b"old-main"
         );
+    }
+
+    #[test]
+    fn hashes_known_bytes_and_parses_strict_sidecars() {
+        let fixture = InstallationRoot::new().unwrap();
+        let path = fixture.write_file("abc", b"abc").unwrap();
+        let manifest = super::parse_sha256_sidecar(
+            "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD  abc\n",
+        )
+        .unwrap();
+        assert_eq!(manifest.filename(), Some("abc"));
+        assert_eq!(
+            super::verify_file(&path, &manifest).unwrap(),
+            *manifest.digest()
+        );
+        assert!(super::parse_sha256_sidecar("abc\ndef").is_err());
+        assert!(super::parse_sha256_sidecar(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  other"
+        )
+        .and_then(|manifest| super::verify_file(&path, &manifest))
+        .is_err());
+        assert!(super::parse_sha256_sidecar("not-a-digest  abc").is_err());
+    }
+
+    #[test]
+    fn integrity_verification_precedes_candidate_validation() {
+        let inputs = InstallationRoot::new().unwrap();
+        let install = InstallationRoot::new().unwrap();
+        let source = inputs.write_file("main", b"verified bytes").unwrap();
+        let digest = super::hash_file(&source).unwrap();
+        let member = ArtifactMember::new(MemberId::new("main").unwrap(), source, "bin/main")
+            .unwrap()
+            .with_integrity(super::IntegrityRequirement::Sha256(digest));
+        let verified = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(member).unwrap(),
+        )
+        .unwrap()
+        .prepare()
+        .unwrap()
+        .verify_integrity()
+        .unwrap();
+        assert_eq!(
+            verified
+                .integrity(&MemberId::new("main").unwrap())
+                .unwrap()
+                .status(),
+            super::IntegrityStatus::Verified
+        );
+
+        let bad_source = inputs.write_file("bad", b"bad bytes").unwrap();
+        let bad_member = ArtifactMember::new(MemberId::new("bad").unwrap(), bad_source, "bin/bad")
+            .unwrap()
+            .with_integrity(super::IntegrityRequirement::Sha256(digest));
+        assert!(matches!(
+            InstallPlan::new(
+                ProductId::new("eggup").unwrap(),
+                ReleaseId::new("r1").unwrap(),
+                install.path(),
+                ArtifactSet::single(bad_member).unwrap(),
+            )
+            .unwrap()
+            .prepare()
+            .unwrap()
+            .verify_integrity(),
+            Err(Error::VerificationFailed(_))
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bounded_candidates_are_exact_and_environment_is_cleared() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let inputs = InstallationRoot::new().unwrap();
+        let install = InstallationRoot::new().unwrap();
+        let script = inputs
+            .write_file("main", b"#!/bin/sh\nprintf 'eggup 1.2.3\\n'\n")
+            .unwrap();
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        let digest = super::hash_file(&script).unwrap();
+        let member = ArtifactMember::new(MemberId::new("main").unwrap(), script, "bin/main")
+            .unwrap()
+            .with_integrity(super::IntegrityRequirement::Sha256(digest));
+        let verified = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(member).unwrap(),
+        )
+        .unwrap()
+        .prepare()
+        .unwrap()
+        .verify_integrity()
+        .unwrap();
+        let validator =
+            ExactIdentityValidator::new(MemberId::new("main").unwrap(), "eggup 1.2.3\n");
+        let validated = verified.validate(&validator).unwrap();
+        assert_eq!(
+            validated.commit().unwrap().disposition(),
+            TransactionDisposition::Committed
+        );
+
+        let secret_script = inputs
+            .write_file(
+                "secret",
+                b"#!/bin/sh\nprintf '%s' \"${EGGUP_SECRET-unset}\"\n",
+            )
+            .unwrap();
+        fs::set_permissions(&secret_script, fs::Permissions::from_mode(0o755)).unwrap();
+        let output = super::run_bounded(
+            &super::CommandSpec::new(secret_script).timeout(Duration::from_secs(1)),
+        )
+        .unwrap();
+        assert!(output.success());
+        assert_eq!(output.stdout(), b"unset");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bounded_runner_kills_timeouts_and_limits_output() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let fixture = InstallationRoot::new().unwrap();
+        let timeout_script = fixture
+            .write_file("timeout", b"#!/bin/sh\nsleep 2\n")
+            .unwrap();
+        let noisy_script = fixture
+            .write_file("noisy", b"#!/bin/sh\nprintf '1234567890'\n")
+            .unwrap();
+        for path in [&timeout_script, &noisy_script] {
+            fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let timed_out = super::run_bounded(
+            &super::CommandSpec::new(timeout_script).timeout(Duration::from_millis(20)),
+        )
+        .unwrap();
+        assert!(timed_out.timed_out());
+        assert!(!timed_out.success());
+        let limited =
+            super::run_bounded(&super::CommandSpec::new(noisy_script).max_output_bytes(4)).unwrap();
+        assert!(limited.output_limited());
+        assert!(!limited.success());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cross_member_identity_requires_bundle_agreement() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let inputs = InstallationRoot::new().unwrap();
+        let install = InstallationRoot::new().unwrap();
+        let main = inputs
+            .write_file("main", b"#!/bin/sh\nprintf 'bundle 9\\n'\n")
+            .unwrap();
+        let helper = inputs
+            .write_file("helper", b"#!/bin/sh\nprintf 'bundle 9\\n'\n")
+            .unwrap();
+        for path in [&main, &helper] {
+            fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let main_digest = super::hash_file(&main).unwrap();
+        let helper_digest = super::hash_file(&helper).unwrap();
+        let verified = InstallPlan::new(
+            ProductId::new("bundle").unwrap(),
+            ReleaseId::new("r9").unwrap(),
+            install.path(),
+            ArtifactSet::new(vec![
+                ArtifactMember::new(MemberId::new("main").unwrap(), main, "bin/main")
+                    .unwrap()
+                    .with_integrity(super::IntegrityRequirement::Sha256(main_digest)),
+                ArtifactMember::new(MemberId::new("helper").unwrap(), helper, "bin/helper")
+                    .unwrap()
+                    .with_integrity(super::IntegrityRequirement::Sha256(helper_digest)),
+            ])
+            .unwrap(),
+        )
+        .unwrap()
+        .prepare()
+        .unwrap()
+        .verify_integrity()
+        .unwrap();
+        let validator = super::CrossMemberAgreementValidator::new(
+            [
+                MemberId::new("main").unwrap(),
+                MemberId::new("helper").unwrap(),
+            ],
+            "bundle 9\n",
+        );
+        assert!(verified.validate(&validator).is_ok());
     }
 }

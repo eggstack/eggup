@@ -12,3 +12,5 @@ authors = ["David Bowman"]
 [lints]
 workspace = true
 
+[dependencies]
+sha2 = "0.10"

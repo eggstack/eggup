@@ -28,6 +28,10 @@ pub enum Error {
         /// The destination path that failed revalidation.
         destination: std::path::PathBuf,
     },
+    /// Declared integrity or candidate identity evidence did not pass.
+    VerificationFailed(String),
+    /// Candidate execution could not produce an accepted bounded result.
+    CandidateExecution(String),
 }
 
 impl Error {
@@ -58,6 +62,12 @@ impl fmt::Display for Error {
                 "destination failed ownership revalidation: {}",
                 destination.display()
             ),
+            Self::VerificationFailed(message) => {
+                write!(formatter, "verification failed: {message}")
+            }
+            Self::CandidateExecution(message) => {
+                write!(formatter, "candidate execution failed: {message}")
+            }
         }
     }
 }
@@ -69,7 +79,9 @@ impl std::error::Error for Error {
             Self::InvalidInput(_)
             | Self::UnknownMember(_)
             | Self::UpdateInProgress { .. }
-            | Self::DestinationConflict { .. } => None,
+            | Self::DestinationConflict { .. }
+            | Self::VerificationFailed(_)
+            | Self::CandidateExecution(_) => None,
         }
     }
 }

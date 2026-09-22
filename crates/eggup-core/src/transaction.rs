@@ -99,7 +99,7 @@ struct BackupEntry {
 
 impl PreparedTransaction {
     /// Commits the prepared artifact set synchronously with lock, backup, and rollback handling.
-    pub fn commit(self) -> Result<TransactionReceipt> {
+    pub(crate) fn commit(self) -> Result<TransactionReceipt> {
         self.commit_inner(None)
     }
 
