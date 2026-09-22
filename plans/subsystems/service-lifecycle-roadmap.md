@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: active; M001-M002 closed, M003 Windows SCM planning-ready
+Status: active corrective; M001-M002 closed, M003 Unix-adapter corrective ready for handoff
 
 Long-term references:
 
@@ -61,7 +61,9 @@ It does not own application health semantics, service hardening content, artifac
 
 M001 is closed and `eggup-service 0.1.0` is published with the manager-neutral ownership/lifecycle contract and deterministic test double.
 
-Eggsearch and greggd each contain mature but separate Unix manager logic. Both demonstrate the rules M002 should extract: native manager selection, exact ownership checks, bounded manager commands/transitions, health distinct from manager state, cron fallback, and no hidden elevation. Windows SCM remains a separate M003 concern.
+M002 implemented systemd/launchd/cron adapters, but post-closure review found four correctness/security gaps tracked by M003: launchd restart can report complete after an incomplete subtransition, caller timeouts are not consistently end-to-end budgets, production manager execution trusts ambient PATH/full inherited environment, and `ServiceSpec.config` is not faithfully represented by systemd/launchd observations.
+
+Eggsearch and greggd remain the primary consumer evidence. No service-bearing consumer should migrate until M003 closes. Windows SCM moves to M004 so it can reuse the corrected shared executor/deadline/identity semantics.
 
 ## 5. Target architecture
 
@@ -77,12 +79,17 @@ core M005 corrected ownership/transaction semantics
        v
 M001 lifecycle model + ownership contract
        |
-       +--> M002 systemd/launchd/cron
+       v
+M002 systemd/launchd/cron [closed]
        |
-       `--> M003 Windows SCM
-                 |
-                 v
-           M004 update-lifecycle integration
+       v
+M003 Unix adapter correctness/security corrective
+       |
+       +--> M004 Windows SCM
+       |
+       `-------------------+
+                           v
+                 M005 update-lifecycle integration
 ```
 
 ## 7. Milestones
@@ -101,11 +108,17 @@ Plan: `plans/implementation/service-lifecycle/002-unix-manager-adapters.md`.
 
 Systemd, launchd, and cron/watchdog mechanics with bounded execution, exact ownership, caller-owned definitions, and no implicit elevation.
 
-### M003 — Windows SCM adapter
+### M003 — Unix adapter correctness and execution hardening corrective
 
-Native SCM registration/state/transition behavior and running-image ownership checks.
+Plan: `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md`.
 
-### M004 — Prepared-transaction lifecycle integration
+Correct composed transition truthfulness, end-to-end deadline semantics, trusted manager executable/environment handling, and neutral config identity before consumer adoption.
+
+### M004 — Windows SCM adapter
+
+Native SCM registration/state/transition behavior and running-image ownership checks, built on the corrected M003 shared execution/identity semantics.
+
+### M005 — Prepared-transaction lifecycle integration
 
 Compose a verified prepared transaction with quiesce/commit/restart using explicit post-commit failure policy.
 
@@ -130,6 +143,7 @@ At least two service-bearing consumers share the manager mechanics without losin
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
 | M001 | closed | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | `plans/closure/service-lifecycle/001-status.md` | — |
-| M002 | closed | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
-| M003 | planned (planning-ready) | — | — | service M002 closed; detailed plan may now be authored |
-| M004 | planned | — | — | service M002/M003 + corrected core |
+| M002 | closed; post-closure findings feed M003 | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
+| M003 | **ready for handoff** | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | — | — |
+| M004 | planned / blocked | — | — | service M003 corrective |
+| M005 | planned / blocked | — | — | service M003/M004 + corrected core |
