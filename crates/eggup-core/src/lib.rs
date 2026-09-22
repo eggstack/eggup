@@ -600,6 +600,29 @@ mod tests {
             .verify_integrity(),
             Err(Error::VerificationFailed(_))
         ));
+
+        let no_requirement = ArtifactMember::new(
+            MemberId::new("none").unwrap(),
+            inputs.write_file("none", b"no declaration").unwrap(),
+            "bin/none",
+        )
+        .unwrap();
+        let verified = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(no_requirement).unwrap(),
+        )
+        .unwrap()
+        .prepare()
+        .unwrap()
+        .verify_integrity()
+        .unwrap();
+        let validator = ExactIdentityValidator::new(MemberId::new("none").unwrap(), "anything");
+        assert!(matches!(
+            verified.validate(&validator),
+            Err(Error::VerificationFailed(_))
+        ));
     }
 
     #[cfg(unix)]

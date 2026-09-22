@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::domain::MemberId;
 use crate::error::{Error, Result};
-use crate::integrity::VerifiedTransaction;
+use crate::integrity::{IntegrityStatus, VerifiedTransaction};
 use crate::transaction::TransactionReceipt;
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -409,6 +409,14 @@ pub struct ValidatedTransaction {
 impl VerifiedTransaction {
     /// Runs a consumer-supplied validator before exposing the commit operation.
     pub fn validate(self, validator: &dyn CandidateValidator) -> Result<ValidatedTransaction> {
+        if self.artifacts().iter().any(|member| {
+            self.integrity(member.id())
+                .is_none_or(|result| result.status() != IntegrityStatus::Verified)
+        }) {
+            return Err(Error::VerificationFailed(
+                "candidate execution requires verified integrity evidence for every member".into(),
+            ));
+        }
         validator.validate(&self)?;
         Ok(ValidatedTransaction { verified: self })
     }
