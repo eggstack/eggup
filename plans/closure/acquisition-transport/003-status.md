@@ -10,7 +10,7 @@ Reviewed repository baseline: `8f6ce48cda5bdeb593939077bcca452cdd5f2800` (plan b
 
 ## Implementation commits/PRs
 
-- M003 corrective commit (this pass): `fix: harden acquisition timeouts, tempfile, and redaction (M003)` (pending SHA; see git log)
+- M003 implementation landed in aggregate implementation commit `889a234cbe7f461d92def3df45c83c06a7d257e5` (`feat: close acquisition M003, distribution M001, service M002 with verification`).
 - Prior: `892d6cc` (`planning: register post-adoption implementation wave`)
 - No PR was required for this local implementation pass. No publication was performed.
 
@@ -252,3 +252,12 @@ path.
 
 - Acquisition M003 → closed.
 - Consumer adoption gate: additional updater-bearing migrations no longer blocked by acquisition corrective (service/distribution gates still apply per plan).
+
+## Post-closure review addendum
+
+A subsequent source review of implementation SHA `889a234cbe7f461d92def3df45c83c06a7d257e5` identified two contract gaps not covered by the M003 closure tests:
+
+- public `FetchLimits` fields allow direct struct literals to bypass constructor validation unless transports revalidate at entry;
+- successful hard-link promotion can create a complete destination and then return ordinary `Err` if redundant temp unlink fails.
+
+These findings do not erase the M003 evidence above, but they supersede its statement that no medium-or-higher acquisition contract issue remained. Broader updater-bearing adoption is re-blocked on `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md`.
