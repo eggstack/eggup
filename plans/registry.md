@@ -126,14 +126,13 @@ These depend on evidence from the corrected core and first two consumers. Writin
 ## Current project state
 
 - Planning system: established.
-- Production Rust workspace: core M001-M006 + acquisition M001-M002 + service M001 implemented, verified (72 tests: 37 core + 12 acquisition + 13 eggfetch + 10 service, stable + 1.89), packages qualified (no publication; eggfetch packaging awaits seam publication order).
+- Production Rust workspace: core M001-M006 + acquisition M001-M002 + service M001 implemented, verified (72 tests: 37 core + 12 acquisition + 13 eggfetch + 10 service, stable + 1.89), packages qualified and published.
 - Hosted CI: lanes defined for stable, MSRV 1.89, macOS, and Windows-check; local verification green.
-- Published crates: none.
-- Release process: none.
-- Consumer integrations: none.
-- Active work: eggsact adoption M001 (dependency-ready: core M006 + transport M002 closed; operationally gated on publication/release decision — no crates published, no release process; adoption requires versioned Eggup dependencies per plan).
+- Published crates: `eggup-acquisition 0.1.0`, `eggup-core 0.1.0`, `eggup-service 0.1.0`, `eggup-eggfetch 0.1.0` (manual `cargo publish`, seam → core/service → adapter order).
+- Release process: manual publication only; no automation.
+- Consumer integrations: none yet; adoption M001 handed off against published versions.
+- Active work: eggsact adoption M001 (proceeding against `eggup-core 0.1.0` + `eggup-eggfetch 0.1.0`).
 - Second consumer migration (stegoeggo): blocked on adoption M001.
-- Publication gate: M006 qualified without publishing (by design). Consumer migration must not begin via path/git workarounds without an explicit release-direction decision. Awaiting reassessment before adoption handoff.
 
 ## Next handoff
 
