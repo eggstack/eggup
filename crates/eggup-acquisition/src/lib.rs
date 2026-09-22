@@ -84,6 +84,26 @@ impl Default for FetchLimits {
 }
 
 impl FetchLimits {
+    /// Validates caller-provided byte and time bounds.
+    ///
+    /// The fields remain public for 0.1.x source compatibility, so every
+    /// transport validates limits again at its I/O boundary. Invalid direct
+    /// struct literals are rejected before route, filesystem, or network I/O.
+    pub fn validate(&self) -> Result<(), AcquisitionError> {
+        if self.max_metadata_bytes == 0 || self.max_metadata_bytes > 16 * 1024 * 1024 {
+            return Err(AcquisitionError::invalid("metadata bound out of range"));
+        }
+        if self.total_timeout.is_zero() || self.connect_timeout.is_zero() {
+            return Err(AcquisitionError::invalid("timeouts must be positive"));
+        }
+        if self.connect_timeout > self.total_timeout {
+            return Err(AcquisitionError::invalid(
+                "connect timeout must not exceed total timeout",
+            ));
+        }
+        Ok(())
+    }
+
     /// Creates limits with explicit bounds.
     ///
     /// Requires non-zero `connect_timeout` and `total_timeout` with
@@ -96,23 +116,14 @@ impl FetchLimits {
         connect_timeout: Duration,
         total_timeout: Duration,
     ) -> Result<Self, AcquisitionError> {
-        if max_metadata_bytes == 0 || max_metadata_bytes > 16 * 1024 * 1024 {
-            return Err(AcquisitionError::invalid("metadata bound out of range"));
-        }
-        if total_timeout.is_zero() || connect_timeout.is_zero() {
-            return Err(AcquisitionError::invalid("timeouts must be positive"));
-        }
-        if connect_timeout > total_timeout {
-            return Err(AcquisitionError::invalid(
-                "connect timeout must not exceed total timeout",
-            ));
-        }
-        Ok(Self {
+        let limits = Self {
             max_metadata_bytes,
             max_artifact_bytes,
             connect_timeout,
             total_timeout,
-        })
+        };
+        limits.validate()?;
+        Ok(limits)
     }
 
     /// Derives the authoritative effective deadlines for one fetch.
@@ -458,7 +469,9 @@ pub fn __acquire_exclusive_temp(
 /// Uses a race-safe no-replace strategy (`hard_link` fails with
 /// `AlreadyExists` when `dest` exists, without overwriting). The temp and
 /// dest must share a parent directory (same filesystem). On success the temp
-/// link is removed and `dest` holds the complete bytes. If `dest` already
+/// link cleanup is best-effort after commit; failure may leave the owned temp
+/// link as residue but never turns a committed destination into ordinary
+/// failure. If `dest` already
 /// exists — before the call or raced in during the fetch — returns an
 /// explicit `InvalidInput` error and preserves the foreign destination;
 /// the caller must remove its owned temp separately.
@@ -468,12 +481,19 @@ pub fn __acquire_exclusive_temp(
 /// `hard_link` fails closed on both when `dest` exists.
 #[doc(hidden)]
 pub fn __promote_no_clobber(tmp: &Path, dest: &Path) -> Result<(), AcquisitionError> {
+    __promote_no_clobber_with(tmp, dest, |path| fs::remove_file(path))
+}
+
+fn __promote_no_clobber_with(
+    tmp: &Path,
+    dest: &Path,
+    remove_temp: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<(), AcquisitionError> {
     match std::fs::hard_link(tmp, dest) {
         Ok(()) => {
-            // Dest now holds the complete bytes; remove the temp link.
-            if let Err(e) = std::fs::remove_file(tmp) {
-                return Err(AcquisitionError::io("cleaning part file after promote", e));
-            }
+            // The destination is committed. Cleanup of the redundant owned
+            // name cannot retroactively make acquisition fail.
+            let _ = remove_temp(tmp);
             Ok(())
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(AcquisitionError::invalid(
@@ -637,6 +657,7 @@ impl AcquisitionTransport for FixtureTransport {
         limits: FetchLimits,
         cancel: &CancelFlag,
     ) -> Result<FetchOutcome<MetadataBytes>, AcquisitionError> {
+        limits.validate()?;
         let start = Instant::now();
         if cancel.is_cancelled() {
             return Err(AcquisitionError::Cancelled);
@@ -690,6 +711,7 @@ impl AcquisitionTransport for FixtureTransport {
         limits: FetchLimits,
         cancel: &CancelFlag,
     ) -> Result<FetchOutcome<ArtifactEvidence>, AcquisitionError> {
+        limits.validate()?;
         let start = Instant::now();
         if cancel.is_cancelled() {
             return Err(AcquisitionError::Cancelled);
@@ -1071,6 +1093,62 @@ mod tests {
     }
 
     #[test]
+    fn invalid_public_limits_are_rejected_before_fixture_io() {
+        let transport = FixtureTransport::new();
+        let request = req("https://example.com/no-route");
+        let invalid = [
+            FetchLimits {
+                max_metadata_bytes: 0,
+                ..limits()
+            },
+            FetchLimits {
+                max_metadata_bytes: 16 * 1024 * 1024 + 1,
+                ..limits()
+            },
+            FetchLimits {
+                connect_timeout: Duration::ZERO,
+                ..limits()
+            },
+            FetchLimits {
+                total_timeout: Duration::ZERO,
+                ..limits()
+            },
+            FetchLimits {
+                connect_timeout: Duration::from_secs(6),
+                total_timeout: Duration::from_secs(5),
+                ..limits()
+            },
+        ];
+        let dir = temp_dir("acq-invalid-limits");
+        let dest = dir.join("app");
+        for limits in invalid {
+            assert!(matches!(
+                limits.validate(),
+                Err(AcquisitionError::InvalidInput(_))
+            ));
+            assert!(matches!(
+                transport.fetch_metadata(&request, limits, &CancelFlag::new()),
+                Err(AcquisitionError::InvalidInput(_))
+            ));
+            assert!(matches!(
+                transport.fetch_artifact(&request, &dest, limits, &CancelFlag::new()),
+                Err(AcquisitionError::InvalidInput(_))
+            ));
+            assert!(!dest.exists());
+            assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
+        }
+        assert!(limits().validate().is_ok());
+        assert!(FetchLimits::new(
+            1024,
+            Some(4096),
+            Duration::from_secs(1),
+            Duration::from_secs(5)
+        )
+        .is_ok());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn missing_artifact_parent_fails_without_creation() {
         let t = FixtureTransport::new();
         t.route(
@@ -1208,6 +1286,24 @@ mod tests {
             })
             .collect();
         assert!(leftovers.is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn post_link_cleanup_failure_keeps_committed_destination_successful() {
+        let dir = temp_dir("acq-promote-cleanup");
+        let tmp = dir.join("owned.part");
+        let dest = dir.join("app");
+        fs::write(&tmp, b"complete artifact").unwrap();
+        let result = __promote_no_clobber_with(&tmp, &dest, |_| {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "injected",
+            ))
+        });
+        assert!(result.is_ok());
+        assert_eq!(fs::read(&dest).unwrap(), b"complete artifact");
+        assert_eq!(fs::read(&tmp).unwrap(), b"complete artifact");
         let _ = fs::remove_dir_all(&dir);
     }
 

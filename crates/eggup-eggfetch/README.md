@@ -37,13 +37,19 @@ Both operations apply the effective deadlines via a real Eggfetch
 request-level timeout override (never a post-hoc elapsed check).
 `EggfetchConfig::timeouts` are ceilings; invalid values (zero or
 `connect > total`) fail closed at `EggfetchTransport::strict`.
+Because `FetchLimits` fields remain public for 0.1.x compatibility, each
+metadata and artifact call also validates request limits before network or
+filesystem work. `EggfetchConfig::effective_timeouts` assumes validated input;
+the transport entry points enforce that precondition.
 A caller deadline surfaces as `AcquisitionError::Timeout`
 (including established-transport inactivity mapped to `total`).
 
 Staging matches the seam contract: exclusively-created owner-private
 (`0600` on Unix) temp siblings in the destination parent, race-safe
 no-clobber promotion (existing or raced-in `dest` fails explicitly and is
-preserved), owned-temp-only cleanup.
+preserved), owned-temp-only cleanup. Successful no-clobber hard-link creation
+commits the complete destination; failure to remove the redundant temp link is
+best-effort cleanup and cannot turn the committed fetch into ordinary failure.
 
 Redaction audit (M003): upstream `eggfetch_core::Error` display and proxy
 details are never embedded. All transport failures use `Error::kind()`

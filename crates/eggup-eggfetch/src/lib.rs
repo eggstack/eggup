@@ -115,7 +115,9 @@ impl EggfetchConfig {
     ///
     /// A stricter adapter ceiling wins; the adapter never extends a caller
     /// deadline. Both metadata and artifact operations use this derivation,
-    /// and the effective total covers headers plus body streaming.
+    /// and the effective total covers headers plus body streaming. This
+    /// helper assumes `limits.validate()` has succeeded; transport entry
+    /// points perform that validation before calling it.
     pub fn effective_timeouts(&self, limits: FetchLimits) -> (Duration, Duration) {
         limits.effective(self.connect_timeout, self.total_timeout)
     }
@@ -233,6 +235,7 @@ impl AcquisitionTransport for EggfetchTransport {
         limits: FetchLimits,
         cancel: &CancelFlag,
     ) -> Result<FetchOutcome<MetadataBytes>, AcquisitionError> {
+        limits.validate()?;
         if cancel.is_cancelled() {
             return Err(AcquisitionError::Cancelled);
         }
@@ -296,6 +299,7 @@ impl AcquisitionTransport for EggfetchTransport {
         limits: FetchLimits,
         cancel: &CancelFlag,
     ) -> Result<FetchOutcome<ArtifactEvidence>, AcquisitionError> {
+        limits.validate()?;
         if cancel.is_cancelled() {
             return Err(AcquisitionError::Cancelled);
         }
@@ -626,6 +630,51 @@ mod tests {
             .fetch_metadata(&req(&format!("{base}/meta")), limits(), &CancelFlag::new())
             .unwrap();
         assert_eq!(out.success().unwrap().bytes(), b"hello-metadata");
+    }
+
+    #[test]
+    fn invalid_public_limits_fail_before_eggfetch_io() {
+        let transport = strict_transport();
+        let request = req("http://127.0.0.1:1/never-contact");
+        let invalid = [
+            FetchLimits {
+                max_metadata_bytes: 0,
+                ..limits()
+            },
+            FetchLimits {
+                max_metadata_bytes: 16 * 1024 * 1024 + 1,
+                ..limits()
+            },
+            FetchLimits {
+                connect_timeout: Duration::ZERO,
+                ..limits()
+            },
+            FetchLimits {
+                total_timeout: Duration::ZERO,
+                ..limits()
+            },
+            FetchLimits {
+                connect_timeout: Duration::from_secs(11),
+                total_timeout: Duration::from_secs(10),
+                ..limits()
+            },
+        ];
+        let dir = temp_dir("eggfetch-invalid-limits");
+        let dest = dir.join("app");
+        for limits in invalid {
+            assert!(matches!(
+                transport.fetch_metadata(&request, limits, &CancelFlag::new()),
+                Err(AcquisitionError::InvalidInput(_))
+            ));
+            assert!(matches!(
+                transport.fetch_artifact(&request, &dest, limits, &CancelFlag::new()),
+                Err(AcquisitionError::InvalidInput(_))
+            ));
+            assert!(!dest.exists());
+            assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
+        }
+        assert!(limits().validate().is_ok());
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

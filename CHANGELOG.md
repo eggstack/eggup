@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- M004 acquisition corrective: `FetchLimits::validate` is shared by its
+  constructor and re-run at every fixture/Eggfetch transport boundary while
+  public fields remain source-compatible for 0.1.x. Invalid direct literals
+  fail before transport work. No-clobber hard-link creation is now the
+  promotion commit point; redundant temp-link cleanup is best-effort and
+  cannot return ordinary failure after a complete destination exists. No
+  publication performed.
+
 - M002 Unix service adapters (`eggup-service` capability): `SystemdManager`,
   `LaunchdManager`, and `CronManager` on the closed M001 contract with
   bounded literal-argv command execution (no shell, kill/reap, output

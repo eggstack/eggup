@@ -27,7 +27,11 @@ effective total timeout   = min(request total, adapter total ceiling)
 ```
 
 A stricter adapter may tighten a deadline but never extends one.
-`FetchLimits::new` requires non-zero timeouts with `connect <= total`.
+`FetchLimits::new` and `FetchLimits::validate` require a metadata bound in
+`1..=16 MiB`, non-zero timeouts, and `connect <= total`. The fields remain
+public for 0.1.x source compatibility, so every transport revalidates a value
+at entry before route lookup, filesystem mutation, or network I/O. Direct
+struct literals cannot bypass the checks.
 Both metadata and artifact operations use the same derivation; the total
 covers headers plus body streaming. A caller deadline produces
 `AcquisitionError::Timeout`, never `NotFound`/fallback.
@@ -40,6 +44,9 @@ Artifact staging (M003 corrective):
 - Promotion requires `dest` to be absent and uses race-safe no-replace
   semantics (`hard_link` fails with `AlreadyExists` without overwriting).
   An existing or raced-in destination fails explicitly and is preserved.
+- Successful hard-link creation is the promotion commit point. Removing the
+  redundant owned temp link is best-effort cleanup; if it fails, the complete
+  destination is still reported as success and the temp residue may remain.
 - Cleanup removes only the owned temp; foreign files are preserved.
   No prefix-based scavenging.
 
