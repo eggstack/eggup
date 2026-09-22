@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: active corrective; M001-M003 closed, M004 corrective ready for handoff
+Status: M001-M004 closed; optional M005 remains evidence-driven
 
 Long-term references:
 
@@ -167,5 +167,5 @@ The subsystem's primary path is complete when two real consumers remain green on
 | M001 | closed | `plans/implementation/acquisition-transport/001-acquisition-seam-and-fixture-transport.md` | `plans/closure/acquisition-transport/001-status.md` | — |
 | M002 | closed; post-closure findings fed M003 | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | `plans/closure/acquisition-transport/002-status.md` | — |
 | M003 | closed; post-closure findings feed M004 | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | `plans/closure/acquisition-transport/003-status.md` | — |
-| M004 | **ready for handoff** | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | — | — |
+| M004 | closed | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | `plans/closure/acquisition-transport/004-status.md` | — |
 | M005 | deferred/evidence-driven | — | — | corrected-path footprint evidence |

@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 004 — Validated Limits and Promotion-State Corrective
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/acquisition-transport/004-status.md`)
 
 Repository baseline: `889a234cbe7f461d92def3df45c83c06a7d257e5`
 
