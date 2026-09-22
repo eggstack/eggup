@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Roadmap
 
-Status: active; M001 schema closed, M002 validators planning-ready
+Status: active corrective; M001 schema closed, M002 schema-uniqueness corrective ready for handoff
 
 Long-term references:
 
@@ -59,7 +59,9 @@ It owns release-time schema/tooling, not release cadence or hosting.
 
 The roadmap's first-consumer evidence gate is satisfied: eggsact and stegoeggo are live on the same Eggup 0.1.0 core/acquisition contracts without generic API changes.
 
-Gregg already uses a machine-readable target table checked against runtime constants. Eggsearch, eggsact, stegoeggo, Egress, and CodeGG duplicate shell/PowerShell target mapping and checksum logic. CodeGG demonstrates a multi-runfile bundle installer; Egress demonstrates archive-based pair installation. These provide the three concrete layout classes needed to define schema v1 without inventing a generic package language.
+M001 established TOML schema v1, but post-closure review found that valid individual templates can still collapse onto duplicate release filenames, checksum sidecars, or install names after expansion, and malformed brace grammar is not always rejected until expansion. M002 corrects those invariants before validators are built on top of v1.
+
+Gregg already uses a machine-readable target table checked against runtime constants. Eggsearch, eggsact, stegoeggo, Egress, and CodeGG duplicate shell/PowerShell target mapping and checksum logic. CodeGG demonstrates a multi-runfile bundle installer; Egress demonstrates archive-based pair installation.
 
 ## 5. Target architecture
 
@@ -71,13 +73,16 @@ Gregg already uses a machine-readable target table checked against runtime const
 core + acquisition contracts proven by consumers
               |
               v
-M001 DistributionContract schema
+M001 DistributionContract schema [closed]
               |
               v
-M002 installer/release validators
+M002 schema uniqueness/template grammar corrective
               |
               v
-M003 generator/templates + two consumer adoptions
+M003 installer/release validators
+              |
+              v
+M004 generator/templates + two consumer adoptions
 ```
 
 ## 7. Milestones
@@ -88,11 +93,17 @@ Plan: `plans/implementation/distribution-bootstrap/001-distribution-contract-sch
 
 Define schema v1 from real simple, CodeGG bundle, and Egress archive/pair layouts. Parse and structurally validate target/alias, asset, checksum, and archive-member mappings. No network, extraction, or installer generation.
 
-### M002 — Release and installer conformance validators
+### M002 — Schema uniqueness and template grammar corrective
 
-Validate target mapping, release asset completeness, checksum names, archive members, and bootstrap fixtures against the M001 contract.
+Plan: `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md`.
 
-### M003 — Generator/templates and two consumer adoptions
+Reject malformed template grammar and any expanded release/install namespace collision before v1 becomes a downstream validation contract.
+
+### M003 — Release and installer conformance validators
+
+Validate target mapping, release asset completeness, checksum names, archive members, and bootstrap fixtures against the corrected v1 contract.
+
+### M004 — Generator/templates and two consumer adoptions
 
 Optionally generate installer bodies or checked fragments once validation proves the schema is sufficiently expressive.
 
@@ -116,6 +127,7 @@ At least two consumers derive or validate runtime and bootstrap asset policy fro
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 | closed | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | `plans/closure/distribution-bootstrap/001-status.md` | — |
-| M002 | planned (planning-ready) | — | — | dist M001 closed |
-| M003 | planned | — | — | dist M002 |
+| M001 | closed; post-closure findings feed M002 | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | `plans/closure/distribution-bootstrap/001-status.md` | — |
+| M002 | **ready for handoff** | `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md` | — | — |
+| M003 | planned / blocked | — | — | dist M002 corrective |
+| M004 | planned / blocked | — | — | dist M003 |
