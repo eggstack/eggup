@@ -6,6 +6,7 @@ Long-term references:
 
 - `plans/000-long-term-specification.md#22-consumer-adoption`
 - `plans/002-long-term-roadmap.md#phase-5--first-real-consumer-adoption`
+- `plans/002-long-term-roadmap.md#phase-8--multi-artifact-codegg-adoption`
 
 Related ADRs:
 
