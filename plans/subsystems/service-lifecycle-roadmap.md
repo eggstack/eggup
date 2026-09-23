@@ -5,12 +5,14 @@ Status: M001-M004 closed; M005 blocked on verified-update-core M007 deferred-fin
 Long-term references:
 
 - `plans/000-long-term-specification.md#10-ownership-model`
+- `plans/000-long-term-specification.md#12-rollback-model`
 - `plans/000-long-term-specification.md#13-service-lifecycle`
 - `plans/000-long-term-specification.md#20-platform-scope`
 
-Related ADR:
+Related ADRs:
 
 - `plans/adrs/ADR-0001-layered-mechanism-and-policy-ownership.md`
+- `plans/adrs/ADR-0002-multi-artifact-transaction-and-rollback.md`
 
 ## 1. Purpose and ownership boundary
 
