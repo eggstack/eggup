@@ -20,6 +20,7 @@ Primary class: architecture / cleanup
 External dependency:
 - repository: `eggstack/eggpack`
 - planning baseline at authoring: `e3452263225fa1ea262e03b557f40b395e6a52d8`
+- reoriented Eggpack M002 plan commit: `9c71f6230e0cac25041dbe85af53c4d7d75a3ac1`
 - required closure: Eggpack Contract and Conformance M002
 - predecessor Eggup implementation: distribution M003 implementation `9941c58d7039410c728860f9e4e382881d4ccf54`, closure `4169c8021b447fe73c8ee3ea71a80a535c940f54`
 
