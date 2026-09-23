@@ -88,6 +88,8 @@ Make live mutation safe for one or many files.
 - multi-member commit;
 - deterministic rollback;
 - rollback-failure/RecoveryRequired result;
+- deferred successful-commit finalization for one bounded caller post-install check;
+- explicit post-commit `KeepInstalled | RollBack` policy;
 - cleanup rules;
 - transaction receipt.
 
@@ -95,6 +97,8 @@ Make live mutation safe for one or many files.
 
 - every injected commit-phase failure has deterministic old/new/recovery outcome evidence;
 - successful multi-file commit never reports success with mixed generations;
+- a coherent newly installed generation can remain rollback-capable through one caller-owned post-install verification step;
+- post-commit rollback failure yields RecoveryRequired with retained evidence;
 - lock contention is deterministic;
 - pre-commit failures do not alter live destinations.
 
@@ -184,7 +188,7 @@ Extract reusable ownership-safe manager mechanics from eggsearch/greggd patterns
 - Windows SCM adapter;
 - bounded transition waits;
 - optional HealthProbe seam;
-- lifecycle snapshot and restore orchestration.
+- lifecycle snapshot and restore orchestration composed with the core deferred-finalization/post-commit policy seam.
 
 ### Exit criteria
 
@@ -225,11 +229,11 @@ Resolve CodeGG's documented generic-updater blocker.
 
 ### Deliverables
 
-- CodeGG ReleasePlan adapter;
+- CodeGG `InstallPlan` / `ArtifactSet` adapter;
 - transactional bundle update for `codegg`, `codegg-sandbox-helper`, and `codegg-eggsearch`;
-- native Eggfetch acquisition;
-- checksum manifest verification;
-- bundle member identity/version checks;
+- bounded native acquisition through Eggup's acquisition seam while preserving CodeGG's existing Eggfetch trust profile;
+- archive checksum-manifest verification before strict CodeGG-owned extraction;
+- per-member integrity continuity plus product-specific bundle member identity/version checks;
 - atomic/recoverable commit;
 - removal of check-only limitation for supported prebuilt installations.
 
