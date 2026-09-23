@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M004 closed; M005 prepared-transaction integration ready for plan authoring
+Status: M001-M004 closed; M005 blocked on verified-update-core M007 deferred-finalization closure
 
 Long-term references:
 
@@ -61,9 +61,11 @@ It does not own application health semantics, service hardening content, artifac
 
 M001 is closed and `eggup-service 0.1.0` is published with the manager-neutral ownership/lifecycle contract and deterministic test double.
 
-M002 implemented systemd/launchd/cron adapters. M003 closed the follow-up restart truthfulness, end-to-end deadline, trusted execution environment, mutation-status, and config-identity findings. Unix service mechanics are therefore ready for consumer adoption.
+M002 implemented systemd/launchd/cron adapters. M003 closed the follow-up restart truthfulness, end-to-end deadline, trusted execution environment, mutation-status, and config-identity findings. Unix service mechanics are qualified and already used by eggsearch.
 
-Windows SCM is the remaining native manager family. Eggsearch provides concrete evidence for SCM create/query/start/stop/delete behavior without requiring its product policy to move into Eggup.
+M004 closed Windows SCM registration, ownership, start/stop/restart, and uninstall behavior. All planned manager families therefore have a reusable adapter surface.
+
+The remaining orchestration milestone is not yet dependency-ready. ADR-0002 requires an explicit `KeepInstalled | RollBack` choice for failures after a coherent new artifact generation is live. Current `eggup-core` finalizes/removes backup state before service restart or health verification can run. Verified Update Core M007 owns that missing deferred-finalization seam; Service M005 must wait for its closure rather than duplicate rollback state in `eggup-service`.
 
 ## 5. Target architecture
 
@@ -85,11 +87,14 @@ M002 systemd/launchd/cron [closed]
        v
 M003 Unix adapter correctness/security corrective
        |
-       +--> M004 Windows SCM
+       +--> M004 Windows SCM [closed]
        |
-       `-------------------+
-                           v
-                 M005 update-lifecycle integration
+       +---------------------------+
+                                   |
+core M007 deferred finalization ---+
+                                   |
+                                   v
+                    M005 update-lifecycle integration
 ```
 
 ## 7. Milestones
@@ -122,7 +127,14 @@ Native SCM registration/state/transition behavior and exact executable/argv/conf
 
 ### M005 — Prepared-transaction lifecycle integration
 
-Compose a verified prepared transaction with quiesce/commit/restart using explicit post-commit failure policy.
+Status: blocked; detailed implementation plan intentionally unwritten until Verified Update Core M007 closes.
+
+Hard dependencies:
+
+- service M004 closure;
+- verified-update-core M007 deferred-finalization/post-commit policy closure.
+
+After M007 stabilizes the core seam, compose a verified transaction with lifecycle snapshot, ownership-safe quiescence, coherent artifact commit, bounded restart/health work, and explicit `KeepInstalled | RollBack` policy. Service/application semantics must remain caller-owned; M005 must consume the core rollback boundary rather than recreate backup/restore machinery in `eggup-service`.
 
 ## 8. Cross-cutting requirements
 
@@ -148,4 +160,4 @@ At least two service-bearing consumers share the manager mechanics without losin
 | M002 | closed; post-closure findings feed M003 | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
-| M005 | ready for plan authoring | — | — | service M004 + verified-update-core M005 closed |
+| M005 | blocked / plan intentionally unwritten | — | — | verified-update-core M007 closure (service M004 already closed) |
