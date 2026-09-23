@@ -796,11 +796,8 @@ mod tests {
             )
             .unwrap();
         fs::set_permissions(&secret_script, fs::Permissions::from_mode(0o755)).unwrap();
-        let output = super::run_bounded(
-            &super::CommandSpec::new(secret_script).timeout(Duration::from_secs(1)),
-        )
-        .unwrap();
-        assert!(output.success());
+        let output = super::run_bounded(&super::CommandSpec::new(secret_script)).unwrap();
+        assert!(output.success(), "bounded candidate output: {output:?}");
         assert_eq!(output.stdout(), b"unset");
     }
 

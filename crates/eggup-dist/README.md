@@ -94,9 +94,39 @@ the contract; extraction belongs to later milestones.
 Sidecar naming is explicit/derivable (for example `{asset}.sha256`).
 The model calls this integrity metadata, never signature/authenticity.
 
+## Conformance validation
+
+`expected_release_files` derives the flat asset and sidecar names for one
+contract target/version. A release client or fixture supplies a
+`ReleaseInventory`; `validate_release_inventory` reports required files that
+are missing. `ExtrasPolicy::AllowExtras` is the default for provider releases
+that also contain source archives or documentation. Use `ExtrasPolicy::Exact`
+for controlled release fixtures.
+
+For archive checks, the caller supplies the member paths it already observed
+to `ArchiveMemberInventory::new`. `validate_archive_member_inventory` checks
+required member presence without opening or extracting the archive. Member
+paths use the same traversal-free, forward-slash validation as schema v1.
+
+Runtime and bootstrap tests can serialize an `ObservedTargetMapping` as TOML.
+Consumer-owned tests extract that small data shape from their runtime
+tables or script fixtures, then `validate_observed_mapping` compares it to the
+contract. Eggup does not parse Rust, shell, or PowerShell. Observations contain
+only target, asset, sidecar, install-name, and archive-member mapping facts.
+
+All supplied inventories and observations are capped at
+`MAX_OBSERVED_ENTRIES` (256). Reports are structured, deterministically sorted,
+and capped at 512 findings. `ConformanceReport::into_result` provides a simple
+pass/fail adapter when a caller does not need to inspect the report.
+
+The library API and consumer-owned fixture tests provide this seam with less
+surface than a CLI, so M003 deliberately adds no executable, filesystem reader,
+network client, archive command, or source parser.
+
 ## Layout
 
-- `src/lib.rs`: typed model, parser, validation, expansion.
+- `src/lib.rs`: typed model, parser, expansion, inventories, and pure
+  conformance validators.
 - `tests/fixtures/`: `simple-direct.toml` (eggsact/stegoeggo-like),
   `codegg-bundle.toml`, `egress-archive.toml`.
 - Product-specific fixtures live under `tests/`, never as generic constants.

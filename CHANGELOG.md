@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- M003 distribution conformance library: derive stable release asset/sidecar
+  inventories; validate caller-supplied release and archive-member names with
+  explicit allow/exact extras policy; compare typed runtime/bootstrap target
+  mappings against schema v1. Inventories and reports are bounded and
+  deterministic. No network client, archive reader, source parser, CLI,
+  generator, or runtime dependency added.
+
 - M003 service corrective: launchd restart now propagates incomplete stop/start
   results; systemd/launchd transitions share one end-to-end monotonic deadline;
   production manager commands use trusted absolute paths and a cleared,
