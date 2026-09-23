@@ -50,6 +50,8 @@ Typical Eggup ADR subjects include:
 
 Accepted ADRs are historical. Supersede rather than rewrite.
 
+Before authoring any cross-repository release/update milestone, plan authors MUST classify the work against ADR-0004. Producer release contracts, conformance, packaging, bootstrap generation, release manifests, generated release CI, publication, and producer provenance belong in Eggpack. Consumer acquisition, verification, local mutation/recovery, service lifecycle, and optional manifest-to-deployment translation belong in Eggup. If a proposed Eggup plan crosses that boundary, stop and register the work in Eggpack instead.
+
 ## 4. Subsystem roadmaps
 
 A subsystem roadmap MUST define:
@@ -261,14 +263,17 @@ Because Eggup is intended as a cross-repository library:
 - package dry-run is part of boundary qualification;
 - breaking API changes before 1.0 still require migration notes for existing Eggstack consumers.
 
-## 17. Initial subsystem decomposition
+## 17. Subsystem decomposition
 
-Initial roadmaps are:
+Active Eggup roadmaps are:
 
 1. verified update core;
 2. acquisition transport;
 3. service lifecycle;
-4. distribution/bootstrap contract;
-5. consumer adoption and compatibility.
+4. consumer adoption and compatibility.
+
+The historical distribution/bootstrap roadmap is migration-only. Its sole remaining milestone is M004 retirement of `eggup-dist`, blocked on Eggpack Contract M002 closure. It MUST NOT be extended with producer capabilities.
+
+Future Eggpack-manifest interoperability, if justified, is a consumer adapter concern and receives its own narrow Eggup roadmap/plan only after Eggpack ReleaseManifest v1 is stable.
 
 Only dependency-ready implementation plans should be created. Future roadmap milestones need not have detailed implementation plans until preceding evidence stabilizes the contract.
