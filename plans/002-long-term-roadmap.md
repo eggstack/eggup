@@ -19,7 +19,8 @@ Every phase MUST:
 7. use deterministic local fixtures for correctness tests;
 8. bound network, subprocess, and captured-output resources;
 9. document dependency/feature impact for consumers;
-10. add closure evidence before dependent work is considered ready.
+10. add closure evidence before dependent work is considered ready;
+11. keep producer release contracts, packaging, bootstrap generation, release CI, and publication in Eggpack.
 
 ## Phase 0 — Repository and contract foundation
 
@@ -238,27 +239,28 @@ Resolve CodeGG's documented generic-updater blocker.
 - failure leaves a coherent prior installation or typed RecoveryRequired state;
 - fresh-install bootstrap script remains independently supported.
 
-## Phase 9 — Distribution contract and bootstrap convergence
+## Phase 9 — Eggpack authority cutover and manifest interoperability
 
 ### Objective
 
-Reduce duplicated shell/PowerShell target/asset/checksum policy.
+End Eggup's temporary ownership of producer-side distribution contracts and establish a narrow producer/consumer seam with Eggpack.
 
 ### Deliverables
 
-- `eggup-dist`;
-- DistributionContract schema;
-- target/asset/checksum derivation;
-- installer template generation or strict conformance checker;
-- release asset completeness checker;
-- runtime-to-bootstrap drift tests;
-- archive/member declaration support.
+- preserve Eggup distribution M001-M003 as predecessor/closure evidence;
+- freeze `eggup-dist` except for migration-critical correctness fixes;
+- require Eggpack Contract M002 to port and independently qualify the closed Eggup M003 conformance behavior;
+- execute Eggup distribution M004 to remove `eggup-dist` after that Eggpack closure;
+- keep installer generation, release conformance, package construction, release manifests, CI, and publication in Eggpack;
+- after Eggpack ReleaseManifest v1 stabilizes, optionally add a small `eggup-eggpack` manifest-consumer adapter.
 
 ### Exit criteria
 
-- at least two consumers use one machine-readable source for runtime updater and bootstrap installer asset contract;
-- generated/validated installers retain product-specific origin and fallback policy;
-- release workflows remain orchestration rather than hidden policy owners.
+- Eggup has no active producer distribution crate or producer-side distribution roadmap;
+- Eggpack is the sole active authority for DistributionContract/conformance;
+- `eggup-core` has no Eggpack dependency;
+- any future manifest adapter translates producer evidence into explicit Eggup deployment inputs without deciding update policy;
+- Eggup remains usable with non-Eggpack releases.
 
 ## Phase 10 — Eggress archive/bundle convergence
 
