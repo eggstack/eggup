@@ -2,7 +2,7 @@
 
 Manager-neutral service-registration, ownership, state, and
 lifecycle-snapshot model plus reusable Unix manager mechanics
-(systemd, launchd, user crontab). Windows SCM remains a later milestone.
+(systemd, launchd, user crontab) and a native Windows SCM adapter.
 
 - `ServiceId` / `ServiceSpec` identify desired registrations with exact
   executable, arguments, and config evidence.
@@ -15,6 +15,21 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
   registered but stopped". Stopped services remain stopped by default.
 - `ServiceManager` trait plus `TestDoubleManager` for deterministic tests;
   `HealthProbe` seam is consumer-supplied and never mutates manager state.
+- `WindowsScmManager` uses the safe `windows-service` SCM wrapper on Windows
+  and a Windows command-line parser for exact executable/argument ownership.
+  Service key name alone never authorizes a mutation; ambiguous registrations
+  are `Unknown` and foreign registrations are denied.
+- `WindowsScmInstall` supplies caller-owned display/start/error settings.
+  Creation never starts the service. Refresh preserves service type,
+  dependencies, account, load-order group, and tag fields outside the adapter's
+  ownership. Account selection is create-time only; custom passwords,
+  descriptions, and recovery actions are not supported by this generic adapter.
+- Windows start/stop/restart polling shares one monotonic deadline per
+  transition. Uninstall reports incomplete while SCM still exposes a
+  marked-for-delete entry and completes only after confirmed absence. Access
+  denial returns bounded remediation and never starts an elevation flow.
+- `windows-service` is a Windows-target dependency. `windows-args` is the small
+  cross-platform parser dependency used for the same ownership tests on Unix.
 - Bounded `TransitionResult` with conflict diagnostics; no automatic privilege
   elevation; no updater/release/network policy.
 - M003 hardening: each start/stop/restart validates one monotonic caller

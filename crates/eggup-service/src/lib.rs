@@ -1,12 +1,17 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![doc = "Manager-neutral service registration, ownership, and lifecycle model"]
-#![doc = "plus reusable Unix manager mechanics (systemd, launchd, cron)."]
+#![doc = "plus Unix manager mechanics and a native Windows SCM adapter."]
 #![doc = ""]
 #![doc = "Destructive manager operations are authorized only for `Owned`"]
 #![doc = "registrations. `Foreign` and `Unknown` fail closed. Manager state and"]
 #![doc = "application health are separate. No privilege escalation, no updater or"]
 #![doc = "transport policy, and no shell interpolation live in this crate."]
+
+mod windows_scm;
+pub use windows_scm::{
+    WindowsErrorControl, WindowsScmInstall, WindowsScmManager, WindowsStartType,
+};
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;

@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 homepage = "https://github.com/eggstack/eggup"
 documentation = "https://docs.rs/eggup-service"
-description = "Manager-neutral service registration, ownership, and lifecycle snapshot contract (no adapters, no escalation)"
+description = "Service registration, ownership, and lifecycle adapters without automatic privilege escalation"
 readme = "README.md"
 authors = ["David Bowman"]
 keywords = ["service", "systemd", "launchd", "lifecycle"]
@@ -21,3 +21,7 @@ exclude = [
 workspace = true
 
 [dependencies]
+windows-args = "=0.2.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "=0.8.1"

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- M004 Windows SCM adapter for `eggup-service`: safe typed SCM query,
+  create/refresh, start/stop/restart, and delete; exact parsed executable and
+  argument ownership; fail-closed handling of ambiguous command lines; shared
+  transition deadlines; and truthful marked-for-delete completion. SCM
+  settings remain caller-owned, unmanaged registration fields are preserved,
+  and no shell, `sc.exe`, ambient PATH, or automatic elevation is used.
+  `windows-service` is target-specific; custom passwords, descriptions,
+  recovery actions, and service entrypoints remain out of scope. No consumer
+  migration or publication performed.
+
 - M003 distribution conformance library: derive stable release asset/sidecar
   inventories; validate caller-supplied release and archive-member names with
   explicit allow/exact extras policy; compare typed runtime/bootstrap target
