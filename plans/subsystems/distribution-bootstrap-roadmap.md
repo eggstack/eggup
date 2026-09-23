@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Roadmap
 
-Status: migration-only; M001-M003 closed historical predecessor, M004 blocked on Eggpack Contract M002 closure
+Status: archived/transferred to Eggpack; M001-M003 retained as historical predecessor, M004 closed
 
 Long-term references:
 
@@ -67,9 +67,9 @@ Eggup distribution milestones:
 - M003 implementation `9941c58d7039410c728860f9e4e382881d4ccf54`;
 - M003 closure `4169c8021b447fe73c8ee3ea71a80a535c940f54`.
 
-`eggup-dist` remains unpublished. Runtime Eggup crates do not depend on it.
+At M004 start, `eggup-dist` was unpublished and no runtime Eggup crate depended on it. M004 removed the crate after Eggpack Contract M002 closed; see `plans/closure/distribution-bootstrap/004-status.md`.
 
-Eggpack Contract M001 is closed. Eggpack Contract M002 is responsible for porting and independently qualifying the full closed M003 conformance behavior.
+Eggpack Contract M002 independently qualified the complete closed M003 conformance behavior and closed at `82f799f3d971b2999ac14c2d8fc1b965370e0f58`. Eggup M004 then removed this producer implementation. No producer capability remains active in Eggup.
 
 ## 5. Target architecture
 
@@ -158,11 +158,11 @@ Closure: `plans/closure/distribution-bootstrap/003-status.md`.
 
 Plan: `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md`.
 
-Status: blocked.
+Status: closed; see `plans/closure/distribution-bootstrap/004-status.md`.
 
-Hard dependency: Eggpack Contract M002 must close with equivalent schema-v1/conformance behavior and direct/bundle/archive evidence.
+Satisfied dependency: Eggpack Contract M002 closed with equivalent schema-v1/conformance behavior and direct/bundle/archive evidence.
 
-Objective: remove the unpublished `eggup-dist` workspace member, preserve historical evidence, and archive this subsystem.
+Objective: remove the unpublished `eggup-dist` workspace member, preserve historical evidence, and archive this subsystem. Completed.
 
 This milestone does not generate installers or add producer functionality.
 
@@ -189,7 +189,7 @@ M004 requires:
 
 The primary risk is deleting the predecessor before Eggpack M002 proves equivalence. The inverse risk is leaving both implementations active long enough for semantic drift.
 
-Therefore `eggup-dist` is frozen during migration: correctness/security fixes only, mirrored or accounted for in Eggpack before cutover.
+During migration, `eggup-dist` was frozen except for correctness/security fixes, which had to be mirrored or accounted for in Eggpack before cutover. That migration is complete.
 
 ## 11. Completion definition
 
@@ -202,4 +202,4 @@ This subsystem is complete when Eggpack is the sole active owner of Distribution
 | M001 | closed / historical | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | `plans/closure/distribution-bootstrap/001-status.md` | — |
 | M002 | closed / historical | `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md` | `plans/closure/distribution-bootstrap/002-status.md` | — |
 | M003 | closed / terminal predecessor | `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md` | `plans/closure/distribution-bootstrap/003-status.md` | — |
-| M004 | blocked / retirement | `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md` | — | Eggpack Contract M002 closure |
+| M004 | closed / retirement | `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md` | `plans/closure/distribution-bootstrap/004-status.md` | — |

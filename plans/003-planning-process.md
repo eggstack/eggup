@@ -272,7 +272,7 @@ Active Eggup roadmaps are:
 3. service lifecycle;
 4. consumer adoption and compatibility.
 
-The historical distribution/bootstrap roadmap is migration-only. Its sole remaining milestone is M004 retirement of `eggup-dist`, blocked on Eggpack Contract M002 closure. It MUST NOT be extended with producer capabilities.
+The distribution/bootstrap roadmap is archived/transferred after M004 retirement of `eggup-dist`, which was authorized by Eggpack Contract M002 closure. It MUST NOT be extended with producer capabilities.
 
 Future Eggpack-manifest interoperability, if justified, is a consumer adapter concern and receives its own narrow Eggup roadmap/plan only after Eggpack ReleaseManifest v1 is stable.
 

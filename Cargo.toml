@@ -5,7 +5,6 @@ members = [
     "crates/eggup-acquisition",
     "crates/eggup-eggfetch",
     "crates/eggup-service",
-    "crates/eggup-dist",
 ]
 
 [workspace.package]
@@ -20,4 +19,3 @@ unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
-

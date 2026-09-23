@@ -65,11 +65,11 @@ The durable ownership rule is:
 
 ## Eggup-dist disposition
 
-`eggup-dist` M003 is the terminal Eggup producer-side implementation. It is frozen except for correctness/security fixes needed to preserve migration evidence.
+`eggup-dist` M003 was the terminal Eggup producer-side implementation. It remained frozen except for correctness/security fixes needed to preserve migration evidence until authority transfer completed.
 
 Eggpack Contract M002 must port and independently qualify the closed M003 conformance surface rather than redesigning or independently re-deriving it.
 
-After Eggpack Contract M002 closes with equivalent schema/conformance behavior, Eggup distribution M004 removes `eggup-dist` from the active workspace and supersedes future Eggup distribution/bootstrap work. Historical plans and closure records remain for provenance.
+Eggpack Contract M002 closed with equivalent schema/conformance behavior at `82f799f3d971b2999ac14c2d8fc1b965370e0f58`. Eggup distribution M004 then removed `eggup-dist` from the active workspace and superseded future Eggup distribution/bootstrap work. Historical plans and closure records remain for provenance; see `plans/closure/distribution-bootstrap/004-status.md`.
 
 No Eggup installer-generator milestone follows M003.
 
@@ -120,7 +120,7 @@ Normal in-process update after installation should use Eggup.
 1. Preserve all existing Eggup M001-M003 distribution closure evidence.
 2. Port the closed M003 public behavior/tests into Eggpack Contract M002.
 3. Close Eggpack M002 with differential/golden evidence against the Eggup predecessor.
-4. Execute Eggup distribution M004 to remove the unpublished `eggup-dist` workspace member and update canonical docs.
+4. Execute Eggup distribution M004 to remove the unpublished `eggup-dist` workspace member and update canonical docs (completed; see its closure record).
 5. Continue installer generation, manifests, build/package, CI, and producer adoption only in Eggpack.
 6. Add Eggup manifest interoperability only after Eggpack ReleaseManifest v1 is stable enough to consume.
 

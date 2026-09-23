@@ -1,10 +1,11 @@
 # Eggup architecture overview
 
 Eggup separates policy from local update mechanism. A consumer resolves a
-release and acquires local inputs; `eggup-core` will later validate, stage, and
-commit an explicitly described artifact set. Network transport, authenticity
-trust choices, release ordering, service lifecycle, and bootstrap installers
-are separate layers.
+release and acquires local inputs; `eggup-core` validates, stages, and commits
+an explicitly described artifact set. Network transport, authenticity trust
+choices, release ordering, service lifecycle, and producer-side bootstrap
+installers are separate layers. Eggpack owns release contracts, packaging,
+and bootstrap generation; Eggup remains usable with non-Eggpack releases.
 
 The durable requirements and decisions are maintained in:
 

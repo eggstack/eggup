@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Milestone 004 — Retire Eggup Producer Authority
 
-Status: blocked
+Status: implemented (closed; see `plans/closure/distribution-bootstrap/004-status.md`)
 
 Repository baseline: `d894ae63a8963914e545a6d93dc3db92b998138c`
 
@@ -28,9 +28,9 @@ External dependency:
 
 Remove the unpublished `eggup-dist` producer-side contract/conformance implementation from Eggup after Eggpack independently qualifies the full closed M003 behavior. Leave Eggup with consumer deployment, acquisition, service lifecycle, and optional future manifest-consumer responsibilities only.
 
-## 2. Why this milestone is blocked
+## 2. Original blocker and resolution
 
-Eggpack Contract M001 has imported schema-v1 parsing/expansion, but Eggpack Contract M002 must first port and close the conformance surface currently present only in Eggup M003: expected release files, release inventories, archive-member inventories, observed target mappings, structured findings/reports, and their direct/bundle/archive fixtures.
+At authoring, Eggpack Contract M002 still needed to port and close the conformance surface present in Eggup M003. This blocker was resolved by Eggpack Contract M002 closure at `82f799f3d971b2999ac14c2d8fc1b965370e0f58`; its predecessor-to-Eggpack matrix covers the complete API and direct/bundle/archive fixture surface. See the closure record for reviewed equivalence evidence.
 
 Deleting `eggup-dist` before that closure would discard the only qualified implementation of those behaviors.
 
@@ -147,4 +147,4 @@ Record Eggpack M002 closure SHA, predecessor-to-Eggpack behavior matrix, depende
 
 ## 16. Handoff notes
 
-Do not execute this plan until Eggpack Contract M002 is closed. This is the only remaining Eggup distribution/bootstrap milestone; it retires the subsystem rather than extending it.
+Eggpack Contract M002 is closed, so this plan was authorized and executed. This was the final Eggup distribution/bootstrap milestone; it retires the subsystem rather than extending it.

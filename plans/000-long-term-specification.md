@@ -165,7 +165,7 @@ Eggup MAY provide a small optional producer-manifest adapter, conceptually `eggu
 
 Such an adapter MUST NOT pull Eggpack build, packaging, CI, or publication machinery into `eggup-core`. Eggup MUST remain usable with non-Eggpack release systems.
 
-The unpublished `eggup-dist` crate is migration-only predecessor evidence and is retired after Eggpack independently qualifies its closed M003 schema/conformance behavior. See ADR-0004.
+The unpublished `eggup-dist` crate was migration-only predecessor evidence and was retired after Eggpack independently qualified equivalent schema/conformance behavior in Contract M002. The closure is recorded in `plans/closure/distribution-bootstrap/004-status.md`; see ADR-0004.
 
 ### 4.5 eggup facade
 

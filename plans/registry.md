@@ -49,7 +49,7 @@ Published 0.1.0 crates remain:
 - `eggup-eggfetch`
 - `eggup-service`
 
-`eggup-dist` remains unpublished and exists only as migration predecessor evidence. It is frozen after closed M003; no new producer functionality is authorized.
+`eggup-dist` was unpublished and existed only as migration predecessor evidence. It was removed after Eggpack Contract M002 qualified the complete M003 behavior; see `plans/closure/distribution-bootstrap/004-status.md`.
 
 Existing simple consumers:
 
@@ -80,9 +80,9 @@ limits.
 
 ### Distribution
 
-M001-M003 are closed predecessor work. M003 is the terminal Eggup producer-side implementation and provides the conformance behavior that Eggpack Contract M002 must port and independently qualify. The implementation is `9941c58d7039410c728860f9e4e382881d4ccf54`; closure is `4169c8021b447fe73c8ee3ea71a80a535c940f54`.
+M001-M003 are closed predecessor work. M003 is the terminal Eggup producer-side implementation and provides the conformance behavior Eggpack Contract M002 ported and independently qualified. The implementation is `9941c58d7039410c728860f9e4e382881d4ccf54`; closure is `4169c8021b447fe73c8ee3ea71a80a535c940f54`.
 
-Distribution M004 is now a blocked retirement milestone, not a generator milestone: `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md`. It may execute only after Eggpack Contract M002 closes.
+Distribution M004 removed `eggup-dist` after Eggpack Contract M002 closed at `82f799f3d971b2999ac14c2d8fc1b965370e0f58`; see `plans/closure/distribution-bootstrap/004-status.md`. The subsystem is archived/transferred, with no active Eggup producer-distribution milestone.
 
 Eggsearch M003 and service M004 Windows SCM are closed. Service M005 prepared-transaction integration is ready for plan authoring. Gregg remains gated on its corrected-path footprint evidence.
 
@@ -93,7 +93,7 @@ Eggsearch M003 and service M004 Windows SCM are closed. Service M005 prepared-tr
 | Verified update core | qualified 0.1.0 | broader bundle/platform evidence later |
 | Acquisition transport | corrected | M004 closed; optional M005 footprint evidence |
 | Service lifecycle | M004 Windows SCM closed | M005 prepared-transaction integration ready for plan authoring |
-| Distribution/bootstrap | migration-only; M003 closed/frozen | M004 retirement blocked on Eggpack Contract M002 |
+| Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
 | Consumer adoption | simple and eggsearch service-aware tiers closed | Gregg awaits footprint evidence |
 
 ## Dependency-ready implementation work
@@ -102,9 +102,9 @@ Eggsearch M003 and service M004 Windows SCM are closed. Service M005 prepared-tr
 |---|---|---|---|---|
 | Service lifecycle | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md`; `plans/closure/service-lifecycle/004-status.md` | — |
 | Service lifecycle | M005 | ready for plan authoring | — | service M004 + verified-update-core M005 closed |
-| Distribution/bootstrap | M004 retirement | blocked | `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md` | Eggpack Contract M002 closure |
+| Distribution/bootstrap | M004 retirement | closed | `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md`; `plans/closure/distribution-bootstrap/004-status.md` | — |
 
-There is no dependency-ready producer-distribution implementation work in Eggup. Distribution M004 is registered only so the duplicate authority can be removed after Eggpack closes its port. CodeGG runtime deployment planning may proceed only if it does not recreate producer target/asset/release-contract authority.
+There is no dependency-ready producer-distribution implementation work in Eggup. The subsystem is archived/transferred. CodeGG runtime deployment planning may proceed only if it does not recreate producer target/asset/release-contract authority.
 
 ## Planned / blocked work
 
@@ -112,7 +112,7 @@ There is no dependency-ready producer-distribution implementation work in Eggup.
 |---|---|---|---|
 | Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
 | Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | service M004 + verified-update-core M005 closed |
-| Distribution/bootstrap | M004 retire `eggup-dist` | blocked | Eggpack Contract M002 closure |
+| Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
 | Consumer adoption | M005 CodeGG | ready for plan authoring | qualified bundle core + acquisition; producer release mapping remains application/Eggpack-owned |
 | Consumer adoption | M006 Egress | blocked | archive update/extraction transaction contract |
@@ -131,9 +131,9 @@ service M003 [closed] ----------> service M004 Windows SCM [closed]
                                       |
                                       +--> service M005 orchestration plan authoring [ready]
 
-distribution M003 [closed/frozen] ---> Eggpack Contract M002 [external required]
+distribution M003 [closed/frozen] ---> Eggpack Contract M002 [closed]
                                               |
-                                              `--> distribution M004 retirement [blocked]
+                                              `--> distribution M004 retirement [closed; subsystem archived]
 
 verified multi-artifact core [qualified] --> CodeGG M005 runtime plan authoring
                                               |
@@ -149,7 +149,7 @@ Gregg M004 remains separate: corrected Eggfetch footprint measurement -> adopt d
                                                             \-> acquisition M005 only if justified
 ```
 
-The corrective gates are closed. Eggsearch M003, distribution M003, and service M004 have reviewed closure evidence. Service M005 and CodeGG runtime deployment can proceed to plan authoring. Distribution M004 cannot execute until Eggpack Contract M002 closes, and no Eggup installer-generator replacement is authorized.
+The corrective gates are closed. Eggsearch M003, distribution M003/M004, and service M004 have reviewed closure evidence. Service M005 and CodeGG runtime deployment can proceed to plan authoring. Distribution M004 does not unblock another Eggup implementation: future manifest consumption remains gated on a stable Eggpack ReleaseManifest contract, and no Eggup installer-generator replacement is authorized.
 
 ## Current project state
 
@@ -157,7 +157,7 @@ The corrective gates are closed. Eggsearch M003, distribution M003, and service 
 - Core: verified multi-artifact transaction/ownership/rollback boundary remains qualified.
 - Acquisition: M004 validation/promotion corrective is closed; optional M005 still needs corrected-path footprint evidence.
 - Service: M004 Windows SCM is closed; M005 update-lifecycle integration is ready for plan authoring.
-- Distribution: M003 is closed/frozen predecessor evidence; producer authority is assigned to Eggpack; M004 retirement is blocked on Eggpack Contract M002.
+- Distribution: M001-M003 remain historical predecessor evidence; M004 removed the producer crate after Eggpack Contract M002 closure. The subsystem is archived/transferred to Eggpack.
 - Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg still needs its own footprint decision.
 - CodeGG M005 runtime plan authoring is unblocked by qualified multi-artifact core/acquisition evidence. It must not depend on `eggup-dist` as a continuing authority; producer release mapping remains application/Eggpack-owned. Egress remains blocked on archive transaction/extraction semantics.
 - Release process: manual crates.io publication only.
@@ -170,7 +170,7 @@ Next Eggup plan-authoring candidates are:
 - service-lifecycle M005 prepared-transaction/update-lifecycle integration;
 - CodeGG M005 runtime deployment integration, with ADR-0004 explicitly excluding producer distribution-contract work.
 
-Distribution M004 is already registered but blocked on Eggpack Contract M002 closure. Do not author or implement an Eggup installer generator.
+Distribution M004 is closed. Do not author or implement an Eggup installer generator. A future consumer manifest adapter remains a separate, optional milestone gated on a stable Eggpack ReleaseManifest contract.
 
 After each implementation pass:
 
