@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active
+Status: M001-M006 closed; M007 post-commit policy ready for handoff
 
 Long-term references:
 
@@ -53,6 +53,7 @@ It does not own:
 - successful multi-member commit is generation-consistent;
 - pre-commit failure leaves live state unchanged;
 - rollback/recovery outcome is explicit;
+- post-commit failure policy remains rollback-capable until explicit finalization;
 - no implicit privilege escalation;
 - eggup-core carries no HTTP/TLS/service-manager dependency.
 
@@ -61,6 +62,7 @@ It does not own:
 - prepare and commit a one-member deployment;
 - prepare and commit a multi-member deployment;
 - recover the previous deployment after injected commit failures;
+- retain rollback capability through one caller-supplied post-commit verification step;
 - validate executable identity/version through bounded commands;
 - expose structured terminal receipts/errors.
 
@@ -107,7 +109,7 @@ A post-closure review at `9f527be` found pre-adoption contract defects that must
 - stale-lock handling is fail-closed but planning language implied stronger recovery;
 - root/crate architecture documentation still contains foundation-era capability statements.
 
-These are tracked in M005. M001-M004 closure records remain historical evidence and are not rewritten to conceal the findings.
+These were tracked and closed in M005, followed by M006 package qualification. A later planning review identified one accepted ADR-0002 capability that was intentionally reserved but still unimplemented: the current successful `ValidatedTransaction::commit()` finalizes backup state before a caller can run post-install verification and choose `KeepInstalled | RollBack`. M007 owns that missing deferred-finalization boundary. M001-M006 closure records remain historical evidence and are not rewritten.
 
 ## 5. Target architecture
 
@@ -158,6 +160,9 @@ M005 pre-qualification safety/API corrective
                   |
                   v
 M006 core package qualification
+        |
+        v
+M007 deferred finalization + post-commit policy
 ```
 
 - M001 -> M002: hard.
@@ -165,7 +170,9 @@ M006 core package qualification
 - M002 -> M004: hard.
 - M003 + M004 -> M005: hard.
 - M005 -> M006: hard.
-- Acquisition and service implementation-plan execution MUST use the corrected M005 public boundary even though their conceptual interfaces became visible earlier.
+- M005 + M006 -> M007: hard and satisfied.
+- Acquisition consumers may continue using the qualified immediate-commit path.
+- Service Lifecycle M005 is hard-blocked on M007 because rollback after service restart/health failure requires backup retention beyond the initial live commit.
 
 ## 7. Milestones
 
@@ -266,6 +273,25 @@ Exit conditions:
 - representative single/bundle examples compile;
 - platform-support claims match actual CI/native evidence.
 
+### M007 — Deferred finalization and post-commit failure policy
+
+Class: invariant/capability.
+
+Plan: `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md`.
+
+Objective: implement ADR-0002's reserved `KeepInstalled | RollBack` boundary after a coherent new artifact generation becomes live but before backup finalization.
+
+Exit conditions:
+
+- one caller-supplied post-commit operation runs while the mutation lock and rollback evidence remain owned by the transaction;
+- post-commit success finalizes normally;
+- `KeepInstalled` retains the new generation while recording the failed post-commit check truthfully;
+- `RollBack` restores and verifies the old generation;
+- rollback failure yields `RecoveryRequired` with both causes and real retained evidence;
+- existing immediate `commit()` behavior remains available;
+- no service/network/product policy enters `eggup-core`;
+- drop/interruption semantics for the chosen API shape are fail-safe and documented.
+
 ## 8. Cross-cutting requirements
 
 ### Storage and migration
@@ -315,7 +341,7 @@ Every safety-sensitive public type documents what it proves and what it does not
 
 ## 11. Completion definition
 
-The roadmap closes when eggup-core safely supports one- and multi-member verified local transactions, fault-injected rollback/recovery is closed, and the package is independently consumable.
+The roadmap closes when eggup-core safely supports one- and multi-member verified local transactions, fault-injected rollback/recovery is closed, the package is independently consumable, and ADR-0002 post-commit failure policy can retain or roll back a coherent newly installed generation before backup finalization.
 
 ## 12. Milestone status
 
@@ -327,3 +353,4 @@ The roadmap closes when eggup-core safely supports one- and multi-member verifie
 | M004 | closed; post-closure findings feed M005 | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | `plans/closure/verified-update-core/004-status.md` | — |
 | M005 | closed | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | `plans/closure/verified-update-core/005-status.md` | — |
 | M006 | closed | `plans/implementation/verified-update-core/006-core-package-qualification.md` | `plans/closure/verified-update-core/006-status.md` | — |
+| M007 | ready | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md` | — | M005 + M006 closed |
