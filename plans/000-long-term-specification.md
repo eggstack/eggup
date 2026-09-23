@@ -20,7 +20,7 @@ Its primary purpose is to eliminate duplicated security-sensitive machinery arou
 - rollback and recovery;
 - install/uninstall primitives;
 - optional service-manager registration and lifecycle coordination;
-- release/install contract validation.
+- consumer-side release metadata translation and validation needed to prepare an explicit deployment.
 
 Eggup is not a centralized release policy engine. Applications retain authority over what version should be installed, which release source is authoritative, which artifacts form one release, which fallback mechanisms are acceptable, and how application-specific migrations or health checks behave.
 
@@ -153,19 +153,19 @@ It MUST remain independent from release acquisition and artifact selection.
 
 Consumer-specific service definitions, command arguments, hardening policy, health payload semantics, and privilege decisions remain supplied by the consumer.
 
-### 4.4 eggup-dist
+### 4.4 producer-manifest interoperability
 
-`eggup-dist` owns development/release-time distribution-contract machinery:
+Producer-side distribution contracts, release conformance, packaging, release manifests, bootstrap-installer generation, release CI, and publication belong to Eggpack, not Eggup.
 
-- machine-readable target and asset declarations;
-- artifact-name/checksum-name derivation;
-- release-contract validation;
-- installer template generation or conformance validation;
-- release asset completeness checks;
-- bootstrap installer test fixtures;
-- drift detection between runtime updater and bootstrap installer contracts.
+Eggup MAY provide a small optional producer-manifest adapter, conceptually `eggup-eggpack`, that:
 
-It is tooling, not a runtime dependency required by every consumer.
+- parses/validates a stable Eggpack release manifest;
+- resolves an already consumer-selected release entry for the current target;
+- translates exact artifact names, sizes, digests, and install names into Eggup deployment inputs.
+
+Such an adapter MUST NOT pull Eggpack build, packaging, CI, or publication machinery into `eggup-core`. Eggup MUST remain usable with non-Eggpack release systems.
+
+The unpublished `eggup-dist` crate is migration-only predecessor evidence and is retired after Eggpack independently qualifies its closed M003 schema/conformance behavior. See ADR-0004.
 
 ### 4.5 eggup facade
 
@@ -365,23 +365,13 @@ A foreign or ambiguous service registration MUST not be stopped, rewritten, or d
 
 ## 14. Bootstrap installers
 
-A bootstrap installer necessarily runs before the Rust library exists. Eggup therefore cannot eliminate shell/PowerShell bootstrap code solely through a runtime crate.
+Bootstrap installers are producer-generated release artifacts and therefore belong to Eggpack.
 
-Instead, Eggup SHOULD provide one authoritative distribution contract from which bootstrap installers are generated or validated.
+Eggup does not own their generation, target/asset mapping, release-layout contract, or release-time conformance. Eggpack may generate installers that contain the minimal staging/integrity/install behavior required before an Eggup-linked application exists.
 
-Bootstrap installers MUST:
+Once native Eggup integration is available, normal in-process install/update SHOULD use Eggup's verified deployment machinery rather than re-running a bootstrap installer.
 
-- use fixed or validated release origins;
-- map OS/architecture deterministically;
-- download into private temporary space;
-- verify integrity before execution or commit;
-- validate candidate identity when practical;
-- avoid automatic privilege escalation;
-- fail closed on unsupported targets;
-- preserve an existing installation on verification failure;
-- perform multi-file updates transactionally when the release is a bundle.
-
-Installer scripts MUST NOT become the normal in-process self-update implementation when native Eggup replacement is available.
+Any bootstrap-to-Eggup handoff format, such as a future compatible install receipt, MUST preserve Eggup's ownership and receipt semantics rather than redefining them in producer tooling.
 
 ## 15. Version and release authority
 
@@ -524,7 +514,7 @@ The project MUST provide deterministic tests for:
 - interruption/recovery seams;
 - Windows running-image replacement semantics;
 - service ownership and lifecycle state machines;
-- installer/updater asset-contract drift.
+- producer-manifest-to-ArtifactSet translation drift for any optional runtime interoperability adapter.
 
 Network tests MUST use local fixtures/test transports by default. Public internet access is not a correctness prerequisite.
 
@@ -549,6 +539,7 @@ Eggup is not:
 - an application auto-update scheduler;
 - a replacement for systemd/launchd/SCM;
 - a source-build system;
+- a release-contract, packaging, bootstrap-installer, or release-CI generator;
 - an excuse to standardize unrelated application release policies.
 
 Those capabilities may integrate with Eggup, but they do not belong in its core ownership boundary.
@@ -560,7 +551,7 @@ Eggup reaches its intended mature state when:
 - core verified multi-artifact transactions are stable and independently packaged;
 - transport is pluggable and Eggfetch has a supported adapter;
 - service lifecycle is separately reusable with ownership-safe semantics;
-- bootstrap installer contracts share authoritative target/asset metadata with runtime consumers;
+- optional producer-manifest adapters can consume authoritative Eggpack release evidence without duplicating target/asset policy inside Eggup;
 - CodeGG's generic updater blocker is resolved without importing Gregg-specific assumptions;
 - at least two Eggstack projects have deleted their bespoke updater implementations in favor of Eggup;
 - at least one multi-artifact consumer uses the transaction engine;
