@@ -293,23 +293,17 @@ A running manager entry is not sufficient proof that the intended application is
 
 ## 30. Distribution contract
 
-A **DistributionContract** is machine-readable release-time policy used to keep runtime update code, bootstrap installers, and release artifacts synchronized.
+A **DistributionContract** is producer-side machine-readable release-layout policy owned by Eggpack.
 
-It may define:
+It may define supported target triples, asset/checksum/install names, archive member layout, and other portable release identity needed to keep release assets and bootstrap installers synchronized.
 
-- supported target triples;
-- asset naming;
-- archive format;
-- checksum naming;
-- member layout;
-- executable names;
-- version/tag template.
+Eggup does not own or evolve this contract. An optional Eggup interoperability adapter may consume concrete producer evidence derived from it without making DistributionContract a runtime deployment authority.
 
 ## 31. Bootstrap installer
 
-A **BootstrapInstaller** is the shell/PowerShell entry point used before any Eggup-linked binary exists.
+A **BootstrapInstaller** is the pre-application shell/PowerShell/program entry point used before any Eggup-linked binary exists.
 
-It must conform to the DistributionContract.
+Its generation and release-layout conformance belong to Eggpack. Product policy may still supply origin, privilege, and fallback choices.
 
 It is not the preferred normal self-update path once native Eggup integration exists.
 
@@ -355,4 +349,5 @@ When terminology is ambiguous, classify concepts by authority:
 - safe artifact mutation belongs to eggup-core;
 - byte transport belongs to acquisition adapters;
 - manager operations belong to eggup-service;
-- bootstrap/release drift control belongs to eggup-dist.
+- producer release contracts, bootstrap/release drift control, packaging, manifests, and release CI belong to Eggpack;
+- optional producer-manifest translation into deployment inputs may live in a narrow Eggup adapter.
