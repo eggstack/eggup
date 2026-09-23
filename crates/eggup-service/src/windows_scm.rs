@@ -40,6 +40,15 @@ pub enum WindowsErrorControl {
     Critical,
 }
 
+/// A caller-selected SCM dependency by service key or load-order group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WindowsServiceDependency {
+    /// Require another service to start first.
+    Service(String),
+    /// Require a Windows load-order group to start first.
+    Group(String),
+}
+
 /// Caller-owned settings used when creating or refreshing an SCM registration.
 ///
 /// The descriptor intentionally omits failure actions, service descriptions,
@@ -52,6 +61,7 @@ pub struct WindowsScmInstall {
     start_type: WindowsStartType,
     error_control: WindowsErrorControl,
     account_name: Option<String>,
+    dependencies: Option<Vec<WindowsServiceDependency>>,
     transition_timeout: Duration,
 }
 
@@ -77,8 +87,20 @@ impl WindowsScmInstall {
             start_type,
             error_control,
             account_name,
+            dependencies: None,
             transition_timeout: DEFAULT_SCM_TIMEOUT,
         })
+    }
+
+    /// Sets caller-owned SCM dependencies. An empty list explicitly clears
+    /// dependencies during refresh; leaving this unset preserves them.
+    pub fn with_dependencies(
+        mut self,
+        dependencies: Vec<WindowsServiceDependency>,
+    ) -> Result<Self, ServiceError> {
+        validate_dependencies(&dependencies)?;
+        self.dependencies = Some(dependencies);
+        Ok(self)
     }
 
     /// Sets the bounded timeout used by install/uninstall and SCM polling.
@@ -113,6 +135,11 @@ impl WindowsScmInstall {
     /// Optional caller-selected account name; no account password is accepted or stored.
     pub fn account_name(&self) -> Option<&str> {
         self.account_name.as_deref()
+    }
+
+    /// Optional caller-owned SCM dependencies; `None` preserves them on refresh.
+    pub fn dependencies(&self) -> Option<&[WindowsServiceDependency]> {
+        self.dependencies.as_deref()
     }
 
     /// The bounded timeout used by install/uninstall and SCM polling.
@@ -154,6 +181,32 @@ fn validate_account_name(value: &str) -> Result<(), ServiceError> {
         return Err(ServiceError::invalid(
             "Windows service account name is empty, overlong, or has controls",
         ));
+    }
+    Ok(())
+}
+
+fn validate_dependencies(dependencies: &[WindowsServiceDependency]) -> Result<(), ServiceError> {
+    let mut seen = std::collections::HashSet::new();
+    for dependency in dependencies {
+        let (kind, name) = match dependency {
+            WindowsServiceDependency::Service(name) => ("service", name),
+            WindowsServiceDependency::Group(name) => ("group", name),
+        };
+        if name.is_empty()
+            || name.encode_utf16().count() > MAX_SCM_NAME_CHARS
+            || name.chars().any(|c| c.is_control() || c == '\0')
+            || name.contains(['/', '\\'])
+        {
+            return Err(ServiceError::invalid(format!(
+                "Windows SCM {kind} dependency is empty, overlong, path-like, or has controls"
+            )));
+        }
+        let key = name.to_ascii_lowercase();
+        if !seen.insert(key) {
+            return Err(ServiceError::invalid(
+                "Windows SCM dependencies contain a duplicate name",
+            ));
+        }
     }
     Ok(())
 }
@@ -821,6 +874,23 @@ fn error_control(value: WindowsErrorControl) -> windows_service::service::Servic
 }
 
 #[cfg(windows)]
+fn service_dependencies(
+    dependencies: &[WindowsServiceDependency],
+) -> Vec<windows_service::service::ServiceDependency> {
+    use std::ffi::OsString;
+    use windows_service::service::ServiceDependency;
+    dependencies
+        .iter()
+        .map(|dependency| match dependency {
+            WindowsServiceDependency::Service(name) => {
+                ServiceDependency::Service(OsString::from(name))
+            }
+            WindowsServiceDependency::Group(name) => ServiceDependency::Group(OsString::from(name)),
+        })
+        .collect()
+}
+
+#[cfg(windows)]
 #[derive(Debug, Default)]
 struct WindowsBackend;
 
@@ -874,7 +944,7 @@ impl WindowsBackend {
         spec: &ServiceSpec,
     ) -> windows_service::service::ServiceInfo {
         use std::ffi::OsString;
-        use windows_service::service::{ServiceDependency, ServiceType};
+        use windows_service::service::ServiceType;
         windows_service::service::ServiceInfo {
             name: OsString::from(install.service_id.as_str()),
             display_name: OsString::from(&install.display_name),
@@ -883,7 +953,7 @@ impl WindowsBackend {
             error_control: error_control(install.error_control),
             executable_path: spec.executable().to_path_buf(),
             launch_arguments: spec.args().iter().map(OsString::from).collect(),
-            dependencies: Vec::<ServiceDependency>::new(),
+            dependencies: service_dependencies(install.dependencies.as_deref().unwrap_or_default()),
             account_name: install.account_name.as_deref().map(OsString::from),
             account_password: None,
         }
@@ -982,7 +1052,11 @@ impl ScmBackend for WindowsBackend {
         // leaves the existing account unchanged. Load-order group/tag are passed as null by the
         // wrapper, which likewise means no change.
         info.service_type = config.service_type;
-        info.dependencies = config.dependencies;
+        info.dependencies = install
+            .dependencies
+            .as_deref()
+            .map(service_dependencies)
+            .unwrap_or(config.dependencies);
         info.account_name = None;
         service
             .change_config(&info)
@@ -1148,6 +1222,20 @@ mod tests {
             WindowsErrorControl::Normal,
             None,
         )
+        .is_err());
+        let dependencies = vec![
+            WindowsServiceDependency::Service("Tcpip".into()),
+            WindowsServiceDependency::Group("NetworkProvider".into()),
+        ];
+        assert!(validate_dependencies(&dependencies).is_ok());
+        assert!(validate_dependencies(&[
+            WindowsServiceDependency::Service("Tcpip".into()),
+            WindowsServiceDependency::Group("tcpip".into()),
+        ])
+        .is_err());
+        assert!(validate_dependencies(&[WindowsServiceDependency::Service(
+            "group/service".into(),
+        )])
         .is_err());
     }
 

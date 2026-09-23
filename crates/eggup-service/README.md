@@ -20,9 +20,10 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
   Service key name alone never authorizes a mutation; ambiguous registrations
   are `Unknown` and foreign registrations are denied.
 - `WindowsScmInstall` supplies caller-owned display/start/error settings.
-  Creation never starts the service. Refresh preserves service type,
-  dependencies, account, load-order group, and tag fields outside the adapter's
-  ownership. Account selection is create-time only; custom passwords,
+  Creation never starts the service. Optional caller-supplied service or
+  load-order-group dependencies are supported. Refresh preserves service type,
+  unspecified dependencies, account, load-order group, and tag fields outside
+  the adapter's ownership. Account selection is create-time only; custom passwords,
   descriptions, and recovery actions are not supported by this generic adapter.
 - Windows start/stop/restart polling shares one monotonic deadline per
   transition. Uninstall reports incomplete while SCM still exposes a

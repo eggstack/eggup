@@ -10,7 +10,8 @@
 
 mod windows_scm;
 pub use windows_scm::{
-    WindowsErrorControl, WindowsScmInstall, WindowsScmManager, WindowsStartType,
+    WindowsErrorControl, WindowsScmInstall, WindowsScmManager, WindowsServiceDependency,
+    WindowsStartType,
 };
 
 use std::collections::{HashMap, VecDeque};
