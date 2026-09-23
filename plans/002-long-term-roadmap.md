@@ -248,7 +248,7 @@ End Eggup's temporary ownership of producer-side distribution contracts and esta
 ### Deliverables
 
 - preserve Eggup distribution M001-M003 as predecessor/closure evidence;
-- freeze `eggup-dist` except for migration-critical correctness fixes;
+- freeze `eggup-dist` except for migration-critical correctness fixes (completed during migration; crate retired by M004);
 - require Eggpack Contract M002 to port and independently qualify the closed Eggup M003 conformance behavior;
 - execute Eggup distribution M004 to remove `eggup-dist` after that Eggpack closure (completed; see `plans/closure/distribution-bootstrap/004-status.md`);
 - keep installer generation, release conformance, package construction, release manifests, CI, and publication in Eggpack;

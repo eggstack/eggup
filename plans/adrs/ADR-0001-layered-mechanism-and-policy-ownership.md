@@ -60,7 +60,7 @@ Network acquisition is supplied by separate adapters, initially `eggup-eggfetch`
 
 Service manager operations live in `eggup-service`.
 
-Release/bootstrap contract tooling was initially placed in `eggup-dist`. ADR-0004 supersedes that portion of this decision: producer-side distribution contracts, conformance, packaging, bootstrap generation, release manifests, CI, and publication now belong to Eggpack. `eggup-dist` is migration-only predecessor evidence pending retirement.
+Release/bootstrap contract tooling was initially placed in `eggup-dist`. ADR-0004 supersedes that portion of this decision: producer-side distribution contracts, conformance, packaging, bootstrap generation, release manifests, CI, and publication now belong to Eggpack. `eggup-dist` was migration-only predecessor evidence and was retired after Eggpack Contract M002 closed; see `plans/closure/distribution-bootstrap/004-status.md`.
 
 Consumer applications retain release authority, version ordering, fallback decisions, CLI presentation, database/config migrations, and application-specific health semantics.
 
