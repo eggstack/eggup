@@ -1,6 +1,8 @@
 # Consumer Adoption Milestone 005 — CodeGG Managed-Runfile Bundle Adoption
 
-Status: ready for handoff
+Status: closed
+
+Closure record: `plans/closure/consumer-adoption/005-status.md`.
 
 Eggup repository baseline: `66acd739f792437cb9fa1701b8fa456c4ba4c403`
 
@@ -490,6 +492,6 @@ Record:
 
 ## 16. Handoff notes
 
-This plan may execute in parallel with Verified Update Core M007. It does not require post-commit service rollback.
+This plan is closed before the requested Verified Update Core M007 pass. It did not require post-commit service rollback.
 
 Do not add service lifecycle, Eggpack manifest generation, generic archive extraction, background autoupdate, Cargo fallback, or release publication to this pass.
