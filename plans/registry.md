@@ -2,7 +2,9 @@
 
 Status: active
 
-Last implementation baseline reviewed: `d894ae63a8963914e545a6d93dc3db92b998138c`
+Last implementation baseline reviewed: `bc25885bd41b86bfdf2f32d1e42856e00829cd7a`
+
+Last planning/closure baseline reviewed: `66acd739f792437cb9fa1701b8fa456c4ba4c403`
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -84,37 +86,38 @@ M001-M003 are closed predecessor work. M003 is the terminal Eggup producer-side 
 
 Distribution M004 removed `eggup-dist` after Eggpack Contract M002 closed at `82f799f3d971b2999ac14c2d8fc1b965370e0f58`; see `plans/closure/distribution-bootstrap/004-status.md`. The subsystem is archived/transferred, with no active Eggup producer-distribution milestone.
 
-Eggsearch M003 and service M004 Windows SCM are closed. Service M005 prepared-transaction integration is ready for plan authoring. Gregg remains gated on its corrected-path footprint evidence.
+Eggsearch M003 and service M004 Windows SCM are closed. A planning-readiness review found that Service M005 is **not** yet dependency-ready: ADR-0002 requires post-commit `KeepInstalled | RollBack`, while the current core finalizes backup state before service restart/health verification can run. Verified Update Core M007 now owns that missing deferred-finalization boundary. Gregg remains gated on its corrected-path footprint evidence.
 
 ## Active subsystem roadmaps
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
-| Verified update core | qualified 0.1.0 | broader bundle/platform evidence later |
+| Verified update core | M001-M006 closed/qualified | M007 deferred finalization + post-commit policy ready |
 | Acquisition transport | corrected | M004 closed; optional M005 footprint evidence |
-| Service lifecycle | M004 Windows SCM closed | M005 prepared-transaction integration ready for plan authoring |
+| Service lifecycle | M004 Windows SCM closed | M005 blocked on verified-update-core M007 |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
-| Consumer adoption | simple and eggsearch service-aware tiers closed | Gregg awaits footprint evidence |
+| Consumer adoption | simple + eggsearch tiers closed | CodeGG M005 ready; Gregg remains footprint-gated |
 
 ## Dependency-ready implementation work
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Service lifecycle | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md`; `plans/closure/service-lifecycle/004-status.md` | — |
-| Service lifecycle | M005 | ready for plan authoring | — | service M004 + verified-update-core M005 closed |
+| Verified update core | M007 post-commit policy / deferred finalization | ready | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md` | M005 + M006 closed |
+| Consumer adoption | M005 CodeGG managed-runfile bundle | ready | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | core M006 + acquisition M004 closed |
+| Service lifecycle | M005 update-lifecycle integration | blocked / plan intentionally unwritten | — | verified-update-core M007 closure |
 | Distribution/bootstrap | M004 retirement | closed | `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md`; `plans/closure/distribution-bootstrap/004-status.md` | — |
 
-There is no dependency-ready producer-distribution implementation work in Eggup. The subsystem is archived/transferred. CodeGG runtime deployment planning may proceed only if it does not recreate producer target/asset/release-contract authority.
+The two ready plans may execute in parallel: CodeGG uses the existing immediate-finalize multi-artifact transaction, while core M007 adds the later post-commit rollback seam required by service orchestration. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
 
 ## Planned / blocked work
 
 | Subsystem | Milestone | State | Blocker |
 |---|---|---|---|
 | Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
-| Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | service M004 + verified-update-core M005 closed |
+| Service lifecycle | M005 update-lifecycle integration | blocked / plan intentionally unwritten | verified-update-core M007 closure |
 | Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
-| Consumer adoption | M005 CodeGG | ready for plan authoring | qualified bundle core + acquisition; producer release mapping remains application/Eggpack-owned |
+| Consumer adoption | M005 CodeGG | ready | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md`; producer release mapping remains application/Eggpack-owned |
 | Consumer adoption | M006 Egress | blocked | archive update/extraction transaction contract |
 | Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
 | Authenticity/signatures | future | ADR required | trust standard not selected |
@@ -129,15 +132,19 @@ service M003 [closed] ------+          |
 
 service M003 [closed] ----------> service M004 Windows SCM [closed]
                                       |
-                                      +--> service M005 orchestration plan authoring [ready]
+                                      +--------------------------+
+                                                                 |
+core M006 [closed] --> core M007 post-commit policy [READY] -----+
+                                                                 |
+                                                                 `--> service M005 orchestration [BLOCKED until M007 closes]
 
 distribution M003 [closed/frozen] ---> Eggpack Contract M002 [closed]
                                               |
                                               `--> distribution M004 retirement [closed; subsystem archived]
 
-verified multi-artifact core [qualified] --> CodeGG M005 runtime plan authoring
-                                              |
-                                              `--> producer release mapping stays in Eggpack
+core M006 + acquisition M004 [closed] --> CodeGG M005 managed bundle [READY]
+                                            |
+                                            `--> producer release mapping stays in application/Eggpack; strict archive extraction stays CodeGG-owned
 
 Egress consumer adoption remains blocked on local archive extraction/update transaction semantics.
 
@@ -149,28 +156,30 @@ Gregg M004 remains separate: corrected Eggfetch footprint measurement -> adopt d
                                                             \-> acquisition M005 only if justified
 ```
 
-The corrective gates are closed. Eggsearch M003, distribution M003/M004, and service M004 have reviewed closure evidence. Service M005 and CodeGG runtime deployment can proceed to plan authoring. Distribution M004 does not unblock another Eggup implementation: future manifest consumption remains gated on a stable Eggpack ReleaseManifest contract, and no Eggup installer-generator replacement is authorized.
+The corrective gates are closed. Eggsearch M003, distribution M003/M004, and service M004 have reviewed closure evidence. Core M007 and CodeGG M005 are the current dependency-ready implementation batch and may execute independently. Service M005 is deliberately held until M007 proves the ADR-0002 post-commit rollback seam. Future manifest consumption remains gated on a stable Eggpack ReleaseManifest contract, and no Eggup installer-generator replacement is authorized.
 
 ## Current project state
 
 - Rust baseline: 1.89.
-- Core: verified multi-artifact transaction/ownership/rollback boundary remains qualified.
+- Core: M001-M006 remain qualified; M007 is ready to add the accepted-but-deferred post-commit `KeepInstalled | RollBack` boundary without service coupling.
 - Acquisition: M004 validation/promotion corrective is closed; optional M005 still needs corrected-path footprint evidence.
-- Service: M004 Windows SCM is closed; M005 update-lifecycle integration is ready for plan authoring.
+- Service: M004 Windows SCM is closed; M005 update-lifecycle integration is blocked on core M007 and intentionally has no detailed plan yet.
 - Distribution: M001-M003 remain historical predecessor evidence; M004 removed the producer crate after Eggpack Contract M002 closure. The subsystem is archived/transferred to Eggpack.
 - Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg still needs its own footprint decision.
-- CodeGG M005 runtime plan authoring is unblocked by qualified multi-artifact core/acquisition evidence. It must not depend on `eggup-dist` as a continuing authority; producer release mapping remains application/Eggpack-owned. Egress remains blocked on archive transaction/extraction semantics.
+- CodeGG M005 has a registered ready plan at `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md`. It uses CodeGG-owned strict extraction of the already-defined verified archive and Eggup's multi-artifact transaction; it must not recreate producer release authority in Eggup. Egress remains separately blocked on a generic archive transaction/extraction contract.
 - Release process: manual crates.io publication only.
 - The previously selected lockstep 0.1.1 patch is now eligible for separate qualification/publication when directed because the corrective gates are closed. Eggsearch M003 may use an immutable path/git source for local qualification until that release exists; no publication is implicit in these plans.
 
 ## Next handoff
 
-Next Eggup plan-authoring candidates are:
+The current dependency-ready implementation batch is:
 
-- service-lifecycle M005 prepared-transaction/update-lifecycle integration;
-- CodeGG M005 runtime deployment integration, with ADR-0004 explicitly excluding producer distribution-contract work.
+1. `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md`;
+2. `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md`.
 
-Distribution M004 is closed. Do not author or implement an Eggup installer generator. A future consumer manifest adapter remains a separate, optional milestone gated on a stable Eggpack ReleaseManifest contract.
+These plans may execute in parallel. After core M007 closes cleanly, author Service Lifecycle M005 against the exact stabilized post-commit API.
+
+Do not author or implement an Eggup installer generator. A future consumer manifest adapter remains a separate, optional milestone gated on a stable Eggpack ReleaseManifest contract.
 
 After each implementation pass:
 
