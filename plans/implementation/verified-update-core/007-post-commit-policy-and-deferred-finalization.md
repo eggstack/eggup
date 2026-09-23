@@ -1,6 +1,9 @@
 # Verified Update Core Milestone 007 — Deferred Finalization and Post-Commit Failure Policy
 
-Status: ready for handoff
+Status: closed
+
+Closure evidence: `plans/closure/verified-update-core/007-status.md`.
+Implementation: `8d5fc12f7224145285f22d0975a7bb91e1e363ea`.
 
 Repository baseline: `66acd739f792437cb9fa1701b8fa456c4ba4c403`
 

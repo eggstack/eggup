@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M004 closed; M005 blocked on verified-update-core M007 deferred-finalization closure
+Status: M001-M004 closed; M005 ready for plan authoring after verified-update-core M007 closure
 
 Long-term references:
 
@@ -67,7 +67,7 @@ M002 implemented systemd/launchd/cron adapters. M003 closed the follow-up restar
 
 M004 closed Windows SCM registration, ownership, start/stop/restart, and uninstall behavior. All planned manager families therefore have a reusable adapter surface.
 
-The remaining orchestration milestone is not yet dependency-ready. ADR-0002 requires an explicit `KeepInstalled | RollBack` choice for failures after a coherent new artifact generation is live. Current `eggup-core` finalizes/removes backup state before service restart or health verification can run. Verified Update Core M007 owns that missing deferred-finalization seam; Service M005 must wait for its closure rather than duplicate rollback state in `eggup-service`.
+The remaining orchestration milestone is now dependency-ready. Core M007 provides the ADR-0002 `KeepInstalled | RollBack` choice while a coherent new artifact generation remains live and rollback evidence is retained. Service M005 should consume `ValidatedTransaction::commit_with_post_commit` rather than duplicate rollback state in `eggup-service`. See `plans/closure/verified-update-core/007-status.md` for qualification evidence and limits.
 
 ## 5. Target architecture
 
@@ -129,14 +129,14 @@ Native SCM registration/state/transition behavior and exact executable/argv/conf
 
 ### M005 — Prepared-transaction lifecycle integration
 
-Status: blocked; detailed implementation plan intentionally unwritten until Verified Update Core M007 closes.
+Status: ready for plan authoring; detailed implementation plan not yet written.
 
 Hard dependencies:
 
 - service M004 closure;
-- verified-update-core M007 deferred-finalization/post-commit policy closure.
+- verified-update-core M007 deferred-finalization/post-commit policy closure (closed; `plans/closure/verified-update-core/007-status.md`).
 
-After M007 stabilizes the core seam, compose a verified transaction with lifecycle snapshot, ownership-safe quiescence, coherent artifact commit, bounded restart/health work, and explicit `KeepInstalled | RollBack` policy. Service/application semantics must remain caller-owned; M005 must consume the core rollback boundary rather than recreate backup/restore machinery in `eggup-service`.
+Compose a verified transaction with lifecycle snapshot, ownership-safe quiescence, coherent artifact commit, bounded restart/health work, and explicit `KeepInstalled | RollBack` policy. Service/application semantics must remain caller-owned; M005 must consume the qualified `commit_with_post_commit` boundary rather than recreate backup/restore machinery in `eggup-service`.
 
 ## 8. Cross-cutting requirements
 
@@ -162,4 +162,4 @@ At least two service-bearing consumers share the manager mechanics without losin
 | M002 | closed; post-closure findings feed M003 | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
-| M005 | blocked / plan intentionally unwritten | — | — | verified-update-core M007 closure (service M004 already closed) |
+| M005 | ready for plan authoring | — | — | — (service M004 and core M007 closed) |

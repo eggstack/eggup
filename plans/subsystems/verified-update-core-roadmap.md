@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: M001-M006 closed; M007 post-commit policy ready for handoff
+Status: M001-M007 closed/qualified
 
 Long-term references:
 
@@ -109,7 +109,7 @@ A post-closure review at `9f527be` found pre-adoption contract defects that must
 - stale-lock handling is fail-closed but planning language implied stronger recovery;
 - root/crate architecture documentation still contains foundation-era capability statements.
 
-These were tracked and closed in M005, followed by M006 package qualification. A later planning review identified one accepted ADR-0002 capability that was intentionally reserved but still unimplemented: the current successful `ValidatedTransaction::commit()` finalizes backup state before a caller can run post-install verification and choose `KeepInstalled | RollBack`. M007 owns that missing deferred-finalization boundary. M001-M006 closure records remain historical evidence and are not rewritten.
+These were tracked and closed in M005, followed by M006 package qualification. A later planning review identified one accepted ADR-0002 capability that was intentionally reserved: the current successful `ValidatedTransaction::commit()` finalized backup state before caller post-install verification. M007 implemented and qualified the deferred-finalization boundary; see `plans/closure/verified-update-core/007-status.md`. M001-M006 closure records remain historical evidence and are not rewritten.
 
 ## 5. Target architecture
 
@@ -172,7 +172,7 @@ M007 deferred finalization + post-commit policy
 - M005 -> M006: hard.
 - M005 + M006 -> M007: hard and satisfied.
 - Acquisition consumers may continue using the qualified immediate-commit path.
-- Service Lifecycle M005 is hard-blocked on M007 because rollback after service restart/health failure requires backup retention beyond the initial live commit.
+- Service Lifecycle M005 is ready for plan authoring after M007 closure because rollback after service restart/health failure requires backup retention beyond the initial live commit.
 
 ## 7. Milestones
 
@@ -353,4 +353,4 @@ The roadmap closes when eggup-core safely supports one- and multi-member verifie
 | M004 | closed; post-closure findings feed M005 | `plans/implementation/verified-update-core/004-integrity-and-candidate-validation.md` | `plans/closure/verified-update-core/004-status.md` | — |
 | M005 | closed | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | `plans/closure/verified-update-core/005-status.md` | — |
 | M006 | closed | `plans/implementation/verified-update-core/006-core-package-qualification.md` | `plans/closure/verified-update-core/006-status.md` | — |
-| M007 | ready | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md` | — | M005 + M006 closed |
+| M007 | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md` | `plans/closure/verified-update-core/007-status.md` | — |
