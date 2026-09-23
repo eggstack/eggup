@@ -1,10 +1,13 @@
 # Consumer Adoption Milestone 003 — Eggsearch Service-Aware Adoption
 
-Status: ready for handoff
+Status: closed
 
 Eggup planning baseline: `4495df6241b3fac9e396553727cf8d3d497ff3cd`
+Eggup implementation baseline: `cf5b3d3819c168eb2dbf841daa8332f3eb28c915`
 
-Consumer evidence baseline: `eggstack/eggsearch@30d597f6b9eadff20e5569a1034312004c248de8`
+Consumer evidence baseline: `eggstack/eggsearch@68ae2fa5457c3fb8fa335851d60d0dce3e98aa08` (refreshed before implementation; the originally captured `30d597f6b9eadff20e5569a1034312004c248de8` had advanced)
+
+Closure record: `plans/closure/consumer-adoption/003-status.md`
 
 Source roadmap:
 

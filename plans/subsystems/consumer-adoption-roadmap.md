@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple tier closed, eggsearch M003 ready for handoff, Gregg awaits footprint evidence
+Status: active; simple and eggsearch service-aware tiers closed, Gregg awaits footprint evidence
 
 Long-term references:
 
@@ -131,6 +131,8 @@ Plan: `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adopti
 
 Adopt corrected core/acquisition plus the Unix service substrate after acquisition M004 and service M003 closure. Preserve eggsearch-owned release/Cargo fallback, health, cron watchdog, and Windows-specific behavior until the corresponding shared layers are qualified.
 
+Closed by `plans/closure/consumer-adoption/003-status.md`. Eggsearch uses the immutable Eggup revision for its shared updater and Unix manager paths; Windows self-replacement/SCM remain consumer-owned. The measured release binary increase is 12.6%; Gregg's separate footprint gate remains open.
+
 ### M004 — Gregg adoption
 
 Replace `gregg-update` with Eggup mechanics after remeasuring the acquisition-M004-corrected Eggfetch path against Gregg's footprint budget. Create lightweight acquisition M005 only if the evidence still justifies it. Detailed adoption plan waits for that decision.
@@ -169,7 +171,7 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 |---|---|---|---|---|
 | M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
-| M003 eggsearch | **ready for handoff** | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | — | acquisition M004 + service M003 closed |
+| M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | blocked / plan intentionally unwritten | — | — | corrected-path footprint decision |
 | M005 CodeGG | planned / blocked | — | — | mature multi-artifact core + distribution M003 validator evidence |
 | M006 Egress | planned / blocked | — | — | core/archive contract + distribution M003 validator evidence |
