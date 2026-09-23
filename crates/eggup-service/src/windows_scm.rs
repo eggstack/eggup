@@ -211,6 +211,18 @@ fn validate_dependencies(dependencies: &[WindowsServiceDependency]) -> Result<()
     Ok(())
 }
 
+#[cfg(any(windows, test))]
+fn scm_error_detail(operation: &'static str, code: Option<i32>) -> String {
+    if code == Some(5) {
+        format!("{operation} denied by Windows SCM; run with an account authorized for this service operation")
+    } else {
+        format!(
+            "{operation} failed in Windows SCM (code {})",
+            code.unwrap_or_default()
+        )
+    }
+}
+
 /// Native Windows SCM adapter implementing the manager-neutral contract.
 ///
 /// `new` is available on Windows. The ownership, command-line parser, and
@@ -901,15 +913,7 @@ impl WindowsBackend {
             windows_service::Error::Winapi(io_error) => io_error.raw_os_error(),
             _ => None,
         };
-        let detail = if code == Some(5) {
-            format!("{operation} denied by Windows SCM; run with an account authorized for this service operation")
-        } else {
-            format!(
-                "{operation} failed in Windows SCM (code {})",
-                code.unwrap_or_default()
-            )
-        };
-        ServiceError::manager(detail)
+        ServiceError::manager(scm_error_detail(operation, code))
     }
 
     fn manager(
@@ -1242,6 +1246,15 @@ mod tests {
             "group/service".into(),
         )])
         .is_err());
+    }
+
+    #[test]
+    fn access_denied_diagnostic_is_bounded_and_does_not_escalate() {
+        let detail = scm_error_detail("start service", Some(5));
+        assert!(detail.contains("account authorized"));
+        assert!(!detail.to_ascii_lowercase().contains("uac"));
+        assert!(!detail.to_ascii_lowercase().contains("runas"));
+        assert!(ServiceError::bounded(detail).len() <= 512);
     }
 
     fn spec() -> ServiceSpec {
