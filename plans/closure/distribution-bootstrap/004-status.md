@@ -80,7 +80,7 @@ Static dependency searches:
 - `rg -n "eggup-dist"` across eggsact, stegoeggo, and eggsearch returned no matches.
 - `git grep -n "eggup-dist"` returns historical provenance/documentation references only; no deleted source or active dependency remains.
 
-Hosted Eggup CI was not run for this local change. Native test evidence is Darwin x86_64; no Windows runner behavior is inferred from it.
+Hosted CI run [35856805564](https://github.com/eggstack/eggup/actions/runs/35856805564) passed Stable checks, Windows workspace check, Rust 1.89 workspace check, and macOS workspace tests on rerun (attempt 2). The first macOS attempt had one unrelated timing-sensitive `eggup-service` unit-test failure: `unix_tests::transition_deadline_rejects_zero_and_only_shrinks` exhausted its 80 ms deadline before the first assertion call. The other 69 service tests passed; rerunning the failed macOS job passed. No distribution code is involved. The current local Darwin x86_64 workspace test run also passed. CI emitted only informational action/runner deprecation annotations.
 
 ## Invariant, failure, and recovery review
 
