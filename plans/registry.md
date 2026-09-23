@@ -2,7 +2,7 @@
 
 Status: active
 
-Last implementation baseline reviewed: `01554361be11ea4d851610eb8aee8840d3048e01`
+Last implementation baseline reviewed: `51baa10717c0faf761175f8c4563f1a2b181565c`
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -29,7 +29,7 @@ This file is the compact control surface for active Eggup planning. Detailed req
 |---|---|---|
 | Verified update core | M001-M006 | `plans/closure/verified-update-core/` |
 | Acquisition transport | M001-M004 | `plans/closure/acquisition-transport/` |
-| Service lifecycle | M001-M003 | `plans/closure/service-lifecycle/` |
+| Service lifecycle | M001-M004 | `plans/closure/service-lifecycle/` |
 | Distribution/bootstrap | M001-M002 | `plans/closure/distribution-bootstrap/` |
 | Consumer adoption | M001 eggsact + M002 stegoeggo + M003 eggsearch | `plans/closure/consumer-adoption/` |
 
@@ -80,9 +80,10 @@ conformance validators; see
 `plans/closure/distribution-bootstrap/003-status.md` for the report, fixtures,
 package, MSRV, and hosted CI evidence.
 
-Eggsearch M003 and distribution M003 are closed. Service M004 Windows SCM is
-the next plan in the authorized sequential batch. Gregg remains gated on its
-own corrected-path footprint evidence.
+Eggsearch M003, distribution M003, and service M004 Windows SCM are closed.
+Service M005 prepared-transaction integration is now ready for plan authoring;
+the verified-update-core M005 dependency is already closed. Gregg remains
+gated on its own corrected-path footprint evidence.
 
 ## Active subsystem roadmaps
 
@@ -90,7 +91,7 @@ own corrected-path footprint evidence.
 |---|---|---|
 | Verified update core | qualified 0.1.0 | broader bundle/platform evidence later |
 | Acquisition transport | corrected | M004 closed; optional M005 footprint evidence |
-| Service lifecycle | corrected | M004 Windows SCM ready for handoff |
+| Service lifecycle | M004 Windows SCM closed | M005 prepared-transaction integration ready for plan authoring |
 | Distribution/bootstrap | M003 validators closed | M004 generator/adoption plan authoring |
 | Consumer adoption | simple and eggsearch service-aware tiers closed | Gregg awaits footprint evidence |
 
@@ -98,16 +99,17 @@ own corrected-path footprint evidence.
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Service lifecycle | M004 | **ready for handoff** | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | service M003 closed |
+| Service lifecycle | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md`; `plans/closure/service-lifecycle/004-status.md` | — |
+| Service lifecycle | M005 | ready for plan authoring | — | service M004 + verified-update-core M005 closed |
 
-The three-plan execution batch is being completed sequentially. Eggsearch M003 deliberately excludes Windows SCM migration; its closure leaves service M004 independent. Distribution M003 is closed; service M004 is next.
+The authorized three-plan execution batch is complete. Eggsearch M003 deliberately excludes Windows SCM migration; service M004 independently provides the generic SCM adapter. Distribution M003 is closed. Gregg remains blocked only on its corrected-path footprint evidence.
 
 ## Planned / blocked work
 
 | Subsystem | Milestone | State | Blocker |
 |---|---|---|---|
 | Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
-| Service lifecycle | M005 update-lifecycle integration | blocked / plan intentionally unwritten | service M004 + corrected core |
+| Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | service M004 + verified-update-core M005 closed |
 | Distribution/bootstrap | M004 generators/adoptions | ready for plan authoring | distribution M003 closed |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
 | Consumer adoption | M005 CodeGG | ready for plan authoring | mature bundle core + distribution M003 evidence closed |
@@ -123,9 +125,9 @@ acquisition M004 [closed] --+
 service M003 [closed] ------+          |
                                        +--> service-aware adoption evidence recorded
 
-service M003 [closed] ----------> service M004 Windows SCM [ready]
+service M003 [closed] ----------> service M004 Windows SCM [closed]
                                       |
-                                      +--> service M005 orchestration planning
+                                      +--> service M005 orchestration plan authoring [ready]
 
 distribution M002 [closed] -----> distribution M003 validators [closed]
                                       |

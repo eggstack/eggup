@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 004 — Windows SCM Adapter
 
-Status: ready for handoff
+Status: closed
 
 Repository baseline: `4495df6241b3fac9e396553727cf8d3d497ff3cd`
 

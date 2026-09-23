@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M003 closed; M004 Windows SCM ready for handoff
+Status: M001-M004 closed; M005 prepared-transaction integration ready for plan authoring
 
 Long-term references:
 
@@ -147,5 +147,5 @@ At least two service-bearing consumers share the manager mechanics without losin
 | M001 | closed | `plans/implementation/service-lifecycle/001-manager-neutral-state-and-ownership.md` | `plans/closure/service-lifecycle/001-status.md` | — |
 | M002 | closed; post-closure findings feed M003 | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
-| M004 | **ready for handoff** | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | — | M003 closed |
-| M005 | planned / blocked | — | — | service M004 + corrected core |
+| M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
+| M005 | ready for plan authoring | — | — | service M004 + verified-update-core M005 closed |
