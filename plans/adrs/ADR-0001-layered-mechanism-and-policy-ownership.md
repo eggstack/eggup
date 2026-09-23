@@ -1,6 +1,6 @@
 # ADR-0001: Layered mechanism and policy ownership
 
-Status: accepted
+Status: accepted; distribution ownership superseded by ADR-0004
 
 Date: 2026-09-22
 
@@ -60,7 +60,7 @@ Network acquisition is supplied by separate adapters, initially `eggup-eggfetch`
 
 Service manager operations live in `eggup-service`.
 
-Release/bootstrap contract tooling lives in `eggup-dist`.
+Release/bootstrap contract tooling was initially placed in `eggup-dist`. ADR-0004 supersedes that portion of this decision: producer-side distribution contracts, conformance, packaging, bootstrap generation, release manifests, CI, and publication now belong to Eggpack. `eggup-dist` is migration-only predecessor evidence pending retirement.
 
 Consumer applications retain release authority, version ordering, fallback decisions, CLI presentation, database/config migrations, and application-specific health semantics.
 
@@ -103,4 +103,4 @@ The separation prevents hidden network fallback and privilege/service behavior i
 
 ## Supersession
 
-None.
+ADR-0004 supersedes only the producer distribution/bootstrap ownership portion of this ADR. The layered Eggup core/acquisition/service and consumer-policy decisions remain authoritative.
