@@ -4,7 +4,7 @@ Status: active
 
 Last implementation baseline reviewed: `bc25885bd41b86bfdf2f32d1e42856e00829cd7a`
 
-Last planning/closure baseline reviewed: `66acd739f792437cb9fa1701b8fa456c4ba4c403`
+Planning baseline for this implementation-plan batch: `66acd739f792437cb9fa1701b8fa456c4ba4c403`
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -39,7 +39,7 @@ Eggup owns consumer-side acquisition, verification, candidate validation, local 
 | Verified update core | M001-M006 | `plans/closure/verified-update-core/` |
 | Acquisition transport | M001-M004 | `plans/closure/acquisition-transport/` |
 | Service lifecycle | M001-M004 | `plans/closure/service-lifecycle/` |
-| Distribution/bootstrap predecessor | M001-M003 | `plans/closure/distribution-bootstrap/` |
+| Distribution/bootstrap (archived/transferred) | M001-M004 | `plans/closure/distribution-bootstrap/` |
 | Consumer adoption | M001 eggsact + M002 stegoeggo + M003 eggsearch | `plans/closure/consumer-adoption/` |
 
 Implementation wave `889a234c` added/closed acquisition M003, service M002, and distribution M001. Hosted CI at that exact SHA passed stable fmt/clippy/test/doc, Rust 1.89 check, macOS tests, and Windows workspace check.
