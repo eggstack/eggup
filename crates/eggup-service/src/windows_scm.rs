@@ -188,9 +188,9 @@ fn validate_account_name(value: &str) -> Result<(), ServiceError> {
 fn validate_dependencies(dependencies: &[WindowsServiceDependency]) -> Result<(), ServiceError> {
     let mut seen = std::collections::HashSet::new();
     for dependency in dependencies {
-        let (kind, name) = match dependency {
-            WindowsServiceDependency::Service(name) => ("service", name),
-            WindowsServiceDependency::Group(name) => ("group", name),
+        let (kind, namespace, name) = match dependency {
+            WindowsServiceDependency::Service(name) => ("service", 's', name),
+            WindowsServiceDependency::Group(name) => ("group", 'g', name),
         };
         if name.is_empty()
             || name.encode_utf16().count() > MAX_SCM_NAME_CHARS
@@ -201,7 +201,7 @@ fn validate_dependencies(dependencies: &[WindowsServiceDependency]) -> Result<()
                 "Windows SCM {kind} dependency is empty, overlong, path-like, or has controls"
             )));
         }
-        let key = name.to_ascii_lowercase();
+        let key = (namespace, name.to_ascii_lowercase());
         if !seen.insert(key) {
             return Err(ServiceError::invalid(
                 "Windows SCM dependencies contain a duplicate name",
@@ -1231,6 +1231,11 @@ mod tests {
         assert!(validate_dependencies(&[
             WindowsServiceDependency::Service("Tcpip".into()),
             WindowsServiceDependency::Group("tcpip".into()),
+        ])
+        .is_ok());
+        assert!(validate_dependencies(&[
+            WindowsServiceDependency::Service("Tcpip".into()),
+            WindowsServiceDependency::Service("tcpip".into()),
         ])
         .is_err());
         assert!(validate_dependencies(&[WindowsServiceDependency::Service(
