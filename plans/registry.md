@@ -114,7 +114,7 @@ There is no dependency-ready producer-distribution implementation work in Eggup.
 | Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | service M004 + verified-update-core M005 closed |
 | Distribution/bootstrap | M004 retire `eggup-dist` | blocked | Eggpack Contract M002 closure |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
-| Consumer adoption | M005 CodeGG | ready for plan authoring | mature bundle core + distribution M003 evidence closed |
+| Consumer adoption | M005 CodeGG | ready for plan authoring | qualified bundle core + acquisition; producer release mapping remains application/Eggpack-owned |
 | Consumer adoption | M006 Egress | blocked | archive update/extraction transaction contract |
 | Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
 | Authenticity/signatures | future | ADR required | trust standard not selected |
@@ -159,7 +159,7 @@ The corrective gates are closed. Eggsearch M003, distribution M003, and service 
 - Service: M004 Windows SCM is closed; M005 update-lifecycle integration is ready for plan authoring.
 - Distribution: M003 is closed/frozen predecessor evidence; producer authority is assigned to Eggpack; M004 retirement is blocked on Eggpack Contract M002.
 - Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg still needs its own footprint decision.
-- CodeGG M005 plan authoring is unblocked by core qualification plus distribution M003 observation evidence. Egress remains blocked on archive transaction/extraction semantics.
+- CodeGG M005 runtime plan authoring is unblocked by qualified multi-artifact core/acquisition evidence. It must not depend on `eggup-dist` as a continuing authority; producer release mapping remains application/Eggpack-owned. Egress remains blocked on archive transaction/extraction semantics.
 - Release process: manual crates.io publication only.
 - The previously selected lockstep 0.1.1 patch is now eligible for separate qualification/publication when directed because the corrective gates are closed. Eggsearch M003 may use an immutable path/git source for local qualification until that release exists; no publication is implicit in these plans.
 
