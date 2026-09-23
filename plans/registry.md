@@ -75,10 +75,14 @@ limits.
 
 M002 closed the schema-v1 findings: template grammar is strict at parse time,
 and expanded release/install filename namespaces reject exact and ASCII-case
-collisions. Distribution M003 validators are now dependency-ready for plan
-authoring. See `plans/closure/distribution-bootstrap/002-status.md`.
+collisions. M003 then closed the release, archive-member, and mapping
+conformance validators; see
+`plans/closure/distribution-bootstrap/003-status.md` for the report, fixtures,
+package, MSRV, and hosted CI evidence.
 
-Eggsearch M003 is closed. Distribution M003 validators and service M004 Windows SCM remain dependency-ready; the authorized batch proceeds to distribution M003 next. Gregg remains gated on its own corrected-path footprint evidence.
+Eggsearch M003 and distribution M003 are closed. Service M004 Windows SCM is
+the next plan in the authorized sequential batch. Gregg remains gated on its
+own corrected-path footprint evidence.
 
 ## Active subsystem roadmaps
 
@@ -87,7 +91,7 @@ Eggsearch M003 is closed. Distribution M003 validators and service M004 Windows 
 | Verified update core | qualified 0.1.0 | broader bundle/platform evidence later |
 | Acquisition transport | corrected | M004 closed; optional M005 footprint evidence |
 | Service lifecycle | corrected | M004 Windows SCM ready for handoff |
-| Distribution/bootstrap | corrected | M003 validators ready for handoff |
+| Distribution/bootstrap | M003 validators closed | M004 generator/adoption plan authoring |
 | Consumer adoption | simple and eggsearch service-aware tiers closed | Gregg awaits footprint evidence |
 
 ## Dependency-ready implementation work
@@ -95,9 +99,8 @@ Eggsearch M003 is closed. Distribution M003 validators and service M004 Windows 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
 | Service lifecycle | M004 | **ready for handoff** | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | service M003 closed |
-| Distribution/bootstrap | M003 | **ready for handoff** | `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md` | distribution M002 closed |
 
-The three-plan execution batch is being completed sequentially. Eggsearch M003 deliberately excludes Windows SCM migration; its closure leaves service M004 independent.
+The three-plan execution batch is being completed sequentially. Eggsearch M003 deliberately excludes Windows SCM migration; its closure leaves service M004 independent. Distribution M003 is closed; service M004 is next.
 
 ## Planned / blocked work
 
@@ -105,10 +108,10 @@ The three-plan execution batch is being completed sequentially. Eggsearch M003 d
 |---|---|---|---|
 | Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
 | Service lifecycle | M005 update-lifecycle integration | blocked / plan intentionally unwritten | service M004 + corrected core |
-| Distribution/bootstrap | M004 generators/adoptions | blocked / plan intentionally unwritten | distribution M003 |
+| Distribution/bootstrap | M004 generators/adoptions | ready for plan authoring | distribution M003 closed |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
-| Consumer adoption | M005 CodeGG | later / blocked | mature bundle core + distribution M003 evidence |
-| Consumer adoption | M006 Egress | later / blocked | archive contract + distribution M003 evidence |
+| Consumer adoption | M005 CodeGG | ready for plan authoring | mature bundle core + distribution M003 evidence closed |
+| Consumer adoption | M006 Egress | blocked | archive update/extraction transaction contract |
 | Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
 | Authenticity/signatures | future | ADR required | trust standard not selected |
 
@@ -116,17 +119,19 @@ The three-plan execution batch is being completed sequentially. Eggsearch M003 d
 
 ```text
 acquisition M004 [closed] --+
-                            +--> eggsearch M003 [ready]
+                            +--> eggsearch M003 [closed]
 service M003 [closed] ------+          |
-                                       +--> first service-aware adoption evidence
+                                       +--> service-aware adoption evidence recorded
 
 service M003 [closed] ----------> service M004 Windows SCM [ready]
                                       |
                                       +--> service M005 orchestration planning
 
-distribution M002 [closed] -----> distribution M003 validators [ready]
+distribution M002 [closed] -----> distribution M003 validators [closed]
                                       |
-                                      +--> distribution M004 + stronger CodeGG/Egress evidence
+                                      +--> distribution M004 plan authoring
+                                      +--> CodeGG M005 plan authoring
+                                      `--> Egress evidence improved; archive contract remains blocked
 
 consumer acquisition M004 + service M003 --> eggsearch M003 [closed]
                                                   |
@@ -136,7 +141,7 @@ Gregg M004 remains separate: corrected Eggfetch footprint measurement -> adopt d
                                                             \-> acquisition M005 only if justified
 ```
 
-The corrective gates are closed. The three linked implementation plans are now the authoritative handoffs; downstream work remains blocked until their closure evidence is reviewed.
+The corrective gates are closed. Eggsearch M003 and distribution M003 have reviewed closure evidence. Service M004 is next in the active batch; distribution M004 and CodeGG M005 can proceed to plan authoring.
 
 ## Current project state
 
@@ -144,16 +149,16 @@ The corrective gates are closed. The three linked implementation plans are now t
 - Core: verified multi-artifact transaction/ownership/rollback boundary remains qualified.
 - Acquisition: M004 validation/promotion corrective is closed; optional M005 still needs corrected-path footprint evidence.
 - Service: M003 Unix adapter corrective is closed; M004 Windows SCM is ready for handoff.
-- Distribution: corrected TOML v1 M002 is closed; M003 conformance validators are ready for handoff.
+- Distribution: M003 conformance validators are closed; M004 plan authoring is ready.
 - Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg still needs its own footprint decision.
+- CodeGG M005 plan authoring is unblocked by core qualification plus distribution M003 observation evidence. Egress remains blocked on archive transaction/extraction semantics.
 - Release process: manual crates.io publication only.
 - The previously selected lockstep 0.1.1 patch is now eligible for separate qualification/publication when directed because the corrective gates are closed. Eggsearch M003 may use an immutable path/git source for local qualification until that release exists; no publication is implicit in these plans.
 
 ## Next handoff
 
-Remaining plans in the active implementation batch:
+Remaining plan in the active implementation batch:
 
-- `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md`
 - `plans/implementation/service-lifecycle/004-windows-scm-adapter.md`
 
 Planning baseline for this batch: `4495df6241b3fac9e396553727cf8d3d497ff3cd`.

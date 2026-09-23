@@ -173,6 +173,6 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | blocked / plan intentionally unwritten | — | — | corrected-path footprint decision |
-| M005 CodeGG | planned / blocked | — | — | mature multi-artifact core + distribution M003 validator evidence |
-| M006 Egress | planned / blocked | — | — | core/archive contract + distribution M003 validator evidence |
+| M005 CodeGG | ready for plan authoring | — | — | — |
+| M006 Egress | blocked | — | — | archive update/extraction transaction contract |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |

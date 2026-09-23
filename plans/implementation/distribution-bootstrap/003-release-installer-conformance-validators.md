@@ -1,8 +1,11 @@
 # Distribution and Bootstrap Milestone 003 — Release and Installer Conformance Validators
 
-Status: ready for handoff
+Status: closed
 
 Repository baseline: `4495df6241b3fac9e396553727cf8d3d497ff3cd`
+Implementation baseline: `bd20bd2d33941cef86020a8709aafc76911ef48d`
+Implementation commit: `9941c58d7039410c728860f9e4e382881d4ccf54`
+Closure record: `plans/closure/distribution-bootstrap/003-status.md`
 
 Source roadmap:
 

@@ -1,6 +1,6 @@
 # Distribution and Bootstrap Roadmap
 
-Status: M001-M002 closed; M003 validators ready for handoff
+Status: M001-M003 closed; M004 ready for plan authoring
 
 Long-term references:
 
@@ -105,6 +105,8 @@ Plan: `plans/implementation/distribution-bootstrap/003-release-installer-conform
 
 Validate target mapping, release asset completeness, checksum names, caller-supplied archive member inventories, and runtime/bootstrap mapping observations against corrected v1 without network, extraction, or language parsing.
 
+Closed by `plans/closure/distribution-bootstrap/003-status.md`. Simple, CodeGG-like bundle, and Egress-like archive observations are covered by TOML fixtures. The report/observation surface is sufficient to begin M004 plan authoring; archive extraction/update semantics remain outside M003.
+
 ### M004 — Generator/templates and two consumer adoptions
 
 Optionally generate installer bodies or checked fragments once validation proves the schema is sufficiently expressive.
@@ -131,5 +133,5 @@ At least two consumers derive or validate runtime and bootstrap asset policy fro
 |---|---|---|---|---|
 | M001 | closed; post-closure findings feed M002 | `plans/implementation/distribution-bootstrap/001-distribution-contract-schema.md` | `plans/closure/distribution-bootstrap/001-status.md` | — |
 | M002 | closed | `plans/implementation/distribution-bootstrap/002-schema-uniqueness-template-corrective.md` | `plans/closure/distribution-bootstrap/002-status.md` | — |
-| M003 | **ready for handoff** | `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md` | — | corrected schema M002 closed |
-| M004 | planned / blocked | — | — | dist M003 |
+| M003 | closed | `plans/implementation/distribution-bootstrap/003-release-installer-conformance-validators.md` | `plans/closure/distribution-bootstrap/003-status.md` | — |
+| M004 | ready for plan authoring | — | — | — |
