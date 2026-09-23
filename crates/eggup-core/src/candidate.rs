@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -8,7 +9,7 @@ use std::time::{Duration, Instant};
 use crate::domain::{CommitOwnership, MemberId};
 use crate::error::{Error, Result};
 use crate::integrity::{IntegrityStatus, VerifiedTransaction};
-use crate::transaction::TransactionReceipt;
+use crate::transaction::{PostCommitFailurePolicy, TransactionReceipt};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_OUTPUT_LIMIT: usize = 64 * 1024;
@@ -449,7 +450,33 @@ impl ValidatedTransaction {
         let digests = self.verified.verified_digests();
         self.verified
             .prepared
-            .commit_inner(ownership, &digests, None)
+            .commit_inner(ownership, &digests, None, None)
+    }
+
+    /// Commits the complete artifact set, runs one caller check while the
+    /// mutation lock and rollback evidence remain held, then resolves its
+    /// result according to `policy`.
+    ///
+    /// The callback runs only after all members are live. Its error is copied
+    /// into bounded core-owned evidence. Panics are caught and recorded as a
+    /// failed check, so `RollBack` still restores the prior generation during
+    /// unwinding. The callback must itself bound its work; core invents no
+    /// timeout. Process termination or power loss is outside this guarantee.
+    pub fn commit_with_post_commit<F, E>(
+        self,
+        ownership: CommitOwnership<'_>,
+        policy: PostCommitFailurePolicy,
+        check: F,
+    ) -> Result<TransactionReceipt>
+    where
+        F: FnOnce() -> std::result::Result<(), E>,
+        E: std::fmt::Display,
+    {
+        let digests = self.verified.verified_digests();
+        let check = Box::new(move || check().map_err(|error| bounded_display(&error)));
+        self.verified
+            .prepared
+            .commit_inner(ownership, &digests, None, Some((policy, check)))
     }
 
     /// Test-only commit with injected faults. The ownership and staged
@@ -463,6 +490,43 @@ impl ValidatedTransaction {
         let digests = self.verified.verified_digests();
         self.verified
             .prepared
-            .commit_inner(ownership, &digests, Some(fault))
+            .commit_inner(ownership, &digests, Some(fault), None)
     }
+
+    #[cfg(test)]
+    pub(crate) fn commit_with_post_commit_fault(
+        self,
+        ownership: CommitOwnership<'_>,
+        policy: PostCommitFailurePolicy,
+        fault: crate::transaction::CommitFault,
+    ) -> Result<TransactionReceipt> {
+        let digests = self.verified.verified_digests();
+        self.verified.prepared.commit_inner(
+            ownership,
+            &digests,
+            Some(fault),
+            Some((
+                policy,
+                Box::new(|| Err("injected post-commit failure".to_string())),
+            )),
+        )
+    }
+}
+
+fn bounded_display(value: &impl std::fmt::Display) -> String {
+    struct Bounded(String);
+    impl std::fmt::Write for Bounded {
+        fn write_str(&mut self, text: &str) -> std::fmt::Result {
+            for character in text.chars() {
+                if self.0.len() + character.len_utf8() > 512 {
+                    break;
+                }
+                self.0.push(character);
+            }
+            Ok(())
+        }
+    }
+    let mut output = Bounded(String::new());
+    let _ = std::write!(&mut output, "{value}");
+    output.0
 }

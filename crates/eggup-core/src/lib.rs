@@ -39,8 +39,8 @@ pub use integrity::{
 pub use lock::{LockStatus, MutationLock};
 pub use stage::PreparedTransaction;
 pub use transaction::{
-    CleanupDisposition, FailureCategory, FailurePhase, FailureReport, TransactionDisposition,
-    TransactionReceipt,
+    CleanupDisposition, FailureCategory, FailurePhase, FailureReport, PostCommitFailurePolicy,
+    TransactionDisposition, TransactionReceipt,
 };
 
 #[cfg(test)]
@@ -54,7 +54,7 @@ mod tests {
         AbsentOnlyVerifier, AbsentPolicy, AllValidators, ArtifactMember, ArtifactSet,
         CleanupDisposition, CommitOwnership, Error, ExactDigestVerifier, ExactIdentityValidator,
         ExistingAsOwnedVerifier, InstallPlan, MemberId, MutationLock, Ownership, OwnershipVerifier,
-        ProductId, ReleaseId, TransactionDisposition,
+        PostCommitFailurePolicy, ProductId, ReleaseId, TransactionDisposition,
     };
     use std::collections::HashMap;
     use std::fs;
@@ -402,6 +402,218 @@ mod tests {
                 .file_name()
                 .to_string_lossy()
                 .starts_with(".eggup-backup-")));
+    }
+
+    #[test]
+    fn post_commit_check_sees_complete_generation_and_holds_mutation_lock() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+        let verifier = allow_create();
+        let validated = prepared
+            .verify_integrity()
+            .unwrap()
+            .validate(&AllValidators::new())
+            .unwrap();
+        let receipt = validated
+            .commit_with_post_commit(
+                CommitOwnership::new(&verifier, AbsentPolicy::AllowCreate),
+                PostCommitFailurePolicy::RollBack,
+                || {
+                    assert_eq!(
+                        fs::read(install.path().join("bin/main")).unwrap(),
+                        b"new-main"
+                    );
+                    assert_eq!(
+                        fs::read(install.path().join("bin/helper")).unwrap(),
+                        b"new-helper"
+                    );
+                    assert!(MutationLock::acquire(
+                        install.path(),
+                        &ProductId::new("bundle").unwrap(),
+                        &ReleaseId::new("r1").unwrap(),
+                    )
+                    .is_err());
+                    Ok::<_, &str>(())
+                },
+            )
+            .unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::Committed);
+        assert!(receipt.post_commit_failure().is_none());
+    }
+
+    #[test]
+    fn post_commit_keep_installed_records_bounded_failure() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+        let verifier = allow_create();
+        let validated = prepared
+            .verify_integrity()
+            .unwrap()
+            .validate(&AllValidators::new())
+            .unwrap();
+        let receipt = validated
+            .commit_with_post_commit(
+                CommitOwnership::new(&verifier, AbsentPolicy::AllowCreate),
+                PostCommitFailurePolicy::KeepInstalled,
+                || Err("é".repeat(400)),
+            )
+            .unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::Committed);
+        let failure = receipt.post_commit_failure().unwrap();
+        assert_eq!(failure.phase(), super::FailurePhase::PostCommit);
+        assert!(failure.detail().len() <= 512);
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"new-main"
+        );
+        assert_eq!(
+            fs::read(install.path().join("bin/helper")).unwrap(),
+            b"new-helper"
+        );
+    }
+
+    #[test]
+    fn post_commit_rollback_restores_old_generation_and_absent_members() {
+        let inputs = InstallationRoot::new().unwrap();
+        let install = InstallationRoot::new().unwrap();
+        let main = inputs.write_file("main", b"new-main").unwrap();
+        let helper = inputs.write_file("helper", b"new-helper").unwrap();
+        install.write_file("bin/main", b"old-main").unwrap();
+        let artifacts = ArtifactSet::new(vec![
+            ArtifactMember::new(MemberId::new("main").unwrap(), main, "bin/main")
+                .unwrap()
+                .with_integrity(super::IntegrityRequirement::Sha256(
+                    super::hash_file(&inputs.path().join("main")).unwrap(),
+                )),
+            ArtifactMember::new(MemberId::new("helper").unwrap(), helper, "bin/helper")
+                .unwrap()
+                .with_integrity(super::IntegrityRequirement::Sha256(
+                    super::hash_file(&inputs.path().join("helper")).unwrap(),
+                )),
+        ])
+        .unwrap();
+        let prepared = InstallPlan::new(
+            ProductId::new("bundle").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            artifacts,
+        )
+        .unwrap()
+        .prepare()
+        .unwrap();
+        let verifier = allow_create();
+        let receipt = prepared
+            .verify_integrity()
+            .unwrap()
+            .validate(&AllValidators::new())
+            .unwrap()
+            .commit_with_post_commit(
+                CommitOwnership::new(&verifier, AbsentPolicy::AllowCreate),
+                PostCommitFailurePolicy::RollBack,
+                || Err("health check failed"),
+            )
+            .unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::RolledBack);
+        assert_eq!(
+            receipt.failure().unwrap().phase(),
+            super::FailurePhase::PostCommit
+        );
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"old-main"
+        );
+        assert!(!install.path().join("bin/helper").exists());
+    }
+
+    #[test]
+    fn post_commit_rollback_failure_retains_both_reports_and_evidence() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+        let verifier = allow_create();
+        let receipt = prepared
+            .verify_integrity()
+            .unwrap()
+            .validate(&AllValidators::new())
+            .unwrap()
+            .commit_with_post_commit_fault(
+                CommitOwnership::new(&verifier, AbsentPolicy::AllowCreate),
+                PostCommitFailurePolicy::RollBack,
+                CommitFault::PostCommitRollback,
+            )
+            .unwrap();
+        assert_eq!(
+            receipt.disposition(),
+            TransactionDisposition::RecoveryRequired
+        );
+        assert_eq!(
+            receipt.post_commit_failure().unwrap().phase(),
+            super::FailurePhase::PostCommit
+        );
+        assert_eq!(
+            receipt.rollback_failure().unwrap().phase(),
+            super::FailurePhase::Rollback
+        );
+        assert!(receipt.recovery_path().unwrap().exists());
+        let recovery = receipt.recovery_path().unwrap().to_path_buf();
+        let _ = fs::remove_dir_all(recovery);
+        let _ = fs::remove_file(install.path().join(".eggup-mutation.lock"));
+    }
+
+    #[test]
+    fn keep_installed_finalize_failure_preserves_both_failure_facts() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+        let verifier = allow_create();
+        let receipt = prepared
+            .verify_integrity()
+            .unwrap()
+            .validate(&AllValidators::new())
+            .unwrap()
+            .commit_with_post_commit_fault(
+                CommitOwnership::new(&verifier, AbsentPolicy::AllowCreate),
+                PostCommitFailurePolicy::KeepInstalled,
+                CommitFault::Finalize,
+            )
+            .unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::Committed);
+        assert_eq!(
+            receipt.failure().unwrap().phase(),
+            super::FailurePhase::Finalize
+        );
+        assert_eq!(
+            receipt.post_commit_failure().unwrap().phase(),
+            super::FailurePhase::PostCommit
+        );
+        let recovery = receipt.recovery_path().unwrap().to_path_buf();
+        assert!(recovery.exists());
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"new-main"
+        );
+        let _ = fs::remove_dir_all(recovery);
+        let _ = fs::remove_file(install.path().join(".eggup-mutation.lock"));
+    }
+
+    #[test]
+    fn post_commit_panic_is_reported_and_rolls_back() {
+        let (_inputs, install, prepared) = prepared_bundle(true);
+        let verifier = allow_create();
+        let receipt = prepared
+            .verify_integrity()
+            .unwrap()
+            .validate(&AllValidators::new())
+            .unwrap()
+            .commit_with_post_commit(
+                CommitOwnership::new(&verifier, AbsentPolicy::AllowCreate),
+                PostCommitFailurePolicy::RollBack,
+                || -> Result<(), &str> { panic!("simulated check panic") },
+            )
+            .unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::RolledBack);
+        assert_eq!(
+            receipt.post_commit_failure().unwrap().detail(),
+            "post-commit check panicked"
+        );
+        assert_eq!(
+            fs::read(install.path().join("bin/main")).unwrap(),
+            b"old-main"
+        );
     }
 
     #[test]

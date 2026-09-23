@@ -27,9 +27,11 @@ consumer/release policy  ->  acquisition/transport  ->  eggup-core
 SHA-256 integrity verification, bounded candidate execution, explicit
 `Absent | Owned | Foreign | Unknown` ownership proofs, locked ownership and
 staged-digest revalidation, mutation locking with inspection-only stale
-handling, and commit/rollback with structured failure reports. No live
-destination parent is created automatically, and no authenticity claim is
-made. Commit/rollback mechanics are documented in
+handling, and commit/rollback with structured failure reports. The optional
+`commit_with_post_commit` path retains the mutation lock and backup through one
+caller check and resolves failure with explicit keep-or-rollback policy. No
+live destination parent is created automatically, and no authenticity claim
+is made. Commit/rollback mechanics are documented in
 the [transaction contract](../crates/eggup-core/docs/transaction.md); service
 and transport layers remain outside the crate. Verification ordering and
 bounded candidate execution are defined in the [verification contract](../crates/eggup-core/docs/verification.md).

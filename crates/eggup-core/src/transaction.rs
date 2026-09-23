@@ -27,17 +27,24 @@ pub enum TransactionDisposition {
 
 /// How transaction-owned temporary evidence was handled.
 ///
-/// This replaces the former `PostCommitFailurePolicy::{Cleaned,
-/// RetainForRecovery}` name, which conflated cleanup disposition with the
-/// ADR-0002 post-commit `KeepInstalled | RollBack` policy. The ADR-0002 policy
-/// is reserved for a future post-commit failure boundary and is not
-/// implemented here.
+/// This describes transaction-owned temporary evidence. The separate
+/// [`PostCommitFailurePolicy`] selects what to do when a post-commit check
+/// fails.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CleanupDisposition {
     /// Owned temporary state was cleaned up.
     Cleaned,
     /// Evidence was retained for an operator because cleanup was unsafe or failed.
     RetainedForRecovery,
+}
+
+/// Caller policy for a failed post-commit check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostCommitFailurePolicy {
+    /// Keep the complete new artifact set installed and report the check failure.
+    KeepInstalled,
+    /// Restore and verify the complete previous artifact set.
+    RollBack,
 }
 
 /// The transaction phase that produced a failure.
@@ -56,6 +63,8 @@ pub enum FailurePhase {
     Backup,
     /// Renaming staged members into live destinations.
     Commit,
+    /// A caller-supplied post-commit check failed.
+    PostCommit,
     /// Restoring backups after a failure.
     Rollback,
     /// Removing the backup set after a successful commit.
@@ -71,6 +80,7 @@ impl FailurePhase {
             Self::StageRevalidation => "stage-revalidation",
             Self::Backup => "backup",
             Self::Commit => "commit",
+            Self::PostCommit => "post-commit",
             Self::Rollback => "rollback",
             Self::Finalize => "finalize",
         }
@@ -93,6 +103,8 @@ pub enum FailureCategory {
     InvalidInput,
     /// The failure was injected by the test fault harness.
     Injected,
+    /// A caller-supplied post-commit check failed or panicked.
+    PostCommitCheck,
 }
 
 impl FailureCategory {
@@ -105,6 +117,7 @@ impl FailureCategory {
             Self::Filesystem => "filesystem",
             Self::InvalidInput => "invalid-input",
             Self::Injected => "injected",
+            Self::PostCommitCheck => "post-commit-check",
         }
     }
 }
@@ -128,7 +141,13 @@ impl FailureReport {
         let mut detail = detail.into();
         // Bound human-readable detail; receipts must never embed unbounded output.
         if detail.len() > 512 {
-            detail.truncate(512);
+            let boundary = detail
+                .char_indices()
+                .map(|(index, _)| index)
+                .take_while(|index| *index <= 512)
+                .last()
+                .unwrap_or(0);
+            detail.truncate(boundary);
         }
         Self {
             phase,
@@ -204,6 +223,7 @@ pub struct TransactionReceipt {
     recovery_path: Option<PathBuf>,
     failure: Option<FailureReport>,
     rollback_failure: Option<FailureReport>,
+    post_commit_failure: Option<FailureReport>,
 }
 
 impl TransactionReceipt {
@@ -264,6 +284,11 @@ impl TransactionReceipt {
     pub fn rollback_failure(&self) -> Option<&FailureReport> {
         self.rollback_failure.as_ref()
     }
+
+    /// Returns the failed post-commit check, if one occurred.
+    pub fn post_commit_failure(&self) -> Option<&FailureReport> {
+        self.post_commit_failure.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -275,6 +300,7 @@ pub(crate) enum CommitFault {
     Commit(MemberId),
     CommitThenRollback(MemberId, MemberId),
     Finalize,
+    PostCommitRollback,
 }
 
 #[derive(Debug)]
@@ -284,12 +310,18 @@ struct BackupEntry {
     backup: Option<PathBuf>,
 }
 
+type PostCommitCheck<'a> = (
+    PostCommitFailurePolicy,
+    Box<dyn FnOnce() -> std::result::Result<(), String> + 'a>,
+);
+
 impl PreparedTransaction {
     pub(crate) fn commit_inner(
         self,
         ownership: CommitOwnership<'_>,
         verified_digests: &HashMap<MemberId, [u8; 32]>,
         fault: Option<CommitFault>,
+        post_commit: Option<PostCommitCheck<'_>>,
     ) -> Result<TransactionReceipt> {
         if fault == Some(CommitFault::LockCreation) {
             return Err(Error::invalid("injected lock creation failure"));
@@ -408,6 +440,63 @@ impl PreparedTransaction {
             committed.insert(member.id().clone());
         }
 
+        let mut post_commit_failure = None;
+        if let Some((policy, check)) = post_commit {
+            let checked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(check));
+            let failure_detail = match checked {
+                Ok(Ok(())) => None,
+                Ok(Err(detail)) => Some(detail),
+                Err(_) => Some("post-commit check panicked".to_string()),
+            };
+            if let Some(detail) = failure_detail {
+                let report = FailureReport::new(
+                    FailurePhase::PostCommit,
+                    None,
+                    FailureCategory::PostCommitCheck,
+                    detail,
+                );
+                match policy {
+                    PostCommitFailurePolicy::KeepInstalled => {
+                        post_commit_failure = Some(report);
+                    }
+                    PostCommitFailurePolicy::RollBack => {
+                        let rollback_fault = if fault == Some(CommitFault::PostCommitRollback) {
+                            Some(CommitFault::CommitThenRollback(
+                                self.plan
+                                    .artifacts()
+                                    .iter()
+                                    .next()
+                                    .expect("non-empty artifact set")
+                                    .id()
+                                    .clone(),
+                                self.plan
+                                    .artifacts()
+                                    .iter()
+                                    .next()
+                                    .expect("non-empty artifact set")
+                                    .id()
+                                    .clone(),
+                            ))
+                        } else {
+                            fault.clone()
+                        };
+                        let (verified, rollback_failure) =
+                            restore_entries(&entries, &committed, rollback_fault);
+                        let mut receipt = finish_failure(
+                            self,
+                            lock,
+                            backup_root,
+                            verified,
+                            rollback_failure,
+                            report.clone(),
+                        )?;
+                        receipt.post_commit_failure = Some(report);
+                        return Ok(receipt);
+                    }
+                }
+            }
+        }
+
         if fault == Some(CommitFault::Finalize) {
             lock.preserve();
             let report = FailureReport::new(
@@ -426,6 +515,7 @@ impl PreparedTransaction {
                 recovery_path: Some(backup_root),
                 failure: Some(report),
                 rollback_failure: None,
+                post_commit_failure,
             });
         }
         if let Err(source) = fs::remove_dir_all(&backup_root) {
@@ -442,6 +532,7 @@ impl PreparedTransaction {
                 recovery_path: Some(backup_root),
                 failure: Some(report),
                 rollback_failure: None,
+                post_commit_failure,
             });
         }
         Ok(TransactionReceipt {
@@ -454,6 +545,7 @@ impl PreparedTransaction {
             recovery_path: None,
             failure: None,
             rollback_failure: None,
+            post_commit_failure,
         })
     }
 
@@ -837,6 +929,7 @@ fn finish_failure_no_mutation(
         recovery_path: None,
         failure: Some(report),
         rollback_failure: None,
+        post_commit_failure: None,
     })
 }
 
@@ -859,6 +952,7 @@ fn finish_failure(
             recovery_path: None,
             failure: Some(report),
             rollback_failure: None,
+            post_commit_failure: None,
         });
     }
     lock.preserve();
@@ -872,5 +966,6 @@ fn finish_failure(
         recovery_path: Some(backup_root),
         failure: Some(report),
         rollback_failure,
+        post_commit_failure: None,
     })
 }

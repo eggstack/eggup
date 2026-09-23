@@ -24,11 +24,19 @@ reports whether restoration was verified, and always carries the triggering
 `FailureReport` (phase, member, category, bounded detail). Rollback failure
 additionally carries `rollback_failure` while preserving the original cause.
 `CleanupDisposition::{Cleaned, RetainedForRecovery}` describes temporary
-evidence only; the ADR-0002 `KeepInstalled | RollBack` post-commit policy is
-reserved for a future boundary. A rollback or cleanup failure keeps the real
-backup root and lock record for manual recovery; cleanup failure after success
-returns the real retained root, never a synthetic path. The implementation
-does not claim crash-safe journaling or literal filesystem-wide atomicity.
+evidence only. `commit_with_post_commit` is the ADR-0002 boundary: after all
+members are live, its one caller check runs while the mutation lock and backup
+remain held. Success finalizes normally. On failure, `KeepInstalled` finalizes
+the backup and records `post_commit_failure` while retaining `Committed`;
+`RollBack` restores and verifies the previous generation. A rollback failure
+returns `RecoveryRequired`, preserving the post-commit cause, rollback cause,
+real backup path, and lock record. Callback errors are copied into bounded
+core-owned reports; callback panics are treated as failed checks and resolved
+by the selected policy. The callback owns its own time bound. Process
+termination and power loss are outside this guarantee. Cleanup failure keeps
+the real backup root and lock record; no synthetic path is returned. The
+implementation does not claim crash-safe journaling or literal filesystem-wide
+atomicity.
 
 Existing symlink, non-regular, hard-linked, or escaped destinations fail closed
 before backup. Lock records are bounded (4 KiB), owner-private (0600), and
@@ -36,4 +44,3 @@ malformed, oversized, or ambiguous records are never auto-removed.
 `MutationLock::inspect` reports `Available | Held | Malformed` without
 deleting anything; stale removal requires manual operator action with
 deployment-specific process evidence.
-

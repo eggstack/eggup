@@ -17,13 +17,17 @@ PreparedTransaction
 VerifiedTransaction
         | validate(&CandidateValidator)
         v
-ValidatedTransaction -- commit(ownership) --> TransactionReceipt
+ValidatedTransaction -- commit(ownership) ---------------------> TransactionReceipt
+        `-- commit_with_post_commit(ownership, policy, check) --> TransactionReceipt
 ```
 
 `validate` rejects any member without `Verified` integrity evidence.
-`commit` additionally re-hashes every staged member under lock against the
+Both commit paths re-hash every staged member under lock against the
 digest recorded at verification time; bytes altered by candidate execution or
 by a concurrent writer fail with `StageRevalidation` before live mutation.
+The post-commit path then holds the lock and backup through one caller-owned
+check and resolves a failed check using explicit `KeepInstalled` or
+`RollBack` policy.
 
 Candidate commands use literal argv vectors, clear inherited environment, null
 stdin, a controlled working directory, a wall-clock deadline, bounded stdout
@@ -31,4 +35,3 @@ and stderr, and kill/reap on timeout or output overflow. `ExactIdentityValidator
 and `CrossMemberAgreementValidator` are consumer-policy-neutral helpers; a
 consumer can supply a custom `CandidateValidator` for a different identity
 contract. No fallback or release ordering is selected by core.
-

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `eggup-core`: added ADR-0002 post-commit policy via
+  `ValidatedTransaction::commit_with_post_commit`. The transaction retains
+  its lock and backup through one caller check, records bounded check-failure
+  evidence, and either keeps the complete new generation or restores the old
+  one. Existing immediate `commit()` remains unchanged. Callback panics are
+  converted into failed-check evidence; process-crash durability is not
+  claimed.
+
 - M004 Windows SCM adapter for `eggup-service`: safe typed SCM query,
   create/refresh, start/stop/restart, and delete; exact parsed executable and
   argument ownership; fail-closed handling of ambiguous command lines; shared

@@ -9,7 +9,7 @@
 use eggup_core::{
     AbsentPolicy, AllValidators, ArtifactMember, ArtifactSet, CommitOwnership,
     ExistingAsOwnedVerifier, InstallPlan, IntegrityRequirement, MemberId, Ownership,
-    OwnershipVerifier, ProductId, ReleaseId, TransactionDisposition,
+    OwnershipVerifier, PostCommitFailurePolicy, ProductId, ReleaseId, TransactionDisposition,
 };
 use std::fmt::Debug;
 use std::fs;
@@ -104,5 +104,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // or unclean finalization; operators must inspect `recovery_path` and the
     // preserved lock. See `docs/transaction.md` for the full contract.
     println!("recovery-required: inspect recovery_path + lock; do not retry blindly");
+
+    // 4. A failed post-commit check can keep the coherent new generation,
+    // while remaining machine-readable as a failed check.
+    let (base, plan) = build(b"new", Some(b"old"))?;
+    let receipt = plan
+        .prepare()?
+        .verify_integrity()?
+        .validate(&AllValidators::new())?
+        .commit_with_post_commit(
+            CommitOwnership::new(&ExistingAsOwnedVerifier, AbsentPolicy::AllowCreate),
+            PostCommitFailurePolicy::KeepInstalled,
+            || Err("example health check failed"),
+        )?;
+    assert_eq!(receipt.disposition(), TransactionDisposition::Committed);
+    assert!(receipt.post_commit_failure().is_some());
+    println!(
+        "kept installed after failed check: {:?}",
+        receipt.disposition()
+    );
+    let _ = fs::remove_dir_all(base);
     Ok(())
 }

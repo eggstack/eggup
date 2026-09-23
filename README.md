@@ -3,7 +3,10 @@
 Eggup is the shared library for safe, verified local updates of one or more
 application artifacts. Its core owns local staging, SHA-256 integrity
 verification, bounded candidate validation, destination ownership
-revalidation, locking, replacement, rollback, and recovery evidence.
+revalidation, locking, replacement, rollback, and recovery evidence. A caller
+that needs a post-install check can use `ValidatedTransaction::commit_with_post_commit`
+to retain rollback evidence through one check and choose `KeepInstalled` or
+`RollBack` on failure.
 Transport, release discovery, service management, installers, and consumer
 policy remain outside the core boundary.
 
@@ -18,4 +21,3 @@ and their [closure records](plans/closure/README.md).
 
 See [architecture/overview.md](architecture/overview.md) for the ownership
 map and canonical planning references.
-
