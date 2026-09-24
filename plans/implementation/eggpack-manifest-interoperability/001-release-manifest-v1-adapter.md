@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 001 — ReleaseManifest v1 Direct/Bundle Adapter
 
-Status: ready for handoff
+Status: closed
 
 Repository baseline: dfad557f7405beac569c4e3368f67e5a2e501002
 
