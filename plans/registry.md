@@ -178,7 +178,7 @@ Gregg M004 remains separate: corrected Eggfetch footprint measurement -> adopt d
                                                             \-> acquisition M005 only if justified
 ```
 
-The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004, service M004/M005, CodeGG M005, and Verified Update Core M007 have reviewed closure evidence. Planning/closure hygiene C001/C002 are closed. No service-aware consumer migration is currently scheduled; Gregg remains footprint-gated. Eggpack manifest consumption is structurally implemented, and adapter M001a has closed with the full regression matrix and truthful service packageability reconciliation. Historical M001 remains closed evidence; lower Eggup crates remain Eggpack-independent. M003 real-consumer adoption is ready for plan authoring. Archive work still requires the Phase 10 extraction contract. No Eggup installer-generator replacement is authorized.
+The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004, service M004/M005, CodeGG M005, and Verified Update Core M007 have reviewed closure evidence. Planning/closure hygiene C001/C002 are closed. No service-aware consumer migration is currently scheduled; Gregg remains footprint-gated. Eggpack manifest consumption is structurally implemented, and adapter M001a has closed with the full regression matrix and truthful service packageability reconciliation. Historical M001 remains closed evidence; lower Eggup crates remain Eggpack-independent. M003 is registered for Eggsact and is producer-evidence gated as described by its implementation plan. Archive work still requires the Phase 10 extraction contract. No Eggup installer-generator replacement is authorized.
 
 ## Current project state
 
@@ -197,7 +197,7 @@ The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004,
 
 The next interoperability handoff is the registered M003 Eggsact real-consumer manifest adoption plan at `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`. Eggsact is selected because it is already a qualified direct Eggup consumer. Begin with the plan's producer-evidence preflight: reconcile current live Eggsact asset naming with Eggpack producer authority and identify the producer-owned ReleaseManifest artifact convention. If that convention is not yet available, perform only the bounded Eggup adapter/API qualification work and return the producer blocker rather than inventing release policy in Eggup. M001a is closed; Service M005 and planning hygiene remain closed; Gregg remains independently footprint-gated.
 
-Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter. M003 consumer adoption may now be authored.
+Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter. Execute M003 only through its registered Eggsact plan and producer-evidence gate.
 
 After each implementation pass:
 
