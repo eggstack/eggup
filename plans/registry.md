@@ -6,7 +6,7 @@ Last implementation baseline reviewed: `5fbb66853bdad59aaf2bd3c7bb43a43492d0b6ef
 
 Plan-authoring baseline for C002 + Service M005: `a88e482d84d3d8bafa429a2973baf82c8ed90597`
 
-Latest already-existing closure/planning evidence baseline reviewed: `3d6677cdf86b7a9858a02a6665a7348438684f0e` (Eggpack M001 implementation and closure reviewed; does not identify the commit currently being authored)
+Latest already-existing closure/planning evidence baseline reviewed: `a1b69e76b6f6c1b52cc5986f75f5b553f6c08da7` (C002 corrective commit A and M001 closure reviewed; does not identify the commit currently being authored)
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -106,7 +106,7 @@ Eggsearch M003 and service M004 Windows SCM are closed. Verified Update Core M00
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
 | Planning/closure hygiene corrective | C001 post-batch status and evidence reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/001-post-batch-status-and-evidence-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/001-status.md` | CodeGG M005 + core M007 closed |
-| Planning/closure hygiene corrective | C002 C001 commit + registry baseline reconciliation | ready | `plans/implementation/planning-closure-hygiene-corrective/002-c001-commit-and-registry-baseline-reconciliation.md` | C001 closed; docs-only; no runtime blocker |
+| Planning/closure hygiene corrective | C002 C001 commit + registry baseline reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/002-c001-commit-and-registry-baseline-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/002-status.md` | — |
 | Verified update core | M007 post-commit policy / deferred finalization | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md`; `plans/closure/verified-update-core/007-status.md` | — |
 | Consumer adoption | M005 CodeGG managed-runfile bundle | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` |
 | Service lifecycle | M005 prepared-transaction lifecycle integration | ready | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | service M004 + core M007 closed; C002 docs-only and non-blocking |

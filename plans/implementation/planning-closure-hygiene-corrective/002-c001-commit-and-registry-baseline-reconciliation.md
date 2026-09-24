@@ -1,6 +1,6 @@
 # Planning and Closure Hygiene Corrective C002 — C001 Commit and Registry Baseline Reconciliation
 
-Status: ready for handoff
+Status: closed
 
 Repository baseline reviewed: `a88e482d84d3d8bafa429a2973baf82c8ed90597`
 
