@@ -227,7 +227,7 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 ReleaseManifest v1 direct/bundle adapter | ready | plans/implementation/eggpack-manifest-interoperability/001-release-manifest-v1-adapter.md | — | Eggpack M001a closure satisfied |
-| M002 archive extraction handoff | blocked | — | — | Phase 10 archive extraction contract + M001 |
-| M003 real consumer adoption | blocked | — | — | M001 closure + selected consumer |
+| M001 ReleaseManifest v1 direct/bundle adapter | closed | plans/implementation/eggpack-manifest-interoperability/001-release-manifest-v1-adapter.md | plans/closure/eggpack-manifest-interoperability/001-status.md | — |
+| M002 archive extraction handoff | blocked | — | — | Phase 10 archive extraction contract |
+| M003 real consumer adoption | ready for plan authoring | — | — | Select a consumer with duplicate mapping; Eggsact direct fixture is a candidate |
 | M004 package/API promotion | planned | — | — | real adoption + publishable eggpack-manifest |

@@ -19,5 +19,11 @@ Integrity is checksum evidence only; no authenticity or signature claim is
 made. Work is sequenced by the [implementation plans](plans/implementation/README.md)
 and their [closure records](plans/closure/README.md).
 
+The optional `eggup-eggpack` leaf crate translates Eggpack ReleaseManifest v1
+into caller-bound acquisition requests and direct/bundle deployment members.
+It does not add an Eggpack dependency to core, acquisition, or service. Archive
+manifests remain extraction-required; URL, install-root, ownership, permission,
+release, and authenticity policy remain caller-owned.
+
 See [architecture/overview.md](architecture/overview.md) for the ownership
 map and canonical planning references.
