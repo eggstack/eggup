@@ -106,13 +106,14 @@ Eggsearch M003 and service M004 Windows SCM are closed. Verified Update Core M00
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
 | Planning/closure hygiene corrective | C001 post-batch status and evidence reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/001-post-batch-status-and-evidence-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/001-status.md` | CodeGG M005 + core M007 closed |
+| Planning/closure hygiene corrective | C002 C001 commit + registry baseline reconciliation | ready | `plans/implementation/planning-closure-hygiene-corrective/002-c001-commit-and-registry-baseline-reconciliation.md` | C001 closed; docs-only; no runtime blocker |
 | Verified update core | M007 post-commit policy / deferred finalization | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md`; `plans/closure/verified-update-core/007-status.md` | — |
 | Consumer adoption | M005 CodeGG managed-runfile bundle | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` |
 | Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | — | core M007 closed; C001 closure hygiene complete |
 | Distribution/bootstrap | M004 retirement | closed | `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md`; `plans/closure/distribution-bootstrap/004-status.md` | — |
 | Eggpack manifest interoperability | optional `eggup-eggpack` adapter | blocked / plan intentionally unwritten | — | Eggpack Interop M001a corrective closure + corrected fixture baseline |
 
-CodeGG M005 and Verified Update Core M007 are closed. Planning/closure hygiene C001 is closed; it reconciled the stale control-surface state and the missing M005 measurement evidence. Service Lifecycle M005 is dependency-ready against the qualified core seam and is now unblocked for plan authoring. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
+CodeGG M005 and Verified Update Core M007 are closed. Planning/closure hygiene C001 is closed. C002 is a narrow docs-only bookkeeping corrective for C001's exact landing SHA and registry baseline semantics; it does not block Service Lifecycle M005 API planning. Service Lifecycle M005 is dependency-ready against the qualified core seam and is now unblocked for plan authoring. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
 
 ## Planned / blocked work
 
@@ -120,7 +121,8 @@ CodeGG M005 and Verified Update Core M007 are closed. Planning/closure hygiene C
 |---|---|---|---|
 | Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
 | Planning/closure hygiene corrective | C001 post-batch status/evidence reconciliation | closed | `plans/closure/planning-closure-hygiene-corrective/001-status.md` |
-| Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | core M007 closed; C001 closure hygiene complete |
+| Planning/closure hygiene corrective | C002 final commit/baseline bookkeeping | ready | C001 exact landing SHA + registry baseline semantics |
+| Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | core M007 closed; C001 closure hygiene complete; C002 is docs-only and not a runtime blocker |
 | Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
 | Consumer adoption | M005 CodeGG | closed | `plans/closure/consumer-adoption/005-status.md`; producer release mapping remains application/Eggpack-owned |
