@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 005 — Prepared-Transaction Lifecycle Integration
 
-Status: ready for handoff
+Status: closed; see `plans/closure/service-lifecycle/005-status.md`
 
 Repository baseline reviewed: `bfa01c05e0108eccba9d7d939a19517ef366f1ef`
 

@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M004 closed; M005 implementation plan ready for handoff
+Status: M001-M005 closed; no service-aware consumer migration is currently scheduled
 
 Long-term references:
 
@@ -67,7 +67,7 @@ M002 implemented systemd/launchd/cron adapters. M003 closed the follow-up restar
 
 M004 closed Windows SCM registration, ownership, start/stop/restart, and uninstall behavior. All planned manager families therefore have a reusable adapter surface.
 
-The remaining orchestration milestone is now dependency-ready. Core M007 provides the ADR-0002 `KeepInstalled | RollBack` choice while a coherent new artifact generation remains live and rollback evidence is retained. Service M005 should consume `ValidatedTransaction::commit_with_post_commit` rather than duplicate rollback state in `eggup-service`. See `plans/closure/verified-update-core/007-status.md` for qualification evidence and limits.
+The final orchestration milestone, M005, is closed. It consumes Core M007's ADR-0002 `KeepInstalled | RollBack` choice while a coherent new artifact generation remains live and rollback evidence is retained. See `plans/closure/service-lifecycle/005-status.md` and `plans/closure/verified-update-core/007-status.md` for qualification evidence and limits.
 
 ## 5. Target architecture
 
@@ -94,9 +94,9 @@ M003 Unix adapter correctness/security corrective
        +---------------------------+
                                    |
 core M007 deferred finalization ---+
-                                   |
-                                   v
-                    M005 update-lifecycle integration
+                    |
+                    v
+                    M005 update-lifecycle integration [closed]
 ```
 
 ## 7. Milestones
@@ -131,7 +131,7 @@ Native SCM registration/state/transition behavior and exact executable/argv/conf
 
 Plan: `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md`.
 
-Status: ready for handoff.
+Status: closed; see `plans/closure/service-lifecycle/005-status.md`.
 
 Hard dependencies:
 
@@ -139,6 +139,8 @@ Hard dependencies:
 - verified-update-core M007 deferred-finalization/post-commit policy closure (closed; `plans/closure/verified-update-core/007-status.md`).
 
 Compose a validated transaction with lifecycle snapshot, ownership-safe quiescence, coherent artifact commit, bounded post-commit lifecycle/check work, and explicit `KeepInstalled | RollBack` policy. M005 consumes the qualified `commit_with_post_commit` boundary rather than recreating artifact backup/restore machinery. The implementation plan also makes the rollback/service-state boundary explicit: RollBack quiesces a newly started service before artifact rollback when possible, successful artifact rollback restores the pre-update service state, and RecoveryRequired does not auto-start against uncertain artifacts. Application health semantics remain caller-owned through a bounded post-install check seam.
+
+Implemented by `plans/closure/service-lifecycle/005-status.md`. Eggsearch M003 remains closed and no lifecycle-aware follow-up plan is currently scheduled. Gregg M004 remains independently blocked on corrected-path footprint evidence; M005 does not change that dependency.
 
 ## 8. Cross-cutting requirements
 
@@ -164,4 +166,4 @@ At least two service-bearing consumers share the manager mechanics without losin
 | M002 | closed; post-closure findings feed M003 | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
-| M005 | ready for handoff | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | — | — (service M004 and core M007 closed) |
+| M005 | closed | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | `plans/closure/service-lifecycle/005-status.md` | — |
