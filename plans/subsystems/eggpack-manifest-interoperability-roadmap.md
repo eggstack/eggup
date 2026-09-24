@@ -89,7 +89,7 @@ Eggpack ReleaseManifest v1 is implemented and its consumer interface is now corr
 - hosted CI run: 35998756491, all required lanes passed;
 - corrected CodeGG bundle projection SHA-256: f0b227442e2a2a28dc4e2100301233f2698703d15251b6f2459e6387df6c53ce.
 
-The previous Eggup planning block on Eggpack M001a is satisfied. Eggup adapter M001 then implemented and closed historically, but post-closure review found an incomplete adapter regression matrix and an out-of-scope service-manifest edit in the implementation commit. Corrective M001a is now the active gate before real-consumer adoption.
+The previous Eggup planning block on Eggpack M001a is satisfied. Eggup adapter M001 then implemented and closed historically, but post-closure review found an incomplete adapter regression matrix and an out-of-scope service-manifest edit in the implementation commit. Corrective M001a has since closed with the full regression matrix and service packageability reconciliation, and M003 real-consumer adoption is ready for plan authoring.
 
 ## 5. Target architecture
 
@@ -234,7 +234,7 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
 | M001 ReleaseManifest v1 direct/bundle adapter | closed (historical) | plans/implementation/eggpack-manifest-interoperability/001-release-manifest-v1-adapter.md | plans/closure/eggpack-manifest-interoperability/001-status.md | post-closure qualification/scope findings tracked by M001a |
-| M001a adapter qualification + closure hardening | ready | plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md | — | M001 implementation/closure + current Service M005 packageability repair |
+| M001a adapter qualification + closure hardening | closed | plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md | plans/closure/eggpack-manifest-interoperability/001a-status.md | — |
 | M002 archive extraction handoff | blocked | — | — | Phase 10 archive extraction contract |
-| M003 real consumer adoption | blocked | — | — | M001a corrective closure; then select a real consumer |
+| M003 real consumer adoption | ready for plan authoring | — | — | select a real consumer currently owning duplicated manifest-to-update mapping |
 | M004 package/API promotion | planned | — | — | real adoption + publishable eggpack-manifest |

@@ -1,6 +1,8 @@
 # Eggpack Manifest Interoperability Milestone 001a — Adapter Qualification and Closure-Hardening Corrective
 
-Status: ready for handoff
+Status: closed
+
+Closure record: `plans/closure/eggpack-manifest-interoperability/001a-status.md`
 
 Repository baseline: `3809241d637b2ee1f7f5e36170db10043f19a4a8`
 

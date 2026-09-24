@@ -62,3 +62,7 @@ Subsequent review identified two qualification/closure issues that do not invali
 Corrective plan: `plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md`.
 
 The prior transition marking M003 real-consumer adoption ready is withdrawn until M001a closes. Historical M001 implementation/CI evidence above remains accurate for what was actually exercised at the time and is not rewritten. Corrective closure will be recorded separately at `plans/closure/eggpack-manifest-interoperability/001a-status.md`.
+
+## M001a closure pointer
+
+M001a closed at implementation `19935ec3610a5238af33a9d4f05a14925ceac25c` with 4 unit + 28 interoperability tests, no production-code change, and current-main service packageability re-verified. Closure: `plans/closure/eggpack-manifest-interoperability/001a-status.md`. M003 real-consumer adoption is returned to ready for plan authoring.
