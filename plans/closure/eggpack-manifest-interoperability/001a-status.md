@@ -80,9 +80,7 @@ Passed on a clean worktree at the implementation commit
 `eggpack-manifest` is unpublished and the adapter is `publish = false`; that
 known packaging constraint is not a corrective failure.
 
-Hosted CI: `PENDING_HOSTED_CI` (to be replaced with the run id/attempt and
-lane results observed after push; required lanes are Linux stable, Linux Rust
-1.89, macOS, and Windows).
+Hosted CI run [36014508645](https://github.com/eggstack/eggup/actions/runs/36014508645) passed all four lanes on closure HEAD `56b9740`: stable fmt/clippy/workspace tests/docs, Rust 1.89 check, macOS workspace tests, and Windows workspace check.
 
 ## Copied fixture provenance
 
