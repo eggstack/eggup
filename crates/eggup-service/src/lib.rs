@@ -8,7 +8,13 @@
 #![doc = "application health are separate. No privilege escalation, no updater or"]
 #![doc = "transport policy, and no shell interpolation live in this crate."]
 
+mod lifecycle_update;
 mod windows_scm;
+pub use lifecycle_update::{
+    commit_with_lifecycle, LifecycleFailure, LifecycleRestorationStatus, LifecycleUpdateError,
+    LifecycleUpdatePhase, LifecycleUpdatePolicy, LifecycleUpdateReceipt, NoPostInstallCheck,
+    PostInstallCheck, PostInstallCheckError,
+};
 pub use windows_scm::{
     WindowsErrorControl, WindowsScmInstall, WindowsScmManager, WindowsServiceDependency,
     WindowsStartType,

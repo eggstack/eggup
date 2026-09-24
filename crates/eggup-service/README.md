@@ -33,6 +33,19 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
   cross-platform parser dependency used for the same ownership tests on Unix.
 - Bounded `TransitionResult` with conflict diagnostics; no automatic privilege
   elevation; no updater/release/network policy.
+- `commit_with_lifecycle` composes an already validated `eggup_core` transaction
+  with owned-service quiescence, successful-update restoration, a bounded
+  caller-owned `PostInstallCheck`, and Core's `KeepInstalled` / `RollBack`
+  policy. It requires an existing `Owned` registration in `Running` or
+  `Stopped` state; it never installs or refreshes the registration.
+- With `RestoreIntent::Preserve`, a stopped service stays stopped after
+  success. `RestoreIntent` only controls the successful new generation; after
+  a successful artifact rollback, orchestration restores the pre-update
+  running/stopped state. If Core reports `RecoveryRequired`, it does not
+  automatically start the service against uncertain artifacts.
+- The post-install check receives the remaining shared deadline and must
+  finish within it. Existing `HealthProbe` has no timeout contract and alone
+  does not meet this bound. Application health semantics remain caller-owned.
 - M003 hardening: each start/stop/restart validates one monotonic caller
   deadline shared by ownership queries, manager commands, and state polling.
   Zero transition timeouts are rejected; expiry is returned as an incomplete
