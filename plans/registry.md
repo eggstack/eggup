@@ -96,7 +96,7 @@ Eggsearch M003 and service M004 Windows SCM are closed. Verified Update Core M00
 |---|---|---|
 | Verified update core | M001-M007 closed/qualified | — |
 | Acquisition transport | corrected | M004 closed; optional M005 footprint evidence |
-| Service lifecycle | M004 Windows SCM closed | M005 ready for plan authoring |
+| Service lifecycle | M004 Windows SCM closed | M005 plan ready for handoff |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
 | Eggpack manifest interoperability | blocked cross-repo gate | optional adapter plan intentionally unwritten pending Eggpack M001a closure |
 | Consumer adoption | simple, eggsearch, and CodeGG M005 closed | Gregg remains footprint-gated |
@@ -109,11 +109,11 @@ Eggsearch M003 and service M004 Windows SCM are closed. Verified Update Core M00
 | Planning/closure hygiene corrective | C002 C001 commit + registry baseline reconciliation | ready | `plans/implementation/planning-closure-hygiene-corrective/002-c001-commit-and-registry-baseline-reconciliation.md` | C001 closed; docs-only; no runtime blocker |
 | Verified update core | M007 post-commit policy / deferred finalization | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md`; `plans/closure/verified-update-core/007-status.md` | — |
 | Consumer adoption | M005 CodeGG managed-runfile bundle | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` |
-| Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | — | core M007 closed; C001 closure hygiene complete |
+| Service lifecycle | M005 prepared-transaction lifecycle integration | ready | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | service M004 + core M007 closed; C002 docs-only and non-blocking |
 | Distribution/bootstrap | M004 retirement | closed | `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md`; `plans/closure/distribution-bootstrap/004-status.md` | — |
 | Eggpack manifest interoperability | optional `eggup-eggpack` adapter | blocked / plan intentionally unwritten | — | Eggpack Interop M001a corrective closure + corrected fixture baseline |
 
-CodeGG M005 and Verified Update Core M007 are closed. Planning/closure hygiene C001 is closed. C002 is a narrow docs-only bookkeeping corrective for C001's exact landing SHA and registry baseline semantics; it does not block Service Lifecycle M005 API planning. Service Lifecycle M005 is dependency-ready against the qualified core seam and is now unblocked for plan authoring. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
+CodeGG M005 and Verified Update Core M007 are closed. Planning/closure hygiene C001 is closed. C002 is a narrow docs-only bookkeeping corrective for C001's exact landing SHA and registry baseline semantics. Service Lifecycle M005 now has a detailed implementation plan and is ready for handoff against the qualified core seam; C002 does not block its runtime/API work. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
 
 ## Planned / blocked work
 
@@ -122,7 +122,7 @@ CodeGG M005 and Verified Update Core M007 are closed. Planning/closure hygiene C
 | Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
 | Planning/closure hygiene corrective | C001 post-batch status/evidence reconciliation | closed | `plans/closure/planning-closure-hygiene-corrective/001-status.md` |
 | Planning/closure hygiene corrective | C002 final commit/baseline bookkeeping | ready | C001 exact landing SHA + registry baseline semantics |
-| Service lifecycle | M005 update-lifecycle integration | ready for plan authoring | core M007 closed; C001 closure hygiene complete; C002 is docs-only and not a runtime blocker |
+| Service lifecycle | M005 prepared-transaction lifecycle integration | ready | service M004 + core M007 closed; plan authored; C002 docs-only and non-blocking |
 | Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
 | Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
 | Consumer adoption | M005 CodeGG | closed | `plans/closure/consumer-adoption/005-status.md`; producer release mapping remains application/Eggpack-owned |
@@ -147,7 +147,7 @@ core M006 [closed] --> core M007 post-commit policy [CLOSED] ---+
                                                                  |
 CodeGG M005 [closed] ---------------------------------------------+--> planning/closure hygiene C001 [CLOSED]
                                                                            |
-                                                                           `--> service M005 plan authoring [READY FOR AUTHORING]
+                                                                           `--> service M005 implementation [READY; PLAN AUTHORED]
 
 distribution M003 [closed/frozen] ---> Eggpack Contract M002 [closed]
                                               |
@@ -174,7 +174,7 @@ The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004,
 - Rust baseline: 1.89.
 - Core: M001-M007 are qualified; M007 adds the accepted post-commit `KeepInstalled | RollBack` boundary without service coupling. Closure: `plans/closure/verified-update-core/007-status.md`.
 - Acquisition: M004 validation/promotion corrective is closed; optional M005 still needs corrected-path footprint evidence.
-- Service: M004 Windows SCM is closed; M005 update-lifecycle integration is ready for plan authoring now that planning/closure hygiene C001 has closed.
+- Service: M004 Windows SCM is closed; M005 prepared-transaction lifecycle integration is planned and ready for handoff at `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md`.
 - Distribution: M001-M003 remain historical predecessor evidence; M004 removed the producer crate after Eggpack Contract M002 closure. The subsystem is archived/transferred to Eggpack.
 - Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg still needs its own footprint decision.
 - CodeGG M005 closed using CodeGG-owned strict extraction of the existing verified archive and Eggup's multi-artifact transaction; it did not recreate producer release authority in Eggup. Evidence: `plans/closure/consumer-adoption/005-status.md`. Egress remains separately blocked on a generic archive transaction/extraction contract.
@@ -183,7 +183,7 @@ The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004,
 
 ## Next handoff
 
-The requested implementation batch is complete: CodeGG M005 and Verified Update Core M007 are closed at `plans/closure/consumer-adoption/005-status.md` and `plans/closure/verified-update-core/007-status.md`, and planning/closure hygiene C001 is closed at `plans/closure/planning-closure-hygiene-corrective/001-status.md`. The immediate handoff is authoring Service Lifecycle M005 against the stabilized post-commit API.
+The next handoff batch is now authored: planning/closure hygiene C002 is ready at `plans/implementation/planning-closure-hygiene-corrective/002-c001-commit-and-registry-baseline-reconciliation.md`, and Service Lifecycle M005 is ready at `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md`. Execute the tiny C002 docs correction first or alongside M005; it does not change M005 runtime/API dependencies.
 
 Do not author or implement an Eggup installer generator. A future consumer manifest adapter remains a separate, optional milestone and is currently blocked on Eggpack Interop M001a closure and its corrected fixture baseline. Do not author the Eggup adapter implementation plan until that external gate closes.
 
