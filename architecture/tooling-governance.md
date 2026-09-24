@@ -35,9 +35,9 @@ unsafe_code = "deny"
 all = { level = "warn", priority = -1 }
 ```
 
-Each crate opts in with `[lints] workspace = true`. `eggup-core` additionally
-documents `#![forbid(unsafe_code)]`-equivalent intent via the Phase 0 roadmap
-requirement (`plans/002-long-term-roadmap.md`, Phase 0).
+Each crate opts in with `[lints] workspace = true` and additionally sets
+`#![forbid(unsafe_code)]` + `#![deny(missing_docs)]` at the top of its
+`src/lib.rs` (all five crates, verified against the current tree).
 
 Per-crate package metadata diverges deliberately:
 
@@ -142,7 +142,8 @@ concerns, verification strategy, risks, completion definition, status table:
 Layout `implementation/<subsystem>/NNN-short-title.md`; 16 required sections
 (objective … handoff notes); must state SHA baseline, readiness, invariants,
 explicit non-goals, failure/rollback semantics, compat/migration, tests,
-verification commands, closure evidence. Current inventory (31 files):
+verification commands, closure evidence. Current inventory (30 milestone files
+plus the `README.md` template guide):
 
 - `verified-update-core/`: 001 foundation, 002 domain/prepared-txn, 003
   commit/rollback, 004 integrity/candidate, 005 prequalification corrective,
@@ -172,7 +173,7 @@ invariant/failure/compat/security/docs reviews, severitized unresolved
 findings, roadmap + registry disposition. Compilation or happy-path-only is
 explicitly insufficient; platform work reports Linux/macOS/Windows separately.
 
-Current inventory (30 files): core 001–007 (7); acquisition 001–004 (4);
+Current inventory (30 milestone records plus the `README.md` structure guide): core 001–007 (7); acquisition 001–004 (4);
 service 001–005 (5); distribution 001–004 (4); consumer 001, 002, 003, 005 (4,
 no 004); eggpack-interop 001, 001a, 003 (3); hygiene C001–C003 (3).
 
