@@ -2,11 +2,9 @@
 
 Status: active
 
-Last implementation baseline reviewed: `19935ec3610a5238af33a9d4f05a14925ceac25c` (Eggpack manifest adapter M001a qualification corrective; no production-code delta)
+Last implementation baseline reviewed: `cbfa8fa3870dae22d16775408a3135ea682c9365` (Eggpack manifest adapter bounded JSON projection)
 
-Plan-authoring baseline for Eggpack Manifest Interoperability M003: `77fe72a9f6e34e48e1f667d2869b05fd010c1462`
-
-Latest closure/planning evidence baseline reviewed before M003 authoring: `77fe72a9f6e34e48e1f667d2869b05fd010c1462` (adapter M001a closure/status reconciliation)
+Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -32,15 +30,15 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 Eggup owns consumer-side acquisition, verification, candidate validation, local extraction required for installation, ownership/staging/locking/commit/rollback/recovery, install receipts, and service lifecycle. Producer release contracts, release conformance, package/archive construction, final release manifests, bootstrap-installer generation, generated release CI, staging/publication, and producer provenance belong to `eggstack/eggpack`.
 
-`eggup-core` must remain usable without Eggpack. The optional manifest adapter translates stable Eggpack release evidence into Eggup deployment inputs without importing producer build/CI machinery. Eggpack interoperability M001a is closed at `eggstack/eggpack@678bbf04f5a02827003a1d9ab83ba4f0e6360e41`; Eggup adapter M001 is historically closed and M001a qualification/closure hardening is closed at `plans/closure/eggpack-manifest-interoperability/001a-status.md`. Real-consumer M003 plan authoring is now dependency-ready.
+`eggup-core` must remain usable without Eggpack. The optional manifest adapter translates stable Eggpack release evidence into Eggup deployment inputs without importing producer build/CI machinery. Eggpack interoperability M001a is closed at `eggstack/eggpack@678bbf04f5a02827003a1d9ab83ba4f0e6360e41`; Eggup adapter M001 is historically closed and M001a qualification/closure hardening is closed at `plans/closure/eggpack-manifest-interoperability/001a-status.md`. Bounded Eggup adapter/API qualification for M003 is complete, but real Eggsact adoption is blocked on producer-owned live artifact mapping and ReleaseManifest publication/addressing; resume M003 only after that evidence exists.
 
 ## Recently closed foundation
 
 | Workstream | Closed work | Evidence |
 |---|---|---|
-| Verified update core | M001-M006 | `plans/closure/verified-update-core/` |
+| Verified update core | M001-M007 | `plans/closure/verified-update-core/` |
 | Acquisition transport | M001-M004 | `plans/closure/acquisition-transport/` |
-| Service lifecycle | M001-M004 | `plans/closure/service-lifecycle/` |
+| Service lifecycle | M001-M005 | `plans/closure/service-lifecycle/` |
 | Distribution/bootstrap (archived/transferred) | M001-M004 | `plans/closure/distribution-bootstrap/` |
 | Consumer adoption | M001 eggsact + M002 stegoeggo + M003 eggsearch | `plans/closure/consumer-adoption/` |
 
@@ -153,7 +151,7 @@ core M006 [closed] --> core M007 post-commit policy [CLOSED] ---+
                                                                  |
 CodeGG M005 [closed] ---------------------------------------------+--> planning/closure hygiene C001 [CLOSED]
                                                                            |
-`--> service M005 implementation [CLOSED]
+                                                                           `--> service M005 implementation [CLOSED]
 
 distribution M003 [closed/frozen] ---> Eggpack Contract M002 [closed]
                                               |
@@ -187,7 +185,7 @@ Gregg M004 remains separate: corrected Eggfetch footprint measurement -> adopt d
                                                             \-> acquisition M005 only if justified
 ```
 
-The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004, service M004/M005, CodeGG M005, and Verified Update Core M007 have reviewed closure evidence. Planning/closure hygiene C001/C002 are closed. No service-aware consumer migration is currently scheduled; Gregg remains footprint-gated. Eggpack manifest consumption is structurally implemented, and adapter M001a has closed with the full regression matrix and truthful service packageability reconciliation. Historical M001 remains closed evidence; lower Eggup crates remain Eggpack-independent. M003 bounded JSON parse/project work is qualified, but the real Eggsact updater integration is blocked on producer convention evidence; M004 promotion is also blocked. Archive work still requires the Phase 10 extraction contract. No Eggup installer-generator replacement is authorized.
+The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004, service M004/M005, CodeGG M005, and Verified Update Core M007 have reviewed closure evidence. Planning/closure hygiene C001/C002 are closed. No service-aware consumer migration is currently scheduled; Gregg remains footprint-gated. Eggpack manifest adapter/API work is structurally implemented and qualified, and adapter M001a has closed with the full regression matrix and truthful service packageability reconciliation. Historical M001 remains closed evidence; lower Eggup crates remain Eggpack-independent. M003 bounded JSON parse/project work is qualified, but the real Eggsact updater integration is blocked on producer convention evidence; M004 promotion is also blocked. Archive work still requires the Phase 10 extraction contract. No Eggup installer-generator replacement is authorized.
 
 ## Current project state
 

@@ -91,6 +91,17 @@ No new legacy fallback behavior was introduced. Existing Eggsact behavior remain
 
 No platform behavior changed. Local verification ran on macOS ARM64. Linux/Windows native or hosted Eggsact evidence was not run and is not inferred. The adapter test suite is host-independent but does not substitute for consumer platform verification.
 
+## Hosted Eggup repository CI
+
+Hosted Eggup CI run `36037573793` at head `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` passed all four configured repository lanes:
+
+- Stable checks;
+- Rust 1.89 MSRV check;
+- macOS tests; and
+- Windows check.
+
+This qualifies the current Eggup repository HEAD reviewed for the bounded adapter/API change. It is not hosted Eggsact consumer verification: hosted Eggsact checks remain unrun, and the M003 producer blocker remains unchanged.
+
 ## Future-plan transition
 
 - M004 package/API promotion remains blocked: M003 has not met real-consumer acceptance, and `eggpack-manifest` remains unpublished at the inspected Eggpack head.
