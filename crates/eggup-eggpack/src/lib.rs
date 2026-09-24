@@ -2,7 +2,7 @@
 #![deny(missing_docs)]
 #![doc = "Optional consumer-side adapter from Eggpack ReleaseManifest v1 to Eggup inputs."]
 
-use eggpack_manifest::{ArtifactForm, ReleaseManifest};
+use eggpack_manifest::{ArtifactForm, ReleaseManifest, MAX_DOCUMENT_BYTES};
 use eggup_acquisition::{AcquisitionRequest, FetchLimits};
 use eggup_core::{
     ArtifactMember, ArtifactSet, IntegrityRequirement, MemberId, PermissionsIntent, ProductId,
@@ -46,6 +46,9 @@ impl fmt::Display for AdapterError {
     }
 }
 impl std::error::Error for AdapterError {}
+
+/// Maximum accepted UTF-8 JSON document size, as defined by Eggpack's manifest schema.
+pub const MAX_MANIFEST_BYTES: usize = MAX_DOCUMENT_BYTES;
 
 /// One manifest artifact paired with its exact installed member relationship.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -321,6 +324,22 @@ pub fn project(
     }
 }
 
+/// Parse bounded ReleaseManifest JSON and project one exact canonical target.
+///
+/// Parsing and schema validation are delegated to `eggpack-manifest`. Input
+/// contents and parser diagnostics are never included in returned errors.
+pub fn project_json(
+    input: &[u8],
+    canonical_target: &str,
+) -> Result<ManifestProjection, AdapterError> {
+    if input.len() > MAX_MANIFEST_BYTES {
+        return Err(AdapterError::InvalidManifest);
+    }
+    let json = std::str::from_utf8(input).map_err(|_| AdapterError::InvalidManifest)?;
+    let manifest = ReleaseManifest::from_json(json).map_err(|_| AdapterError::InvalidManifest)?;
+    project(&manifest, canonical_target)
+}
+
 /// Return product and release identities for an installable projection.
 pub fn install_ids(
     projection: &ManifestProjection,
@@ -332,6 +351,56 @@ pub fn install_ids(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn direct_json() -> Vec<u8> {
+        include_bytes!("../tests/fixtures/direct-manifest.json").to_vec()
+    }
+
+    #[test]
+    fn bounded_json_projection_accepts_fixture_and_exact_limit() {
+        let fixture = direct_json();
+        assert!(fixture.len() < MAX_MANIFEST_BYTES);
+        assert!(matches!(
+            project_json(&fixture, "x86_64-unknown-linux-gnu").unwrap(),
+            ManifestProjection::Installable { .. }
+        ));
+
+        let mut at_limit = fixture;
+        at_limit.resize(MAX_MANIFEST_BYTES, b' ');
+        assert!(project_json(&at_limit, "x86_64-unknown-linux-gnu").is_ok());
+    }
+
+    #[test]
+    fn bounded_json_projection_rejects_invalid_documents_without_leaking_input() {
+        let oversized = vec![b' '; MAX_MANIFEST_BYTES + 1];
+        let invalid_utf8 = [b'{', 0xff, b'}'];
+        let malformed = br#"{"private":"https://user:super-secret@example.invalid/?token=hidden""#;
+        let unsupported: Vec<u8> = String::from_utf8(direct_json())
+            .unwrap()
+            .replace("\"schema_version\":1", "\"schema_version\":999")
+            .into_bytes();
+
+        for input in [
+            &oversized[..],
+            &invalid_utf8[..],
+            &malformed[..],
+            &unsupported[..],
+        ] {
+            let error = project_json(input, "x86_64-unknown-linux-gnu").unwrap_err();
+            assert!(matches!(error, AdapterError::InvalidManifest));
+            let diagnostic = format!("{error} {error:?}");
+            assert!(!diagnostic.contains("private"));
+            assert!(!diagnostic.contains("super-secret"));
+            assert!(!diagnostic.contains("token=hidden"));
+        }
+    }
+
+    #[test]
+    fn json_projection_keeps_exact_target_selection() {
+        let error = project_json(&direct_json(), "linux-x64").unwrap_err();
+        assert!(matches!(error, AdapterError::TargetNotFound));
+    }
+
     #[test]
     fn corrected_fixtures_project_and_archive_stays_separate() {
         let direct: ReleaseManifest =
