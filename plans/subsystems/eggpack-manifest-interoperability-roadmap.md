@@ -85,7 +85,7 @@ Eggpack ReleaseManifest v1 is implemented and its consumer interface is now corr
 
 - Eggpack manifest M001/M001a and M002 are closed;
 - Eggpack interoperability M001a implementation: 8d9264b3c224f3f05a061f4038b0f328b1c5c95e;
-- corrected closure: eggstack/eggpack@678bbf04f5a02827003a1d9ab83ba4f0e6360e41, plans/closure/eggup-interoperability/001a-status.md;
+- corrected closure in `eggstack/eggpack@678bbf04f5a02827003a1d9ab83ba4f0e6360e41`: `plans/closure/eggup-interoperability/001a-status.md` in that repository;
 - hosted CI run: 35998756491, all required lanes passed;
 - corrected CodeGG bundle projection SHA-256: f0b227442e2a2a28dc4e2100301233f2698703d15251b6f2459e6387df6c53ce.
 

@@ -1,6 +1,8 @@
 # Planning and Closure Hygiene Corrective C003 — M003 Registry and Closure Reconciliation
 
-Status: planned / dependency-ready
+Status: closed
+
+Closure record: `plans/closure/planning-closure-hygiene-corrective/003-status.md`.
 
 Eggup repository baseline reviewed: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b`
 

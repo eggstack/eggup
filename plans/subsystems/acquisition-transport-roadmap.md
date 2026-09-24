@@ -66,7 +66,7 @@ Post-closure review then found two narrower correctness gaps tracked by M004:
 - `FetchLimits::new` validates limits, but the struct fields remain public, so direct struct literals can bypass validation unless each transport revalidates at its trust boundary;
 - no-clobber promotion hard-links the complete temp to `dest` and then returns `Err` if unlinking the redundant temp fails, which can report ordinary failure after a complete destination already exists.
 
-Broader updater-bearing adoption is gated on M004. Gregg still provides evidence for a possible lightweight transport after this corrective, but that remains optional and footprint-driven.
+M004 is closed. Gregg still requires corrected-path footprint evidence before an optional lightweight M005 adapter is justified; that adapter remains evidence-driven.
 
 ## 5. Target architecture
 

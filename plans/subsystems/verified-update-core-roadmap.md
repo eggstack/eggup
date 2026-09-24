@@ -172,7 +172,7 @@ M007 deferred finalization + post-commit policy
 - M005 -> M006: hard.
 - M005 + M006 -> M007: hard and satisfied.
 - Acquisition consumers may continue using the qualified immediate-commit path.
-- Service Lifecycle M005 is ready for plan authoring after M007 closure because rollback after service restart/health failure requires backup retention beyond the initial live commit.
+- Service Lifecycle M005 is closed; no downstream service-aware consumer migration is currently scheduled.
 
 ## 7. Milestones
 
