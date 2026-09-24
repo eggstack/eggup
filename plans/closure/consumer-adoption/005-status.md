@@ -98,3 +98,14 @@ to copy Gregg's updater is resolved by Eggup's immutable-pinned public APIs.
 The requested sequential batch proceeds to Verified Update Core M007; this
 closure makes no claim about Windows replacement, archive authenticity, or
 release binary-size impact.
+
+## Post-closure supplement
+
+Post-closure measurement and status reconciliation for this milestone lives
+in `plans/closure/planning-closure-hygiene-corrective/001-status.md`
+(planning/closure hygiene C001). That record quantifies the
+baseline-to-implementation updater diff and the release binary-size delta
+that were not measured at original M005 closure time. The statement above
+that no release-profile before/after binary-size measurement was made
+remains the accurate historical record of this closure; the C001 supplement
+does not retroactively claim otherwise.

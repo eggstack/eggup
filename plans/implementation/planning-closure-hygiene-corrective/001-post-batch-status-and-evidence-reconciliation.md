@@ -1,6 +1,8 @@
 # Planning and Closure Hygiene Corrective C001 — Post-Batch Status and Evidence Reconciliation
 
-Status: ready for handoff
+Status: closed
+
+Closure record: `plans/closure/planning-closure-hygiene-corrective/001-status.md`.
 
 Eggup repository baseline reviewed: `2cab1f97ef30fa347c2030da321462459672c521`
 

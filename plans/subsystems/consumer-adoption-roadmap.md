@@ -66,7 +66,7 @@ Eggup owns generic fixes revealed by adoption. Consumer repositories own their a
 | stegoeggo | Eggfetch + single binary | second simple adopter | Rust 1.89 baseline |
 | eggsearch | Eggfetch + updater + service lifecycle | core + service adopter | health/manager semantics |
 | Gregg | shared gregg-update + service lifecycle | replace local shared crate | transport footprint; Cargo fallback |
-| CodeGG | check-only update; verified bundle installer | resolve generic updater blocker | 3-runfile bundle |
+| CodeGG | verified in-place managed-runfile update on supported Linux/macOS; manual fresh-install guidance elsewhere | first multi-artifact bundle adopter; generalized updater blocker resolved | 3-runfile bundle |
 | Egress | GitHub authority + archive + 2 binaries | multi-artifact/archive proof | no Cargo fallback |
 | EggPool | rich provenance + package-manager transitions | selective primitives | PEP-440-like/version/provenance policy |
 
@@ -103,7 +103,7 @@ core M005 corrective + M006 qualification + transport M002
 qualified core M006 + acquisition M004
                     |
                     v
-              M005 CodeGG [ready]
+               M005 CodeGG [closed]
                     |
                     +--> multi-artifact consumer evidence
 
