@@ -19,7 +19,7 @@ Per `README.md` and `src/lib.rs:3`:
 
 Dependency direction (from `Cargo.toml:15-18`):
 
-- Depends on `eggup-core`, `eggup-acquisition` (both `=0.1.0`, local paths).
+- Depends on `eggup-core`, `eggup-acquisition` (both `=0.1.1`, local paths).
 - Depends on `eggpack-manifest` `=0.1.0` via git pin:
   `https://github.com/eggstack/eggpack.git`, rev
   `678bbf04f5a02827003a1d9ab83ba4f0e6360e41`, package `eggpack-manifest`.

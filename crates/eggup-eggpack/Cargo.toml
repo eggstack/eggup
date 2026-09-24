@@ -13,8 +13,8 @@ publish = false
 workspace = true
 
 [dependencies]
-eggup-core = { version = "=0.1.0", path = "../eggup-core" }
-eggup-acquisition = { version = "=0.1.0", path = "../eggup-acquisition" }
+eggup-core = { version = "=0.1.1", path = "../eggup-core" }
+eggup-acquisition = { version = "=0.1.1", path = "../eggup-acquisition" }
 eggpack-manifest = { version = "=0.1.0", git = "https://github.com/eggstack/eggpack.git", rev = "678bbf04f5a02827003a1d9ab83ba4f0e6360e41", package = "eggpack-manifest" }
 
 [dev-dependencies]

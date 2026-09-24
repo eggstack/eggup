@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
 
 - `eggup-core`: added ADR-0002 post-commit policy via
   `ValidatedTransaction::commit_with_post_commit`. The transaction retains

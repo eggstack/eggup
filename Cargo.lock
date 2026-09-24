@@ -167,18 +167,18 @@ dependencies = [
 
 [[package]]
 name = "eggup-acquisition"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "eggup-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "sha2",
 ]
 
 [[package]]
 name = "eggup-eggfetch"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eggfetch-core",
  "eggup-acquisition",
@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "eggup-eggpack"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eggpack-manifest",
  "eggup-acquisition",
@@ -200,7 +200,7 @@ dependencies = [
 
 [[package]]
 name = "eggup-service"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "eggup-core",
  "windows-args",

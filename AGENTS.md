@@ -8,7 +8,7 @@ Rust workspace (edition 2021, MSRV 1.89, `resolver = "2"`). `unsafe_code = "deny
 - `crates/eggup-acquisition` — transport-neutral seam (`AcquisitionTransport`, `FixtureTransport`, `FetchLimits`). No eggup deps.
 - `crates/eggup-eggfetch` — native HTTP adapter; depends only on `eggup-acquisition`.
 - `crates/eggup-service` — manager-neutral lifecycle; depends only on `eggup-core`.
-- `crates/eggup-eggpack` — optional leaf adapter for Eggpack ReleaseManifest v1; `publish = false`, depends on `core` + `acquisition` (pinned `=0.1.0`) + `eggpack-manifest` by git rev. Only crate allowed to touch producer types.
+- `crates/eggup-eggpack` — optional leaf adapter for Eggpack ReleaseManifest v1; `publish = false`, depends on `core` + `acquisition` (pinned `=0.1.1`) + `eggpack-manifest` by git rev. Only crate allowed to touch producer types.
 
 New crates must join `Cargo.toml` members, inherit the 5 shared keys, and set `[lints] workspace = true`.
 

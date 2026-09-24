@@ -20,7 +20,7 @@ No `eggup-dist` member: retired per `plans/closure/distribution-bootstrap/004-st
 (see §5). No thin `eggup` facade crate yet (allowed but not built;
 `plans/000-long-term-specification.md` §4.5).
 
-Shared inheritance (`Cargo.toml:11-16`): `version = "0.1.0"`, `edition = "2021"`,
+Shared inheritance (`Cargo.toml:11-16`): `version = "0.1.1"`, `edition = "2021"`,
 `rust-version = "1.89"`, `license = "MIT"`,
 `repository = "https://github.com/eggstack/eggup"`. Every crate `Cargo.toml`
 inherits all five via `*.workspace = true`.
@@ -46,7 +46,7 @@ Per-crate package metadata diverges deliberately:
   `description`, `readme = "README.md"`, `keywords`, `categories`, `exclude`
   of `tests/`/`benches/` and for core also `docs/`).
 - `eggup-eggpack`: `publish = false`, no `homepage`/`documentation`/`keywords`;
-  depends on `eggup-core` + `eggup-acquisition` by path (`=0.1.0`) and on
+  depends on `eggup-core` + `eggup-acquisition` by path (`=0.1.1`) and on
   `eggpack-manifest` by git rev
   (`678bbf04f5a02827003a1d9ab83ba4f0e6360e41`, package `eggpack-manifest`).
   This encodes the ADR-0004 rule that `eggup-core` stays Eggpack-independent
@@ -219,14 +219,14 @@ Other crates carry rustdoc + tests/fixtures instead of a `docs/` tree
 (`eggup-service` platform adapters, `eggup-acquisition` seam + fixture
 transport, `eggup-eggfetch` bounded adapter, `eggup-eggpack` adapter + `tests/`).
 
-**Changelog:** `CHANGELOG.md`, single `## Unreleased` section (no versioned
-history yet). Entries map 1:1 to closed corrective/qualification milestones:
+**Changelog:** `CHANGELOG.md`, `## 0.1.1` section released as the lockstep
+patch (prior `## Unreleased` work; no versioned history before 0.1.0). Entries map 1:1 to closed corrective/qualification milestones:
 core M005/M006/M007 + post-commit policy, acquisition M003/M004, Unix service
 M002 + M003 corrective, Windows SCM M004, distribution M001/M002/M003
 predecessor evidence. Each entry states scope, fail-closed behavior, and an
 explicit no-publication / no-migration disclaimer. Registry notes published
-0.1.0 crates (`eggup-acquisition`, `eggup-core`, `eggup-eggfetch`,
-`eggup-service`); `eggup-dist` listed as unpublished predecessor evidence.
+0.1.1 crates (`eggup-acquisition`, `eggup-core`, `eggup-eggfetch`,
+`eggup-service`), superseding 0.1.0; `eggup-dist` listed as unpublished predecessor evidence.
 
 ## 5. Review checklist (tooling/governance lens)
 
