@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M004 closed; M005 ready for plan authoring after verified-update-core M007 closure
+Status: M001-M004 closed; M005 implementation plan ready for handoff
 
 Long-term references:
 
@@ -129,14 +129,16 @@ Native SCM registration/state/transition behavior and exact executable/argv/conf
 
 ### M005 — Prepared-transaction lifecycle integration
 
-Status: ready for plan authoring; detailed implementation plan not yet written.
+Plan: `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md`.
+
+Status: ready for handoff.
 
 Hard dependencies:
 
 - service M004 closure;
 - verified-update-core M007 deferred-finalization/post-commit policy closure (closed; `plans/closure/verified-update-core/007-status.md`).
 
-Compose a verified transaction with lifecycle snapshot, ownership-safe quiescence, coherent artifact commit, bounded restart/health work, and explicit `KeepInstalled | RollBack` policy. Service/application semantics must remain caller-owned; M005 must consume the qualified `commit_with_post_commit` boundary rather than recreate backup/restore machinery in `eggup-service`.
+Compose a validated transaction with lifecycle snapshot, ownership-safe quiescence, coherent artifact commit, bounded post-commit lifecycle/check work, and explicit `KeepInstalled | RollBack` policy. M005 consumes the qualified `commit_with_post_commit` boundary rather than recreating artifact backup/restore machinery. The implementation plan also makes the rollback/service-state boundary explicit: RollBack quiesces a newly started service before artifact rollback when possible, successful artifact rollback restores the pre-update service state, and RecoveryRequired does not auto-start against uncertain artifacts. Application health semantics remain caller-owned through a bounded post-install check seam.
 
 ## 8. Cross-cutting requirements
 
@@ -162,4 +164,4 @@ At least two service-bearing consumers share the manager mechanics without losin
 | M002 | closed; post-closure findings feed M003 | `plans/implementation/service-lifecycle/002-unix-manager-adapters.md` | `plans/closure/service-lifecycle/002-status.md` | — |
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
-| M005 | ready for plan authoring | — | — | — (service M004 and core M007 closed) |
+| M005 | ready for handoff | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | — | — (service M004 and core M007 closed) |
