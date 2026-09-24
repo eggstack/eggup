@@ -2,11 +2,11 @@
 
 Status: active
 
-Last implementation baseline reviewed: `8d5fc12f7224145285f22d0975a7bb91e1e363ea`
+Last implementation baseline reviewed: `5fbb66853bdad59aaf2bd3c7bb43a43492d0b6ef` (Eggup eggpack-manifest adapter M001; qualified by `plans/closure/eggpack-manifest-interoperability/001-status.md`)
 
-Planning baseline for this implementation-plan batch: `66acd739f792437cb9fa1701b8fa456c4ba4c403`
+Plan-authoring baseline for C002 + Service M005: `a88e482d84d3d8bafa429a2973baf82c8ed90597`
 
-Latest closure/planning baseline reviewed: `2ad8ce3968128cbc8d1065d8334a106f82b3a9bd` (Eggpack manifest interoperability M001 implementation plan authored; runtime implementation baselines remain separately recorded)
+Latest already-existing closure/planning evidence baseline reviewed: `3d6677cdf86b7a9858a02a6665a7348438684f0e` (Eggpack M001 implementation and closure reviewed; does not identify the commit currently being authored)
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 

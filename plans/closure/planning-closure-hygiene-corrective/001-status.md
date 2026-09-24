@@ -8,10 +8,7 @@ Source governance: `plans/003-planning-process.md#11-corrective-passes`, `#12-cl
 
 Eggup starting SHA: `8937ad01b18268fd72c3917b0391f0c7c5b30f1c` (HEAD before corrective work).
 
-Eggup corrective commit: the single commit landing this record together with
-the reconciliation edits (first commit touching
-`plans/closure/planning-closure-hygiene-corrective/001-status.md`; parent is
-the starting SHA above).
+C001 landing commit: `47bd68255534d3be5798968a4c290c6f202b3cb7` (the commit that landed the C001 reconciliation; parent is the starting SHA above).
 
 CodeGG before (pre-adoption) SHA: `220d3638fe043b24e65a7817241543612f9e82af`
 (`retrieval-architecture C001: explicit sweep provenance, remove git subprocess`).
