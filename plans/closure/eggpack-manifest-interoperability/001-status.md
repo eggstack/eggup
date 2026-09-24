@@ -50,3 +50,15 @@ This is additive optional functionality. Existing lower crates remain Eggpack-in
 - M002 remains blocked on the long-term Phase 10 safe extraction contract.
 - M003 is ready for plan authoring, which must select a real consumer currently owning duplicated manifest-to-update mapping. Eggsact's direct fixture is a candidate, not yet sufficient adoption evidence.
 - M004 remains planned pending real consumer adoption and a publishable upstream `eggpack-manifest` version.
+
+
+## Post-closure corrective registration
+
+Subsequent review identified two qualification/closure issues that do not invalidate the current adapter architecture but do require a separate corrective before real-consumer adoption:
+
+1. M001 closed with four adapter tests, while the source plan required a broader positive/negative compatibility matrix covering exact request/acquired/permissions maps, filesystem rejection cases, unknown schema behavior, corrected CodeGG bundle relationship fidelity, and dependency/authority checks.
+2. Implementation commit `5fbb66853bdad59aaf2bd3c7bb43a43492d0b6ef` also introduced an unrelated path-only `eggup-service -> eggup-core` dependency. Service M005 later repaired the dependency with `version = "0.1.0"` at `84076a066e498f2e4ec4ed5472af4359c0b93af7` and qualified service package construction. Current main is repaired; the historical scope interaction remains part of the evidence record.
+
+Corrective plan: `plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md`.
+
+The prior transition marking M003 real-consumer adoption ready is withdrawn until M001a closes. Historical M001 implementation/CI evidence above remains accurate for what was actually exercised at the time and is not rewritten. Corrective closure will be recorded separately at `plans/closure/eggpack-manifest-interoperability/001a-status.md`.
