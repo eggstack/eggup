@@ -89,7 +89,7 @@ Eggpack ReleaseManifest v1 is implemented and its consumer interface is now corr
 - hosted CI run: 35998756491, all required lanes passed;
 - corrected CodeGG bundle projection SHA-256: f0b227442e2a2a28dc4e2100301233f2698703d15251b6f2459e6387df6c53ce.
 
-The previous Eggup planning block on Eggpack M001a is satisfied. Eggup adapter M001 then implemented and closed historically, but post-closure review found an incomplete adapter regression matrix and an out-of-scope service-manifest edit in the implementation commit. Corrective M001a has since closed with the full regression matrix and service packageability reconciliation, and M003 real-consumer adoption is ready for plan authoring.
+The previous Eggup planning block on Eggpack M001a is satisfied. Eggup adapter M001 then implemented and closed historically, but post-closure review found an incomplete adapter regression matrix and an out-of-scope service-manifest edit in the implementation commit. Corrective M001a has since closed with the full regression matrix and service packageability reconciliation. M003 now has a registered Eggsact real-consumer adoption handoff. The implementation plan records a producer-evidence preflight because the historical direct fixture naming is not itself authority for Eggsact's live release assets; Eggup must not invent producer manifest naming or silently change release asset names.
 
 ## 5. Target architecture
 
@@ -179,9 +179,15 @@ Implementation plan: `plans/implementation/eggpack-manifest-interoperability/001
 
 Only after Phase 10 establishes the generic/safe archive extraction contract, connect archive member evidence to qualified extracted local files and ArtifactSet construction.
 
-### M003 — Real consumer adoption
+### M003 — Eggsact real-consumer manifest adoption
 
-Adopt the adapter in at least one consumer that currently owns duplicated manifest-to-update mapping. Confirm net code/authority reduction and retain product policy.
+Selected consumer: Eggsact, the already-qualified direct single-binary Eggup adopter.
+
+Implementation plan: plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md.
+
+Adopt the adapter in Eggsact's real updater path so producer-valid ReleaseManifest evidence can replace duplicated manifest-to-update mapping while Eggsact retains release/version/origin/fallback/install/candidate policy.
+
+The plan includes an explicit producer-evidence gate: the historical interoperability fixture uses version-qualified Eggsact artifact names while the current Eggsact updater uses its existing live asset convention. Implementation must first reconcile that against Eggpack's producer authority and the actual manifest artifact location. M003 must not change release naming or invent a manifest filename inside Eggup. Deterministic consumer/API qualification may proceed, but closure requires a real normal-updater manifest path rather than test-only dead code.
 
 ### M004 — Package/API promotion
 
@@ -236,5 +242,5 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 | M001 ReleaseManifest v1 direct/bundle adapter | closed (historical) | plans/implementation/eggpack-manifest-interoperability/001-release-manifest-v1-adapter.md | plans/closure/eggpack-manifest-interoperability/001-status.md | post-closure qualification/scope findings tracked by M001a |
 | M001a adapter qualification + closure hardening | closed | plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md | plans/closure/eggpack-manifest-interoperability/001a-status.md | — |
 | M002 archive extraction handoff | blocked | — | — | Phase 10 archive extraction contract |
-| M003 real consumer adoption | ready for plan authoring | — | — | select a real consumer currently owning duplicated manifest-to-update mapping |
+| M003 Eggsact real-consumer manifest adoption | planned / producer-evidence gated | plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md | — | preflight must reconcile live Eggsact asset naming and a producer-owned manifest artifact convention; no producer policy may be invented in Eggup |
 | M004 package/API promotion | planned | — | — | real adoption + publishable eggpack-manifest |
