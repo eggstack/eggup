@@ -194,6 +194,7 @@ dependencies = [
  "eggpack-manifest",
  "eggup-acquisition",
  "eggup-core",
+ "serde",
  "serde_json",
 ]
 
