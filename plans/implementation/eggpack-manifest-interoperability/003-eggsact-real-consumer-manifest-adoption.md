@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 003 — Eggsact Real-Consumer Manifest Adoption
 
-Status: planned; execute only through the gates in section 3
+Status: blocked after bounded adapter/API qualification; real-consumer adoption is not closed (see `plans/closure/eggpack-manifest-interoperability/003-status.md`)
 
 Eggup plan-authoring baseline: 77fe72a9f6e34e48e1f667d2869b05fd010c1462
 
