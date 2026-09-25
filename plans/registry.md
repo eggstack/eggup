@@ -2,7 +2,7 @@
 
 Status: active
 
-Latest reviewed repository baseline: `8e3971e7f5cd8e71949a1a6743061a2869af04f2` (acquisition M006 corrective closure/docs head; implementation `1c601f29a16c952e90feaeebd0fa654401b54a86`; hosted matrix green on runs `36176009068` and `36176524748`)
+Last implementation/closure baseline reviewed: `8e3971e7f5cd8e71949a1a6743061a2869af04f2` (acquisition M006 corrective closure/docs head; implementation `1c601f29a16c952e90feaeebd0fa654401b54a86`; hosted matrix green on runs `36176009068` and `36176524748`; later planning-only reconciliation does not advance this baseline)
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
