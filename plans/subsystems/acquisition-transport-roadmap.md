@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M004 closed; optional M005 remains evidence-driven
+Status: M001-M004 closed; M005 curl adapter and transport composition ready for handoff
 
 Long-term references:
 
@@ -39,7 +39,8 @@ This subsystem owns bounded byte acquisition adapters. It does not choose releas
 - small acquisition trait/seam;
 - eggup-eggfetch;
 - test transport;
-- optional lightweight adapter if justified.
+- lightweight external-curl adapter;
+- explicit caller-selected transport composition/fallback policy.
 
 ### Polish
 
@@ -66,13 +67,13 @@ Post-closure review then found two narrower correctness gaps tracked by M004:
 - `FetchLimits::new` validates limits, but the struct fields remain public, so direct struct literals can bypass validation unless each transport revalidates at its trust boundary;
 - no-clobber promotion hard-links the complete temp to `dest` and then returns `Err` if unlinking the redundant temp fails, which can report ordinary failure after a complete destination already exists.
 
-M004 is closed. Gregg still requires corrected-path footprint evidence before an optional lightweight M005 adapter is justified; that adapter remains evidence-driven.
+M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` now supplies the real-consumer evidence previously required for M005: Gregg deliberately uses a bounded external `curl` updater path to avoid forcing an embedded HTTP/TLS stack. M005 is therefore ready as an upstream Eggup capability; Gregg itself remains untouched.
 
 ## 5. Target architecture
 
-`eggup-eggfetch` should depend on a stable Eggfetch version with a deliberately narrow feature set.
+`eggup-eggfetch` should depend on a stable Eggfetch version with a deliberately narrow feature set. `eggup-curl` should provide the complementary external-process path without embedding an HTTP/TLS implementation.
 
-The acquisition interface should represent operations such as bounded small-body fetch and streamed file download, returning typed status without encoding release policy.
+The acquisition interface should represent operations such as bounded small-body fetch and streamed file download, returning typed status without encoding release policy. A caller-selected composition layer may choose curl, Eggfetch, or a preferred order; transport fallback must remain distinct from release/source fallback, and exact `NotFound` is terminal for the requested URL.
 
 A test adapter/local fixture path must exist so correctness never requires public GitHub.
 
@@ -97,7 +98,7 @@ M004 validated-limits/promotion-state corrective
           |
           +--> broader updater-bearing adoption
           |
-          `--> optional M005 lightweight/curl adapter (evidence-driven)
+          `--> M005 curl adapter + explicit transport composition [ready]
 ```
 
 ## 7. Milestones
@@ -138,15 +139,19 @@ Plan: `plans/implementation/acquisition-transport/004-validated-limits-and-promo
 
 Require boundary revalidation of public `FetchLimits` values and truthful post-promotion terminal state before broader updater-bearing adoption.
 
-### M005 — Lightweight acquisition adapter
+### M005 — Curl adapter and explicit transport composition
 
-Class: optional infrastructure.
+Class: infrastructure/capability.
 
-Create only if Gregg or another real consumer still demonstrates a footprint requirement after the M004-corrected Eggfetch path is remeasured.
+Plan: `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md`.
+
+Hard dependency: M004 closure.
+
+Use Gregg only as read-only behavioral evidence for a mature bounded external-curl path. Add `eggup-curl` plus caller-selected curl/Eggfetch/preferred-fallback composition. Preserve exact `NotFound` as terminal for the requested URL; default composition falls back only when the preferred transport is unavailable, while broader transport-error fallback requires explicit caller policy. Record curl-only, Eggfetch-only, and dual-transport footprint evidence. No Gregg migration occurs in M005.
 
 ## 8. Cross-cutting requirements
 
-Transport adapters must preserve bounded body/output behavior, redaction, cancellation cleanup, and partial-file cleanup. Proxy behavior must be explicit rather than inherited accidentally.
+Transport adapters must preserve bounded body/output behavior, redaction, cancellation cleanup, and partial-file cleanup. Proxy behavior must be explicit rather than inherited accidentally. Transport fallback is never release/source fallback: `NotFound`, verification failure, cancellation, size-limit failure, and staging/promotion failure do not silently select another source.
 
 ## 9. Verification strategy
 
@@ -158,7 +163,7 @@ Eggfetch version/feature choice may materially affect binary size. Measure rathe
 
 ## 11. Completion definition
 
-The subsystem's primary path is complete when two real consumers remain green on the corrected M004 acquisition contract, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. The lightweight M005 adapter is optional and evidence-driven.
+The subsystem's primary path is complete when the corrected native Eggfetch path and lightweight curl path both satisfy the common acquisition contract, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains.
 
 ## 12. Milestone status
 
@@ -168,4 +173,4 @@ The subsystem's primary path is complete when two real consumers remain green on
 | M002 | closed; post-closure findings fed M003 | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | `plans/closure/acquisition-transport/002-status.md` | — |
 | M003 | closed; post-closure findings feed M004 | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | `plans/closure/acquisition-transport/003-status.md` | — |
 | M004 | closed | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | `plans/closure/acquisition-transport/004-status.md` | — |
-| M005 | deferred/evidence-driven | — | — | corrected-path footprint evidence |
+| M005 | ready for handoff | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | — | M004 closed; Gregg reference evidence recorded |
