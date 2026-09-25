@@ -2,7 +2,7 @@
 
 Status: active
 
-Last implementation baseline reviewed: `cbfa8fa3870dae22d16775408a3135ea682c9365` (Eggpack manifest adapter bounded JSON projection)
+Last implementation baseline reviewed: `881c95ff069d3d465a282cb6a495ba6fcb70cb6f` (published 0.1.1 lockstep workspace baseline)
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
@@ -86,15 +86,15 @@ M001-M003 are closed predecessor work. M003 is the terminal Eggup producer-side 
 
 Distribution M004 removed `eggup-dist` after Eggpack Contract M002 closed at `82f799f3d971b2999ac14c2d8fc1b965370e0f58`; see `plans/closure/distribution-bootstrap/004-status.md`. The subsystem is archived/transferred, with no active Eggup producer-distribution milestone.
 
-Eggsearch M003, Service M004, Verified Update Core M007, and Service M005 are closed. M005 provides reusable lifecycle/transaction composition, but no service-aware consumer migration is currently scheduled. Gregg remains gated on its corrected-path footprint evidence; Service M005 does not affect that gate.
+Eggsearch M003, Service M004, Verified Update Core M007, and Service M005 are closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` now justifies two upstream reference-driven milestones without authorizing a Gregg migration: Acquisition M005 (curl adapter + explicit transport composition) and Service M006 (daemon update disposition/revalidation). Gregg consumer M004 remains intentionally unwritten until both close.
 
 ## Active subsystem roadmaps
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
 | Verified update core | M001-M007 closed/qualified | — |
-| Acquisition transport | corrected | M004 closed; optional M005 footprint evidence |
-| Service lifecycle | M001-M005 closed | no service-aware consumer migration scheduled |
+| Acquisition transport | M001-M004 closed | M005 curl adapter/transport composition ready |
+| Service lifecycle | M001-M005 closed | M006 daemon disposition/reference qualification ready |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
 | Eggpack manifest interoperability | active; M003 bounded qualification recorded | real-consumer adoption blocked on producer convention |
 | Consumer adoption | simple, eggsearch, and CodeGG M005 closed | Gregg remains footprint-gated |
@@ -109,25 +109,28 @@ Eggsearch M003, Service M004, Verified Update Core M007, and Service M005 are cl
 | Verified update core | M007 post-commit policy / deferred finalization | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md`; `plans/closure/verified-update-core/007-status.md` | — |
 | Consumer adoption | M005 CodeGG managed-runfile bundle | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` |
 | Service lifecycle | M005 prepared-transaction lifecycle integration | closed | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md`; `plans/closure/service-lifecycle/005-status.md` | — |
+| Acquisition transport | M005 curl adapter + explicit transport composition | ready for handoff | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | M004 closed; Gregg reference evidence only |
+| Service lifecycle | M006 daemon update disposition + reference qualification | ready for handoff | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | M005 + Core M007 closed; Gregg reference only |
 | Distribution/bootstrap | M004 retirement | closed | `plans/implementation/distribution-bootstrap/004-retire-eggup-dist-authority.md`; `plans/closure/distribution-bootstrap/004-status.md` | — |
 | Eggpack manifest interoperability | M001 ReleaseManifest v1 direct/bundle adapter | closed (historical) | `plans/implementation/eggpack-manifest-interoperability/001-release-manifest-v1-adapter.md` | `plans/closure/eggpack-manifest-interoperability/001-status.md`; post-closure findings tracked by M001a |
 | Eggpack manifest interoperability | M001a adapter qualification + closure hardening | closed | `plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md` | `plans/closure/eggpack-manifest-interoperability/001a-status.md`; full regression matrix qualified |
 | Eggpack manifest interoperability | M003 Eggsact real-consumer manifest adoption | blocked after bounded adapter/API qualification | `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`; `plans/closure/eggpack-manifest-interoperability/003-status.md` | Eggpack/Eggsact must establish producer-owned live artifact mapping and ReleaseManifest publication/addressing convention |
 | Eggpack manifest interoperability | M004 package/API promotion | blocked | roadmap milestone; no implementation plan until ready | M003 adoption must close and eggpack-manifest needs a publishable version |
 
-CodeGG M005, Verified Update Core M007, and Service Lifecycle M005 are closed. Planning/closure hygiene C001, C002, and C003 are closed. M005 completes the reusable service-aware transaction mechanism; no downstream consumer plan is newly unblocked because Eggsearch M003 is already closed and Gregg M004 remains footprint-gated. Eggpack Interop M001a is closed with the full adapter regression matrix. M003 bounded parse/project qualification is complete, while real Eggsact updater integration is blocked on producer-owned artifact and manifest conventions; see `plans/closure/eggpack-manifest-interoperability/003-status.md`. M004 package/API promotion remains blocked. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
+CodeGG M005, Verified Update Core M007, and Service Lifecycle M005 are closed. Planning/closure hygiene C001, C002, and C003 are closed. Acquisition M005 and Service M006 are now dependency-ready upstream work grounded in Gregg reference evidence; they do not modify or migrate Gregg. Gregg M004 remains intentionally deferred until both upstream milestones close. Eggpack Interop M001a is closed with the full adapter regression matrix. M003 bounded parse/project qualification is complete, while real Eggsact updater integration is blocked on producer-owned artifact and manifest conventions; see `plans/closure/eggpack-manifest-interoperability/003-status.md`. M004 package/API promotion remains blocked. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
 
 ## Planned / blocked work
 
 | Subsystem | Milestone | State | Blocker |
 |---|---|---|---|
-| Acquisition transport | M005 lightweight/curl adapter | deferred/evidence-driven | corrected-path footprint evidence, especially Gregg |
+| Acquisition transport | M005 curl adapter + explicit transport composition | ready | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` |
 | Planning/closure hygiene corrective | C001 post-batch status/evidence reconciliation | closed | `plans/closure/planning-closure-hygiene-corrective/001-status.md` |
 | Planning/closure hygiene corrective | C002 final commit/baseline bookkeeping | closed | `plans/closure/planning-closure-hygiene-corrective/002-status.md` |
 | Planning/closure hygiene corrective | C003 M003 registry/closure reconciliation | closed | `plans/closure/planning-closure-hygiene-corrective/003-status.md` |
 | Service lifecycle | M005 prepared-transaction lifecycle integration | closed | `plans/closure/service-lifecycle/005-status.md` |
+| Service lifecycle | M006 daemon update disposition/reference qualification | ready | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` |
 | Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
-| Consumer adoption | M004 Gregg | blocked / plan intentionally unwritten | corrected-path footprint decision |
+| Consumer adoption | M004 Gregg | deferred / plan intentionally unwritten | acquisition M005 + service M006 must close; no Gregg migration authorized in either upstream milestone |
 | Consumer adoption | M005 CodeGG | closed | `plans/closure/consumer-adoption/005-status.md`; producer release mapping remains application/Eggpack-owned |
 | Consumer adoption | M006 Egress | blocked | archive update/extraction transaction contract |
 | Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
@@ -181,20 +184,22 @@ consumer acquisition M004 + service M003 --> eggsearch M003 [closed]
                                                   |
                                                   +--> service-aware consumer evidence recorded
 
-Gregg M004 remains separate: corrected Eggfetch footprint measurement -> adopt directly
-                                                            \-> acquisition M005 only if justified
+Gregg read-only reference evidence -> acquisition M005 curl/composition [READY]
+                                  \-> service M006 disposition/revalidation [READY]
+                                                |
+                                                `-> Gregg M004 [DEFERRED; no plan/migration yet]
 ```
 
-The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004, service M004/M005, CodeGG M005, and Verified Update Core M007 have reviewed closure evidence. Planning/closure hygiene C001-C003 are closed. No service-aware consumer migration is currently scheduled; Gregg remains footprint-gated. Eggpack manifest adapter/API work is structurally implemented and qualified, and adapter M001a has closed with the full regression matrix and truthful service packageability reconciliation. Historical M001 remains closed evidence; lower Eggup crates remain Eggpack-independent. M003 bounded JSON parse/project work is qualified, but the real Eggsact updater integration is blocked on producer convention evidence; M004 promotion is also blocked. Archive work still requires the Phase 10 extraction contract. No Eggup installer-generator replacement is authorized.
+The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004, service M004/M005, CodeGG M005, and Verified Update Core M007 have reviewed closure evidence. Planning/closure hygiene C001-C003 are closed. Acquisition M005 and Service M006 are the next dependency-ready upstream mechanisms; Gregg remains read-only reference evidence and its consumer migration is not scheduled. Eggpack manifest adapter/API work is structurally implemented and qualified, and adapter M001a has closed with the full regression matrix and truthful service packageability reconciliation. Historical M001 remains closed evidence; lower Eggup crates remain Eggpack-independent. M003 bounded JSON parse/project work is qualified, but the real Eggsact updater integration is blocked on producer convention evidence; M004 promotion is also blocked. Archive work still requires the Phase 10 extraction contract. No Eggup installer-generator replacement is authorized.
 
 ## Current project state
 
 - Rust baseline: 1.89.
 - Core: M001-M007 are qualified; M007 adds the accepted post-commit `KeepInstalled | RollBack` boundary without service coupling. Closure: `plans/closure/verified-update-core/007-status.md`.
-- Acquisition: M004 validation/promotion corrective is closed; optional M005 still needs corrected-path footprint evidence.
-- Service: M001-M005 are closed; M005 closure is at `plans/closure/service-lifecycle/005-status.md`. No service-aware consumer migration is scheduled.
+- Acquisition: M004 validation/promotion corrective is closed; M005 curl adapter/transport composition is ready for handoff from Gregg reference evidence.
+- Service: M001-M005 are closed; M006 daemon disposition/reference qualification is ready for handoff. No downstream service consumer migration is part of M006.
 - Distribution: M001-M003 remain historical predecessor evidence; M004 removed the producer crate after Eggpack Contract M002 closure. The subsystem is archived/transferred to Eggpack.
-- Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg still needs its own footprint decision.
+- Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg M004 remains intentionally unwritten until acquisition M005 and service M006 close.
 - CodeGG M005 closed using CodeGG-owned strict extraction of the existing verified archive and Eggup's multi-artifact transaction; it did not recreate producer release authority in Eggup. Evidence: `plans/closure/consumer-adoption/005-status.md`. Egress remains separately blocked on a generic archive transaction/extraction contract.
 - Eggpack interoperability: M001 adapter is historically closed; M001a corrective closed at `plans/closure/eggpack-manifest-interoperability/001a-status.md`. M003 bounded API qualification is implemented at `cbfa8fa3870dae22d16775408a3135ea682c9365`; real Eggsact adoption remains blocked because the live workflow publishes no manifest and no producer-owned convention resolves the fixture/live artifact naming difference. See `plans/closure/eggpack-manifest-interoperability/003-status.md`. M004 promotion remains blocked; M002 archive extraction remains independently gated on Phase 10.
 - Release process: manual crates.io publication only.
@@ -202,9 +207,9 @@ The runtime corrective gates are closed. Eggsearch M003, distribution M003/M004,
 
 ## Next handoff
 
-Planning/Closure Hygiene C003 is closed and recorded the compact-registry reconciliation plus hosted Eggup CI evidence without changing M003's blocked disposition. No further Eggup-side interoperability implementation is dependency-ready solely from this pass. The next required handoff is producer-side: Eggpack/Eggsact must establish Eggsact's authoritative live artifact mapping and ReleaseManifest publication/addressing convention. After that evidence exists, resume the blocked consumer portion of M003; its bounded Eggup adapter/API qualification is already complete. M004 promotion cannot begin until M003 closes and upstream publication is viable. M002 archive extraction remains independently blocked on Phase 10. Service M005 and planning hygiene remain closed; Gregg remains independently footprint-gated.
+Two independent Eggup-side implementation milestones are now dependency-ready from read-only Gregg reference evidence: Acquisition M005 and Service Lifecycle M006. They may proceed independently/parallel and MUST NOT modify, migrate, or depend on Gregg. Separately, the Eggpack/Eggsact producer-side manifest convention remains the next handoff for the blocked interoperability M003 work. After that evidence exists, resume the blocked consumer portion of M003; its bounded Eggup adapter/API qualification is already complete. M004 promotion cannot begin until M003 closes and upstream publication is viable. M002 archive extraction remains independently blocked on Phase 10. Service M005 and planning hygiene remain closed. Gregg adoption remains independently deferred until Acquisition M005 and Service M006 close.
 
-Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter. Resume M003 only after producer-owned evidence resolves its gate.
+Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter. Resume interoperability M003 only after producer-owned evidence resolves its gate. Do not author Gregg consumer M004 or modify Gregg while Acquisition M005 / Service M006 are being implemented.
 
 After each implementation pass:
 
