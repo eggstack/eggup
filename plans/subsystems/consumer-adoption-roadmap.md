@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple, eggsearch, and CodeGG M005 are closed, Gregg remains footprint-gated
+Status: active; simple, eggsearch, and CodeGG M005 are closed; Gregg adoption remains intentionally deferred pending upstream acquisition M005 and service M006 qualification
 
 Long-term references:
 
@@ -65,7 +65,7 @@ Eggup owns generic fixes revealed by adoption. Consumer repositories own their a
 | eggsact | Eggfetch + single binary + checksum/Cargo fallback | first simple adopter | preserve explicit fallback conditions |
 | stegoeggo | Eggfetch + single binary | second simple adopter | Rust 1.89 baseline |
 | eggsearch | Eggfetch + updater + service lifecycle | core + service adopter | health/manager semantics |
-| Gregg | shared gregg-update + service lifecycle | replace local shared crate | transport footprint; Cargo fallback |
+| Gregg | shared gregg-update + mature daemon-update lifecycle | future replacement of local generic machinery | transport selection/footprint; Cargo fallback; exact executable/config runtime semantics |
 | CodeGG | verified in-place managed-runfile update on supported Linux/macOS; manual fresh-install guidance elsewhere | first multi-artifact bundle adopter; generalized updater blocker resolved | 3-runfile bundle |
 | Egress | GitHub authority + archive + 2 binaries | multi-artifact/archive proof | no Cargo fallback |
 | EggPool | rich provenance + package-manager transitions | selective primitives | PEP-440-like/version/provenance policy |
@@ -97,8 +97,12 @@ core M005 corrective + M006 qualification + transport M002
           +---------+---------+
           |                   |
           v                   v
-    M003 eggsearch       M004 Gregg
-       [closed]        [blocked independently]
+    M003 eggsearch       upstream M005 acquisition + M006 service
+       [closed]              [ready; Gregg reference only]
+                                      |
+                                      v
+                                M004 Gregg
+                           [deferred; no plan]
 
 qualified core M006 + acquisition M004
                     |
@@ -140,7 +144,12 @@ Closed by `plans/closure/consumer-adoption/003-status.md`. Eggsearch uses the im
 
 ### M004 — Gregg adoption
 
-Replace `gregg-update` with Eggup mechanics after remeasuring the acquisition-M004-corrected Eggfetch path against Gregg's footprint budget. Create lightweight acquisition M005 only if the evidence still justifies it. Detailed adoption plan waits for that decision.
+Do not author or execute the Gregg migration yet. Gregg is currently a read-only reference/test oracle for two upstream Eggup milestones:
+
+- acquisition M005: external curl adapter + explicit curl/Eggfetch transport composition;
+- service M006: managed/direct/stopped/foreign-preserved daemon update disposition and revalidation semantics.
+
+After both upstream milestones close with their own Eggup qualification evidence, re-review Gregg and author M004 only if migration can delete duplicated generic machinery without regressing transport footprint, Cargo fallback policy, exact executable/config lifecycle behavior, or CLI/release policy. Gregg-owned release/version/target/Cargo-fallback semantics remain downstream policy.
 
 ### M005 — CodeGG managed-runfile bundle adoption
 
@@ -187,7 +196,7 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
-| M004 Gregg | blocked / plan intentionally unwritten | — | — | corrected-path footprint decision |
+| M004 Gregg | deferred / plan intentionally unwritten | — | — | acquisition M005 + service M006 must close; no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
 | M006 Egress | blocked | — | — | archive update/extraction transaction contract |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
