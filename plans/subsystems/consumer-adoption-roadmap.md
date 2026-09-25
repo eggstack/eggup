@@ -140,7 +140,7 @@ Plan: `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adopti
 
 Adopt corrected core/acquisition plus the Unix service substrate after acquisition M004 and service M003 closure. Preserve eggsearch-owned release/Cargo fallback, health, cron watchdog, and Windows-specific behavior until the corresponding shared layers are qualified.
 
-Closed by `plans/closure/consumer-adoption/003-status.md`. Eggsearch uses the immutable Eggup revision for its shared updater and Unix manager paths; Windows self-replacement/SCM remain consumer-owned. The measured release binary increase is 12.6%; Gregg's separate footprint gate remains open.
+Closed by `plans/closure/consumer-adoption/003-status.md`. Eggsearch uses the immutable Eggup revision for its shared updater and Unix manager paths; Windows self-replacement/SCM remain consumer-owned. The measured release binary increase was 12.6%. Gregg's former footprint/transport prerequisite was subsequently resolved by acquisition M005/M006; Gregg M004 is now writable but remains intentionally unwritten.
 
 ### M004 — Gregg adoption
 
