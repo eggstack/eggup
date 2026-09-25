@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M005 implemented; M006 Windows portability/qualification corrective ready
+Status: M001-M006 closed; primary path fully cross-platform qualified
 
 Long-term references:
 
@@ -67,7 +67,7 @@ Post-closure review then found two narrower correctness gaps tracked by M004:
 - `FetchLimits::new` validates limits, but the struct fields remain public, so direct struct literals can bypass validation unless each transport revalidates at its trust boundary;
 - no-clobber promotion hard-links the complete temp to `dest` and then returns `Err` if unlinking the redundant temp fails, which can report ordinary failure after a complete destination already exists.
 
-M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` supplied the real-consumer evidence previously required for M005. M005 is implemented with `eggup-curl`, `Unavailable`, and explicit `ComposedTransport`, but hosted run `36169295410` subsequently exposed a Windows all-targets test portability failure in `eggup-curl`. M006 is the active corrective and must close before M005 is treated as fully cross-platform qualified. Gregg remains untouched.
+M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` supplied the real-consumer evidence previously required for M005. M005 is closed and fully cross-platform qualified with corrective M006: hosted run `36169295410` exposed a Windows all-targets test portability failure in `eggup-curl`, corrected by `1c601f2`, with green hosted matrix `36176009068`. Gregg remains untouched.
 
 ## 5. Target architecture
 
@@ -96,9 +96,12 @@ M003 contract/temp-file hardening corrective [closed]
           v
 M004 validated-limits/promotion-state corrective
           |
-          +--> broader updater-bearing adoption
-          |
-          `--> M005 curl adapter + explicit transport composition [ready]
+           +--> broader updater-bearing adoption
+           |
+           `--> M005 curl adapter + explicit transport composition [closed; qualified with M006]
+                     |
+                     v
+               M006 Windows portability/qualification corrective [closed]
 ```
 
 ## 7. Milestones
@@ -155,9 +158,9 @@ Class: invariant/corrective.
 
 Plan: `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md`.
 
-Status: ready for handoff.
+Status: closed; see `plans/closure/acquisition-transport/006-status.md`.
 
-Correct the Windows `--all-targets` failure caused by Unix-only `PermissionsExt` test support in `eggup-curl`, clean the Windows-only core import warning, require a green hosted matrix, and reconcile M005/M006 closure evidence plus stale roadmap/registry state. Gregg remains read-only and consumer M004 remains unwritten.
+Corrects the Windows `--all-targets` failure caused by Unix-only `PermissionsExt` test support in `eggup-curl`, cleans the Windows-only core import warnings, requires a green hosted matrix, and reconciles M005/M006 closure evidence plus stale roadmap/registry state. Gregg remains read-only and consumer M004 remains unwritten.
 
 ## 8. Cross-cutting requirements
 
@@ -183,5 +186,5 @@ The subsystem's primary path is complete when the corrected native Eggfetch path
 | M002 | closed; post-closure findings fed M003 | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | `plans/closure/acquisition-transport/002-status.md` | — |
 | M003 | closed; post-closure findings feed M004 | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | `plans/closure/acquisition-transport/003-status.md` | — |
 | M004 | closed | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | `plans/closure/acquisition-transport/004-status.md` | — |
-| M005 | implemented; qualification corrective open | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | `plans/closure/acquisition-transport/005-status.md` | hosted Windows failure tracked by M006 |
-| M006 | ready for handoff | `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md` | — | run `36169295410` / job `108184625301` |
+| M005 | closed; qualified with M006 corrective | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | `plans/closure/acquisition-transport/005-status.md` | — |
+| M006 | closed | `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md` | `plans/closure/acquisition-transport/006-status.md` | — |

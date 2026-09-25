@@ -234,3 +234,47 @@ M005 closure unblocks the acquisition half of that gate.
 - Consumer adoption Gregg M004: still deferred; now blocked only on Service M006
   (acquisition half satisfied).
 - Current state: acquisition primary path complete (native + curl + composition).
+
+## Post-closure corrective addendum — acquisition M006 (2026-09-25)
+
+This record was originally written with hosted CI pending. The subsequent push
+proved Windows workspace qualification was incomplete. History is preserved;
+nothing above is rewritten.
+
+Original failure (implementation + closure head `eb989659feabd44e3c1441bb8eb522614ce96a31`):
+
+- Workflow run `36169295410` — conclusion `failure`.
+- Windows job `108184625301` (`cargo check --workspace --all-targets --locked`) — conclusion `failure`.
+- Stable job `108184625133`, MSRV job `108184625222`, macOS job `108184625296` — all `success`.
+- Diagnostics:
+
+```text
+error[E0433]: cannot find `unix` in `os`
+ --> crates/eggup-curl/src/lib.rs:662:18
+error[E0599]: no method named `set_mode` found for struct `Permissions`
+ --> crates/eggup-curl/src/lib.rs:787:15
+warning: unused import: `PermissionsIntent`
+ --> crates/eggup-core/src/stage.rs:5:50
+```
+
+Plan-only head `759f175828b0be9b462fdd5336b9c3115ebb3534` reproduced the same
+red lane: workflow `36175333145` failure, Windows job `108204439265` failure
+(Stable/MSRV/macOS green).
+
+Corrective implementation `1c601f29a16c952e90feaeebd0fa654401b54a86`
+(`fix(acquisition): gate Unix-only curl test support and core imports for
+Windows (M006)`): `PermissionsExt` import, `fake_curl_script`, and the six
+shell-dependent fake-child tests are `#[cfg(unix)]`-gated (module itself stays
+compiled on Windows); `PermissionsIntent` (and same-class test-only `Duration`)
+imports in `eggup-core` are target-gated. No transport, composition, disposition,
+or Gregg semantics changed.
+
+Succeeding hosted matrix on the corrective head:
+
+- Workflow run `36176009068` — conclusion `success`.
+- Stable job `108206656486`, MSRV job `108206656574`, macOS job `108206656474`,
+  Windows job `108206656342` — all `success`.
+
+Final disposition: M005 implementation stands; cross-platform qualification is
+restored by acquisition M006 (`plans/closure/acquisition-transport/006-status.md`).
+M005 is treated as fully qualified only with that corrective closure.

@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M006 implemented; hosted cross-workspace qualification pending acquisition M006 corrective
+Status: M001-M006 closed; hosted cross-workspace qualification reconciled via acquisition M006
 
 Long-term references:
 
@@ -99,11 +99,11 @@ M003 Unix adapter correctness/security corrective
 core M007 deferred finalization ---+
                     |
                     v
-                    M005 update-lifecycle integration [closed]
-                              |
-                              v
-                    M006 daemon disposition + revalidation [implemented]
-                    (Gregg reference only; no migration)
+                     M005 update-lifecycle integration [closed]
+                               |
+                               v
+                     M006 daemon disposition + revalidation [closed; evidence reconciled via acquisition M006]
+                     (Gregg reference only; no migration)
 ```
 
 ## 7. Milestones
@@ -153,7 +153,7 @@ Implemented by `plans/closure/service-lifecycle/005-status.md`. Eggsearch M003 r
 
 Plan: `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md`.
 
-Status: closed; see `plans/closure/service-lifecycle/006-status.md`.
+Status: closed; see `plans/closure/service-lifecycle/006-status.md` (evidence reconciled via acquisition M006, no service code change).
 
 Hard dependencies: service M005 and verified-update-core M007 closure (both closed).
 
@@ -184,4 +184,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
 | M005 | closed | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | `plans/closure/service-lifecycle/005-status.md` | — |
-| M006 | implemented; closure evidence reconciliation pending | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | acquisition M006 must restore green hosted Windows workspace qualification |
+| M006 | closed; hosted evidence reconciled via acquisition M006 | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | — |

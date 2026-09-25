@@ -205,3 +205,26 @@ and no Gregg migration is authorized by this closure.
 - Consumer adoption Gregg M004: deferred → writable prerequisite satisfied
   (acquisition M005 + service M006 closed); plan still intentionally unwritten.
 - Current state: service disposition/reference qualification complete.
+
+## Post-closure corrective addendum — acquisition M006 (2026-09-25)
+
+This record was originally written with hosted CI pending. The subsequent push
+proved the shared Windows workspace lane was red for a defect outside service
+production code. History is preserved; nothing above is rewritten.
+
+Original failure is the same acquisition-head event recorded in
+`plans/closure/acquisition-transport/005-status.md`: workflow `36169295410`,
+Windows job `108184625301` (`cargo check --workspace --all-targets --locked`)
+failed on `eggup-curl` Unix-only test support plus an `eggup-core::stage`
+unused-import warning. Service M006 production code required no change; no
+service stop condition from the corrective plan was triggered.
+
+Corrective implementation `1c601f29a16c952e90feaeebd0fa654401b54a86` leaves all
+M006 disposition/revalidation semantics unchanged. Succeeding hosted matrix on
+that head: workflow `36176009068` success with Stable `108206656486`, MSRV
+`108206656574`, macOS `108206656474`, and Windows `108206656342` all green.
+
+Final disposition: M006 implementation stands; hosted workspace qualification is
+reconciled through acquisition M006
+(`plans/closure/acquisition-transport/006-status.md`). No service production
+change was required.

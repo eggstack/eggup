@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 006 — M005 Windows Portability and Cross-Closure Qualification Corrective
 
-Status: ready for handoff
+Status: implemented
 
 Repository baseline: `eb989659feabd44e3c1441bb8eb522614ce96a31`
 
