@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple, eggsearch, and CodeGG M005 are closed; Gregg adoption remains intentionally deferred pending upstream acquisition M005 and service M006 qualification
+Status: active; simple, eggsearch, and CodeGG M005 are closed; Gregg adoption remains intentionally deferred pending acquisition M006 hosted-qualification corrective
 
 Long-term references:
 
@@ -149,7 +149,7 @@ Do not author or execute the Gregg migration yet. Gregg is currently a read-only
 - acquisition M005: external curl adapter + explicit curl/Eggfetch transport composition;
 - service M006: managed/direct/stopped/foreign-preserved daemon update disposition and revalidation semantics.
 
-After both upstream milestones close with their own Eggup qualification evidence, re-review Gregg and author M004 only if migration can delete duplicated generic machinery without regressing transport footprint, Cargo fallback policy, exact executable/config lifecycle behavior, or CLI/release policy. Gregg-owned release/version/target/Cargo-fallback semantics remain downstream policy.
+Both upstream feature milestones are implemented, but hosted Windows qualification failed after their closure records were written. Re-review Gregg and author M004 only after acquisition M006 closes with a green hosted matrix and reconciled M005/M006 closure evidence, and only if migration can delete duplicated generic machinery without regressing transport footprint, Cargo fallback policy, exact executable/config lifecycle behavior, or CLI/release policy. Gregg-owned release/version/target/Cargo-fallback semantics remain downstream policy.
 
 ### M005 — CodeGG managed-runfile bundle adoption
 
@@ -196,7 +196,7 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
-| M004 Gregg | deferred / plan intentionally unwritten | — | — | acquisition M005 + service M006 must close; no migration authorized yet |
+| M004 Gregg | deferred / plan intentionally unwritten | — | — | acquisition M006 hosted-qualification corrective must close; no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
 | M006 Egress | blocked | — | — | archive update/extraction transaction contract |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |

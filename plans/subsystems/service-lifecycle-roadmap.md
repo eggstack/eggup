@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M006 closed
+Status: M001-M006 implemented; hosted cross-workspace qualification pending acquisition M006 corrective
 
 Long-term references:
 
@@ -102,7 +102,7 @@ core M007 deferred finalization ---+
                     M005 update-lifecycle integration [closed]
                               |
                               v
-                    M006 daemon disposition + revalidation [ready]
+                    M006 daemon disposition + revalidation [implemented]
                     (Gregg reference only; no migration)
 ```
 
@@ -184,4 +184,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
 | M005 | closed | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | `plans/closure/service-lifecycle/005-status.md` | — |
-| M006 | closed | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | — |
+| M006 | implemented; closure evidence reconciliation pending | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | acquisition M006 must restore green hosted Windows workspace qualification |

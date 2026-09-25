@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M005 closed
+Status: M001-M005 implemented; M006 Windows portability/qualification corrective ready
 
 Long-term references:
 
@@ -67,7 +67,7 @@ Post-closure review then found two narrower correctness gaps tracked by M004:
 - `FetchLimits::new` validates limits, but the struct fields remain public, so direct struct literals can bypass validation unless each transport revalidates at its trust boundary;
 - no-clobber promotion hard-links the complete temp to `dest` and then returns `Err` if unlinking the redundant temp fails, which can report ordinary failure after a complete destination already exists.
 
-M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` supplied the real-consumer evidence previously required for M005: Gregg deliberately uses a bounded external `curl` updater path to avoid forcing an embedded HTTP/TLS stack. M005 is closed at `plans/closure/acquisition-transport/005-status.md` with `eggup-curl`, `Unavailable`, and explicit `ComposedTransport` composition; Gregg itself remains untouched and undepended on.
+M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` supplied the real-consumer evidence previously required for M005. M005 is implemented with `eggup-curl`, `Unavailable`, and explicit `ComposedTransport`, but hosted run `36169295410` subsequently exposed a Windows all-targets test portability failure in `eggup-curl`. M006 is the active corrective and must close before M005 is treated as fully cross-platform qualified. Gregg remains untouched.
 
 ## 5. Target architecture
 
@@ -149,6 +149,16 @@ Hard dependency: M004 closure.
 
 Use Gregg only as read-only behavioral evidence for a mature bounded external-curl path. Add `eggup-curl` plus caller-selected curl/Eggfetch/preferred-fallback composition. Preserve exact `NotFound` as terminal for the requested URL; default composition falls back only when the preferred transport is unavailable, while broader transport-error fallback requires explicit caller policy. Record curl-only, Eggfetch-only, and dual-transport footprint evidence. No Gregg migration occurs in M005.
 
+### M006 — M005 Windows portability and cross-closure qualification corrective
+
+Class: invariant/corrective.
+
+Plan: `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md`.
+
+Status: ready for handoff.
+
+Correct the Windows `--all-targets` failure caused by Unix-only `PermissionsExt` test support in `eggup-curl`, clean the Windows-only core import warning, require a green hosted matrix, and reconcile M005/M006 closure evidence plus stale roadmap/registry state. Gregg remains read-only and consumer M004 remains unwritten.
+
 ## 8. Cross-cutting requirements
 
 Transport adapters must preserve bounded body/output behavior, redaction, cancellation cleanup, and partial-file cleanup. Proxy behavior must be explicit rather than inherited accidentally. Transport fallback is never release/source fallback: `NotFound`, verification failure, cancellation, size-limit failure, and staging/promotion failure do not silently select another source.
@@ -173,4 +183,5 @@ The subsystem's primary path is complete when the corrected native Eggfetch path
 | M002 | closed; post-closure findings fed M003 | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | `plans/closure/acquisition-transport/002-status.md` | — |
 | M003 | closed; post-closure findings feed M004 | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | `plans/closure/acquisition-transport/003-status.md` | — |
 | M004 | closed | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | `plans/closure/acquisition-transport/004-status.md` | — |
-| M005 | closed | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | `plans/closure/acquisition-transport/005-status.md` | — |
+| M005 | implemented; qualification corrective open | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | `plans/closure/acquisition-transport/005-status.md` | hosted Windows failure tracked by M006 |
+| M006 | ready for handoff | `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md` | — | run `36169295410` / job `108184625301` |
