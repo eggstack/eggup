@@ -4,8 +4,10 @@ members = [
     "crates/eggup-core",
     "crates/eggup-acquisition",
     "crates/eggup-eggfetch",
+    "crates/eggup-curl",
     "crates/eggup-service",
     "crates/eggup-eggpack",
+    "crates/eggup-transport-footprint",
 ]
 
 [workspace.package]

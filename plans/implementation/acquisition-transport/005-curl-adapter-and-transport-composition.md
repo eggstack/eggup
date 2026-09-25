@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 005 — Curl Adapter and Explicit Transport Composition
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/acquisition-transport/005-status.md`)
 
 Repository baseline: `881c95ff069d3d465a282cb6a495ba6fcb70cb6f`
 

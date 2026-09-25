@@ -1,0 +1,46 @@
+[package]
+name = "eggup-transport-footprint"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "Non-published footprint fixtures for acquisition transport configurations (curl-only, eggfetch-only, dual)"
+authors = ["David Bowman"]
+
+[lints]
+workspace = true
+
+[dependencies]
+eggup-acquisition = { version = "0.1.0", path = "../eggup-acquisition" }
+
+[features]
+curl = ["dep:eggup-curl"]
+eggfetch = ["dep:eggup-eggfetch"]
+default = []
+
+[dependencies.eggup-curl]
+version = "0.1.0"
+path = "../eggup-curl"
+optional = true
+
+[dependencies.eggup-eggfetch]
+version = "0.1.0"
+path = "../eggup-eggfetch"
+optional = true
+
+[[bin]]
+name = "curl_only"
+path = "src/bin/curl_only.rs"
+required-features = ["curl"]
+
+[[bin]]
+name = "eggfetch_only"
+path = "src/bin/eggfetch_only.rs"
+required-features = ["eggfetch"]
+
+[[bin]]
+name = "dual"
+path = "src/bin/dual.rs"
+required-features = ["curl", "eggfetch"]

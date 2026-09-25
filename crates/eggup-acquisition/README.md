@@ -14,10 +14,24 @@ destination, or service policy:
 - `AcquisitionTransport::fetch_metadata` (bounded small body) and
   `fetch_artifact` (streamed to a file).
 - `FixtureTransport`: deterministic in-memory transport for correctness tests;
-  real network policy lives in `eggup-eggfetch`.
+  real network policy lives in `eggup-eggfetch` (native) and `eggup-curl`
+  (external process).
+- `AcquisitionError::Unavailable`: typed adapter-unavailable condition
+  (missing executable, discovery failure, spawn failure) for safe composition.
+- `ComposedTransport` + `CompositionPolicy`: explicit caller-selected
+  preferred/fallback composition over two transports.
 
 Transports never execute downloaded content, never choose fallback, and redact
 credential-bearing URL material in diagnostics.
+
+Transport fallback (`curl <-> Eggfetch` for the same exact URL) is never
+release/source fallback. `NotFound` is terminal for the exact URL under every
+policy. `InvalidInput`, `Cancelled`, `TooLarge`, and `Io`
+(staging/promotion) failures are terminal under every policy. Default policy
+(`UnavailableOnly`) falls back only when the preferred adapter is unavailable;
+broader transport-error fallback (`UnavailableOrTransport`) requires an
+explicit caller choice. Verification/candidate failures occur above this layer
+and are never transport-fallback inputs.
 
 Effective time bounds (M003 corrective):
 

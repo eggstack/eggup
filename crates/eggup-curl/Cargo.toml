@@ -1,0 +1,24 @@
+[package]
+name = "eggup-curl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage = "https://github.com/eggstack/eggup"
+documentation = "https://docs.rs/eggup-curl"
+description = "External curl acquisition adapter for Eggup (bounded, no release policy)"
+readme = "README.md"
+authors = ["David Bowman"]
+keywords = ["update", "http", "fetch", "transport"]
+categories = ["network-programming"]
+exclude = [
+    "tests/",
+    "benches/",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+eggup-acquisition = { version = "0.1.0", path = "../eggup-acquisition" }

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Acquisition M005 (unpublished): new `eggup-curl` external-curl adapter plus
+  `AcquisitionError::Unavailable` and `eggup-acquisition::ComposedTransport`
+  with `CompositionPolicy::{UnavailableOnly (default), UnavailableOrTransport}`.
+  Curl-only binaries avoid an embedded HTTP/TLS stack; Eggfetch-only binaries
+  avoid curl; dual binaries compose both for the same exact URL. Exact 404
+  remains terminal `NotFound`; default fallback occurs only on unavailability.
+  No `eggup-core` change; no Gregg modification or dependency. No publication
+  or consumer migration performed.
+
 ## 0.1.1
 
 - `eggup-core`: added ADR-0002 post-commit policy via

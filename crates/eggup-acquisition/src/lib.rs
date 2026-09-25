@@ -266,6 +266,13 @@ pub enum AcquisitionError {
     Cancelled,
     /// A transaction-owned filesystem operation failed.
     Io(String),
+    /// The adapter could not attempt the request (missing executable, failed
+    /// discovery, spawn failure). URL material is already redacted.
+    ///
+    /// Composition falls back to the next transport on `Unavailable`. Ordinary
+    /// `Transport`/`Timeout` failures fall back only under an explicit
+    /// opt-in policy. All other errors and `NotFound` are terminal.
+    Unavailable(String),
 }
 
 impl AcquisitionError {
@@ -277,8 +284,23 @@ impl AcquisitionError {
         Self::Transport(bound_detail(detail.into()))
     }
 
+    /// Adapter-only constructor for unavailable evidence.
+    ///
+    /// `#[doc(hidden)]`: not part of the consumer contract; allows verified
+    /// adapters (`eggup-curl`) to report missing/spawn failures without
+    /// widening the public seam with a general constructor.
+    #[doc(hidden)]
+    pub fn __adapter_unavailable(detail: impl Into<String>) -> Self {
+        Self::Unavailable(bound_detail(detail.into()))
+    }
+
     pub(crate) fn io(operation: &'static str, source: std::io::Error) -> Self {
         Self::Io(bound_detail(format!("{operation}: {source}")))
+    }
+
+    /// Returns true when the adapter was unavailable to attempt the request.
+    pub fn is_unavailable(&self) -> bool {
+        matches!(self, Self::Unavailable(_))
     }
 }
 
@@ -291,6 +313,7 @@ impl fmt::Display for AcquisitionError {
             Self::Timeout { phase } => write!(f, "acquisition timed out ({phase})"),
             Self::Cancelled => write!(f, "acquisition cancelled"),
             Self::Io(d) => write!(f, "acquisition I/O failed: {d}"),
+            Self::Unavailable(d) => write!(f, "acquisition transport unavailable: {d}"),
         }
     }
 }
@@ -566,6 +589,7 @@ enum FixtureKind {
     Body(Vec<u8>),
     NotFound,
     Failure,
+    Unavailable,
     Truncated { prefix_len: usize },
     Slow { body: Vec<u8>, delay: Duration },
 }
@@ -607,6 +631,14 @@ impl FixtureResponse {
     pub fn slow(body: Vec<u8>, delay: Duration) -> Self {
         Self {
             kind: FixtureKind::Slow { body, delay },
+        }
+    }
+
+    /// An adapter-unavailable condition (missing executable/spawn failure
+    /// equivalent) for composition fallback testing.
+    pub fn unavailable() -> Self {
+        Self {
+            kind: FixtureKind::Unavailable,
         }
     }
 }
@@ -669,6 +701,9 @@ impl AcquisitionTransport for FixtureTransport {
             // secrets and production adapters use category-only errors.
             FixtureKind::Failure => Err(AcquisitionError::transport_redacted(
                 "fixture transport failure",
+            )),
+            FixtureKind::Unavailable => Err(AcquisitionError::__adapter_unavailable(
+                "fixture transport unavailable",
             )),
             FixtureKind::Body(bytes) => {
                 if start.elapsed() > limits.total_timeout {
@@ -740,6 +775,11 @@ impl AcquisitionTransport for FixtureTransport {
             FixtureKind::Failure => {
                 return Err(AcquisitionError::transport_redacted(
                     "fixture transport failure",
+                ));
+            }
+            FixtureKind::Unavailable => {
+                return Err(AcquisitionError::__adapter_unavailable(
+                    "fixture transport unavailable",
                 ));
             }
             FixtureKind::Body(b) => b,
@@ -849,6 +889,131 @@ pub fn __adapter_metadata(bytes: Vec<u8>) -> MetadataBytes {
 #[doc(hidden)]
 pub fn __adapter_artifact(bytes_written: u64) -> ArtifactEvidence {
     ArtifactEvidence { bytes_written }
+}
+
+/// Caller-selected fallback scope for a composed transport.
+///
+/// Transport fallback (`curl <-> Eggfetch` for the same exact URL) is never
+/// release/source fallback. `NotFound` is terminal for the exact URL under
+/// every policy. `InvalidInput`, `Cancelled`, `TooLarge`, and `Io`
+/// (staging/promotion) failures are terminal under every policy.
+/// Verification/candidate failures occur above this layer and are never
+/// transport-fallback inputs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CompositionPolicy {
+    /// Fall back only when the preferred adapter is unavailable
+    /// (`AcquisitionError::Unavailable`). This is the default.
+    #[default]
+    UnavailableOnly,
+    /// Fall back on unavailability plus ordinary transport failures
+    /// (`Transport` and `Timeout`). Terminal conditions above remain terminal.
+    UnavailableOrTransport,
+}
+
+/// Explicit caller-selected preferred/fallback composition over two transports.
+///
+/// The composition itself implements [`AcquisitionTransport`] so callers keep
+/// a single seam. Preferred order is the construction order: `primary` is
+/// attempted first, `secondary` only when the policy allows fallback for the
+/// primary outcome.
+///
+/// Fallback is decided from typed outcomes, never by parsing human-readable
+/// errors.
+pub struct ComposedTransport<'a> {
+    primary: &'a dyn AcquisitionTransport,
+    secondary: &'a dyn AcquisitionTransport,
+    policy: CompositionPolicy,
+}
+
+impl std::fmt::Debug for ComposedTransport<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ComposedTransport")
+            .field("policy", &self.policy)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> ComposedTransport<'a> {
+    /// Creates a composed transport with an explicit fallback policy.
+    ///
+    /// No network, filesystem, or process work occurs here; policy and
+    /// ordering are the only decisions recorded.
+    pub fn new(
+        primary: &'a dyn AcquisitionTransport,
+        secondary: &'a dyn AcquisitionTransport,
+        policy: CompositionPolicy,
+    ) -> Self {
+        Self {
+            primary,
+            secondary,
+            policy,
+        }
+    }
+
+    /// Returns the fallback policy.
+    pub fn policy(&self) -> CompositionPolicy {
+        self.policy
+    }
+
+    fn should_fallback(&self, err: &AcquisitionError) -> bool {
+        match err {
+            AcquisitionError::Unavailable(_) => true,
+            AcquisitionError::Transport(_) | AcquisitionError::Timeout { .. } => {
+                self.policy == CompositionPolicy::UnavailableOrTransport
+            }
+            _ => false,
+        }
+    }
+}
+
+impl AcquisitionTransport for ComposedTransport<'_> {
+    fn fetch_metadata(
+        &self,
+        request: &AcquisitionRequest,
+        limits: FetchLimits,
+        cancel: &CancelFlag,
+    ) -> Result<FetchOutcome<MetadataBytes>, AcquisitionError> {
+        // Validate once at the composition boundary so invalid caller limits
+        // fail before either adapter performs route/filesystem/network I/O.
+        // Adapters revalidate at their own boundaries per the seam contract.
+        limits.validate()?;
+        if cancel.is_cancelled() {
+            return Err(AcquisitionError::Cancelled);
+        }
+        match self.primary.fetch_metadata(request, limits, cancel) {
+            Ok(outcome) => Ok(outcome),
+            Err(err) => {
+                if self.should_fallback(&err) {
+                    self.secondary.fetch_metadata(request, limits, cancel)
+                } else {
+                    Err(err)
+                }
+            }
+        }
+    }
+
+    fn fetch_artifact(
+        &self,
+        request: &AcquisitionRequest,
+        dest: &Path,
+        limits: FetchLimits,
+        cancel: &CancelFlag,
+    ) -> Result<FetchOutcome<ArtifactEvidence>, AcquisitionError> {
+        limits.validate()?;
+        if cancel.is_cancelled() {
+            return Err(AcquisitionError::Cancelled);
+        }
+        match self.primary.fetch_artifact(request, dest, limits, cancel) {
+            Ok(outcome) => Ok(outcome),
+            Err(err) => {
+                if self.should_fallback(&err) {
+                    self.secondary.fetch_artifact(request, dest, limits, cancel)
+                } else {
+                    Err(err)
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1535,5 +1700,277 @@ mod tests {
             .fetch_metadata(&req("https://example.com/p"), limits(), &CancelFlag::new())
             .unwrap_err();
         assert!(!format!("{err}").contains("HUNTER2-PROXY-3311"));
+    }
+
+    // ---- M005: explicit transport composition ----
+
+    struct CountingTransport {
+        inner: FixtureTransport,
+        metadata_calls: std::sync::atomic::AtomicUsize,
+        artifact_calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl CountingTransport {
+        fn new() -> Self {
+            Self {
+                inner: FixtureTransport::new(),
+                metadata_calls: std::sync::atomic::AtomicUsize::new(0),
+                artifact_calls: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+
+        fn route(&self, url: &str, response: FixtureResponse) {
+            self.inner.route(url, response);
+        }
+
+        fn metadata_calls(&self) -> usize {
+            self.metadata_calls
+                .load(std::sync::atomic::Ordering::SeqCst)
+        }
+
+        fn artifact_calls(&self) -> usize {
+            self.artifact_calls
+                .load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    impl AcquisitionTransport for CountingTransport {
+        fn fetch_metadata(
+            &self,
+            request: &AcquisitionRequest,
+            limits: FetchLimits,
+            cancel: &CancelFlag,
+        ) -> Result<FetchOutcome<MetadataBytes>, AcquisitionError> {
+            self.metadata_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.fetch_metadata(request, limits, cancel)
+        }
+
+        fn fetch_artifact(
+            &self,
+            request: &AcquisitionRequest,
+            dest: &Path,
+            limits: FetchLimits,
+            cancel: &CancelFlag,
+        ) -> Result<FetchOutcome<ArtifactEvidence>, AcquisitionError> {
+            self.artifact_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.fetch_artifact(request, dest, limits, cancel)
+        }
+    }
+
+    #[test]
+    fn composition_prefers_primary_without_fallback_call() {
+        let primary = CountingTransport::new();
+        let secondary = CountingTransport::new();
+        primary.route(
+            "https://example.com/meta",
+            FixtureResponse::body(b"primary".to_vec()),
+        );
+        secondary.route(
+            "https://example.com/meta",
+            FixtureResponse::body(b"secondary".to_vec()),
+        );
+        let composed =
+            ComposedTransport::new(&primary, &secondary, CompositionPolicy::UnavailableOnly);
+        let out = composed
+            .fetch_metadata(
+                &req("https://example.com/meta"),
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap();
+        assert_eq!(out.success().unwrap().bytes(), b"primary");
+        assert_eq!(primary.metadata_calls(), 1);
+        assert_eq!(secondary.metadata_calls(), 0);
+    }
+
+    #[test]
+    fn composition_falls_back_on_unavailable_by_default() {
+        let primary = CountingTransport::new();
+        let secondary = CountingTransport::new();
+        primary.route("https://example.com/meta", FixtureResponse::unavailable());
+        secondary.route(
+            "https://example.com/meta",
+            FixtureResponse::body(b"fallback".to_vec()),
+        );
+        let composed =
+            ComposedTransport::new(&primary, &secondary, CompositionPolicy::UnavailableOnly);
+        let out = composed
+            .fetch_metadata(
+                &req("https://example.com/meta"),
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap();
+        assert_eq!(out.success().unwrap().bytes(), b"fallback");
+        assert_eq!(primary.metadata_calls(), 1);
+        assert_eq!(secondary.metadata_calls(), 1);
+    }
+
+    #[test]
+    fn composition_default_does_not_retry_transport_failures() {
+        let primary = CountingTransport::new();
+        let secondary = CountingTransport::new();
+        primary.route("https://example.com/meta", FixtureResponse::failure("boom"));
+        secondary.route(
+            "https://example.com/meta",
+            FixtureResponse::body(b"secondary".to_vec()),
+        );
+        let composed =
+            ComposedTransport::new(&primary, &secondary, CompositionPolicy::UnavailableOnly);
+        let err = composed
+            .fetch_metadata(
+                &req("https://example.com/meta"),
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(err, AcquisitionError::Transport(_)));
+        assert_eq!(primary.metadata_calls(), 1);
+        assert_eq!(secondary.metadata_calls(), 0);
+    }
+
+    #[test]
+    fn composition_broad_policy_retries_transport_and_timeout() {
+        let primary = CountingTransport::new();
+        let secondary = CountingTransport::new();
+        primary.route("https://example.com/meta", FixtureResponse::failure("boom"));
+        secondary.route(
+            "https://example.com/meta",
+            FixtureResponse::body(b"recovered".to_vec()),
+        );
+        let composed = ComposedTransport::new(
+            &primary,
+            &secondary,
+            CompositionPolicy::UnavailableOrTransport,
+        );
+        let out = composed
+            .fetch_metadata(
+                &req("https://example.com/meta"),
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap();
+        assert_eq!(out.success().unwrap().bytes(), b"recovered");
+        assert_eq!(secondary.metadata_calls(), 1);
+
+        let p2 = CountingTransport::new();
+        let s2 = CountingTransport::new();
+        p2.route(
+            "https://example.com/slow",
+            FixtureResponse::slow(b"x".to_vec(), Duration::from_secs(30)),
+        );
+        s2.route(
+            "https://example.com/slow",
+            FixtureResponse::body(b"fast".to_vec()),
+        );
+        let composed2 = ComposedTransport::new(&p2, &s2, CompositionPolicy::UnavailableOrTransport);
+        let out2 = composed2
+            .fetch_metadata(
+                &req("https://example.com/slow"),
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap();
+        assert_eq!(out2.success().unwrap().bytes(), b"fast");
+    }
+
+    #[test]
+    fn composition_never_retries_terminal_conditions() {
+        // NotFound is terminal even under the broad policy.
+        let primary = CountingTransport::new();
+        let secondary = CountingTransport::new();
+        primary.route("https://example.com/missing", FixtureResponse::not_found());
+        secondary.route(
+            "https://example.com/missing",
+            FixtureResponse::body(b"other".to_vec()),
+        );
+        let composed = ComposedTransport::new(
+            &primary,
+            &secondary,
+            CompositionPolicy::UnavailableOrTransport,
+        );
+        let out = composed
+            .fetch_metadata(
+                &req("https://example.com/missing"),
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap();
+        assert!(out.is_not_found());
+        assert_eq!(secondary.metadata_calls(), 0);
+
+        // Cancellation is terminal.
+        let cancel = CancelFlag::new();
+        cancel.cancel();
+        let out = composed.fetch_metadata(&req("https://example.com/missing"), limits(), &cancel);
+        assert!(matches!(out, Err(AcquisitionError::Cancelled)));
+        assert_eq!(secondary.metadata_calls(), 0);
+
+        // TooLarge is terminal.
+        let p3 = CountingTransport::new();
+        let s3 = CountingTransport::new();
+        p3.route(
+            "https://example.com/big",
+            FixtureResponse::body(vec![0u8; 2048]),
+        );
+        s3.route(
+            "https://example.com/big",
+            FixtureResponse::body(b"small".to_vec()),
+        );
+        let c3 = ComposedTransport::new(&p3, &s3, CompositionPolicy::UnavailableOrTransport);
+        let err = c3
+            .fetch_metadata(
+                &req("https://example.com/big"),
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(err, AcquisitionError::TooLarge { .. }));
+        assert_eq!(s3.metadata_calls(), 0);
+
+        // InvalidInput is terminal (fails before either adapter).
+        let err = c3
+            .fetch_metadata(
+                &req("https://example.com/big"),
+                FetchLimits {
+                    max_metadata_bytes: 0,
+                    ..limits()
+                },
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(err, AcquisitionError::InvalidInput(_)));
+        assert_eq!(p3.metadata_calls(), 1);
+        assert_eq!(s3.metadata_calls(), 0);
+    }
+
+    #[test]
+    fn composition_artifact_fallback_preserves_no_clobber() {
+        let primary = CountingTransport::new();
+        let secondary = CountingTransport::new();
+        primary.route("https://example.com/app", FixtureResponse::unavailable());
+        secondary.route(
+            "https://example.com/app",
+            FixtureResponse::body(vec![9u8; 128]),
+        );
+        let composed =
+            ComposedTransport::new(&primary, &secondary, CompositionPolicy::UnavailableOnly);
+        let dir = temp_dir("acq-composed-artifact");
+        let dest = dir.join("app");
+        let out = composed
+            .fetch_artifact(
+                &req("https://example.com/app"),
+                &dest,
+                limits(),
+                &CancelFlag::new(),
+            )
+            .unwrap();
+        assert_eq!(out.success().unwrap().bytes_written, 128);
+        assert_eq!(primary.artifact_calls(), 1);
+        assert_eq!(secondary.artifact_calls(), 1);
+        assert_eq!(fs::read(&dest).unwrap().len(), 128);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

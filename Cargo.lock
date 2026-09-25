@@ -177,6 +177,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "eggup-curl"
+version = "0.1.1"
+dependencies = [
+ "eggup-acquisition",
+]
+
+[[package]]
 name = "eggup-eggfetch"
 version = "0.1.1"
 dependencies = [
@@ -205,6 +212,15 @@ dependencies = [
  "eggup-core",
  "windows-args",
  "windows-service",
+]
+
+[[package]]
+name = "eggup-transport-footprint"
+version = "0.1.1"
+dependencies = [
+ "eggup-acquisition",
+ "eggup-curl",
+ "eggup-eggfetch",
 ]
 
 [[package]]
