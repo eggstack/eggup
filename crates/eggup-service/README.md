@@ -38,6 +38,18 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
   caller-owned `PostInstallCheck`, and Core's `KeepInstalled` / `RollBack`
   policy. It requires an existing `Owned` registration in `Running` or
   `Stopped` state; it never installs or refreshes the registration.
+- `commit_with_disposition` (M006) generalizes orchestration with a
+  product-neutral `UpdateRuntimeDisposition::{ManagedRunning, ManagedStopped,
+  DirectRunning, Stopped, ForeignPreserved}`. Artifact commit authority and
+  manager mutation authority are separate facts: `ForeignPreserved` performs
+  zero manager mutation, `DirectRunning` uses only the caller-owned
+  `DirectRuntimeControl` seam (exact instance/config, bounded deadlines, no
+  health-protocol content), and `Stopped` fabricates no restart. Pure
+  `plan_unix` / `plan_windows` planners reproduce the reference decision
+  matrix without native managers. The disposition observed after preparation
+  is revalidated immediately before mutation; owned-to-foreign/unknown or
+  direct-identity changes fail before destructive action with zero further
+  mutation.
 - With `RestoreIntent::Preserve`, a stopped service stays stopped after
   success. `RestoreIntent` only controls the successful new generation; after
   a successful artifact rollback, orchestration restores the pre-update

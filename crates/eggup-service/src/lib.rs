@@ -8,8 +8,14 @@
 #![doc = "application health are separate. No privilege escalation, no updater or"]
 #![doc = "transport policy, and no shell interpolation live in this crate."]
 
+mod disposition;
 mod lifecycle_update;
 mod windows_scm;
+pub use disposition::{
+    commit_with_disposition, plan_unix, plan_windows, DirectObservation, DirectRuntimeControl,
+    DirectState, DispositionBaseline, KnownConfig, UnixPlannerInput, UpdateRuntimeDisposition,
+    WindowsPlannerInput, WindowsServiceState,
+};
 pub use lifecycle_update::{
     commit_with_lifecycle, LifecycleFailure, LifecycleRestorationStatus, LifecycleUpdateError,
     LifecycleUpdatePhase, LifecycleUpdatePolicy, LifecycleUpdateReceipt, NoPostInstallCheck,

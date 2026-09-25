@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 006 — Daemon Update Disposition and Reference Qualification
 
-Status: ready for handoff
+Status: implemented (closed; see `plans/closure/service-lifecycle/006-status.md`)
 
 Repository baseline: `881c95ff069d3d465a282cb6a495ba6fcb70cb6f`
 

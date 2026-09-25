@@ -11,6 +11,18 @@
   No `eggup-core` change; no Gregg modification or dependency. No publication
   or consumer migration performed.
 
+- Service M006 (unpublished): product-neutral `UpdateRuntimeDisposition`
+  (`ManagedRunning`, `ManagedStopped`, `DirectRunning`, `Stopped`,
+  `ForeignPreserved`) with pure `plan_unix`/`plan_windows` reference planners,
+  caller-owned `DirectRuntimeControl` seam, and `commit_with_disposition`
+  orchestration reusing Core M007 `KeepInstalled | RollBack` / `RecoveryRequired`
+  semantics. Artifact authority and manager mutation authority are separate;
+  `ForeignPreserved` performs zero manager mutation and `DirectRunning` uses
+  only exact direct control. Preparation precedes quiescence and authority is
+  revalidated immediately before mutation. Existing `commit_with_lifecycle`
+  behavior is preserved. No Gregg modification, migration, or dependency. No
+  publication or consumer migration performed.
+
 ## 0.1.1
 
 - `eggup-core`: added ADR-0002 post-commit policy via
