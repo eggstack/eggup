@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M004 closed; M005 curl adapter and transport composition ready for handoff
+Status: M001-M005 closed
 
 Long-term references:
 
@@ -67,7 +67,7 @@ Post-closure review then found two narrower correctness gaps tracked by M004:
 - `FetchLimits::new` validates limits, but the struct fields remain public, so direct struct literals can bypass validation unless each transport revalidates at its trust boundary;
 - no-clobber promotion hard-links the complete temp to `dest` and then returns `Err` if unlinking the redundant temp fails, which can report ordinary failure after a complete destination already exists.
 
-M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` now supplies the real-consumer evidence previously required for M005: Gregg deliberately uses a bounded external `curl` updater path to avoid forcing an embedded HTTP/TLS stack. M005 is therefore ready as an upstream Eggup capability; Gregg itself remains untouched.
+M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` supplied the real-consumer evidence previously required for M005: Gregg deliberately uses a bounded external `curl` updater path to avoid forcing an embedded HTTP/TLS stack. M005 is closed at `plans/closure/acquisition-transport/005-status.md` with `eggup-curl`, `Unavailable`, and explicit `ComposedTransport` composition; Gregg itself remains untouched and undepended on.
 
 ## 5. Target architecture
 
@@ -173,4 +173,4 @@ The subsystem's primary path is complete when the corrected native Eggfetch path
 | M002 | closed; post-closure findings fed M003 | `plans/implementation/acquisition-transport/002-eggfetch-adapter.md` | `plans/closure/acquisition-transport/002-status.md` | — |
 | M003 | closed; post-closure findings feed M004 | `plans/implementation/acquisition-transport/003-contract-and-tempfile-hardening-corrective.md` | `plans/closure/acquisition-transport/003-status.md` | — |
 | M004 | closed | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | `plans/closure/acquisition-transport/004-status.md` | — |
-| M005 | ready for handoff | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | — | M004 closed; Gregg reference evidence recorded |
+| M005 | closed | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | `plans/closure/acquisition-transport/005-status.md` | — |
