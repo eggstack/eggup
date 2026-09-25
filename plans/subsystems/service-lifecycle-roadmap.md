@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M005 closed; M006 daemon-update disposition/reference qualification ready for handoff
+Status: M001-M006 closed
 
 Long-term references:
 
@@ -70,7 +70,7 @@ M004 closed Windows SCM registration, ownership, start/stop/restart, and uninsta
 
 The owned-manager orchestration milestone, M005, is closed. It consumes Core M007's ADR-0002 `KeepInstalled | RollBack` choice while a coherent new artifact generation remains live and rollback evidence is retained. See `plans/closure/service-lifecycle/005-status.md` and `plans/closure/verified-update-core/007-status.md` for qualification evidence and limits.
 
-Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` exposes a mature daemon-update distinction not yet represented by M005: managed-running, managed-stopped, direct-running, stopped, and foreign-manager-preserved states, with exact executable/config identity and a post-preparation revalidation barrier. M006 is ready to generalize and test those semantics in Eggup without modifying or depending on Gregg.
+Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` exposed a mature daemon-update distinction not represented by M005. M006 is closed at `plans/closure/service-lifecycle/006-status.md`, generalizing managed-running, managed-stopped, direct-running, stopped, and foreign-manager-preserved states with exact executable/config identity and a post-preparation revalidation barrier, without modifying or depending on Gregg.
 
 ## 5. Target architecture
 
@@ -153,11 +153,11 @@ Implemented by `plans/closure/service-lifecycle/005-status.md`. Eggsearch M003 r
 
 Plan: `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md`.
 
-Status: ready for handoff.
+Status: closed; see `plans/closure/service-lifecycle/006-status.md`.
 
 Hard dependencies: service M005 and verified-update-core M007 closure (both closed).
 
-Generalize the daemon update decision model using greggd only as a read-only behavioral oracle. Separate artifact commit authority from service-manager mutation authority; add product-neutral managed-running / managed-stopped / direct-running / stopped / foreign-preserved dispositions; revalidate exact executable/config/runtime authority after preparation and immediately before mutation; and preserve M005 `KeepInstalled | RollBack` / RecoveryRequired behavior. No Gregg migration or dependency is allowed in M006.
+Generalized the daemon update decision model using greggd only as a read-only behavioral oracle. Artifact commit authority and service-manager mutation authority are separate; product-neutral managed-running / managed-stopped / direct-running / stopped / foreign-preserved dispositions; exact executable/config/runtime authority revalidated after preparation and immediately before mutation; M005 `KeepInstalled | RollBack` / RecoveryRequired behavior preserved. No Gregg migration or dependency.
 
 ## 8. Cross-cutting requirements
 
@@ -184,4 +184,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M003 | closed | `plans/implementation/service-lifecycle/003-unix-adapter-correctness-security-corrective.md` | `plans/closure/service-lifecycle/003-status.md` | — |
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
 | M005 | closed | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | `plans/closure/service-lifecycle/005-status.md` | — |
-| M006 | ready for handoff | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | — | M005 + Core M007 closed; Gregg reference only |
+| M006 | closed | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | — |
