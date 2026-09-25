@@ -59,6 +59,7 @@ mod tests {
     use std::collections::HashMap;
     use std::fs;
     use std::path::Path;
+    #[cfg(unix)]
     use std::time::Duration;
 
     struct FixedVerifier(Ownership);

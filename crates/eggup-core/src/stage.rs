@@ -2,7 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::domain::{ArtifactMember, InstallPlan, PermissionsIntent};
+#[cfg(unix)]
+use crate::domain::PermissionsIntent;
+use crate::domain::{ArtifactMember, InstallPlan};
 use crate::error::{Error, Result};
 
 static NEXT_STAGE_ID: AtomicU64 = AtomicU64::new(0);

@@ -659,6 +659,7 @@ mod tests {
     use eggup_acquisition::{FixtureResponse, FixtureTransport};
     use std::io::{Read, Write};
     use std::net::TcpListener;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     use std::thread;
 
@@ -748,9 +749,16 @@ mod tests {
         )
     }
 
-    /// Minimal fake curl executable: parses `--output <path>`, writes a fixed
-    /// body, and prints a fixed HTTP code to stdout. Records argv/env for
-    /// policy assertions.
+    /// Minimal fake curl executable (Unix-only): parses `--output <path>`,
+    /// writes a fixed body, and prints a fixed HTTP code to stdout. Records
+    /// argv/env for policy assertions.
+    ///
+    /// Unix-only because it relies on `sh` + `xxd` and Unix executable-mode
+    /// setup. Windows exercises the same transport paths through the real
+    /// `curl.exe` integration tests and the platform-neutral unit tests below;
+    /// shell-dependent fake-child tests are `#[cfg(unix)]`-gated, never the
+    /// whole module.
+    #[cfg(unix)]
     fn fake_curl_script(body: &[u8], code: &str, exit: i32, record_dir: &Path) -> PathBuf {
         let dir = record_dir.to_path_buf();
         let script = dir.join(format!(
@@ -906,6 +914,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     #[test]
     fn tls_like_process_failure_is_transport_not_unavailable() {
         let dir = temp_dir("curl-tls");
@@ -1083,6 +1092,7 @@ mod tests {
         assert!(matches!(err, AcquisitionError::Transport(_)));
     }
 
+    #[cfg(unix)]
     #[test]
     fn proxy_disabled_uses_noproxy_and_cleared_env() {
         let dir = temp_dir("curl-proxy");
@@ -1100,6 +1110,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     #[test]
     fn proxy_custom_env_is_explicit() {
         let dir = temp_dir("curl-proxy-custom");
@@ -1121,6 +1132,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     #[test]
     fn artifact_temp_is_owner_private_and_no_clobber() {
         let dir = temp_dir("curl-perms");
@@ -1168,6 +1180,7 @@ mod tests {
         let _ = fs::remove_dir_all(&work);
     }
 
+    #[cfg(unix)]
     #[test]
     fn credential_material_is_redacted() {
         let dir = temp_dir("curl-redact");
@@ -1184,6 +1197,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     #[test]
     fn invalid_limits_fail_before_spawn() {
         let dir = temp_dir("curl-invalid");
