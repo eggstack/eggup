@@ -2,7 +2,7 @@
 
 Status: active
 
-Last implementation baseline reviewed: `1c601f29a16c952e90feaeebd0fa654401b54a86` (acquisition M006 Windows-portability corrective implementation; hosted matrix green on run `36176009068`; closure/docs reconciliation follows in the same handoff)
+Latest reviewed repository baseline: `8e3971e7f5cd8e71949a1a6743061a2869af04f2` (acquisition M006 corrective closure/docs head; implementation `1c601f29a16c952e90feaeebd0fa654401b54a86`; hosted matrix green on runs `36176009068` and `36176524748`)
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
@@ -97,7 +97,7 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 | Service lifecycle | M001-M006 closed | hosted workspace qualification reconciled through acquisition M006 (green run `36176009068`) |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
 | Eggpack manifest interoperability | active; M003 bounded qualification recorded | real-consumer adoption blocked on producer convention |
-| Consumer adoption | simple, eggsearch, and CodeGG M005 closed | Gregg remains footprint-gated |
+| Consumer adoption | simple, eggsearch, and CodeGG M005 closed | Gregg M004 prerequisites satisfied; plan intentionally unwritten |
 
 ## Dependency-ready implementation work
 
