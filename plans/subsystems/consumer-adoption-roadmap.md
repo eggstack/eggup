@@ -14,6 +14,7 @@ Related ADRs:
 - `plans/adrs/ADR-0002-multi-artifact-transaction-and-rollback.md`
 - `plans/adrs/ADR-0003-verification-layers-and-transport-neutrality.md`
 - `plans/adrs/ADR-0004-eggpack-producer-eggup-consumer-boundary.md`
+- `plans/adrs/ADR-0005-local-archive-extraction-safety-contract.md`
 
 ## 1. Purpose and ownership boundary
 
@@ -111,7 +112,7 @@ qualified core M006 + acquisition M004
                     |
                     +--> multi-artifact consumer evidence
 
-M006 Egress remains independently blocked on the generic consumer-side archive extraction/update contract.
+M006 Egress remains blocked on Archive Extraction M001 closure. The extraction contract is now explicitly planned rather than an unnamed Phase 10 prerequisite.
 
 M007 EggPool selective adoption is independent/evidence-driven after core maturity.
 ```
@@ -167,7 +168,9 @@ This milestone does not depend on core M007 because CodeGG requires immediate ve
 
 ### M006 — Egress archive/pair adoption
 
-Prove archive/member and two-binary transactional semantics.
+Status: blocked on `plans/subsystems/archive-extraction-roadmap.md` M001.
+
+After Archive Extraction M001 closes, author the Egress consumer plan to replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
 
 ### M007 — EggPool selective adoption
 
@@ -198,5 +201,5 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | writable; plan intentionally unwritten | — | — | prerequisites satisfied (acquisition M005+M006 + service M006 closed, hosted matrix green); no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
-| M006 Egress | blocked | — | — | archive update/extraction transaction contract |
+| M006 Egress | blocked | — | — | archive extraction M001 closure |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
