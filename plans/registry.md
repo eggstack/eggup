@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: pending final registration commit for Archive M001b (handle-bound cleanup + Windows portability); Egress M006 and Eggpack M002 are re-blocked until M001b closes
+Latest planning registration head: `81e50e339c33f578e5c08acaf4319cac58403384` (Archive M001b registered; M001a superseded; M008 hosted qualification pending; Egress M006 and Eggpack M002 re-blocked)
 
 Latest reviewed runtime head: `4fb9d8ca1c1c46fa4b4a2976e6fde3a38f51abdb`. Hosted CI run `36220815378`: Stable/MSRV/macOS passed; Windows failed compiling `eggup-archive` at unstable `MetadataExt::file_index()` before archive/acquisition/curl tests could execute. Archive M001a is historical/superseded by M001b. Acquisition M008 implementation remains valid but final hosted closure qualification is pending a fresh full matrix.
 
