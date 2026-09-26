@@ -674,14 +674,15 @@ fn classify_curl_result(
             return Err(AcquisitionError::TooLarge { limit: max_bytes });
         }
         Some(0) => {}
-        Some(_) | None => {
+        failure @ (Some(_) | None) => {
             // Any non-zero curl exit means the transfer did not complete
             // (partial body, TLS, connect, resolve). Even when curl still
             // prints an HTTP code, the body is incomplete and must not be
             // promoted. Report an ordinary transport failure.
             eggup_acquisition::__remove_owned_temp(output);
             return Err(AcquisitionError::Transport(bound(format!(
-                "curl transfer failed for {redacted}"
+                "curl transfer failed (exit {}) for {redacted}",
+                failure.map_or_else(|| "unknown".to_string(), |code| code.to_string())
             ))));
         }
     }
