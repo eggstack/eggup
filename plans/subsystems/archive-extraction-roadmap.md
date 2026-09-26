@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001 ready
+Status: active; M001 closed; Egress and Eggpack handoffs ready to author
 
 Long-term references:
 
@@ -74,7 +74,7 @@ CodeGG M005 is closed using CodeGG-owned strict extraction of one verified archi
 
 Egress currently publishes one version-aligned archive containing `eggress` and `pproxy`: tar.gz on Linux/macOS and zip on Windows. Its updater verifies the archive SHA-256, extracts both staged executables, verifies both versions, then replaces the pair as one release unit. This is the concrete Phase 10 consumer pattern.
 
-Eggpack `eggup-eggpack` already preserves archive artifact size/digest plus declared member source/install/size/digest facts, but returns `ArchiveExtractionRequired`. Interoperability M002 is therefore blocked only on a qualified local extraction contract, not on manifest projection.
+Eggpack `eggup-eggpack` already preserves archive artifact size/digest plus declared member source/install/size/digest facts, but returns `ArchiveExtractionRequired`. With M001 closed, interoperability M002 can define the handoff without adding archive dependencies to lower layers.
 
 Current generic archive APIs are useful primitives but do not by themselves satisfy Eggup's contract. Tar's safer `unpack_in` path can overwrite existing output; Zip's `enclosed_name` helps contain paths, while convenience extraction can overwrite files and support links. Eggup needs explicit iteration, allowlisting, no-clobber, and bounds.
 
@@ -113,7 +113,7 @@ eggup-core prepare/verify/validate/commit
 core M007 [closed] + acquisition M006 [closed]
               |
               v
-archive M001 bounded allowlisted extraction [READY]
+archive M001 bounded allowlisted extraction [CLOSED]
               |
               +--> consumer adoption M006 Egress
               |
@@ -130,13 +130,15 @@ Implement the optional extraction layer with tar.gz + zip evidence, regular-file
 
 ### M002 — Egress real-consumer archive/pair adoption
 
-Blocked until M001 closes.
+Ready to author now that M001 is closed. This roadmap does not authorize or
+replace the separate consumer-adoption plan.
 
 Adopt the generic extraction output plus Eggup's existing multi-artifact transaction in Egress while preserving Egress-owned release/version/origin/candidate/CLI policy. Delete duplicated generic extraction/rollback machinery only after parity is qualified.
 
 ### M003 — Eggpack archive projection handoff
 
-Blocked until M001 closes.
+Ready to author now that M001 is closed. This roadmap does not authorize or
+replace the separate Eggpack interoperability plan.
 
 Connect `ManifestProjection::Archive` member evidence to the extraction contract without putting archive policy or producer authority into lower Eggup layers.
 
@@ -177,6 +179,6 @@ The subsystem is mature when Egress has removed its duplicated generic archive/p
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 bounded allowlisted extraction | ready | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | — | — |
-| M002 Egress adoption | blocked | — | — | M001 closure |
-| M003 Eggpack archive handoff | blocked | — | — | M001 closure |
+| M001 bounded allowlisted extraction | closed | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
+| M002 Egress adoption | ready to author | — | — | M001 closed |
+| M003 Eggpack archive handoff | ready to author | — | — | M001 closed |

@@ -112,7 +112,7 @@ qualified core M006 + acquisition M004
                     |
                     +--> multi-artifact consumer evidence
 
-M006 Egress remains blocked on Archive Extraction M001 closure. The extraction contract is now explicitly planned rather than an unnamed Phase 10 prerequisite.
+M006 Egress was blocked on Archive Extraction M001. With M001 closed, author a bounded Egress consumer plan before changing that repository; the extraction contract is no longer an unnamed Phase 10 prerequisite.
 
 M007 EggPool selective adoption is independent/evidence-driven after core maturity.
 ```
@@ -168,9 +168,9 @@ This milestone does not depend on core M007 because CodeGG requires immediate ve
 
 ### M006 — Egress archive/pair adoption
 
-Status: blocked on `plans/subsystems/archive-extraction-roadmap.md` M001.
+Status: ready to author; archive extraction M001 is closed. No Egress migration plan is written here.
 
-After Archive Extraction M001 closes, author the Egress consumer plan to replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
+Now that Archive Extraction M001 is closed, author the Egress consumer plan to replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
 
 ### M007 — EggPool selective adoption
 
@@ -201,5 +201,5 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | writable; plan intentionally unwritten | — | — | prerequisites satisfied (acquisition M005+M006 + service M006 closed, hosted matrix green); no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
-| M006 Egress | blocked | — | — | archive extraction M001 closure |
+| M006 Egress | ready to author | — | `plans/closure/archive-extraction/001-status.md` | write bounded consumer-adoption plan |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
