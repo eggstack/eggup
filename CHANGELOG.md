@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Archive M001c write half (unpublished, Section 14 stop; continued by
+  M001d): declared tar/zip member files are now created through the
+  retained extraction-root handle (`fs_at` write + create-new + no-follow
+  via `open_at`, `0600` on Unix, one shared authority object) instead of
+  `root.join(output_name)` + pathname creation. Deterministic
+  rename/replacement races prove foreign state stays untouched. No new
+  dependency and no public API change. Known limit: the recorded member
+  pathname is handoff evidence only and can go stale after a root rename;
+  Egress M006 and Eggpack M002 stay blocked on the M001d handle-backed
+  source handoff. No publication or consumer migration performed.
+
 - Archive M001b (unpublished corrective, supersedes M001a cleanup): recursive
   cleanup is now authorized by a retained directory handle rather than a
   pathname identity check. The extraction root is created via `mkdir_at` from

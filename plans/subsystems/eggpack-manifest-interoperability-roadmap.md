@@ -178,7 +178,7 @@ Implementation plan: `plans/implementation/eggpack-manifest-interoperability/001
 
 ### M002 — Archive extraction handoff
 
-Status: blocked on Archive Extraction M001c. M001b remains closed for cleanup authority, but the post-closure materialization-authority finding must close before archive integration. No archive integration is implemented by this status update.
+Status: blocked on Archive Extraction M001d. M001b remains closed for cleanup authority and M001c implemented handle-relative write authority, but the path-only source handoff stopped under M001c Section 14 (continued by M001d). No archive integration is implemented by this status update.
 
 Connect `ManifestProjection::Archive` evidence to the qualified local extraction layer and then to ArtifactSet construction. Do not put archive format dependencies into `eggup-core` and do not make `eggup-eggpack` itself a live-destination extractor.
 
@@ -244,6 +244,6 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 |---|---|---|---|---|
 | M001 ReleaseManifest v1 direct/bundle adapter | closed (historical) | plans/implementation/eggpack-manifest-interoperability/001-release-manifest-v1-adapter.md | plans/closure/eggpack-manifest-interoperability/001-status.md | post-closure qualification/scope findings tracked by M001a |
 | M001a adapter qualification + closure hardening | closed | plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md | plans/closure/eggpack-manifest-interoperability/001a-status.md | — |
-| M002 archive extraction handoff | blocked | — | — | Archive Extraction M001c closure |
+| M002 archive extraction handoff | blocked | — | — | Archive Extraction M001d closure |
 | M003 Eggsact real-consumer manifest adoption | blocked after bounded adapter/API qualification | plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md | plans/closure/eggpack-manifest-interoperability/003-status.md | producer-owned Eggsact artifact mapping and ReleaseManifest publication convention are absent |
 | M004 package/API promotion | blocked | — | — | M003 real adoption must close and eggpack-manifest must have a publishable version |

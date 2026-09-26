@@ -1,6 +1,6 @@
 # Planning / Closure Hygiene Corrective C005 — Post-M001b Materialization Gate Reconciliation
 
-Status: ready for handoff
+Status: implemented
 
 Repository baseline: `d46d35e891bbbc72fced3213ea28fdd6b1ec5ed9`
 

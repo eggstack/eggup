@@ -145,3 +145,11 @@ Archive M001 remains historically closed; M001a remains historical/superseded (i
 - Consumer Adoption M006 Egress: blocked → ready to author.
 - Eggpack Interoperability M002: blocked → ready to author.
 - Archive roadmap M002/M003 (Egress/Eggpack sides): blocked → ready to author.
+
+## Post-closure finding addendum (recorded by C005; M001b cleanup closure retained)
+
+M001b's handle-bound cleanup implementation and hosted qualification remain valid and closed — this addendum does not alter the requirement/evidence matrix above, which recorded tests that passed as passing.
+
+Later review (registered as Archive M001c, implemented in `09c953f`, closure `plans/closure/archive-extraction/001c-status.md`) found a separate materialization-authority gap in code M001b did not touch: declared member files were still created through `root.join(output_name)` + pathname `create_new` while cleanup already used the retained root handle. M001c moved every member write onto the retained handle (shared `ExtractionScope`, `fs_at` write/create-new/no-follow) and stopped under its Section 14 on the path-only handoff truthfulness half, continuing that half as Archive M001d (`plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md`).
+
+Downstream readiness is therefore re-gated: Egress M006 and Eggpack M002 are blocked on M001d closure, not on M001b. The "unblocked to ready-to-author" disposition in the original executive finding above is superseded by this addendum to that extent only.

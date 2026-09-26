@@ -3,6 +3,18 @@
 ## Unreleased
 
 - Add bounded, allowlisted extraction for verified local tar.gz and zip archives.
+- Handle-relative member materialization (M001c write half, unpublished):
+  tar and zip declared-member files are now created through the retained
+  extraction-root handle (`fs_at::OpenOptions` write + create-new +
+  no-follow via `open_at`, `0600` on Unix) instead of
+  `root.join(output_name)` + pathname creation. Both format handlers share
+  one `ExtractionScope` authority object; the returned member `File` is the
+  authoritative streaming/hashing target. Deterministic rename/replacement
+  races prove foreign directories, symlinks, and reparse points stay
+  untouched. No new dependency. Known limit: the recorded member pathname
+  remains handoff evidence only and can go stale after a root rename; the
+  handle-backed source handoff (M001d) is required before consumer
+  integration. No publication or consumer migration performed.
 - Handle-bound cleanup corrective (M001b, unpublished): replace
   pathname-authorized recursive cleanup with retained directory authority via
   `fs_at 0.2.1` (default features disabled). The extraction root is created

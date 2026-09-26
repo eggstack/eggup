@@ -1,6 +1,6 @@
 # Archive Extraction Milestone 001c — Handle-Relative Member Materialization Corrective
 
-Status: ready for handoff
+Status: implemented (Section 14 stop; closure records blocked status, continued by M001d)
 
 Repository baseline: `d46d35e891bbbc72fced3213ea28fdd6b1ec5ed9`
 

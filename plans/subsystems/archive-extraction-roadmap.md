@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001/M001a historical; M001b cleanup closed; M001c materialization-authority corrective ready; M002/M003 blocked
+Status: active; M001/M001a historical; M001b cleanup closed; M001c write half implemented with Section 14 handoff stop (blocked, continued by M001d); M001d ready; M002/M003 blocked
 
 Long-term references:
 
@@ -120,13 +120,17 @@ archive M001a owned-root cleanup authority [HISTORICAL; SUPERSEDED]
               |
               v
 archive M001b handle-bound cleanup + Windows portability [CLOSED via run 36222536670]
-               |
-               v
-archive M001c handle-relative member materialization [READY]
-               |
-               +--> consumer adoption M006 Egress [BLOCKED]
-               |
-               `--> Eggpack interoperability M002 archive handoff [BLOCKED]
+                |
+                v
+archive M001c handle-relative member materialization [BLOCKED: Section 14
+handoff stop; write half implemented in `09c953f`]
+                |
+                v
+archive M001d handle-backed source handoff [READY]
+                |
+                +--> consumer adoption M006 Egress [BLOCKED]
+                |
+                `--> Eggpack interoperability M002 archive handoff [BLOCKED]
 ```
 
 ## 7. Milestones
@@ -159,19 +163,27 @@ A later post-closure review found a separate materialization-authority gap: decl
 
 Plan: `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md`.
 
+Status: blocked under Section 14 stop; write half implemented (`09c953f`), closure `plans/closure/archive-extraction/001c-status.md`.
+
+Tar/zip member creation moved onto the retained root handle with exclusive no-follow `fs_at::open_at` semantics (Unix `0600`), with deterministic rename/replacement races proving foreign state stays untouched. The existing path-only handoff cannot prove namespace binding cross-platform (Windows stable has no file identity; portable identity documents false-positive equality; markers/digests/canonicalize are explicitly insufficient), so success can still record a stale pathname. M001c does not broaden `eggup-core` or weaken ADR-0005; the handle-backed handoff continues as M001d.
+
+### M001d — Handle-backed source handoff
+
+Plan: `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md`.
+
 Status: ready.
 
-Move tar/zip member creation onto the retained root handle with exclusive no-follow `fs_at::open_at` semantics and require truthful handoff if the root pathname is renamed/replaced. If the existing path-only handoff cannot prove namespace binding cross-platform, stop and surface the required API/ADR follow-up rather than weakening ADR-0005.
+Carry object-bound source authority (handle-carrying member, extraction-to-staging copy, or equivalent) from extraction into core staging so no staged byte is obtained by re-resolving a recorded pathname. Closes the M001c handoff stop; Egress M006 and Eggpack M002 re-gate on M001d.
 
 ### M002 — Egress real-consumer archive/pair adoption
 
-Blocked until M001c closes. This roadmap does not authorize or replace the separate consumer-adoption plan.
+Blocked until M001d closes. This roadmap does not authorize or replace the separate consumer-adoption plan.
 
 Adopt the generic extraction output plus Eggup's existing multi-artifact transaction in Egress while preserving Egress-owned release/version/origin/candidate/CLI policy. Delete duplicated generic extraction/rollback machinery only after parity is qualified.
 
 ### M003 — Eggpack archive projection handoff
 
-Blocked until M001c closes. This roadmap does not authorize or replace the separate Eggpack interoperability plan.
+Blocked until M001d closes. This roadmap does not authorize or replace the separate Eggpack interoperability plan.
 
 Connect `ManifestProjection::Archive` member evidence to the extraction contract without putting archive policy or producer authority into lower Eggup layers.
 
@@ -206,7 +218,7 @@ The third risk is dependency/footprint growth. Keep the crate optional and forma
 
 ## 11. Completion definition
 
-The subsystem is mature when M001b cleanup and M001c materialization authority are both closed with green hosted qualification, Egress has removed its duplicated generic archive/pair update mechanics, and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
+The subsystem is mature when M001b cleanup, M001c materialization write authority, and M001d handle-backed handoff are all closed with green hosted qualification, Egress has removed its duplicated generic archive/pair update mechanics, and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
 
 ## 12. Milestone status
 
@@ -215,6 +227,7 @@ The subsystem is mature when M001b cleanup and M001c materialization authority a
 | M001 bounded allowlisted extraction | closed historically | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
 | M001a owned-root cleanup authority | historical; superseded by M001b | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | `plans/closure/archive-extraction/001a-status.md` | remaining TOCTOU + Windows compile defect |
 | M001b handle-bound cleanup + Windows portability | closed | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md` | `plans/closure/archive-extraction/001b-status.md` | — |
-| M001c handle-relative member materialization | ready | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md` | — | — |
-| M002 Egress adoption | blocked | — | — | M001c closure |
-| M003 Eggpack archive handoff | blocked | — | — | M001c closure |
+| M001c handle-relative member materialization | blocked (Section 14 stop; write half implemented) | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md` | `plans/closure/archive-extraction/001c-status.md` | M001d handoff |
+| M001d handle-backed source handoff | ready | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | — | M001c stop |
+| M002 Egress adoption | blocked | — | — | M001d closure |
+| M003 Eggpack archive handoff | blocked | — | — | M001d closure |

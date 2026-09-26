@@ -19,7 +19,7 @@ ArchivePlan { format, declared members, finite limits }
 parse entries -> compare exact normalized paths -> regular files only
                 |
                 v
-private root + create_new 0600 files + streaming bounds + SHA-256
+private root + handle-relative create_new 0600 files + streaming bounds + SHA-256
                 |
                 v
 ExtractedArchive evidence -> caller prepares ArtifactSet/core transaction
@@ -67,7 +67,9 @@ subsequent reads; extraction makes no crash-durability or restart guarantee.
 
 The selected output parent must already be a real directory. Extraction creates
 one exclusive sibling root (`mkdir_at` from the parent handle, `0700` on Unix)
-and creates each file with no-clobber semantics (`0600` on Unix). It never
+and creates each declared member file relative to the retained root handle
+(`fs_at` write + create-new + no-follow via `open_at`, `0600` on Unix; one
+shared `ExtractionScope` authority object for tar and zip). It never
 creates install-root parents or writes into the live installation. The root
 `File` handle is retained through `DirectoryGuard` into `PersistedExtraction`;
 recursive cleanup deletes only through that handle via `fs_at` `*at`
@@ -76,6 +78,13 @@ portable object-bound root unlink exists, explicit cleanup empties only the
 owned tree and reports the now-empty directory as `CleanupFailed` residue;
 drop best-effort empties the same way. Extraction failure preserves the
 original error category and attaches the empty-residue path.
+
+Known limit (M001c Section 14 stop, continued by M001d): the recorded member
+pathname is handoff evidence only, not write authority. A mid-extraction root
+rename leaves bytes in the handle-owned directory while the recorded path
+dangles into the replacement, and no stable cross-platform proof rebinds it;
+the handle-backed source handoff (M001d) must land before Egress M006 or
+Eggpack M002 integrate.
 
 `ExtractedArchive` cleans itself on drop, which is safe for unused results.
 After the caller has prepared/copied the members into a later transaction, it
