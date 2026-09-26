@@ -1,6 +1,6 @@
 # Archive Extraction Milestone 001a — Owned-Root Cleanup Authority Corrective
 
-Status: ready for handoff
+Status: implemented historically; superseded by M001b corrective
 
 Repository baseline: `ea51fe12a7c9120028b727eb5e40411e9b10f8e2`
 
