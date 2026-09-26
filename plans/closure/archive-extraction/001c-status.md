@@ -10,7 +10,7 @@ Reviewed repository baseline: `1388a02356dfa01d72c63c97c1baca09ff6004a1` (pre-im
 
 Implementation commit: `09c953fe1fe512717584bb3e5509e79da894b35a` — handle-relative member materialization via retained root handle; shared `ExtractionScope` authority object; `fs_at` write/create-new/no-follow `create_private_file_at` with Unix `0600`; deterministic rename/replacement race seam plus tar/zip/before/between/symlink/raced-output tests; no new dependency.
 
-Hosted qualification: pending — local Stable + Rust 1.89 MSRV evidence is green (see commands below); a fresh hosted Stable/MSRV/macOS/Windows matrix is still required for the write-authority half and will be recorded here as a supplement. The stop outcome itself does not require hosted evidence: it follows from stable-API analysis, not test results.
+Hosted qualification: green — CI run `36257884083` on the docs-batch head (implementation `09c953f` plus this closure batch): Stable Linux (fmt/clippy/full workspace tests/docs), Rust 1.89 MSRV all-target check, macOS full workspace tests, and Windows archive/acquisition/curl/service portable tests plus workspace check all passed. This qualifies the write-authority half; the Section 14 stop outcome is unchanged (it follows from stable-API analysis, now with hosted confirmation that the write half introduces no platform regression).
 
 ## Executive finding
 
@@ -79,7 +79,14 @@ cargo tree -p eggup-core --locked                                passed; sha2 on
 git diff --check                                                passed
 ```
 
-Hosted CI: pending. A fresh Stable/MSRV/macOS/Windows matrix will be required for the write-authority half; its run ID and job conclusions will be appended here as a supplement. The Section 14 stop does not depend on that matrix.
+Hosted CI run `36257884083` (docs-batch head containing implementation `09c953f`):
+
+- Stable Linux: fmt/clippy/full workspace tests/docs passed.
+- MSRV Linux: Rust 1.89 workspace all-target check passed.
+- macOS: full workspace tests passed.
+- Windows: archive/acquisition/curl/service portable tests plus workspace all-target check passed.
+
+The Section 14 stop stands with hosted confirmation of the write half.
 
 ## Invariant review
 
@@ -117,7 +124,7 @@ The M001c write-redirection TOCTOU (`root.join(output_name)` + pathname `create_
 ## Unresolved findings
 
 - Medium: successful `ExtractedArchive` can record a stale/foreign `ExtractedMember::path()` after a mid-extraction root rename/replacement, and a later path-based staging open could follow it. Owner: Archive M001d (handle-backed source handoff). Not downgraded; Egress M006 and Eggpack M002 stay blocked.
-- Informational: hosted write-authority matrix still pending; will be appended as a supplement without changing the stop outcome.
+- Informational: none pending — hosted write-authority matrix is green (`36257884083`).
 - Informational: Windows reparse race coverage stays best-effort (privilege-gated symlink creation with graceful fallback), same posture as M001b.
 
 ## Roadmap disposition and downstream unblock
