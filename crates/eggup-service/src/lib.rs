@@ -3251,7 +3251,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod unix_tests {
     use super::*;
     use std::path::PathBuf;
