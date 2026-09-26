@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: pending final registration commit for Archive M001c + planning-hygiene C005 (M001c materialization authority ready; Egress M006 and Eggpack M002 re-blocked)
+Latest planning registration head: `ae383d89f2aa61c56dad4811d38ca0d33816706c` (Archive M001c + planning-hygiene C005 registered; Egress M006 and Eggpack M002 re-blocked)
 
 Latest reviewed runtime/documentation head: `d46d35e891bbbc72fced3213ea28fdd6b1ec5ed9`. Current-head CI run `36222870057` passed. Archive M001b remains closed for cleanup authority and Acquisition M008 remains closed. Post-closure review found member materialization still pathname-authorized; Archive M001c is the active runtime corrective. Planning-hygiene C005 is ready to reconcile stale closure/registry prose.
 
