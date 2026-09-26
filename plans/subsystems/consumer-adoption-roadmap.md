@@ -112,7 +112,7 @@ qualified core M006 + acquisition M004
                     |
                     +--> multi-artifact consumer evidence
 
-M006 Egress may be authored now that Archive Extraction M001b has closed (see `plans/closure/archive-extraction/001b-status.md`; hosted run `36222536670`). The bounded Egress consumer plan replaces duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction while preserving Egress-owned release/version/origin/candidate/CLI policy.
+M006 Egress is re-blocked on Archive Extraction M001c. M001b's cleanup authority remains closed, but post-closure review found declared member creation still pathname-authorized; Egress must not adopt the archive boundary until M001c closes.
 
 M007 EggPool selective adoption is independent/evidence-driven after core maturity.
 ```
@@ -168,9 +168,9 @@ This milestone does not depend on core M007 because CodeGG requires immediate ve
 
 ### M006 — Egress archive/pair adoption
 
-Status: ready to author on Archive Extraction M001b closure; no Egress migration plan is written here.
+Status: blocked on Archive Extraction M001c; no Egress migration plan is written here.
 
-After M001b closure with green hosted matrix `36222536670`, author the Egress consumer plan to replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
+After M001c closes with green hosted qualification, author the Egress consumer plan to replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
 
 ### M007 — EggPool selective adoption
 
@@ -201,5 +201,5 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | writable; plan intentionally unwritten | — | — | prerequisites satisfied (acquisition M005+M006 + service M006 closed, hosted matrix green); no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
-| M006 Egress | ready to author | — | — | M001b closed |
+| M006 Egress | blocked | — | — | Archive Extraction M001c closure |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
