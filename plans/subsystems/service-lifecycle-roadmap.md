@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M006 closed; hosted cross-workspace qualification reconciled via acquisition M006
+Status: M001-M006 closed; M007 UTF-8 diagnostic corrective ready
 
 Long-term references:
 
@@ -72,6 +72,8 @@ The owned-manager orchestration milestone, M005, is closed. It consumes Core M00
 
 Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` exposed a mature daemon-update distinction not represented by M005. M006 is closed at `plans/closure/service-lifecycle/006-status.md`, generalizing managed-running, managed-stopped, direct-running, stopped, and foreign-manager-preserved states with exact executable/config identity and a post-preparation revalidation barrier, without modifying or depending on Gregg.
 
+A 2026-09-26 post-closure audit opened narrow corrective M007: several production bounded-diagnostic helpers use fixed-byte `String::truncate` and can panic when a multibyte UTF-8 code point crosses the 256/512-byte limit. M007 changes no lifecycle state-machine semantics.
+
 ## 5. Target architecture
 
 The service crate exposes manager-neutral types plus platform adapters. Consumer-supplied specifications identify exact executable/config arguments and optional health behavior.
@@ -104,6 +106,9 @@ core M007 deferred finalization ---+
                                v
                      M006 daemon disposition + revalidation [closed; evidence reconciled via acquisition M006]
                      (Gregg reference only; no migration)
+                               |
+                               v
+                     M007 UTF-8 bounded diagnostics [READY]
 ```
 
 ## 7. Milestones
@@ -159,6 +164,14 @@ Hard dependencies: service M005 and verified-update-core M007 closure (both clos
 
 Generalized the daemon update decision model using greggd only as a read-only behavioral oracle. Artifact commit authority and service-manager mutation authority are separate; product-neutral managed-running / managed-stopped / direct-running / stopped / foreign-preserved dispositions; exact executable/config/runtime authority revalidated after preparation and immediately before mutation; M005 `KeepInstalled | RollBack` / RecoveryRequired behavior preserved. No Gregg migration or dependency.
 
+### M007 — UTF-8-safe bounded diagnostics corrective
+
+Plan: `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md`.
+
+Status: ready.
+
+Replace panic-capable fixed-byte string truncation in production service diagnostics with UTF-8-boundary-safe byte bounding while preserving existing limits and all M005/M006 lifecycle behavior.
+
 ## 8. Cross-cutting requirements
 
 No destructive action on Foreign/Unknown. Permission errors return remediation rather than escalating. Service definition rendering must reject unsafe control characters/path ambiguity.
@@ -173,7 +186,7 @@ System-level versus user-level service registration differs across consumers. Us
 
 ## 11. Completion definition
 
-Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration.
+Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 must close the bounded-diagnostic panic gap before the subsystem returns to a fully qualified state.
 
 ## 12. Milestone status
 
@@ -185,3 +198,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
 | M005 | closed | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | `plans/closure/service-lifecycle/005-status.md` | — |
 | M006 | closed; hosted evidence reconciled via acquisition M006 | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | — |
+| M007 | ready | `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md` | — | — |
