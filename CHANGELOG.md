@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Archive M001b (unpublished corrective, supersedes M001a cleanup): recursive
+  cleanup is now authorized by a retained directory handle rather than a
+  pathname identity check. The extraction root is created via `mkdir_at` from
+  the parent handle and its `File` handle is carried through `DirectoryGuard`
+  into `PersistedExtraction`; content deletion uses only `fs_at 0.2.1`
+  handle-relative operations and never recursively traverses the replacement
+  pathname. This removes the stable-Windows dependency on nightly
+  `MetadataExt::file_index()` and closes the M001a check-then-`remove_dir_all`
+  window. No portable object-bound root unlink exists, so explicit cleanup
+  empties only the owned tree and returns `CleanupFailed` with the now-empty
+  directory as residue; drop best-effort empties the same way. Extraction
+  failure preserves its original category with the empty-residue path.
+  `ExtractedArchive`/`PersistedExtraction` are now `Send` but not `Sync`. No
+  `eggup-core` change. No publication or consumer migration performed.
+
 - Archive M001a (unpublished corrective): extraction cleanup is now
   authorized by retained filesystem identity rather than a bare pathname.
   `DirectoryGuard` and `PersistedExtraction` carry the captured `(dev, ino)`

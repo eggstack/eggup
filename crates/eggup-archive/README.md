@@ -6,18 +6,27 @@ path, per-member, aggregate decompressed-byte, and archive-file bounds.
 
 The extractor writes only declared regular files into one exclusive private
 directory. It uses exclusive file creation, never overwrites, hashes while
-streaming, checks expected size/digest facts when supplied, and removes its
+streaming, checks expected size/digest facts when supplied, and empties its
 owned incomplete directory after failure. Dropping an unused extraction result
-cleans it; `persist()` transfers cleanup responsibility (and the captured
-identity evidence) to the caller.
+best-effort empties it; `persist()` transfers cleanup responsibility (and the
+retained directory handle) to the caller.
 
-Cleanup is authorized by retained filesystem identity rather than a bare
-pathname: the captured `(dev, ino)` on Unix or `file_index` on Windows is
-revalidated before any recursive deletion. A foreign directory or symlink
-that occupies the original pathname after rename/replace cannot be
-recursively deleted; cleanup fails closed with residue evidence. Drop
-cleanup uses the same identity-checked primitive and never falls back to
-`fs::remove_dir_all(path)`.
+Cleanup is authorized by a retained directory handle, not by a pathname
+check: the extraction root is created via `mkdir_at` from the parent handle
+(mode `0700` on Unix) and the returned `File` handle is carried through
+`DirectoryGuard` into `PersistedExtraction`. Recursive content deletion uses
+only `fs_at` handle-relative operations (`read_dir`, `open_dir_at`,
+`unlink_at`, `rmdir_at`); symlinks and reparse points are unlinked, never
+followed. No recursive operation traverses the replacement pathname, so a
+foreign directory, file, symlink, or reparse point installed after any handle
+operation cannot be recursively deleted. No object-bound root unlink exists
+on all supported platforms, so explicit cleanup empties only the owned tree
+and reports the now-empty directory as `CleanupFailed` residue instead of
+recursively touching the pathname; drop best-effort empties the same way and
+never falls back to `fs::remove_dir_all(path)`.
+
+`ExtractedArchive` and `PersistedExtraction` retain a `std::fs::File` handle
+and are therefore `Send` but not `Sync`.
 
 This crate performs no network access, authenticity policy, external process
 invocation, live installation mutation, metadata restoration, or service

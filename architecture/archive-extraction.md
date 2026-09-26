@@ -26,10 +26,11 @@ ExtractedArchive evidence -> caller prepares ArtifactSet/core transaction
 ```
 
 The archive crate has no Eggpack, acquisition, service-manager, or network
-dependency. Its production dependencies are `tar`, `flate2`, `zip`, and
-`sha2`; tar xattr and zip's optional compression/crypto features are disabled
-except deflate decoding. `eggup-core` does not depend on this crate or any
-archive-format package.
+dependency. Its production dependencies are `tar`, `flate2`, `zip`,
+`fs_at`, and `sha2`; tar xattr and zip's optional compression/crypto features
+are disabled except deflate decoding, and `fs_at` optional `log` /
+`workaround-procmon` features are disabled. `eggup-core` does not depend on
+this crate or any archive-format package.
 
 ## Path and entry contract
 
@@ -65,15 +66,20 @@ subsequent reads; extraction makes no crash-durability or restart guarantee.
 ## Ownership, cleanup, and handoff
 
 The selected output parent must already be a real directory. Extraction creates
-one exclusive sibling root (0700 on Unix) and creates each file with no-clobber
-semantics (0600 on Unix). It never creates install-root parents or writes into
-the live installation. Any failure removes only the root created by that
-operation; cleanup failure changes the returned category to `CleanupFailed`
-and retains the residue path.
+one exclusive sibling root (`mkdir_at` from the parent handle, `0700` on Unix)
+and creates each file with no-clobber semantics (`0600` on Unix). It never
+creates install-root parents or writes into the live installation. The root
+`File` handle is retained through `DirectoryGuard` into `PersistedExtraction`;
+recursive cleanup deletes only through that handle via `fs_at` `*at`
+operations and never recursively traverses the original pathname. Because no
+portable object-bound root unlink exists, explicit cleanup empties only the
+owned tree and reports the now-empty directory as `CleanupFailed` residue;
+drop best-effort empties the same way. Extraction failure preserves the
+original error category and attaches the empty-residue path.
 
 `ExtractedArchive` cleans itself on drop, which is safe for unused results.
 After the caller has prepared/copied the members into a later transaction, it
-can call `persist()` to transfer cleanup responsibility and explicitly remove
+can call `persist()` to transfer cleanup responsibility and explicitly empty
 the retained root when no longer needed. Neither state proves destination
 ownership or grants permission to commit.
 

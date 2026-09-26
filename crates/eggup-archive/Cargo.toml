@@ -13,6 +13,7 @@ exclude = ["tests/", "benches/"]
 
 [dependencies]
 flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+fs_at = { version = "0.2.1", default-features = false }
 sha2 = "0.10.9"
 tar = { version = "0.4.46", default-features = false }
 zip = { version = "6.0.0", default-features = false, features = ["deflate-flate2"] }

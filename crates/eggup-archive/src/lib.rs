@@ -8,6 +8,7 @@
 use flate2::read::GzDecoder;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
@@ -18,6 +19,9 @@ use zip::ZipArchive;
 const ROOT_ATTEMPTS: u32 = 32;
 const IO_CHUNK_SIZE: usize = 16 * 1024;
 const TAR_TRAILING_PADDING_LIMIT: u64 = 1024 * 1024;
+const CLEANUP_MAX_PASSES: u32 = 8;
+const CLEANUP_MAX_ENTRIES_PER_PASS: usize = 10_000;
+const CLEANUP_MAX_DEPTH: usize = 32;
 static NEXT_ROOT_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Supported local archive formats.
@@ -227,6 +231,11 @@ impl ExtractionError {
         self
     }
 
+    fn with_empty_residue(mut self, path: PathBuf) -> Self {
+        self.residue_path = Some(path);
+        self
+    }
+
     /// Returns the stable failure category.
     pub fn kind(&self) -> ExtractionErrorKind {
         self.kind
@@ -305,10 +314,10 @@ impl ExtractedArchive {
     /// preparation or another explicit ownership handoff.
     pub fn persist(mut self) -> PersistedExtraction {
         let guard = self.guard.take().expect("active extraction guard");
-        let (root, identity) = guard.disarm();
+        let (root, handle) = guard.disarm();
         PersistedExtraction {
             root,
-            identity,
+            handle,
             members: self.members,
         }
     }
@@ -322,11 +331,19 @@ impl ExtractedArchive {
 }
 
 /// Extracted output whose cleanup responsibility has been transferred.
-#[derive(Debug)]
 pub struct PersistedExtraction {
     root: PathBuf,
-    identity: OwnedRootIdentity,
+    handle: File,
     members: Vec<ExtractedMember>,
+}
+
+impl std::fmt::Debug for PersistedExtraction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PersistedExtraction")
+            .field("root", &self.root)
+            .field("members", &self.members)
+            .finish_non_exhaustive()
+    }
 }
 
 impl PersistedExtraction {
@@ -342,7 +359,7 @@ impl PersistedExtraction {
 
     /// Removes the retained directory when the caller no longer needs it.
     pub fn cleanup(self) -> Result<(), ExtractionError> {
-        remove_owned_root(&self.root, &self.identity)
+        remove_owned_root_via_handle(self.root, self.handle)
     }
 }
 
@@ -350,9 +367,10 @@ impl PersistedExtraction {
 ///
 /// `output_parent` must already be an existing real directory. The function
 /// creates an exclusive child directory there and never touches the live
-/// installation. Dropping a successful [`ExtractedArchive`] removes only that
-/// operation-owned child; call [`ExtractedArchive::persist`] to transfer that
-/// cleanup responsibility.
+/// installation. Dropping a successful [`ExtractedArchive`] best-effort empties
+/// only that operation-owned child via its retained handle and leaves the
+/// now-empty directory as residue; call [`ExtractedArchive::persist`] to
+/// transfer that cleanup responsibility.
 pub fn extract(
     plan: &ArchivePlan,
     output_parent: &Path,
@@ -365,15 +383,15 @@ pub fn extract(
     if archive_meta.len() > plan.limits.max_archive_bytes {
         return Err(ExtractionError::new(ExtractionErrorKind::ArchiveTooLarge));
     }
-    let (root, identity) = create_private_root(output_parent)?;
+    let (root, handle) = create_private_root(output_parent)?;
     match extract_inner(plan, &root) {
         Ok(members) => Ok(ExtractedArchive {
-            guard: Some(DirectoryGuard::new(root, identity)),
+            guard: Some(DirectoryGuard::new(root, handle)),
             members,
         }),
-        Err(error) => match remove_owned_root(&root, &identity) {
+        Err(error) => match remove_owned_root_with_hook(root.clone(), handle, None) {
             Ok(()) => Err(error),
-            Err(_) => Err(error.with_residue(root)),
+            Err(_) => Err(error.with_empty_residue(root)),
         },
     }
 }
@@ -699,25 +717,43 @@ fn validate_output_name(name: &str, max_path_bytes: usize) -> Result<(), Extract
     Ok(())
 }
 
-fn create_private_root(parent: &Path) -> Result<(PathBuf, OwnedRootIdentity), ExtractionError> {
+fn open_dir_handle(path: &Path) -> std::io::Result<File> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+        std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(path)
+    }
+    #[cfg(not(windows))]
+    {
+        File::open(path)
+    }
+}
+
+fn create_private_root(parent: &Path) -> Result<(PathBuf, File), ExtractionError> {
     let meta = fs::symlink_metadata(parent)
         .map_err(|_| ExtractionError::new(ExtractionErrorKind::InvalidPlan))?;
     if !meta.is_dir() || meta.file_type().is_symlink() {
         return Err(ExtractionError::new(ExtractionErrorKind::InvalidPlan));
     }
+    let parent_handle =
+        open_dir_handle(parent).map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
     for _ in 0..ROOT_ATTEMPTS {
         let id = NEXT_ROOT_ID.fetch_add(1, Ordering::Relaxed);
-        let path = parent.join(format!(".eggup-extract-{}-{id:016x}", std::process::id()));
-        let mut builder = fs::DirBuilder::new();
+        let file_name = format!(".eggup-extract-{}-{id:016x}", std::process::id());
+        let mut options = fs_at::OpenOptions::default();
         #[cfg(unix)]
         {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
+            use fs_at::os::unix::OpenOptionsExt;
+            options.mode(0o700);
         }
-        match builder.create(&path) {
-            Ok(()) => {
-                let identity = OwnedRootIdentity::capture(&path)?;
-                return Ok((path, identity));
+        match options.mkdir_at(&parent_handle, &file_name) {
+            Ok(root_handle) => {
+                let path = parent.join(&file_name);
+                return Ok((path, root_handle));
             }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(_) => return Err(ExtractionError::new(ExtractionErrorKind::Io)),
@@ -739,90 +775,145 @@ fn create_private_file(path: &Path) -> Result<File, ExtractionError> {
         .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))
 }
 
-fn remove_owned_root(path: &Path, identity: &OwnedRootIdentity) -> Result<(), ExtractionError> {
-    if !identity.matches(path)? {
-        return Err(ExtractionError::new(ExtractionErrorKind::CleanupFailed)
-            .with_residue(path.to_path_buf()));
-    }
-    fs::remove_dir_all(path).map_err(|_| {
-        ExtractionError::new(ExtractionErrorKind::CleanupFailed).with_residue(path.to_path_buf())
-    })
+/// Recursively deletes only the directory object referenced by the retained
+/// handle. All deletions are `*at` operations relative to that handle (or a
+/// child handle derived from it); the replacement pathname is never traversed.
+/// Symlinks and reparse points are unlinked, never followed.
+fn empty_dir_contents(dir: &mut File) -> Result<(), ExtractionError> {
+    empty_dir_contents_at_depth(dir, 0)
 }
 
-/// Strong identity evidence for an extraction root.
+fn empty_dir_contents_at_depth(dir: &mut File, depth: usize) -> Result<(), ExtractionError> {
+    if depth > CLEANUP_MAX_DEPTH {
+        return Err(ExtractionError::new(ExtractionErrorKind::Io));
+    }
+    for _ in 0..CLEANUP_MAX_PASSES {
+        let names: Vec<std::ffi::OsString> = {
+            let iter =
+                fs_at::read_dir(dir).map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
+            let mut names = Vec::new();
+            for entry in iter {
+                let entry = entry.map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
+                let name = entry.name();
+                if name == OsStr::new(".") || name == OsStr::new("..") {
+                    continue;
+                }
+                names.push(name.to_os_string());
+                if names.len() > CLEANUP_MAX_ENTRIES_PER_PASS {
+                    return Err(ExtractionError::new(ExtractionErrorKind::Io));
+                }
+            }
+            names
+        };
+        if names.is_empty() {
+            return Ok(());
+        }
+        let mut deleted_any = false;
+        for name in &names {
+            let name_path = Path::new(name);
+            match fs_at::OpenOptions::default().open_dir_at(dir, name_path) {
+                Ok(mut child) => {
+                    let is_dir = child
+                        .metadata()
+                        .map(|metadata| metadata.is_dir())
+                        .unwrap_or(false);
+                    let is_symlink = child
+                        .metadata()
+                        .map(|metadata| metadata.is_symlink())
+                        .unwrap_or(false);
+                    if is_dir && !is_symlink {
+                        empty_dir_contents_at_depth(&mut child, depth + 1)?;
+                        drop(child);
+                        match fs_at::OpenOptions::default().rmdir_at(dir, name_path) {
+                            Ok(()) => deleted_any = true,
+                            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                                deleted_any = true;
+                            }
+                            Err(_) => {
+                                return Err(ExtractionError::new(ExtractionErrorKind::Io));
+                            }
+                        }
+                    } else {
+                        drop(child);
+                        match fs_at::OpenOptions::default().unlink_at(dir, name_path) {
+                            Ok(()) => deleted_any = true,
+                            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                                deleted_any = true;
+                            }
+                            Err(_) => {
+                                return Err(ExtractionError::new(ExtractionErrorKind::Io));
+                            }
+                        }
+                    }
+                }
+                Err(error) => {
+                    if error.kind() == std::io::ErrorKind::NotFound {
+                        deleted_any = true;
+                        continue;
+                    }
+                    match fs_at::OpenOptions::default().unlink_at(dir, name_path) {
+                        Ok(()) => deleted_any = true,
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                            deleted_any = true;
+                        }
+                        Err(_) => {
+                            return Err(ExtractionError::new(ExtractionErrorKind::Io));
+                        }
+                    }
+                }
+            }
+        }
+        if !deleted_any {
+            return Err(ExtractionError::new(ExtractionErrorKind::Io));
+        }
+    }
+    Err(ExtractionError::new(ExtractionErrorKind::Io))
+}
+
+fn remove_owned_root_via_handle(path: PathBuf, handle: File) -> Result<(), ExtractionError> {
+    remove_owned_root_with_hook(path, handle, None)
+}
+
+fn remove_owned_root_with_hook(
+    path: PathBuf,
+    mut handle: File,
+    hook: Option<&dyn Fn(&Path)>,
+) -> Result<(), ExtractionError> {
+    let empty_result = empty_dir_contents(&mut handle);
+    if let Some(hook) = hook {
+        hook(&path);
+    }
+    let _ = empty_result;
+    Err(ExtractionError::new(ExtractionErrorKind::CleanupFailed).with_residue(path))
+}
+
+/// Retained directory authority for an extraction root.
 ///
-/// Captured immediately after creation and revalidated before any recursive
-/// cleanup. A foreign directory placed at the original pathname — whether by
-/// rename + replace, symlink substitution, junction/reparse-point substitution,
-/// or ordinary racing filesystem activity — yields a different identity and
-/// causes cleanup to fail closed with residue evidence instead of recursively
-/// deleting the foreign tree.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct OwnedRootIdentity {
-    #[cfg(unix)]
-    dev: u64,
-    #[cfg(unix)]
-    ino: u64,
-    #[cfg(windows)]
-    file_index: u64,
-    is_symlink: bool,
-}
-
-impl OwnedRootIdentity {
-    fn capture(path: &Path) -> Result<Self, ExtractionError> {
-        let meta = fs::symlink_metadata(path)
-            .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
-        Self::from_metadata(&meta)
-    }
-
-    fn from_metadata(meta: &fs::Metadata) -> Result<Self, ExtractionError> {
-        let is_symlink = meta.file_type().is_symlink();
-        #[cfg(unix)]
-        let identity = {
-            use std::os::unix::fs::MetadataExt;
-            Self {
-                dev: meta.dev(),
-                ino: meta.ino(),
-                is_symlink,
-            }
-        };
-        #[cfg(windows)]
-        let identity = {
-            use std::os::windows::fs::MetadataExt;
-            Self {
-                file_index: meta.file_index(),
-                is_symlink,
-            }
-        };
-        Ok(identity)
-    }
-
-    /// Returns `Ok(true)` when the directory at `path` still matches the
-    /// captured identity, `Ok(false)` when the identity differs (foreign
-    /// replacement), and `Err` when the path is gone or unreadable.
-    fn matches(&self, path: &Path) -> Result<bool, ExtractionError> {
-        let meta = match fs::symlink_metadata(path) {
-            Ok(meta) => meta,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(_) => return Err(ExtractionError::new(ExtractionErrorKind::Io)),
-        };
-        let current = Self::from_metadata(&meta)?;
-        Ok(current == *self)
-    }
-}
-
-#[derive(Debug)]
+/// The open [`File`] handle is captured atomically at creation time via
+/// `mkdir_at` before any archive bytes are materialized. Recursive cleanup
+/// operates only through that handle (and child handles derived from it) via
+/// `fs_at` `*at` operations. The original pathname is used only as residue
+/// evidence; it is never recursively traversed or deleted.
 struct DirectoryGuard {
     path: PathBuf,
-    identity: OwnedRootIdentity,
+    handle: Option<File>,
     active: bool,
 }
 
+impl std::fmt::Debug for DirectoryGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DirectoryGuard")
+            .field("path", &self.path)
+            .field("active", &self.active)
+            .finish_non_exhaustive()
+    }
+}
+
 impl DirectoryGuard {
-    fn new(path: PathBuf, identity: OwnedRootIdentity) -> Self {
+    fn new(path: PathBuf, handle: File) -> Self {
         Self {
             path,
-            identity,
+            handle: Some(handle),
             active: true,
         }
     }
@@ -831,23 +922,25 @@ impl DirectoryGuard {
         &self.path
     }
 
-    fn disarm(mut self) -> (PathBuf, OwnedRootIdentity) {
+    fn disarm(mut self) -> (PathBuf, File) {
         self.active = false;
-        (self.path.clone(), self.identity)
+        let handle = self.handle.take().expect("active extraction guard");
+        (self.path.clone(), handle)
     }
 
     fn cleanup(mut self) -> Result<(), ExtractionError> {
         self.active = false;
-        remove_owned_root(&self.path, &self.identity)
+        let handle = self.handle.take().expect("active extraction guard");
+        remove_owned_root_via_handle(self.path.clone(), handle)
     }
 }
 
 impl Drop for DirectoryGuard {
     fn drop(&mut self) {
         if self.active {
-            // Use the exact same identity-checked primitive as explicit
-            // cleanup. A foreign replacement must not be silently deleted.
-            let _ = remove_owned_root(&self.path, &self.identity);
+            if let Some(handle) = self.handle.as_mut() {
+                let _ = empty_dir_contents(handle);
+            }
         }
     }
 }
@@ -1378,11 +1471,16 @@ mod tests {
             vec![ArchiveMember::new("app", "app", None, None).unwrap()],
             cap,
         );
-        assert_eq!(
-            extract_error(&plan, dir.path()),
-            ExtractionErrorKind::MemberTooLarge
-        );
+        let error = extract(&plan, dir.path()).unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::MemberTooLarge);
         assert_eq!(fs::read(&sentinel).unwrap(), b"keep");
+        // Handle-bound failure cleanup empties the owned partial root via its
+        // retained handle and leaves the now-empty directory as bounded
+        // residue; it never touches the foreign sentinel.
+        let residue = error.residue_path().expect("empty residue").to_path_buf();
+        assert!(residue.exists());
+        assert_eq!(fs::read_dir(&residue).unwrap().count(), 0);
+        fs::remove_dir(&residue).unwrap();
         assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 2);
 
         let archive = zip_file(dir.path(), "good.zip", &[("app", b"ok")]);
@@ -1396,7 +1494,12 @@ mod tests {
             let output = extract(&plan, dir.path()).unwrap();
             output.root().to_path_buf()
         };
-        assert!(!root.exists());
+        // Drop best-effort empties the owned root via its handle but never
+        // falls back to pathname recursion, so the now-empty directory
+        // remains as residue.
+        assert!(root.exists());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        fs::remove_dir(&root).unwrap();
     }
 
     #[test]
@@ -1412,8 +1515,16 @@ mod tests {
         let persisted = extract(&plan, dir.path()).unwrap().persist();
         let root = persisted.root().to_path_buf();
         assert!(root.exists());
-        persisted.cleanup().unwrap();
-        assert!(!root.exists());
+        // No object-bound root unlink exists on all platforms, so explicit
+        // cleanup empties only the owned tree via its handle and reports the
+        // now-empty directory as residue instead of recursively touching the
+        // pathname.
+        let error = persisted.cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        assert!(root.exists());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        fs::remove_dir(&root).unwrap();
     }
 
     #[test]
@@ -1474,6 +1585,7 @@ mod tests {
             );
         }
         assert!(moved.exists());
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
         fs::remove_dir_all(&foreign).unwrap();
         fs::remove_dir_all(moved).unwrap();
     }
@@ -1522,12 +1634,14 @@ mod tests {
             let foreign = root.clone();
             fs::create_dir(&foreign).unwrap();
             fs::write(foreign.join("foreign"), b"keep").unwrap();
-            // Drop the extraction; best-effort drop cleanup must NOT
-            // recursively delete the foreign tree.
+            // Drop the extraction; best-effort drop cleanup empties only the
+            // originally opened tree via its handle and never falls back to
+            // `fs::remove_dir_all(path)`.
             drop(extracted);
-            // The original owned root (now at `moved`) still exists because
-            // drop silently bails on identity mismatch.
+            // The original owned root (now at `moved`) is emptied via its
+            // handle; the foreign replacement is untouched.
             assert!(moved.exists());
+            assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
             assert!(foreign.exists());
             assert_eq!(fs::read(foreign.join("foreign")).unwrap(), b"keep");
             moved
@@ -1591,12 +1705,176 @@ mod tests {
         assert_eq!(error.residue_path(), Some(foreign.as_path()));
         assert!(foreign.exists());
         assert!(moved.exists());
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
         fs::remove_dir_all(&foreign).unwrap();
         fs::remove_dir_all(moved).unwrap();
     }
 
+    fn owned_root_with_files(parent: &Path, files: &[&str]) -> (PathBuf, File) {
+        let (root, handle) = create_private_root(parent).unwrap();
+        for name in files {
+            fs::write(root.join(name), b"owned").unwrap();
+        }
+        (root, handle)
+    }
+
     #[test]
-    fn normal_explicit_cleanup_still_succeeds_with_identity_check() {
+    fn deterministic_race_foreign_non_empty_after_content_deletion_remains_intact() {
+        let dir = TestDir::new();
+        let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
+        let moved = dir.path().join("moved-owned");
+        let error = remove_owned_root_with_hook(
+            root.clone(),
+            handle,
+            Some(&|path: &Path| {
+                fs::rename(path, &moved).unwrap();
+                fs::create_dir(path).unwrap();
+                for i in 0..4 {
+                    fs::write(path.join(format!("foreign-{i}")), b"keep").unwrap();
+                }
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        for i in 0..4 {
+            assert_eq!(
+                fs::read(root.join(format!("foreign-{i}"))).unwrap(),
+                b"keep"
+            );
+        }
+        assert!(moved.exists());
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
+        fs::remove_dir_all(&root).unwrap();
+        fs::remove_dir(&moved).unwrap();
+    }
+
+    #[test]
+    fn deterministic_race_foreign_empty_after_content_deletion_remains_intact() {
+        let dir = TestDir::new();
+        let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
+        let moved = dir.path().join("moved-owned");
+        let error = remove_owned_root_with_hook(
+            root.clone(),
+            handle,
+            Some(&|path: &Path| {
+                fs::rename(path, &moved).unwrap();
+                fs::create_dir(path).unwrap();
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        assert!(root.exists());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        assert!(moved.exists());
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
+        fs::remove_dir(&root).unwrap();
+        fs::remove_dir(&moved).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn deterministic_race_symlink_after_content_deletion_is_not_followed() {
+        use std::os::unix::fs::symlink;
+        let dir = TestDir::new();
+        let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
+        let moved = dir.path().join("moved-owned");
+        let target = dir.path().join("hook-target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("keep"), b"keep").unwrap();
+        let error = remove_owned_root_with_hook(
+            root.clone(),
+            handle,
+            Some(&|path: &Path| {
+                fs::rename(path, &moved).unwrap();
+                symlink(&target, path).unwrap();
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        assert_eq!(fs::read(target.join("keep")).unwrap(), b"keep");
+        assert!(moved.exists());
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
+        fs::remove_dir_all(&moved).unwrap();
+        fs::remove_dir_all(&target).unwrap();
+        fs::remove_file(&root).unwrap();
+    }
+
+    #[test]
+    fn deterministic_race_persisted_cleanup_uses_same_handle_authority() {
+        let dir = TestDir::new();
+        let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
+        let moved = dir.path().join("moved-owned");
+        let error = remove_owned_root_with_hook(
+            root.clone(),
+            handle,
+            Some(&|path: &Path| {
+                fs::rename(path, &moved).unwrap();
+                fs::create_dir(path).unwrap();
+                fs::write(path.join("foreign"), b"keep").unwrap();
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
+        assert!(moved.exists());
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
+        fs::remove_dir_all(&root).unwrap();
+        fs::remove_dir(&moved).unwrap();
+    }
+
+    #[test]
+    fn cleanup_remains_bounded_under_concurrent_file_creation() {
+        let dir = TestDir::new();
+        let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
+        let root_clone = root.clone();
+        let writer = std::thread::spawn(move || {
+            for i in 0..200 {
+                let _ = fs::write(root_clone.join(format!("race-{i}")), b"x");
+            }
+        });
+        let result = remove_owned_root_with_hook(root.clone(), handle, None);
+        assert_eq!(
+            result.unwrap_err().kind(),
+            ExtractionErrorKind::CleanupFailed
+        );
+        writer.join().unwrap();
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn deterministic_race_windows_reparse_after_authority_boundary_is_preserved() {
+        let dir = TestDir::new();
+        let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
+        let moved = dir.path().join("moved-owned");
+        let target = dir.path().join("hook-target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("keep"), b"keep").unwrap();
+        let result = remove_owned_root_with_hook(
+            root.clone(),
+            handle,
+            Some(&|path: &Path| {
+                fs::rename(path, &moved).unwrap();
+                let _ = std::os::windows::fs::symlink_dir(&target, path);
+            }),
+        );
+        let error = result.unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        assert_eq!(fs::read(target.join("keep")).unwrap(), b"keep");
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_file(&root);
+        let _ = fs::remove_dir_all(&moved);
+        let _ = fs::remove_dir(&moved);
+        let _ = fs::remove_dir_all(&target);
+    }
+
+    #[test]
+    fn normal_explicit_cleanup_empties_owned_root_and_reports_empty_residue() {
         let dir = TestDir::new();
         let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
         let plan = make_plan(
@@ -1607,8 +1885,15 @@ mod tests {
         );
         let persisted = extract(&plan, dir.path()).unwrap().persist();
         let root = persisted.root().to_path_buf();
-        persisted.cleanup().unwrap();
-        assert!(!root.exists());
+        let member_path = persisted.members()[0].path().to_path_buf();
+        assert!(member_path.exists());
+        let error = persisted.cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        assert!(!member_path.exists());
+        assert!(root.exists());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        fs::remove_dir(&root).unwrap();
     }
 
     #[test]
@@ -1653,6 +1938,12 @@ mod tests {
         .prepare()
         .unwrap();
         assert!(prepared.stage_root().exists());
-        extracted.cleanup().unwrap();
+        let root = extracted.root().to_path_buf();
+        let error = extracted.cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        assert!(root.exists());
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+        fs::remove_dir(&root).unwrap();
     }
 }
