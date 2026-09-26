@@ -33,6 +33,9 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
   cross-platform parser dependency used for the same ownership tests on Unix.
 - Bounded `TransitionResult` with conflict diagnostics; no automatic privilege
   elevation; no updater/release/network policy.
+- Crate-produced service errors and manager stderr excerpts retain their
+  existing 512-byte and 256-byte ceilings and are truncated only at UTF-8
+  character boundaries.
 - `commit_with_lifecycle` composes an already validated `eggup_core` transaction
   with owned-service quiescence, successful-update restoration, a bounded
   caller-owned `PostInstallCheck`, and Core's `KeepInstalled` / `RollBack`

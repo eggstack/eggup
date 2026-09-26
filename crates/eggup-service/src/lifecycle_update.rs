@@ -677,14 +677,7 @@ fn remaining(deadline: Instant) -> Duration {
 
 fn bounded_detail(mut detail: String) -> String {
     detail = detail.chars().filter(|c| !c.is_control()).collect();
-    if detail.len() > 512 {
-        let mut end = 512;
-        while !detail.is_char_boundary(end) {
-            end -= 1;
-        }
-        detail.truncate(end);
-    }
-    detail
+    crate::truncate_utf8_bytes(detail, 512)
 }
 
 #[cfg(test)]
@@ -706,6 +699,24 @@ mod tests {
     };
 
     static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free() {
+        let spec = ServiceSpec::new(
+            ServiceId::new("diagnostic").unwrap(),
+            std::env::current_exe().unwrap(),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        let mut input = "a".repeat(510);
+        input.push('🧡');
+        input.push_str("\nmanager detail");
+        let failure = LifecycleFailure::new(&spec, LifecycleUpdatePhase::Inspect, input, None);
+        assert!(failure.detail.len() <= 512);
+        assert!(failure.detail.is_char_boundary(failure.detail.len()));
+        assert!(!failure.detail.chars().any(char::is_control));
+    }
 
     struct FixedVerifier(CoreOwnership);
     impl eggup_core::OwnershipVerifier for FixedVerifier {

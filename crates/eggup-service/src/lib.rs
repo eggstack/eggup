@@ -283,6 +283,7 @@ pub enum ServiceOperation {
 }
 
 /// Typed service errors. Destructive attempts on `Foreign`/`Unknown` fail here.
+/// Error strings produced by crate helpers are capped at 512 UTF-8-safe bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ServiceError {
@@ -303,19 +304,11 @@ pub enum ServiceError {
 
 impl ServiceError {
     pub(crate) fn invalid(detail: impl Into<String>) -> Self {
-        let mut d = detail.into();
-        if d.len() > 512 {
-            d.truncate(512);
-        }
-        Self::InvalidInput(d)
+        Self::InvalidInput(truncate_utf8_bytes(detail.into(), 512))
     }
 
     pub(crate) fn bounded(detail: impl Into<String>) -> String {
-        let mut d = detail.into();
-        if d.len() > 512 {
-            d.truncate(512);
-        }
-        d
+        truncate_utf8_bytes(detail.into(), 512)
     }
 
     pub(crate) fn conflict(detail: impl Into<String>) -> Self {
@@ -1477,12 +1470,19 @@ fn reconcile_config_identity(
     observed
 }
 
-fn truncate(s: &str) -> String {
-    let mut s = s.to_string();
-    if s.len() > 256 {
-        s.truncate(256);
+fn truncate_utf8_bytes(mut text: String, max_bytes: usize) -> String {
+    if text.len() > max_bytes {
+        let mut end = max_bytes;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.truncate(end);
     }
-    s
+    text
+}
+
+fn truncate(s: &str) -> String {
+    truncate_utf8_bytes(s.to_string(), 256)
 }
 
 fn permission_hint(e: ServiceError) -> ServiceError {
@@ -1491,9 +1491,9 @@ fn permission_hint(e: ServiceError) -> ServiceError {
             let lower = d.to_lowercase();
             if lower.contains("permission") || lower.contains("denied") || lower.contains("access")
             {
-                ServiceError::Manager(ServiceError::bounded(format!(
-                    "{d} (permission denied; re-run with appropriate user/system scope; no automatic elevation)"
-                )))
+                const HINT: &str = " (permission denied; re-run with appropriate user/system scope; no automatic elevation)";
+                let detail = truncate_utf8_bytes(d, 512 - HINT.len());
+                ServiceError::Manager(format!("{detail}{HINT}"))
             } else {
                 ServiceError::Manager(d)
             }
@@ -3057,6 +3057,48 @@ mod tests {
             None,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn diagnostic_byte_bounds_preserve_utf8_at_256_and_512_edges() {
+        for bound in [256, 512] {
+            let exact = truncate_utf8_bytes("a".repeat(bound), bound);
+            assert_eq!(exact.len(), bound);
+            let over = truncate_utf8_bytes("a".repeat(bound + 1), bound);
+            assert_eq!(over.len(), bound);
+
+            for character in ["é", "€", "🧡"] {
+                let width = character.len();
+                let mut input = "a".repeat(bound - width + 1);
+                input.push_str(character);
+                input.push_str("tail");
+                let bounded = truncate_utf8_bytes(input, bound);
+                assert_eq!(bounded.len(), bound - width + 1);
+                assert!(bounded.is_char_boundary(bounded.len()));
+            }
+        }
+    }
+
+    #[test]
+    fn service_errors_output_and_permission_remediation_stay_utf8_bounded() {
+        let unicode = "🧡".repeat(200);
+        let invalid = ServiceError::invalid(unicode.clone());
+        assert!(
+            matches!(invalid, ServiceError::InvalidInput(text) if text.len() <= 512 && text.is_char_boundary(text.len()))
+        );
+        assert!(ServiceError::bounded(unicode.clone()).len() <= 512);
+        assert!(truncate(&unicode).len() <= 256);
+
+        let manager = ServiceError::manager(format!("manager failed: {unicode}"));
+        let remediated = permission_hint(ServiceError::manager(format!(
+            "permission denied: {unicode}"
+        )));
+        assert!(
+            matches!(manager, ServiceError::Manager(text) if text.len() <= 512 && text.is_char_boundary(text.len()))
+        );
+        assert!(
+            matches!(remediated, ServiceError::Manager(text) if text.len() <= 512 && text.is_char_boundary(text.len()) && text.contains("permission denied;"))
+        );
     }
 
     #[test]

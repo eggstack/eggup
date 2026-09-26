@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Service M007 (unpublished corrective): bounded service errors and manager
+  output excerpts now truncate at UTF-8 character boundaries within their
+  existing 512-byte and 256-byte limits. Long permission errors retain their
+  bounded remediation hint. No lifecycle behavior or consumer migration
+  changed; no publication performed.
+
 - Acquisition M007 (unpublished corrective): diagnostics now truncate only at
   UTF-8 boundaries; `FetchLimits::max_artifact_bytes` is a mandatory positive
   finite `u64` (migration: `Some(n)` → `n`, remove `None`); curl streams body

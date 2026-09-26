@@ -290,14 +290,7 @@ fn mk_failure(
 
 fn bound_detail(mut detail: String) -> String {
     detail = detail.chars().filter(|c| !c.is_control()).collect();
-    if detail.len() > 512 {
-        let mut end = 512;
-        while !detail.is_char_boundary(end) {
-            end -= 1;
-        }
-        detail.truncate(end);
-    }
-    detail
+    crate::truncate_utf8_bytes(detail, 512)
 }
 
 fn remaining(deadline: Instant) -> Duration {

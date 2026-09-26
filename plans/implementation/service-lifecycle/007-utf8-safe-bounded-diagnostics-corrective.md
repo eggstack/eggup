@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 007 — UTF-8-Safe Bounded Diagnostics Corrective
 
-Status: ready for handoff
+Status: active
 
 Repository baseline: `ee1476ef2a9e0d5569d6dc2469e780a4435cc426`
 
