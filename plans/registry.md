@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: pending final registration commit for planning-hygiene C006 (M001d temporarily blocked until plan correction closes; Egress M006 and Eggpack M002 remain blocked on M001d)
+Latest planning registration head: `d68f5dd77688ea291ffbcdbe90d21f5be9032fb9` (planning-hygiene C006 registered; M001d temporarily blocked until plan correction closes; Egress M006 and Eggpack M002 remain blocked on M001d)
 
 Latest reviewed runtime/documentation head: `0d2f1f06110e3949755120fa9e80ff5a5b0b4b3c`. M001c hosted write-authority qualification run `36257884083` passed Stable/MSRV/macOS/Windows, and current-head CI run `36257992801` also passed. Archive M001b remains closed for cleanup authority; Acquisition M008 remains closed; M001c write authority is implemented (`09c953f`) with a Section 14 handoff stop. M001d remains the required runtime follow-up but is temporarily blocked on planning-hygiene C006. Egress M006 and Eggpack M002 remain blocked on M001d. C005 is closed.
 
