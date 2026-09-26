@@ -1,6 +1,6 @@
 # Acquisition Transport M008 — Closure and Verification Record
 
-Status: closed
+Status: implementation complete; hosted closure qualification pending
 
 Source plan: `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md`
 
@@ -12,7 +12,7 @@ Implementation commit: `bcf3084c2e31b497b2b9c2de61aa2b6e25c0a486` — sub-second
 
 ## Executive finding
 
-The remaining curl deadline truthfulness defect is closed. `eggup-curl` no longer widens effective sub-second connect/total deadlines to whole seconds before passing them to curl. The new `duration_decimal_seconds` serializer formats a positive Rust `Duration` at microsecond precision with a locale-independent `.` separator and trailing-zero stripping, so `100 ms -> "0.1"`, `250 ms -> "0.25"`, `1.5 s -> "1.5"`, and `2 s -> "2"`. Truncation to whole microseconds never widens the input; sub-microsecond positive durations are rejected at validation rather than silently extended. The previous one-second timeout-attribution slack in `classify_curl_result` is replaced with the parent scheduling tolerance `POLL_INTERVAL + 5 ms`. The M007 body-streaming/process-cleanup, redaction, byte-bound, status-classification, and fallback semantics are unchanged. No public `FetchLimits` API or default values changed. No high- or medium-severity implementation finding remains open.
+The curl deadline truthfulness implementation defect is corrected, but final hosted closure qualification is pending because current-head CI run `36220815378` fails in `eggup-archive` on Windows before the M008 portable Windows tests execute. `eggup-curl` no longer widens effective sub-second connect/total deadlines to whole seconds before passing them to curl. The new `duration_decimal_seconds` serializer formats a positive Rust `Duration` at microsecond precision with a locale-independent `.` separator and trailing-zero stripping, so `100 ms -> "0.1"`, `250 ms -> "0.25"`, `1.5 s -> "1.5"`, and `2 s -> "2"`. Truncation to whole microseconds never widens the input; sub-microsecond positive durations are rejected at validation rather than silently extended. The previous one-second timeout-attribution slack in `classify_curl_result` is replaced with the parent scheduling tolerance `POLL_INTERVAL + 5 ms`. The M007 body-streaming/process-cleanup, redaction, byte-bound, status-classification, and fallback semantics are unchanged. No public `FetchLimits` API or default values changed. No high- or medium-severity implementation finding remains open.
 
 ## Requirement-to-evidence matrix
 
@@ -65,7 +65,7 @@ cargo tree -p eggup-core --locked                                passed; sha2 on
 git diff --check                                                passed
 ```
 
-The M008 change is local to `eggup-curl`; no hosted run is a prerequisite for closing this corrective. The M007 hosted run `36213509807` already established the M007 baseline on Linux/macOS/Windows with the same Windows live-loopback scope; M008 inherits that disposition. Future hosted CI runs that exercise the new sub-second deadline tests will add runtime coverage but are not required for closure.
+The source plan requires hosted Stable/MSRV/macOS/Windows qualification. Current-head run `36220815378` passes Stable, MSRV, and macOS but fails compiling `eggup-archive` on Windows before acquisition/curl portable tests execute. M008 therefore remains implementation-complete but not fully closure-qualified until Archive M001b restores Windows compilation and a fresh full matrix reaches the M008 tests. The existing M007 live-loopback limitation remains unchanged and need not be resolved by M008.
 
 ## Invariant review
 
