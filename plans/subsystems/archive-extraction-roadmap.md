@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001/M001a historical; M001b closed; M002/M003 ready to author
+Status: active; M001/M001a historical; M001b cleanup closed; M001c materialization-authority corrective ready; M002/M003 blocked
 
 Long-term references:
 
@@ -121,9 +121,12 @@ archive M001a owned-root cleanup authority [HISTORICAL; SUPERSEDED]
               v
 archive M001b handle-bound cleanup + Windows portability [CLOSED via run 36222536670]
                |
-               +--> consumer adoption M006 Egress [READY TO AUTHOR]
+               v
+archive M001c handle-relative member materialization [READY]
                |
-               `--> Eggpack interoperability M002 archive handoff [READY TO AUTHOR]
+               +--> consumer adoption M006 Egress [BLOCKED]
+               |
+               `--> Eggpack interoperability M002 archive handoff [BLOCKED]
 ```
 
 ## 7. Milestones
@@ -150,15 +153,25 @@ Status: closed; see `plans/closure/archive-extraction/001b-status.md` (hosted ru
 
 Retained directory authority via `fs_at` replaces pathname-authorized recursion, stable-Windows portability is restored, deterministic after-check replacement races prove foreign preservation, and the fresh hosted matrix qualifies both M001b and Acquisition M008.
 
+A later post-closure review found a separate materialization-authority gap: declared member files are still created through `root.join(output_name)` rather than relative to the retained root handle. M001b remains valid for cleanup; M001c is the active materialization corrective.
+
+### M001c — Handle-relative member materialization corrective
+
+Plan: `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md`.
+
+Status: ready.
+
+Move tar/zip member creation onto the retained root handle with exclusive no-follow `fs_at::open_at` semantics and require truthful handoff if the root pathname is renamed/replaced. If the existing path-only handoff cannot prove namespace binding cross-platform, stop and surface the required API/ADR follow-up rather than weakening ADR-0005.
+
 ### M002 — Egress real-consumer archive/pair adoption
 
-Ready to author once M001b closes. This roadmap does not authorize or replace the separate consumer-adoption plan.
+Blocked until M001c closes. This roadmap does not authorize or replace the separate consumer-adoption plan.
 
 Adopt the generic extraction output plus Eggup's existing multi-artifact transaction in Egress while preserving Egress-owned release/version/origin/candidate/CLI policy. Delete duplicated generic extraction/rollback machinery only after parity is qualified.
 
 ### M003 — Eggpack archive projection handoff
 
-Ready to author once M001b closes. This roadmap does not authorize or replace the separate Eggpack interoperability plan.
+Blocked until M001c closes. This roadmap does not authorize or replace the separate Eggpack interoperability plan.
 
 Connect `ManifestProjection::Archive` member evidence to the extraction contract without putting archive policy or producer authority into lower Eggup layers.
 
@@ -193,7 +206,7 @@ The third risk is dependency/footprint growth. Keep the crate optional and forma
 
 ## 11. Completion definition
 
-The subsystem is mature when M001b has closed the cleanup-authority and Windows-portability invariants with a green hosted matrix, Egress has removed its duplicated generic archive/pair update mechanics, and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
+The subsystem is mature when M001b cleanup and M001c materialization authority are both closed with green hosted qualification, Egress has removed its duplicated generic archive/pair update mechanics, and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
 
 ## 12. Milestone status
 
@@ -202,5 +215,6 @@ The subsystem is mature when M001b has closed the cleanup-authority and Windows-
 | M001 bounded allowlisted extraction | closed historically | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
 | M001a owned-root cleanup authority | historical; superseded by M001b | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | `plans/closure/archive-extraction/001a-status.md` | remaining TOCTOU + Windows compile defect |
 | M001b handle-bound cleanup + Windows portability | closed | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md` | `plans/closure/archive-extraction/001b-status.md` | — |
-| M002 Egress adoption | ready to author | — | — | M001b closed |
-| M003 Eggpack archive handoff | ready to author | — | — | M001b closed |
+| M001c handle-relative member materialization | ready | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md` | — | — |
+| M002 Egress adoption | blocked | — | — | M001c closure |
+| M003 Eggpack archive handoff | blocked | — | — | M001c closure |
