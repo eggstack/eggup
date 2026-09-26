@@ -13,9 +13,7 @@ Implementation closure heads reviewed in this batch (predating C004):
 - `bcf3084c2e31b497b2b9c2de61aa2b6e25c0a486` — Acquisition M008 (sub-second deadline truthfulness) closed.
 - `0c3af9274c78c36be2051279e10c53abf814ee5a` — Archive M001a (owned-root cleanup authority) closed.
 
-C004 corrective implementation/docs commit: `pending` — see git log for the closing commit hash.
-
-The final C004 closure/status transition is the commit containing this record. It is intentionally not self-referenced here; the exact closing SHA is recorded by Git history.
+C004 corrective implementation/docs commit: `a30f711b87f18f8370d8a3dd99a58b53dcace692` — reconcile registry, roadmap, and project-state text after M008/M001a closures; close C004 itself.
 
 ## Executive finding
 
