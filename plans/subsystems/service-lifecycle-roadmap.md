@@ -104,11 +104,11 @@ core M007 deferred finalization ---+
                      M005 update-lifecycle integration [closed]
                                |
                                v
-                     M006 daemon disposition + revalidation [closed; evidence reconciled via acquisition M006]
-                     (Gregg reference only; no migration)
-                               |
-                               v
-                     M007 UTF-8 bounded diagnostics [READY]
+M006 daemon disposition + revalidation [closed; evidence reconciled via acquisition M006]
+                      (Gregg reference only; no migration)
+                                |
+                                v
+                      M007 UTF-8 bounded diagnostics [CLOSED]
 ```
 
 ## 7. Milestones
@@ -167,8 +167,6 @@ Generalized the daemon update decision model using greggd only as a read-only be
 ### M007 — UTF-8-safe bounded diagnostics corrective
 
 Plan: `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md`.
-
-Status: ready.
 
 Status: closed; see `plans/closure/service-lifecycle/007-status.md`.
 

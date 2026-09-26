@@ -188,7 +188,7 @@ The subsystem is mature when M001a has closed the cleanup-authority invariant, E
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 bounded allowlisted extraction | closed; corrective M001a open | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
+| M001 bounded allowlisted extraction | closed historically; corrective M001a closed | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
 | M001a owned-root cleanup authority | closed | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | `plans/closure/archive-extraction/001a-status.md` | — |
 | M002 Egress adoption | ready to author | — | — | — |
 | M003 Eggpack archive handoff | ready to author | — | — | — |
