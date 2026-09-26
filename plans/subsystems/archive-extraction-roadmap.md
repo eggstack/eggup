@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001 closed; Egress and Eggpack handoffs ready to author
+Status: active; M001 closed historically; M001a cleanup-authority corrective ready
 
 Long-term references:
 
@@ -115,6 +115,9 @@ core M007 [closed] + acquisition M006 [closed]
               v
 archive M001 bounded allowlisted extraction [CLOSED]
               |
+              v
+archive M001a owned-root cleanup authority [READY]
+              |
               +--> consumer adoption M006 Egress
               |
               `--> Eggpack interoperability M002 archive handoff
@@ -128,17 +131,23 @@ Plan: `plans/implementation/archive-extraction/001-bounded-allowlisted-extractio
 
 Implement the optional extraction layer with tar.gz + zip evidence, regular-file-only semantics, private/no-clobber extraction, per-member and aggregate bounds, exact member size/digest verification, deterministic malicious fixtures, and no `eggup-core` dependency growth beyond ordinary domain consumption.
 
+### M001a — Owned-root cleanup authority corrective
+
+Plan: `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md`.
+
+Status: ready.
+
+Retain cleanup authority beyond a bare pathname so rename/replacement of the extraction root cannot cause recursive deletion of a foreign directory. Prefer handle/capability-relative cleanup and fail closed with residue evidence where object-bound deletion cannot be proven.
+
 ### M002 — Egress real-consumer archive/pair adoption
 
-Ready to author now that M001 is closed. This roadmap does not authorize or
-replace the separate consumer-adoption plan.
+Blocked until M001a closes. This roadmap does not authorize or replace the separate consumer-adoption plan.
 
 Adopt the generic extraction output plus Eggup's existing multi-artifact transaction in Egress while preserving Egress-owned release/version/origin/candidate/CLI policy. Delete duplicated generic extraction/rollback machinery only after parity is qualified.
 
 ### M003 — Eggpack archive projection handoff
 
-Ready to author now that M001 is closed. This roadmap does not authorize or
-replace the separate Eggpack interoperability plan.
+Blocked until M001a closes. This roadmap does not authorize or replace the separate Eggpack interoperability plan.
 
 Connect `ManifestProjection::Archive` member evidence to the extraction contract without putting archive policy or producer authority into lower Eggup layers.
 
@@ -173,12 +182,13 @@ The third risk is dependency/footprint growth. Keep the crate optional and forma
 
 ## 11. Completion definition
 
-The subsystem is mature when Egress has removed its duplicated generic archive/pair update mechanics and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
+The subsystem is mature when M001a has closed the cleanup-authority invariant, Egress has removed its duplicated generic archive/pair update mechanics, and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
 
 ## 12. Milestone status
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 bounded allowlisted extraction | closed | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
-| M002 Egress adoption | ready to author | — | — | M001 closed |
-| M003 Eggpack archive handoff | ready to author | — | — | M001 closed |
+| M001 bounded allowlisted extraction | closed; corrective M001a open | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
+| M001a owned-root cleanup authority | ready | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | — | — |
+| M002 Egress adoption | blocked | — | — | M001a closure |
+| M003 Eggpack archive handoff | blocked | — | — | M001a closure |
