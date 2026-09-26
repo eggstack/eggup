@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M006 closed; primary path fully cross-platform qualified
+Status: M001-M006 closed; M007 boundary-safety corrective ready
 
 Long-term references:
 
@@ -69,6 +69,8 @@ Post-closure review then found two narrower correctness gaps tracked by M004:
 
 M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` supplied the real-consumer evidence previously required for M005. M005 is closed and fully cross-platform qualified with corrective M006: hosted run `36169295410` exposed a Windows all-targets test portability failure in `eggup-curl`, corrected by `1c601f2`, with green hosted matrix `36176009068`. Gregg remains untouched.
 
+A 2026-09-26 post-closure audit opened M007. Three boundary defects remain: fixed-byte Unicode diagnostic truncation can panic at a non-character boundary; `FetchLimits::max_artifact_bytes = None` permits an unbounded artifact-byte state contrary to the normative bounded-acquisition contract; and the curl adapter closes its exclusively-created temp before curl reopens the pathname, weakening the intended pathname-race guarantee. M007 is ready and must close before another transport-dependent consumer migration is treated as fully qualified.
+
 ## 5. Target architecture
 
 `eggup-eggfetch` should depend on a stable Eggfetch version with a deliberately narrow feature set. `eggup-curl` should provide the complementary external-process path without embedding an HTTP/TLS implementation.
@@ -102,6 +104,9 @@ M004 validated-limits/promotion-state corrective
                      |
                      v
                M006 Windows portability/qualification corrective [closed]
+                     |
+                     v
+               M007 boundary safety hardening [READY]
 ```
 
 ## 7. Milestones
@@ -162,6 +167,16 @@ Status: closed; see `plans/closure/acquisition-transport/006-status.md`.
 
 Corrects the Windows `--all-targets` failure caused by Unix-only `PermissionsExt` test support in `eggup-curl`, cleans the Windows-only core import warnings, requires a green hosted matrix, and reconciles M005/M006 closure evidence plus stale roadmap/registry state. Gregg remains read-only and consumer M004 remains unwritten.
 
+### M007 — Boundary safety hardening corrective
+
+Class: invariant/corrective.
+
+Plan: `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md`.
+
+Status: ready.
+
+Close UTF-8-unsafe diagnostic truncation, require a finite artifact byte budget, and remove the curl exclusive-temp pathname reopen race by retaining Eggup-owned output authority while streaming the child body. Preserve existing fallback, redaction, no-clobber, timeout, cancellation, and footprint semantics.
+
 ## 8. Cross-cutting requirements
 
 Transport adapters must preserve bounded body/output behavior, redaction, cancellation cleanup, and partial-file cleanup. Proxy behavior must be explicit rather than inherited accidentally. Transport fallback is never release/source fallback: `NotFound`, verification failure, cancellation, size-limit failure, and staging/promotion failure do not silently select another source.
@@ -176,7 +191,7 @@ Eggfetch version/feature choice may materially affect binary size. Measure rathe
 
 ## 11. Completion definition
 
-The subsystem's primary path is complete when the corrected native Eggfetch path and lightweight curl path both satisfy the common acquisition contract, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains.
+The subsystem's primary path is complete when M007 closes, the corrected native Eggfetch path and lightweight curl path both satisfy the common bounded acquisition contract, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains.
 
 ## 12. Milestone status
 
@@ -188,3 +203,4 @@ The subsystem's primary path is complete when the corrected native Eggfetch path
 | M004 | closed | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | `plans/closure/acquisition-transport/004-status.md` | — |
 | M005 | closed; qualified with M006 corrective | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | `plans/closure/acquisition-transport/005-status.md` | — |
 | M006 | closed | `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md` | `plans/closure/acquisition-transport/006-status.md` | — |
+| M007 | ready | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` | — | — |
