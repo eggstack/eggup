@@ -1,6 +1,6 @@
 # Planning / Closure Hygiene Corrective C006 — M001d Readiness and Bound-Source Contract Reconciliation
 
-Status: ready for handoff
+Status: implemented (see `plans/closure/planning-closure-hygiene-corrective/006-status.md`)
 
 Repository baseline: `0d2f1f06110e3949755120fa9e80ff5a5b0b4b3c`
 
