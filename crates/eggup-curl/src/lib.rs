@@ -1098,7 +1098,7 @@ mod tests {
     }
 
     #[test]
-    fn cancellation_kills_and_reaps_child() {
+    fn cancellation_before_spawn_cleans_temp() {
         let Some(t) = transport() else { return };
         let dir = temp_dir("curl-cancel");
         let dest = dir.join("app");
@@ -1115,6 +1115,37 @@ mod tests {
             .filter(|e| e.file_name().to_string_lossy().ends_with(".part"))
             .collect();
         assert!(leftovers.is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn cancellation_during_body_stream_kills_and_reaps_child() {
+        let Some(t) = transport() else { return };
+        let base = serve_once(
+            200,
+            vec![("Content-Length".into(), "65536".into())],
+            vec![3u8; 65536],
+            5000,
+            false,
+        );
+        let dir = temp_dir("curl-cancel-stream");
+        let dest = dir.join("app");
+        let cancel = Arc::new(CancelFlag::new());
+        let child_cancel = Arc::clone(&cancel);
+        let child_transport = t;
+        let url = format!("{base}/app");
+        let child = thread::spawn(move || {
+            child_transport.fetch_artifact(&req(&url), &dest, limits(), &child_cancel)
+        });
+        thread::sleep(Duration::from_millis(150));
+        cancel.cancel();
+        assert!(matches!(
+            child.join().unwrap(),
+            Err(AcquisitionError::Cancelled)
+        ));
+        assert!(!dir.join("app").exists());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
         let _ = fs::remove_dir_all(&dir);
     }
 
