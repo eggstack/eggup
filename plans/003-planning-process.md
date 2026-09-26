@@ -270,10 +270,12 @@ Active Eggup roadmaps are:
 1. verified update core;
 2. acquisition transport;
 3. service lifecycle;
-4. consumer adoption and compatibility.
+4. archive extraction;
+5. Eggpack manifest interoperability;
+6. consumer adoption and compatibility.
 
 The distribution/bootstrap roadmap is archived/transferred after M004 retirement of `eggup-dist`, which was authorized by Eggpack Contract M002 closure. It MUST NOT be extended with producer capabilities.
 
-Future Eggpack-manifest interoperability, if justified, is a consumer adapter concern and receives its own narrow Eggup roadmap/plan only after Eggpack ReleaseManifest v1 is stable.
+Archive extraction is a consumer-machine deployment concern governed by ADR-0005 and remains optional/outside `eggup-core`. Eggpack-manifest interoperability is a narrow consumer adapter concern and must not restore producer authority to Eggup.
 
 Only dependency-ready implementation plans should be created. Future roadmap milestones need not have detailed implementation plans until preceding evidence stabilizes the contract.
