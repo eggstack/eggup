@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: `9f99e9cbff7d65f6dce773c1977dd3c91274dc9f` (ADR-0005 + archive extraction M001 + acquisition/service M007 registration; planning-only, implementation baselines remain `ee1476ef2a9e0d5569d6dc2469e780a4435cc426`)
+Latest planning registration head: `af3c0dd6b6225bd60581225d59b7697ac7f4ef5f` (Acquisition M008 + Archive M001a + planning-hygiene C004 registered; Egress M006 and Eggpack M002 re-gated on M001a)
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
