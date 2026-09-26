@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M006 closed; M007 boundary-safety corrective ready
+Status: M001-M006 closed; M007 conditionally closed (Windows curl loopback evidence unavailable)
 
 Long-term references:
 
@@ -69,7 +69,7 @@ Post-closure review then found two narrower correctness gaps tracked by M004:
 
 M004 is closed. Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` supplied the real-consumer evidence previously required for M005. M005 is closed and fully cross-platform qualified with corrective M006: hosted run `36169295410` exposed a Windows all-targets test portability failure in `eggup-curl`, corrected by `1c601f2`, with green hosted matrix `36176009068`. Gregg remains untouched.
 
-A 2026-09-26 post-closure audit opened M007. Three boundary defects remain: fixed-byte Unicode diagnostic truncation can panic at a non-character boundary; `FetchLimits::max_artifact_bytes = None` permits an unbounded artifact-byte state contrary to the normative bounded-acquisition contract; and the curl adapter closes its exclusively-created temp before curl reopens the pathname, weakening the intended pathname-race guarantee. M007 is ready and must close before another transport-dependent consumer migration is treated as fully qualified.
+A 2026-09-26 post-closure audit opened M007 for three boundary defects: fixed-byte Unicode diagnostic truncation, `FetchLimits::max_artifact_bytes = None`, and curl reopening its exclusive temp by pathname. M007 corrected all three. Hosted Windows `curl.exe` loopback tests returned exit 7 (connection refused) for the test server; the Windows lane therefore runs the portable acquisition fixtures and curl process/error-path tests, while network-dependent curl integration tests run on Linux/macOS. No Windows live HTTP result is claimed; see the M007 closure record.
 
 ## 5. Target architecture
 
@@ -203,4 +203,4 @@ The subsystem's primary path is complete when M007 closes, the corrected native 
 | M004 | closed | `plans/implementation/acquisition-transport/004-validated-limits-and-promotion-state-corrective.md` | `plans/closure/acquisition-transport/004-status.md` | — |
 | M005 | closed; qualified with M006 corrective | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | `plans/closure/acquisition-transport/005-status.md` | — |
 | M006 | closed | `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md` | `plans/closure/acquisition-transport/006-status.md` | — |
-| M007 | ready | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` | — | — |
+| M007 | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` | `plans/closure/acquisition-transport/007-status.md` | Windows hosted runner blocks spawned curl loopback requests; no Windows live-HTTP claim |
