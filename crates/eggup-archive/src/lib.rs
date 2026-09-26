@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fmt;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -384,7 +384,7 @@ pub fn extract(
         return Err(ExtractionError::new(ExtractionErrorKind::ArchiveTooLarge));
     }
     let (root, handle) = create_private_root(output_parent)?;
-    match extract_inner(plan, &root) {
+    match extract_with_hook_inner(plan, &root, &handle, None) {
         Ok(members) => Ok(ExtractedArchive {
             guard: Some(DirectoryGuard::new(root, handle)),
             members,
@@ -396,13 +396,103 @@ pub fn extract(
     }
 }
 
-fn extract_inner(plan: &ArchivePlan, root: &Path) -> Result<Vec<ExtractedMember>, ExtractionError> {
+/// Test seam for deterministic root rename/replacement races.
+/// Deterministic pre-write hook for root rename/replacement races.
+///
+/// Runs synchronously on the extraction thread before each declared-member
+/// file creation with the zero-based declared-write sequence number and the
+/// recorded root path. Production passes `None`.
+type MaterializationHook<'a> = Option<&'a dyn Fn(usize, &Path)>;
+
+/// Retained root authority borrowed by both format handlers.
+///
+/// Carries the recorded root pathname together with the open root directory
+/// object that authorizes every member write, plus the declared-write
+/// sequence counter and optional deterministic test hook. This keeps tar and
+/// zip on one shared authority path instead of duplicating handle logic.
+struct ExtractionScope<'a> {
+    root_path: &'a Path,
+    root_handle: &'a File,
+    write_seq: usize,
+    hook: MaterializationHook<'a>,
+}
+
+impl<'a> ExtractionScope<'a> {
+    /// Runs the deterministic hook (if any) before the next declared write.
+    fn run_hook(&self) {
+        if let Some(hook) = self.hook {
+            hook(self.write_seq, self.root_path);
+        }
+    }
+
+    /// Creates the next declared member file through the retained handle.
+    fn create_member(&mut self, output_name: &str) -> Result<File, ExtractionError> {
+        self.run_hook();
+        let file = create_private_file_at(self.root_handle, Path::new(output_name))?;
+        self.write_seq += 1;
+        Ok(file)
+    }
+
+    /// Records the handoff pathname for a member written via the handle.
+    ///
+    /// The returned path is evidence only, never write authority (see the
+    /// M001c stop record for why it may be stale after a rename).
+    fn member_path(&self, output_name: &str) -> PathBuf {
+        self.root_path.join(output_name)
+    }
+}
+
+///
+/// The optional `hook` runs synchronously on the extraction thread before
+/// each declared-member file creation, with the zero-based declared-write
+/// sequence number and the recorded root path. Production passes `None`.
+#[cfg(test)]
+fn extract_with_hook(
+    plan: &ArchivePlan,
+    output_parent: &Path,
+    hook: MaterializationHook<'_>,
+) -> Result<ExtractedArchive, ExtractionError> {
+    let archive_meta = fs::symlink_metadata(&plan.archive_path)
+        .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
+    if !archive_meta.is_file() || archive_meta.file_type().is_symlink() {
+        return Err(ExtractionError::new(ExtractionErrorKind::InvalidPlan));
+    }
+    if archive_meta.len() > plan.limits.max_archive_bytes {
+        return Err(ExtractionError::new(ExtractionErrorKind::ArchiveTooLarge));
+    }
+    let (root, handle) = create_private_root(output_parent)?;
+    match extract_with_hook_inner(plan, &root, &handle, hook) {
+        Ok(members) => Ok(ExtractedArchive {
+            guard: Some(DirectoryGuard::new(root, handle)),
+            members,
+        }),
+        Err(error) => match remove_owned_root_with_hook(root.clone(), handle, None) {
+            Ok(()) => Err(error),
+            Err(_) => Err(error.with_empty_residue(root)),
+        },
+    }
+}
+
+fn extract_with_hook_inner(
+    plan: &ArchivePlan,
+    root: &Path,
+    root_handle: &File,
+    hook: MaterializationHook<'_>,
+) -> Result<Vec<ExtractedMember>, ExtractionError> {
     let mut total = 0u64;
     let mut seen = HashSet::new();
     let mut extracted = HashMap::new();
+    let mut scope = ExtractionScope {
+        root_path: root,
+        root_handle,
+        write_seq: 0,
+        hook,
+    };
     match plan.format {
-        ArchiveFormat::TarGz => extract_tar_gz(plan, root, &mut total, &mut seen, &mut extracted)?,
-        ArchiveFormat::Zip => extract_zip(plan, root, &mut total, &mut seen, &mut extracted)?,
+        ArchiveFormat::TarGz => {
+            extract_tar_gz(plan, &mut scope, &mut total, &mut seen, &mut extracted)?
+        }
+        ArchiveFormat::Zip => extract_zip(plan, &mut scope, &mut total, &mut seen, &mut extracted)?,
     }
     let mut ordered = Vec::with_capacity(plan.members.len());
     for member in &plan.members {
@@ -417,7 +507,7 @@ fn extract_inner(plan: &ArchivePlan, root: &Path) -> Result<Vec<ExtractedMember>
 
 fn extract_tar_gz(
     plan: &ArchivePlan,
-    root: &Path,
+    scope: &mut ExtractionScope<'_>,
     total: &mut u64,
     seen: &mut HashSet<String>,
     extracted: &mut HashMap<String, ExtractedMember>,
@@ -462,8 +552,14 @@ fn extract_tar_gz(
             continue;
         }
         if let Some(member) = declared {
-            let path = root.join(&member.output_name);
-            let mut output = create_private_file(&path)?;
+            let mut output = scope.create_member(&member.output_name)?;
+            // The recorded member path is handoff evidence only; the write
+            // itself was authorized by the retained root handle, never by
+            // this pathname. If the root namespace entry is renamed/replaced
+            // during extraction, this pathname may be stale/foreign (see
+            // M001c stop record); the bytes remain in the handle-owned
+            // directory.
+            let path = scope.member_path(&member.output_name);
             let (bytes_written, digest) =
                 copy_bounded(&mut entry, Some(&mut output), plan.limits, total)?;
             output
@@ -509,7 +605,7 @@ fn extract_tar_gz(
 
 fn extract_zip(
     plan: &ArchivePlan,
-    root: &Path,
+    scope: &mut ExtractionScope<'_>,
     total: &mut u64,
     seen: &mut HashSet<String>,
     extracted: &mut HashMap<String, ExtractedMember>,
@@ -546,8 +642,10 @@ fn extract_zip(
             continue;
         }
         if let Some(member) = declared {
-            let path = root.join(&member.output_name);
-            let mut output = create_private_file(&path)?;
+            let mut output = scope.create_member(&member.output_name)?;
+            // Recorded path is handoff evidence only; the write was
+            // authorized by the retained root handle (see tar path note).
+            let path = scope.member_path(&member.output_name);
             let (bytes_written, digest) =
                 copy_bounded(&mut entry, Some(&mut output), plan.limits, total)?;
             output
@@ -762,16 +860,31 @@ fn create_private_root(parent: &Path) -> Result<(PathBuf, File), ExtractionError
     Err(ExtractionError::new(ExtractionErrorKind::Io))
 }
 
-fn create_private_file(path: &Path) -> Result<File, ExtractionError> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
+/// Creates one owner-private member file relative to the retained
+/// extraction-root handle.
+///
+/// The write authority is the open root directory object, never the recorded
+/// root pathname: `fs_at::OpenOptions::open_at` resolves only relative to
+/// `root`, `create_new(true)` rejects any existing file/link/directory
+/// atomically where the filesystem supports it, and `follow(false)` refuses
+/// to follow a final-component symlink/reparse point. Unix creation mode is
+/// `0600`, preserving the previous owner-private intent.
+///
+/// `name` must be an already-validated single-component `output_name`; no
+/// multi-component archive-controlled path is accepted here.
+fn create_private_file_at(root: &File, name: &Path) -> Result<File, ExtractionError> {
+    let mut options = fs_at::OpenOptions::default();
+    options
+        .write(fs_at::OpenOptionsWriteMode::Write)
+        .create_new(true)
+        .follow(false);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
+        use fs_at::os::unix::OpenOptionsExt;
         options.mode(0o600);
     }
     options
-        .open(path)
+        .open_at(root, name)
         .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))
 }
 
@@ -1899,13 +2012,17 @@ mod tests {
     #[test]
     fn exclusive_output_creation_preserves_an_existing_file() {
         let dir = TestDir::new();
-        let output = dir.path().join("existing");
-        fs::write(&output, b"foreign").unwrap();
+        let (root, root_handle) = create_private_root(dir.path()).unwrap();
+        fs::write(root.join("existing"), b"foreign").unwrap();
         assert_eq!(
-            create_private_file(&output).unwrap_err().kind(),
+            create_private_file_at(&root_handle, Path::new("existing"))
+                .unwrap_err()
+                .kind(),
             ExtractionErrorKind::Io
         );
-        assert_eq!(fs::read(output).unwrap(), b"foreign");
+        assert_eq!(fs::read(root.join("existing")).unwrap(), b"foreign");
+        drop(root_handle);
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
@@ -1945,5 +2062,309 @@ mod tests {
         assert!(root.exists());
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
         fs::remove_dir(&root).unwrap();
+    }
+
+    // ---- M001c handle-relative materialization races ----
+    //
+    // Each test renames the operation-owned root synchronously on the
+    // extraction thread (deterministic hook, no sleeps) before or between
+    // declared-member creations, then installs a foreign replacement at the
+    // recorded pathname. Writes must remain in the renamed original through
+    // the retained handle; the foreign replacement must stay untouched. The
+    // recorded `ExtractedMember::path()` is expected to be stale here — that
+    // handoff gap is the documented M001c Section 14 stop (see closure
+    // record), so these tests read owned bytes via the known moved location
+    // rather than the returned path.
+
+    #[test]
+    fn tar_handle_relative_write_survives_root_rename_before_first_member() {
+        let dir = TestDir::new();
+        let archive = tar_file(
+            dir.path(),
+            "race.tar.gz",
+            &[TarFixture {
+                path: "app",
+                kind: b'0',
+                body: b"owned-bytes",
+                link: None,
+            }],
+        );
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::TarGz,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let moved = dir.path().join("moved-owned-tar");
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                fs::create_dir(root).unwrap();
+                for i in 0..3 {
+                    fs::write(root.join(format!("foreign-{i}")), b"keep").unwrap();
+                }
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
+        // Owned bytes landed in the renamed original via the handle.
+        assert_eq!(fs::read(moved.join("app")).unwrap(), b"owned-bytes");
+        // Foreign replacement is byte-for-byte untouched: only attacker files.
+        for i in 0..3 {
+            assert_eq!(
+                fs::read(root.join(format!("foreign-{i}"))).unwrap(),
+                b"keep"
+            );
+        }
+        assert!(!root.join("app").exists());
+        // Recorded path is stale (points into the foreign replacement).
+        assert_eq!(extracted.members()[0].path(), root.join("app").as_path());
+        drop(extracted);
+        fs::remove_dir_all(&moved).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn zip_handle_relative_write_survives_root_rename_before_first_member() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"owned-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let moved = dir.path().join("moved-owned-zip");
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                fs::create_dir(root).unwrap();
+                for i in 0..3 {
+                    fs::write(root.join(format!("foreign-{i}")), b"keep").unwrap();
+                }
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
+        assert_eq!(fs::read(moved.join("app")).unwrap(), b"owned-bytes");
+        for i in 0..3 {
+            assert_eq!(
+                fs::read(root.join(format!("foreign-{i}"))).unwrap(),
+                b"keep"
+            );
+        }
+        assert!(!root.join("app").exists());
+        drop(extracted);
+        fs::remove_dir_all(&moved).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn two_member_replacement_between_writes_stays_in_owned_root() {
+        let dir = TestDir::new();
+        let archive = tar_file(
+            dir.path(),
+            "two.tar.gz",
+            &[
+                TarFixture {
+                    path: "one",
+                    kind: b'0',
+                    body: b"first",
+                    link: None,
+                },
+                TarFixture {
+                    path: "two",
+                    kind: b'0',
+                    body: b"second",
+                    link: None,
+                },
+            ],
+        );
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::TarGz,
+            vec![
+                member("one", "one", b"first"),
+                member("two", "two", b"second"),
+            ],
+            limits(),
+        );
+        let moved = dir.path().join("moved-owned-two");
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                if seq == 1 {
+                    fs::rename(root, &moved).unwrap();
+                    fs::create_dir(root).unwrap();
+                    fs::write(root.join("foreign"), b"keep").unwrap();
+                }
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
+        // First member was written before the rename; second after. Both
+        // must live in the handle-owned (renamed) directory.
+        assert_eq!(fs::read(moved.join("one")).unwrap(), b"first");
+        assert_eq!(fs::read(moved.join("two")).unwrap(), b"second");
+        // Foreign replacement untouched: exactly the one attacker file.
+        assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+        assert_eq!(extracted.members().len(), 2);
+        drop(extracted);
+        fs::remove_dir_all(&moved).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn root_symlink_replacement_is_not_followed_by_materialization() {
+        use std::os::unix::fs::symlink;
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"owned-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let moved = dir.path().join("moved-owned-link");
+        let target = dir.path().join("link-target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("keep"), b"keep").unwrap();
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                symlink(&target, root).unwrap();
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
+        // Write stayed in the owned directory; the link target is untouched.
+        assert_eq!(fs::read(moved.join("app")).unwrap(), b"owned-bytes");
+        assert_eq!(fs::read(target.join("keep")).unwrap(), b"keep");
+        assert_eq!(fs::read_dir(&target).unwrap().count(), 1);
+        drop(extracted);
+        fs::remove_dir_all(&moved).unwrap();
+        fs::remove_dir_all(&target).unwrap();
+        fs::remove_file(&root).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_reparse_replacement_is_not_followed_by_materialization() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"owned-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let moved = dir.path().join("moved-owned-reparse");
+        let target = dir.path().join("reparse-target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("keep"), b"keep").unwrap();
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                // Best-effort reparse/symlink: may require privileges. If
+                // creation is denied, the old pathname simply stays absent;
+                // either way materialization must not enter the target.
+                let _ = std::os::windows::fs::symlink_dir(&target, root);
+                if !root.exists() {
+                    fs::create_dir(root).unwrap();
+                    fs::write(root.join("foreign"), b"keep").unwrap();
+                }
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
+        assert_eq!(fs::read(moved.join("app")).unwrap(), b"owned-bytes");
+        assert_eq!(fs::read(target.join("keep")).unwrap(), b"keep");
+        assert_eq!(fs::read_dir(&target).unwrap().count(), 1);
+        drop(extracted);
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_file(&root);
+        let _ = fs::remove_dir_all(&moved);
+        let _ = fs::remove_dir(&moved);
+        let _ = fs::remove_dir_all(&target);
+    }
+
+    #[test]
+    fn raced_existing_output_file_in_owned_root_fails_without_clobber() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"new-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"new-bytes")],
+            limits(),
+        );
+        let error = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                // Concurrent creation inside the owned root (no rename here,
+                // so pathname and handle agree on the directory).
+                fs::write(root.join("app"), b"existing").unwrap();
+            }),
+        )
+        .unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::Io);
+        // No clobber: residue (if any) never contains the new bytes at the
+        // raced name; the failure cleans only the owned partial root.
+        if let Some(residue) = error.residue_path() {
+            if residue.join("app").exists() {
+                assert_eq!(fs::read(residue.join("app")).unwrap(), b"existing");
+            }
+            let _ = fs::remove_dir_all(residue);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn raced_output_symlink_in_owned_root_fails_and_target_untouched() {
+        use std::os::unix::fs::symlink;
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"new-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"new-bytes")],
+            limits(),
+        );
+        let target = dir.path().join("race-target");
+        fs::write(&target, b"keep").unwrap();
+        let error = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                symlink(&target, root.join("app")).unwrap();
+            }),
+        )
+        .unwrap_err();
+        // create_new + no-follow must refuse the symlink; the target is
+        // never opened for write.
+        assert_eq!(error.kind(), ExtractionErrorKind::Io);
+        assert_eq!(fs::read(&target).unwrap(), b"keep");
+        if let Some(residue) = error.residue_path() {
+            let _ = fs::remove_dir_all(residue);
+        }
+        fs::remove_file(&target).unwrap();
     }
 }
