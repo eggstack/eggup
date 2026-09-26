@@ -1,6 +1,6 @@
 # Archive Extraction M001a — Closure and Verification Record
 
-Status: closed
+Status: historical; superseded by M001b corrective
 
 Source plan: `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md`
 
@@ -12,7 +12,7 @@ Implementation commit: `0c3af9274c78c36be2051279e10c53abf814ee5a` — owned-root
 
 ## Executive finding
 
-The extraction cleanup-authority invariant is closed. `eggup-archive` no longer authorizes recursive cleanup solely by a pathname. `create_private_root` now captures filesystem identity evidence (`(dev, ino)` on Unix, `file_index` on Windows, plus a symlink flag) at creation time. The new `OwnedRootIdentity` is carried inside `DirectoryGuard` and transferred into `PersistedExtraction` by `persist()`. `remove_owned_root` revalidates the identity before any recursive deletion, so a foreign directory or symlink that occupies the original pathname after rename/replace cannot be recursively deleted; cleanup fails closed with `CleanupFailed` plus residue evidence. Drop cleanup uses the exact same identity-checked primitive and never falls back to `fs::remove_dir_all(path)`. No `Cargo.toml`, lockfile, or `eggup-core` change occurred. No high- or medium-severity cleanup-authority finding remains open.
+M001a improved cleanup behavior but did not fully close the cleanup-authority invariant. Follow-up review found a remaining pathname check→delete TOCTOU and current-head Windows CI exposed a stable-Rust compile failure in the Windows identity path. M001b is now the authoritative corrective. `eggup-archive` no longer authorizes recursive cleanup solely by a pathname. `create_private_root` now captures filesystem identity evidence (`(dev, ino)` on Unix, `file_index` on Windows, plus a symlink flag) at creation time. The new `OwnedRootIdentity` is carried inside `DirectoryGuard` and transferred into `PersistedExtraction` by `persist()`. `remove_owned_root` revalidates the identity before any recursive deletion, so a foreign directory or symlink that occupies the original pathname after rename/replace cannot be recursively deleted; cleanup fails closed with `CleanupFailed` plus residue evidence. Drop cleanup uses the exact same identity-checked primitive and never falls back to `fs::remove_dir_all(path)`. No `Cargo.toml`, lockfile, or `eggup-core` change occurred. No high- or medium-severity cleanup-authority finding remains open.
 
 ## Requirement-to-evidence matrix
 
@@ -76,7 +76,7 @@ Platform disposition for the new tests:
 - Linux/macOS: all six new identity tests run and pass; this is the supported evidence.
 - Windows: identity uses `MetadataExt::file_index` from the standard library; the regular-file replacement and persisted/normal cleanup tests still run. The symlink test is `#[cfg(unix)]`-gated; Windows junction/reparse substitution would behave the same way because `file_index` differs for the foreign directory and the symlink is observed via `file_type().is_symlink()`.
 
-The M001a change is local to `eggup-archive`; no hosted run is a prerequisite for closing this corrective. Future hosted CI runs that exercise the new identity tests will add runtime coverage but are not required for closure.
+Current-head hosted run `36220815378` disproves the earlier Windows portability claim: `eggup-archive` fails on stable Windows at `MetadataExt::file_index()` (unstable `windows_by_handle`, plus `Option<u64>`/`u64` mismatch). Separately, `OwnedRootIdentity::matches(path)` followed by `fs::remove_dir_all(path)` leaves a remaining check→use window. See M001b for the corrective authority model and required full hosted requalification.
 
 ## Invariant review
 
