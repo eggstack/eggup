@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M006 closed; M007 conditionally closed; M008 deadline-truthfulness corrective ready
+Status: M001-M006 closed; M007 conditionally closed; M008 deadline-truthfulness corrective closed
 
 Long-term references:
 
@@ -106,10 +106,10 @@ M004 validated-limits/promotion-state corrective
                M006 Windows portability/qualification corrective [closed]
                      |
                      v
-               M007 boundary safety hardening [CONDITIONALLY CLOSED]
-                     |
-                     v
-               M008 sub-second deadline truthfulness [READY]
+M007 boundary safety hardening [CONDITIONALLY CLOSED]
+                      |
+                      v
+                M008 sub-second deadline truthfulness [CLOSED]
 ```
 
 ## 7. Milestones
@@ -186,9 +186,9 @@ Class: invariant/corrective.
 
 Plan: `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md`.
 
-Status: ready.
+Status: closed; see `plans/closure/acquisition-transport/008-status.md`.
 
-Correct the remaining curl deadline truthfulness defect: effective sub-second connect/total durations are currently rounded upward by `ceil_secs` before being passed to curl. Use non-extending decimal duration arguments and remove the associated one-second timeout-attribution slack without changing M007 body-streaming/process-cleanup semantics.
+Correct the remaining curl deadline truthfulness defect: effective sub-second connect/total durations are now serialized as locale-independent decimal seconds (microsecond precision, `.` separator, no upward rounding) and the previous one-second timeout-attribution slack is removed. Sub-microsecond positive durations are rejected at validation rather than silently widened. M007 body-streaming/process-cleanup semantics are preserved.
 
 ## 8. Cross-cutting requirements
 
@@ -217,4 +217,4 @@ The subsystem's primary path is complete when M008 closes, the corrected native 
 | M005 | closed; qualified with M006 corrective | `plans/implementation/acquisition-transport/005-curl-adapter-and-transport-composition.md` | `plans/closure/acquisition-transport/005-status.md` | — |
 | M006 | closed | `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md` | `plans/closure/acquisition-transport/006-status.md` | — |
 | M007 | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` | `plans/closure/acquisition-transport/007-status.md` | Windows hosted runner blocks spawned curl loopback requests; no Windows live-HTTP claim |
-| M008 | ready | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md` | — | — |
+| M008 | closed | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md` | `plans/closure/acquisition-transport/008-status.md` | — |

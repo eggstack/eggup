@@ -8,8 +8,14 @@ in to `PATH` discovery), and the adapter invokes it directly with no shell,
 no `sudo`, and no release/version/mirror policy.
 
 - Exact caller-selected URLs only; no discovery, no fallback inside the adapter.
-- Explicit connect/total ceilings (`min(request, adapter)`), passed as
-  `--connect-timeout` / `--max-time` plus an independent parent wall deadline.
+- Explicit connect/total ceilings (`min(request, adapter)`), serialized as
+  locale-independent decimal-second `--connect-timeout` / `--max-time` plus
+  an independent parent wall deadline. Sub-second caller deadlines are
+  honored truthfully (truncated to whole microseconds); sub-microsecond
+  positive durations are rejected at validation rather than widened.
+- Timeout classification labels the connect phase using only the parent
+  scheduling tolerance (`POLL_INTERVAL + 5 ms`); there is no whole-second
+  truthfulness allowance.
 - Cancellation and timeout kill and reap the owned child before return.
 - HTTP status is captured from the same transfer (`-w "%{stderr}%{http_code}"`); no
   second probe. Exact 404 becomes `FetchOutcome::NotFound` and never triggers

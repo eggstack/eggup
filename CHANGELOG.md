@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Acquisition M008 (unpublished corrective): `eggup-curl` deadline
+  arguments now serialize at microsecond precision with a `.` decimal
+  separator, so sub-second connect/total ceilings (`100 ms -> "0.1"`,
+  `250 ms -> "0.25"`, `1.5 s -> "1.5"`, `2 s -> "2"`) are passed to curl
+  truthfully instead of being widened to whole seconds. Truncation to
+  whole microseconds never widens the input. Sub-microsecond positive
+  durations are rejected at validation rather than silently extended.
+  Connect-phase timeout attribution uses only the parent scheduling
+  tolerance (`POLL_INTERVAL + 5 ms`); the previous one-second
+  truthfulness allowance is removed. No public `FetchLimits` API or
+  default values changed; no fallback, release, service, or core policy
+  changed. No publication or consumer migration performed.
+
 - Service M007 (unpublished corrective): bounded service errors and manager
   output excerpts now truncate at UTF-8 character boundaries within their
   existing 512-byte and 256-byte limits. Long permission errors retain their

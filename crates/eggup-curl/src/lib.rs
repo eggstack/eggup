@@ -411,10 +411,43 @@ fn bound(mut s: String) -> String {
     s
 }
 
-fn ceil_secs(d: Duration) -> u64 {
-    let secs = d.as_secs();
-    let extra = if d.subsec_nanos() == 0 { 0 } else { 1 };
-    (secs + extra).max(1)
+/// Serializes a positive Rust `Duration` as locale-independent decimal seconds
+/// suitable for curl `--connect-timeout` and `--max-time`.
+///
+/// Curl accepts decimal seconds with a dot separator. We format at
+/// microsecond resolution and strip trailing fractional zeros, so
+/// `100 ms -> "0.1"`, `250 ms -> "0.25"`, `1.5 s -> "1.5"`, and
+/// `2 s -> "2"`. Whole-second callers observe exact equality.
+///
+/// Sub-second values never round upward: truncation to whole microseconds
+/// always produces a value `<=` the input. A positive Rust `Duration` whose
+/// precision truncates below one microsecond cannot be expressed without
+/// widening; we reject it rather than silently extending the caller's
+/// ceiling.
+fn duration_decimal_seconds(d: Duration) -> Result<String, AcquisitionError> {
+    if d.is_zero() {
+        return Err(AcquisitionError::InvalidInput(bound(
+            "duration must be positive".to_string(),
+        )));
+    }
+    let total_micros = d.as_micros();
+    if total_micros == 0 {
+        return Err(AcquisitionError::InvalidInput(bound(
+            "duration below microsecond precision cannot be represented without widening"
+                .to_string(),
+        )));
+    }
+    let secs = total_micros / 1_000_000;
+    let micros = total_micros % 1_000_000;
+    if micros == 0 {
+        Ok(secs.to_string())
+    } else {
+        let mut frac = format!("{:06}", micros);
+        while frac.ends_with('0') {
+            frac.pop();
+        }
+        Ok(format!("{secs}.{frac}"))
+    }
 }
 
 fn proxy_env_snapshot(proxy: &CurlProxy) -> Vec<(String, String)> {
@@ -447,7 +480,7 @@ fn build_curl_args(
     max_bytes: u64,
     eff_connect: Duration,
     eff_total: Duration,
-) -> Vec<String> {
+) -> Result<Vec<String>, AcquisitionError> {
     // Ignore ~/.curlrc so ambient config cannot smuggle proxy/auth policy.
     let mut args: Vec<String> = vec![
         "--disable".to_string(),
@@ -460,10 +493,12 @@ fn build_curl_args(
         args.push("--max-redirs".to_string());
         args.push(config.max_redirects.to_string());
     }
+    let connect_arg = duration_decimal_seconds(eff_connect)?;
+    let total_arg = duration_decimal_seconds(eff_total)?;
     args.push("--connect-timeout".to_string());
-    args.push(ceil_secs(eff_connect).to_string());
+    args.push(connect_arg);
     args.push("--max-time".to_string());
-    args.push(ceil_secs(eff_total).to_string());
+    args.push(total_arg);
     args.push("--max-filesize".to_string());
     args.push(max_bytes.to_string());
     if !config.allowed_protocols.is_empty() {
@@ -483,7 +518,7 @@ fn build_curl_args(
     args.push("%{stderr}%{http_code}".to_string());
     args.push("--".to_string());
     args.push(url.to_string());
-    args
+    Ok(args)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -513,7 +548,7 @@ fn run_curl_to_file(
 ) -> Result<CurlOutcome, AcquisitionError> {
     let url = request.url().to_string();
     let redacted = request.redacted();
-    let args = build_curl_args(config, &url, max_bytes, eff_connect, eff_total);
+    let args = build_curl_args(config, &url, max_bytes, eff_connect, eff_total)?;
     let proxy_env = proxy_env_snapshot(&config.proxy);
     let start = Instant::now();
     let deadline = start + eff_total;
@@ -656,14 +691,16 @@ fn classify_curl_result(
     let elapsed = start.elapsed();
     let code_text = String::from_utf8_lossy(code_bytes).trim().to_string();
     let http_code: Option<u16> = code_text.parse().ok();
+    // Tolerance covers one parent polling interval plus a small scheduling
+    // margin for kill/reap latency. It must never extend the caller's
+    // deadline; it only labels an already-enforced timeout.
+    let tolerance = POLL_INTERVAL + Duration::from_millis(5);
     match exit_code {
         // curl operation timeout (connect or total). Distinguish by elapsed
-        // against the effective connect ceiling so callers keep truthful
-        // phase evidence without parsing stderr.
+        // against the effective connect ceiling using only the parent
+        // scheduling tolerance, not whole-second slack.
         Some(28) => {
-            // Curl ceils sub-second timeouts to whole seconds, so allow 1s
-            // slack when attributing a timeout to the connect phase.
-            if elapsed <= eff_connect + Duration::from_secs(1) {
+            if elapsed <= eff_connect + tolerance {
                 return Err(AcquisitionError::Timeout { phase: "connect" });
             }
             return Err(AcquisitionError::Timeout { phase: "total" });
@@ -1095,6 +1132,151 @@ mod tests {
             )
             .unwrap_err();
         assert!(matches!(err, AcquisitionError::Timeout { phase: "total" }));
+    }
+
+    #[test]
+    fn duration_decimal_seconds_serializes_sub_second_inputs_truthfully() {
+        // Sub-second positive durations produce decimal-second text that
+        // never exceeds the input when curl parses it back.
+        let cases = [
+            (Duration::from_micros(1), "0.000001"),
+            (Duration::from_micros(500), "0.0005"),
+            (Duration::from_millis(1), "0.001"),
+            (Duration::from_millis(100), "0.1"),
+            (Duration::from_millis(250), "0.25"),
+            (Duration::from_millis(500), "0.5"),
+            (Duration::from_millis(1500), "1.5"),
+            (Duration::from_secs(2), "2"),
+            (Duration::from_secs(120), "120"),
+        ];
+        for (input, expected) in cases {
+            let rendered = duration_decimal_seconds(input).expect("serializes");
+            assert_eq!(rendered, expected, "input {input:?}");
+        }
+        // Whole-second values never gain a spurious fractional part.
+        let rendered = duration_decimal_seconds(Duration::from_secs(7)).unwrap();
+        assert_eq!(rendered, "7");
+        // Zero is rejected.
+        assert!(duration_decimal_seconds(Duration::ZERO).is_err());
+        // Positive durations that truncate below one microsecond cannot be
+        // represented without widening and must be rejected.
+        let sub_micros = Duration::from_nanos(500);
+        assert!(duration_decimal_seconds(sub_micros).is_err());
+    }
+
+    #[test]
+    fn build_curl_args_passes_decimal_deadlines_never_above_ceiling() {
+        let cfg = CurlConfig::strict();
+        let cases = [
+            (
+                Duration::from_millis(100),
+                Duration::from_secs(1),
+                "0.1",
+                "1",
+            ),
+            (
+                Duration::from_millis(250),
+                Duration::from_millis(1500),
+                "0.25",
+                "1.5",
+            ),
+            (Duration::from_secs(2), Duration::from_secs(5), "2", "5"),
+            (
+                Duration::from_micros(500),
+                Duration::from_micros(750),
+                "0.0005",
+                "0.00075",
+            ),
+        ];
+        for (connect, total, expected_connect, expected_total) in cases {
+            let args = build_curl_args(&cfg, "https://example.com/x", 1024, connect, total)
+                .expect("builds");
+            let connect_idx = args
+                .iter()
+                .position(|a| a == "--connect-timeout")
+                .expect("connect-timeout present");
+            let total_idx = args
+                .iter()
+                .position(|a| a == "--max-time")
+                .expect("max-time present");
+            assert_eq!(args[connect_idx + 1], expected_connect);
+            assert_eq!(args[total_idx + 1], expected_total);
+        }
+        // Sub-microsecond positive durations must fail validation rather
+        // than widen to a second.
+        let err = build_curl_args(
+            &cfg,
+            "https://example.com/x",
+            1024,
+            Duration::from_nanos(500),
+            Duration::from_millis(500),
+        );
+        assert!(matches!(err, Err(AcquisitionError::InvalidInput(_))));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn build_curl_args_passes_sub_second_deadlines_to_fake_curl() {
+        let dir = temp_dir("curl-decode-args");
+        let script = fake_curl_script(b"", "200", 0, &dir);
+        let t = CurlTransport::with_executable(&script, CurlConfig::strict()).unwrap();
+        let cfg = FetchLimits {
+            max_metadata_bytes: 64 * 1024,
+            max_artifact_bytes: 256 * 1024,
+            connect_timeout: Duration::from_millis(250),
+            total_timeout: Duration::from_millis(750),
+        };
+        t.fetch_metadata(&req("https://example.com/x"), cfg, &CancelFlag::new())
+            .unwrap();
+        let argv = fs::read_to_string(dir.join("argv")).unwrap();
+        assert!(
+            argv.contains("--connect-timeout 0.25"),
+            "argv missing 0.25: {argv}"
+        );
+        assert!(
+            argv.contains("--max-time 0.75"),
+            "argv missing 0.75: {argv}"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn sub_second_total_timeout_kills_child_promptly() {
+        let Some(t) = transport() else { return };
+        let body = vec![7u8; 8192];
+        let base = serve_once(
+            200,
+            vec![("Content-Length".into(), body.len().to_string())],
+            body,
+            4000,
+            false,
+        );
+        let short_total = FetchLimits {
+            max_metadata_bytes: 64 * 1024,
+            max_artifact_bytes: 256 * 1024,
+            connect_timeout: Duration::from_millis(100),
+            total_timeout: Duration::from_millis(250),
+        };
+        let dir = temp_dir("curl-subsec-total");
+        let dest = dir.join("app");
+        let started = Instant::now();
+        let err = t
+            .fetch_artifact(
+                &req(&format!("{base}/app")),
+                &dest,
+                short_total,
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        let elapsed = started.elapsed();
+        assert!(matches!(err, AcquisitionError::Timeout { phase: "total" }));
+        // Far less than the 4-second body stall and well below the previous
+        // one-second truthfulness allowance.
+        assert!(elapsed < Duration::from_millis(750), "elapsed {elapsed:?}");
+        assert!(!dest.exists());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
