@@ -1,0 +1,91 @@
+# Archive Extraction — Deep Dive
+
+`eggup-archive` is an optional leaf crate for extracting explicitly declared
+regular files from already verified local tar.gz and zip archives. It owns
+member path authorization, decompression limits, private output files, streamed
+hashing, and cleanup of the extraction root. The caller still owns acquisition,
+archive integrity/authenticity policy, install naming, permissions, service
+lifecycle, and the later `ArtifactSet`/transaction.
+
+## Operation boundary
+
+```text
+caller verifies local archive and chooses policy
+                |
+                v
+ArchivePlan { format, declared members, finite limits }
+                |
+                v
+parse entries -> compare exact normalized paths -> regular files only
+                |
+                v
+private root + create_new 0600 files + streaming bounds + SHA-256
+                |
+                v
+ExtractedArchive evidence -> caller prepares ArtifactSet/core transaction
+```
+
+The archive crate has no Eggpack, acquisition, service-manager, or network
+dependency. Its production dependencies are `tar`, `flate2`, `zip`, and
+`sha2`; tar xattr and zip's optional compression/crypto features are disabled
+except deflate decoding. `eggup-core` does not depend on this crate or any
+archive-format package.
+
+## Path and entry contract
+
+- Archive names must be UTF-8, relative, slash-separated paths. Empty, rooted,
+  drive-prefixed, backslash, control, dot, parent, repeated-separator, and
+  overlong paths fail closed; no dangerous path is rewritten into a safe one.
+- Output names are single portable ASCII filenames. Windows device names,
+  separators, control characters, trailing dot/space, and reserved punctuation
+  are rejected. Duplicate source names and case-insensitive output aliases are
+  rejected by plan construction.
+- Only declared tar regular entries (type `0` or NUL) and regular zip entries
+  can be materialized. Links, directories, devices, FIFOs, sparse/unknown types,
+  and other special entries are never written. Undeclared regular entries are
+  drained under the same per-member and aggregate decompressed-byte limits.
+- Every entry path is bounded and duplicate normalized archive paths are
+  rejected. Success requires each declared path exactly once.
+
+## Bounds and evidence
+
+`ArchiveLimits` bounds compressed archive size, entry count, path bytes,
+individual decompressed member bytes, and total decompressed bytes. All limits
+must be positive and finite. The conservative defaults are 512 MiB compressed,
+10,000 entries, 1 KiB path strings, 256 MiB per member, and 512 MiB total.
+Consumers should choose limits from their own release contract rather than
+treating defaults as release policy.
+
+Data is copied in fixed 16 KiB chunks. The extractor counts bytes before each
+write, updates SHA-256 in the same loop, flushes each completed output, then
+checks exact size/digest facts when supplied. A success result contains paths,
+byte counts, and hashes in caller declaration order. Flush supports immediate
+subsequent reads; extraction makes no crash-durability or restart guarantee.
+
+## Ownership, cleanup, and handoff
+
+The selected output parent must already be a real directory. Extraction creates
+one exclusive sibling root (0700 on Unix) and creates each file with no-clobber
+semantics (0600 on Unix). It never creates install-root parents or writes into
+the live installation. Any failure removes only the root created by that
+operation; cleanup failure changes the returned category to `CleanupFailed`
+and retains the residue path.
+
+`ExtractedArchive` cleans itself on drop, which is safe for unused results.
+After the caller has prepared/copied the members into a later transaction, it
+can call `persist()` to transfer cleanup responsibility and explicitly remove
+the retained root when no longer needed. Neither state proves destination
+ownership or grants permission to commit.
+
+## Failure semantics
+
+Malformed/truncated streams, unsafe/duplicate paths, non-regular declared
+members, missing declarations, archive/entry/member/aggregate overages, exact
+size mismatch, digest mismatch, and I/O errors fail before live mutation. The
+caller can retry into a fresh exclusive root; extraction is not resumable.
+Diagnostics expose bounded categories, not archive contents or arbitrary
+upstream text. Raw operating-system errors are not returned.
+
+See `plans/adrs/ADR-0005-local-archive-extraction-safety-contract.md` and
+`plans/closure/archive-extraction/001-status.md` for the normative contract and
+M001 qualification evidence.

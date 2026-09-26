@@ -6,6 +6,7 @@ members = [
     "crates/eggup-eggfetch",
     "crates/eggup-curl",
     "crates/eggup-service",
+    "crates/eggup-archive",
     "crates/eggup-eggpack",
     "crates/eggup-transport-footprint",
 ]

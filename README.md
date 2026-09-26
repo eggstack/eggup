@@ -25,5 +25,10 @@ It does not add an Eggpack dependency to core, acquisition, or service. Archive
 manifests remain extraction-required; URL, install-root, ownership, permission,
 release, and authenticity policy remain caller-owned.
 
+The optional `eggup-archive` crate extracts explicitly declared regular files
+from already verified tar.gz and zip archives into a private bounded staging
+directory. It never changes the live installation, and `eggup-core` remains
+independent of archive formats.
+
 See [architecture/overview.md](architecture/overview.md) for the ownership
 map and canonical planning references.

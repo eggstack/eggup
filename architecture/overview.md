@@ -46,6 +46,7 @@ Domain preparation rules are defined in the [domain contract](../crates/eggup-co
 | `eggup-eggfetch` | Native HTTP adapter | `EggfetchConfig` single policy point (timeouts as ceilings, redirect bound, explicit proxy, HTTP/1 + Rustls), status classification, streaming artifacts, sync-over-async bridge, category-only redacted errors | [eggfetch-adapter.md](eggfetch-adapter.md) |
 | `eggup-curl` | External curl adapter | `CurlConfig` single policy point (explicit executable, opt-in PATH discovery, connect/total ceilings, redirect/protocol/proxy explicit, `--disable` for curlrc), direct-process execution with kill/reap, same-request HTTP status capture, private temp + no-clobber promotion, category-only redacted errors | [acquisition.md](acquisition.md) |
 | `eggup-service` | Manager-neutral service lifecycle | `ServiceSpec`/`Ownership`/`LifecycleSnapshot`, `ServiceManager` + `TestDoubleManager`, `SystemExecutor` (allowlisted paths, cleared env, bounded I/O), `atomic_write_definition`, systemd / launchd / cron / Windows SCM adapters, `commit_with_lifecycle`, M006 `UpdateRuntimeDisposition` + `plan_unix`/`plan_windows` + `DirectRuntimeControl` + `commit_with_disposition` (artifact vs manager authority, revalidation barrier) | [service-lifecycle.md](service-lifecycle.md) |
+| `eggup-archive` | Optional local archive extraction | Explicit tar.gz/zip member allowlists, finite compressed/decompressed limits, regular-file-only extraction, private root, no-clobber files, streamed SHA-256/size evidence, cleanup guard | [archive-extraction.md](archive-extraction.md) |
 | `eggup-eggpack` | Optional Eggpack ReleaseManifest v1 adapter (leaf) | `project` / `project_json`, `bind_requests` (tightened byte caps), `materialize_artifact_set`, direct/bundle installable vs archive extraction-required | [eggpack-adapter.md](eggpack-adapter.md) |
 | tooling + governance | Workspace, verification, planning | `scripts/check-local.sh` (fmt/clippy/test/doc/tree), CI (stable/msrv/macos/windows-check), `forbid(unsafe)` + `deny(missing_docs)`, plans / ADRs / roadmaps / closure / registry | [tooling-governance.md](tooling-governance.md) |
 
@@ -57,6 +58,7 @@ Eggpack ReleaseManifest (optional)
   -> acquisition transport (fixture or eggfetch): fetch_metadata / fetch_artifact
        exact URL verbatim, caller bounds, 0600 temp + no-clobber, NotFound vs failure
   -> eggup-eggpack: materialize_artifact_set (size/regular-file checks + digests)
+  -> eggup-archive (optional): verified archive -> declared private extracted members
   -> eggup-core: prepare (private stage) -> verify_integrity (SHA-256)
        -> validate (bounded candidates) -> commit (locked ownership +
           staged-digest revalidation -> backup -> rename -> receipt)
@@ -69,8 +71,8 @@ Typical flows:
    builds `ArtifactSet` directly, and commits via `eggup-core`.
 2. Eggpack consumer projects a manifest with `eggup-eggpack`, fetches each
    `PlannedAcquisition` via the acquisition seam, materializes one `ArtifactSet`,
-   and commits via `eggup-core`. Archives stop at evidence; extraction is a
-   separate qualified boundary.
+   and commits via `eggup-core`. When an archive is installation-required,
+   `eggup-archive` can materialize its declared members before core preparation.
 3. Service-aware consumer wraps a `ValidatedTransaction` with
    `eggup-service::commit_with_lifecycle` for stop-commit-restore semantics.
    Service state and application health stay distinct.
@@ -82,4 +84,5 @@ Typical flows:
 - [eggfetch-adapter.md](eggfetch-adapter.md) — native HTTP policy, timeouts, redaction, streaming.
 - [service-lifecycle.md](service-lifecycle.md) — neutral model, Unix/Windows adapters, lifecycle composition.
 - [eggpack-adapter.md](eggpack-adapter.md) — manifest projection, binding, materialization, fixtures.
+- [archive-extraction.md](archive-extraction.md) — bounded allowlisted local tar.gz/zip extraction.
 - [tooling-governance.md](tooling-governance.md) — workspace lints, verification workflow, plans/ADRs/closure.

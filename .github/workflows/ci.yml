@@ -40,10 +40,10 @@ jobs:
       - run: cargo test --workspace --all-targets --all-features --locked
 
   windows-check:
-    name: Windows acquisition tests and check
+    name: Windows archive and acquisition tests and check
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test -p eggup-acquisition -p eggup-curl --locked
+      - run: cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl --locked
       - run: cargo check --workspace --all-targets --locked

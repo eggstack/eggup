@@ -8,13 +8,15 @@ docs, and the changelog. Factual as of the current tree.
 
 **Root:** `Cargo.toml` (workspace, `resolver = "2"`).
 
-Members (`Cargo.toml:3-9`):
+Members (`Cargo.toml`):
 
 - `crates/eggup-core`
 - `crates/eggup-acquisition`
 - `crates/eggup-eggfetch`
 - `crates/eggup-service`
+- `crates/eggup-archive`
 - `crates/eggup-eggpack`
+- `crates/eggup-transport-footprint`
 
 No `eggup-dist` member: retired per `plans/closure/distribution-bootstrap/004-status.md`
 (see §5). No thin `eggup` facade crate yet (allowed but not built;
@@ -37,7 +39,7 @@ all = { level = "warn", priority = -1 }
 
 Each crate opts in with `[lints] workspace = true` and additionally sets
 `#![forbid(unsafe_code)]` + `#![deny(missing_docs)]` at the top of its
-`src/lib.rs` (all five crates, verified against the current tree).
+`src/lib.rs` (all first-party library crates, verified against the current tree).
 
 Per-crate package metadata diverges deliberately:
 

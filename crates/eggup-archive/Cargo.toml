@@ -1,0 +1,24 @@
+[package]
+name = "eggup-archive"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Bounded allowlisted local archive extraction for Eggup"
+readme = "README.md"
+keywords = ["archive", "extraction", "updater"]
+categories = ["filesystem"]
+exclude = ["tests/", "benches/"]
+
+[dependencies]
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
+sha2 = "0.10.9"
+tar = { version = "0.4.46", default-features = false }
+zip = { version = "6.0.0", default-features = false, features = ["deflate-flate2"] }
+
+[dev-dependencies]
+eggup-core = { path = "../eggup-core", version = "=0.1.1" }
+
+[lints]
+workspace = true
