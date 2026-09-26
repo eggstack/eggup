@@ -8,7 +8,7 @@ Source roadmap: `plans/subsystems/acquisition-transport-roadmap.md#M008--sub-sec
 
 Reviewed repository baseline: `ea51fe12a7c9120028b727eb5e40411e9b10f8e2` (post-M007/M001/M007 review baseline; source tree was clean before implementation)
 
-Implementation commit: `pending` — see git log for the closing commit hash.
+Implementation commit: `bcf3084c2e31b497b2b9c2de61aa2b6e25c0a486` — sub-second deadline truthfulness corrective; locale-independent microsecond serializer; one-second attribution slack removed; tests + roadmap/CHANGELOG/README updates.
 
 ## Executive finding
 

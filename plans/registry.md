@@ -8,7 +8,7 @@ Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba
 
 Latest planning registration head: `af3c0dd6b6225bd60581225d59b7697ac7f4ef5f` (Acquisition M008 + Archive M001a + planning-hygiene C004 registered; Egress M006 and Eggpack M002 re-gated on M001a)
 
-Latest implementation closure head: `pending` — Acquisition M008 (sub-second deadline truthfulness) closed; see `plans/closure/acquisition-transport/008-status.md` for the closing commit hash.
+Latest implementation closure head: `bcf3084c2e31b497b2b9c2de61aa2b6e25c0a486` — Acquisition M008 (sub-second deadline truthfulness) closed; see `plans/closure/acquisition-transport/008-status.md`.
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
