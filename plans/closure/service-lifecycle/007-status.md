@@ -65,7 +65,7 @@ Hosted final run 36215858056:
 - macOS: full workspace tests passed (service 101/101).
 - Windows: acquisition/archive/curl portable suites passed (34/17/5); the three new service diagnostic tests passed (1 each), all 15 Windows SCM model tests passed, and workspace all-target check passed.
 
-The initial Windows attempt ran the Unix-specific adapter fixtures and then the shared service model suite; fixtures that construct `/opt/...` paths failed Windows `Path::is_absolute` checks. They are now platform-qualified or run only in the appropriate hosted platform lane. The initial macOS attempt had one existing timing assertion (`launchd_restart_does_not_start_after_incomplete_stop`, `<150 ms`) fail while the other 100 service tests passed. A full workflow rerun passed all jobs and all 101 service tests; no timeout or lifecycle behavior was changed.
+The initial Windows attempt ran the Unix-specific adapter fixtures and then the shared service model suite; fixtures that construct `/opt/...` paths failed Windows `Path::is_absolute` checks. They are now platform-qualified or run only in the appropriate hosted platform lane. Two macOS attempts each hit a different existing timing assertion (`launchd_restart_does_not_start_after_incomplete_stop`, `<150 ms`; and `transition_deadline_rejects_zero_and_only_shrinks`, 1 ms deadline) while the other 100 service tests passed. A full workflow rerun passed all jobs and all 101 service tests; no timeout or lifecycle behavior was changed.
 
 ## Invariant review
 
@@ -90,7 +90,7 @@ The change prevents malformed UTF-8 diagnostics from becoming panics and retains
 ## Unresolved findings
 
 - Informational test-scope note: Windows runs UTF-8 service diagnostics and all Windows SCM model tests, while the complete 101-test service suite runs on Linux/macOS. Existing broad service tests contain POSIX path fixtures and are not portable Windows tests. No M007 requirement depends on those fixtures.
-- Informational hosted flake: one timing-sensitive launchd test failed on the first macOS attempt and passed on the full hosted rerun; there is no repeated failure or M007 code change implicated.
+- Informational hosted flakes: separate hosted attempts exposed two existing timing-sensitive tests noted above; each passed on the subsequent full workflow rerun. No repeated failure was observed in the final run, and no M007 code change is implicated.
 - None: no high- or medium-severity implementation issue remains.
 
 ## Roadmap disposition and downstream unblock
