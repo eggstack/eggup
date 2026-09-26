@@ -708,10 +708,13 @@ fn classify_curl_result(
 mod tests {
     use super::*;
     use eggup_acquisition::{FixtureResponse, FixtureTransport};
+    #[cfg(not(windows))]
     use std::io::{Read, Write};
+    #[cfg(not(windows))]
     use std::net::TcpListener;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+    #[cfg(not(windows))]
     use std::thread;
 
     #[test]
@@ -757,6 +760,7 @@ mod tests {
         })
     }
 
+    #[cfg(not(windows))]
     fn serve_once(
         status: u16,
         headers: Vec<(String, String)>,
@@ -797,6 +801,7 @@ mod tests {
         format!("http://{addr}")
     }
 
+    #[cfg(not(windows))]
     fn ok_server(body: Vec<u8>) -> String {
         serve_once(
             200,
@@ -899,6 +904,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn metadata_success_not_found_and_server_error() {
         let Some(t) = transport() else { return };
         let base = ok_server(b"hello-curl-meta".to_vec());
@@ -922,6 +928,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn artifact_success_not_found_and_server_error() {
         let Some(t) = transport() else { return };
         let body: Vec<u8> = (0..4096).map(|i| (i % 251) as u8).collect();
@@ -983,6 +990,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn truncated_transfer_is_hard_failure_without_promotion() {
         let Some(t) = transport() else { return };
         let body = vec![5u8; 4096];
@@ -1009,6 +1017,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn metadata_and_artifact_size_overflow() {
         let Some(t) = transport() else { return };
         let big = vec![9u8; 128 * 1024];
@@ -1042,6 +1051,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn connect_and_total_timeouts_are_typed() {
         let Some(t) = transport() else { return };
         // Unroutable connect with a short connect ceiling.
@@ -1090,14 +1100,12 @@ mod tests {
     #[test]
     fn cancellation_kills_and_reaps_child() {
         let Some(t) = transport() else { return };
-        let body = vec![3u8; 64 * 1024];
-        let base = ok_server(body);
         let dir = temp_dir("curl-cancel");
         let dest = dir.join("app");
         let cancel = CancelFlag::new();
         cancel.cancel();
         let err = t
-            .fetch_artifact(&req(&format!("{base}/app")), &dest, limits(), &cancel)
+            .fetch_artifact(&req("http://127.0.0.1:1/app"), &dest, limits(), &cancel)
             .unwrap_err();
         assert!(matches!(err, AcquisitionError::Cancelled));
         assert!(!dest.exists());
@@ -1111,6 +1119,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn redirect_follow_and_reject() {
         let Some(_) = real_curl() else { return };
         let target_body = b"redirect-target".to_vec();
