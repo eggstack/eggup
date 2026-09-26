@@ -64,8 +64,8 @@ impl AcquisitionRequest {
 pub struct FetchLimits {
     /// Maximum decoded metadata bytes held in memory.
     pub max_metadata_bytes: usize,
-    /// Maximum artifact bytes written to disk, when bounded.
-    pub max_artifact_bytes: Option<u64>,
+    /// Maximum artifact bytes written to disk. Every fetch is finitely bounded.
+    pub max_artifact_bytes: u64,
     /// Deadline for establishing the connection (advisory for fixtures).
     pub connect_timeout: Duration,
     /// Total wall-clock deadline for the fetch.
@@ -76,7 +76,7 @@ impl Default for FetchLimits {
     fn default() -> Self {
         Self {
             max_metadata_bytes: 256 * 1024,
-            max_artifact_bytes: Some(128 * 1024 * 1024),
+            max_artifact_bytes: 128 * 1024 * 1024,
             connect_timeout: Duration::from_secs(10),
             total_timeout: Duration::from_secs(120),
         }
@@ -92,6 +92,9 @@ impl FetchLimits {
     pub fn validate(&self) -> Result<(), AcquisitionError> {
         if self.max_metadata_bytes == 0 || self.max_metadata_bytes > 16 * 1024 * 1024 {
             return Err(AcquisitionError::invalid("metadata bound out of range"));
+        }
+        if self.max_artifact_bytes == 0 {
+            return Err(AcquisitionError::invalid("artifact bound must be positive"));
         }
         if self.total_timeout.is_zero() || self.connect_timeout.is_zero() {
             return Err(AcquisitionError::invalid("timeouts must be positive"));
@@ -112,7 +115,7 @@ impl FetchLimits {
     /// deadline cannot be satisfied truthfully.
     pub fn new(
         max_metadata_bytes: usize,
-        max_artifact_bytes: Option<u64>,
+        max_artifact_bytes: u64,
         connect_timeout: Duration,
         total_timeout: Duration,
     ) -> Result<Self, AcquisitionError> {
@@ -320,9 +323,17 @@ impl fmt::Display for AcquisitionError {
 
 impl std::error::Error for AcquisitionError {}
 
-fn bound_detail(mut s: String) -> String {
-    if s.len() > 512 {
-        s.truncate(512);
+fn bound_detail(s: String) -> String {
+    truncate_utf8_bytes(s, 512)
+}
+
+fn truncate_utf8_bytes(mut s: String, max: usize) -> String {
+    if s.len() > max {
+        let mut end = max;
+        while !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        s.truncate(end);
     }
     s
 }
@@ -357,7 +368,11 @@ pub fn redact_url(url: &str) -> String {
         out.push_str("?<redacted>");
     }
     if out.len() > 256 {
-        out.truncate(256);
+        let mut end = 256;
+        while !out.is_char_boundary(end) {
+            end -= 1;
+        }
+        out.truncate(end);
         out.push('…');
     }
     out
@@ -413,7 +428,11 @@ pub fn __scrub_upstream_text(text: &str) -> String {
         }
     }
     if out.len() > 512 {
-        out.truncate(512);
+        let mut end = 512;
+        while !out.is_char_boundary(end) {
+            end -= 1;
+        }
+        out.truncate(end);
     }
     out
 }
@@ -805,10 +824,10 @@ impl AcquisitionTransport for FixtureTransport {
                 body
             }
         };
-        if let Some(max) = limits.max_artifact_bytes {
-            if body.len() as u64 > max {
-                return Err(AcquisitionError::TooLarge { limit: max });
-            }
+        if body.len() as u64 > limits.max_artifact_bytes {
+            return Err(AcquisitionError::TooLarge {
+                limit: limits.max_artifact_bytes,
+            });
         }
         if start.elapsed() > limits.total_timeout {
             return Err(AcquisitionError::Timeout { phase: "total" });
@@ -1029,7 +1048,7 @@ mod tests {
     fn limits() -> FetchLimits {
         FetchLimits {
             max_metadata_bytes: 1024,
-            max_artifact_bytes: Some(4096),
+            max_artifact_bytes: 4096,
             connect_timeout: Duration::from_secs(1),
             total_timeout: Duration::from_secs(5),
         }
@@ -1245,6 +1264,32 @@ mod tests {
     }
 
     #[test]
+    fn bounded_diagnostics_preserve_utf8_at_256_and_512_byte_edges() {
+        for limit in [256, 512] {
+            for (width, ch) in [(2, "é"), (3, "€"), (4, "🦀")] {
+                let prefix = "a".repeat(limit - 1);
+                let bounded = truncate_utf8_bytes(format!("{prefix}{ch}tail"), limit);
+                assert!(bounded.len() <= limit);
+                assert!(std::str::from_utf8(bounded.as_bytes()).is_ok());
+                assert!(bounded.ends_with(&prefix));
+                assert!(width > 1);
+            }
+        }
+    }
+
+    #[test]
+    fn zero_artifact_limit_is_rejected() {
+        let invalid = FetchLimits {
+            max_artifact_bytes: 0,
+            ..FetchLimits::default()
+        };
+        assert!(matches!(
+            invalid.validate(),
+            Err(AcquisitionError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
     fn no_fallback_on_unregistered_url() {
         let t = FixtureTransport::new();
         let err = t
@@ -1303,13 +1348,9 @@ mod tests {
             assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
         }
         assert!(limits().validate().is_ok());
-        assert!(FetchLimits::new(
-            1024,
-            Some(4096),
-            Duration::from_secs(1),
-            Duration::from_secs(5)
-        )
-        .is_ok());
+        assert!(
+            FetchLimits::new(1024, 4096, Duration::from_secs(1), Duration::from_secs(5)).is_ok()
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -1342,27 +1383,22 @@ mod tests {
 
     #[test]
     fn connect_exceeding_total_is_rejected() {
-        let err = FetchLimits::new(
-            1024,
-            Some(4096),
-            Duration::from_secs(5),
-            Duration::from_secs(1),
-        )
-        .unwrap_err();
+        let err = FetchLimits::new(1024, 4096, Duration::from_secs(5), Duration::from_secs(1))
+            .unwrap_err();
         assert!(matches!(err, AcquisitionError::InvalidInput(_)));
     }
 
     #[test]
     fn zero_timeouts_are_rejected() {
-        assert!(FetchLimits::new(1024, Some(1), Duration::ZERO, Duration::from_secs(1)).is_err());
-        assert!(FetchLimits::new(1024, Some(1), Duration::from_secs(1), Duration::ZERO).is_err());
+        assert!(FetchLimits::new(1024, 1, Duration::ZERO, Duration::from_secs(1)).is_err());
+        assert!(FetchLimits::new(1024, 1, Duration::from_secs(1), Duration::ZERO).is_err());
     }
 
     #[test]
     fn effective_timeouts_take_minimums() {
         let request = FetchLimits {
             max_metadata_bytes: 1024,
-            max_artifact_bytes: Some(4096),
+            max_artifact_bytes: 4096,
             connect_timeout: Duration::from_millis(50),
             total_timeout: Duration::from_millis(50),
         };
@@ -1373,7 +1409,7 @@ mod tests {
         // Adapter stricter than request: adapter wins.
         let request2 = FetchLimits {
             max_metadata_bytes: 1024,
-            max_artifact_bytes: Some(4096),
+            max_artifact_bytes: 4096,
             connect_timeout: Duration::from_secs(5),
             total_timeout: Duration::from_secs(5),
         };
@@ -1397,7 +1433,7 @@ mod tests {
         let dest = dir.join("app");
         let tiny = FetchLimits {
             max_metadata_bytes: 1024,
-            max_artifact_bytes: Some(4096),
+            max_artifact_bytes: 4096,
             connect_timeout: Duration::from_millis(10),
             total_timeout: Duration::from_millis(10),
         };

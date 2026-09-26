@@ -168,14 +168,14 @@ impl ManifestProjection {
         requirements
             .into_iter()
             .map(|(name, size, sha, member)| {
-                if baseline.max_artifact_bytes.is_some_and(|n| n < size) {
+                if baseline.max_artifact_bytes < size {
                     return Err(AdapterError::CallerLimitTooSmall(name.clone()));
                 }
                 Ok(PlannedAcquisition {
                     artifact_name: name.clone(),
                     request: requests.get(&name).expect("checked map").clone(),
                     limits: FetchLimits {
-                        max_artifact_bytes: Some(size),
+                        max_artifact_bytes: size,
                         ..baseline
                     },
                     exact_size: size,
@@ -448,12 +448,9 @@ mod tests {
         requests.insert(name.clone(), request.clone());
         let bound = p.bind_requests(requests, FetchLimits::default()).unwrap();
         assert_eq!(bound[0].request, request);
-        assert_eq!(
-            bound[0].limits.max_artifact_bytes,
-            Some(bound[0].exact_size)
-        );
+        assert_eq!(bound[0].limits.max_artifact_bytes, bound[0].exact_size);
         let too_small = FetchLimits {
-            max_artifact_bytes: Some(bound[0].exact_size - 1),
+            max_artifact_bytes: bound[0].exact_size - 1,
             ..FetchLimits::default()
         };
         assert!(matches!(

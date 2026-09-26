@@ -42,10 +42,11 @@ effective total timeout   = min(request total, adapter total ceiling)
 
 A stricter adapter may tighten a deadline but never extends one.
 `FetchLimits::new` and `FetchLimits::validate` require a metadata bound in
-`1..=16 MiB`, non-zero timeouts, and `connect <= total`. The fields remain
-public for 0.1.x source compatibility, so every transport revalidates a value
-at entry before route lookup, filesystem mutation, or network I/O. Direct
-struct literals cannot bypass the checks.
+`1..=16 MiB`, a positive finite artifact-byte cap, non-zero timeouts, and
+`connect <= total`. Every transport revalidates direct struct literals at
+entry before route lookup, filesystem mutation, or network I/O. Migration:
+replace `max_artifact_bytes: Some(n)` with `max_artifact_bytes: n`; `None` is
+no longer representable. The default remains a finite 128 MiB cap.
 Both metadata and artifact operations use the same derivation; the total
 covers headers plus body streaming. A caller deadline produces
 `AcquisitionError::Timeout`, never `NotFound`/fallback.

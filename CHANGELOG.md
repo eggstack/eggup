@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Acquisition M007 (unpublished corrective): diagnostics now truncate only at
+  UTF-8 boundaries; `FetchLimits::max_artifact_bytes` is a mandatory positive
+  finite `u64` (migration: `Some(n)` → `n`, remove `None`); curl streams body
+  bytes into Eggup's retained exclusive file handle and captures bounded HTTP
+  status separately. No fallback, release, service, or core policy changed.
+  No publication or consumer migration performed.
+
 - Acquisition M005 (unpublished): new `eggup-curl` external-curl adapter plus
   `AcquisitionError::Unavailable` and `eggup-acquisition::ComposedTransport`
   with `CompositionPolicy::{UnavailableOnly (default), UnavailableOrTransport}`.

@@ -421,7 +421,7 @@ fn direct_request_binding_preserves_url_and_tightens_limits() {
     let request = AcquisitionRequest::new(url).unwrap();
     let baseline = FetchLimits {
         max_metadata_bytes: 64 * 1024,
-        max_artifact_bytes: Some(exact + 1024),
+        max_artifact_bytes: exact + 1024,
         connect_timeout: Duration::from_secs(7),
         total_timeout: Duration::from_secs(77),
     };
@@ -432,7 +432,7 @@ fn direct_request_binding_preserves_url_and_tightens_limits() {
     // Exact caller URL retained byte-for-byte.
     assert_eq!(bound[0].request.url(), url);
     // Byte cap tightened to the exact manifest size.
-    assert_eq!(bound[0].limits.max_artifact_bytes, Some(exact));
+    assert_eq!(bound[0].limits.max_artifact_bytes, exact);
     // Caller timeouts and metadata bound preserved, never widened.
     assert_eq!(bound[0].limits.connect_timeout, Duration::from_secs(7));
     assert_eq!(bound[0].limits.total_timeout, Duration::from_secs(77));
@@ -507,7 +507,7 @@ fn bundle_exact_maps_produce_three_member_set() {
         .unwrap();
     assert_eq!(bound.len(), 3);
     for b in &bound {
-        assert_eq!(b.limits.max_artifact_bytes, Some(b.exact_size));
+        assert_eq!(b.limits.max_artifact_bytes, b.exact_size);
     }
 
     let tmp = TempDir::new("bundle-positive");
@@ -558,7 +558,7 @@ fn archive_positive_preserves_facts_and_blocks_materialization() {
         )
         .unwrap();
     assert_eq!(bound.len(), 1);
-    assert_eq!(bound[0].limits.max_artifact_bytes, Some(exact_size));
+    assert_eq!(bound[0].limits.max_artifact_bytes, exact_size);
 
     // Materialization through the generic entry point stays blocked.
     let tmp = TempDir::new("archive-blocked");
@@ -664,7 +664,7 @@ fn negative_06_caller_limit_below_exact_size_fails() {
     let name = artifacts[0].artifact_name.clone();
     let exact = artifacts[0].exact_size;
     let too_small = FetchLimits {
-        max_artifact_bytes: Some(exact - 1),
+        max_artifact_bytes: exact - 1,
         ..FetchLimits::default()
     };
     assert!(matches!(
@@ -688,7 +688,7 @@ fn negative_07_timeouts_and_metadata_bounds_are_never_widened() {
     let exact = artifacts[0].exact_size;
     let baseline = FetchLimits {
         max_metadata_bytes: 4096,
-        max_artifact_bytes: None,
+        max_artifact_bytes: 1024 * 1024,
         connect_timeout: Duration::from_secs(3),
         total_timeout: Duration::from_secs(30),
     };
@@ -705,7 +705,7 @@ fn negative_07_timeouts_and_metadata_bounds_are_never_widened() {
     assert_eq!(bound[0].limits.connect_timeout, Duration::from_secs(3));
     assert_eq!(bound[0].limits.total_timeout, Duration::from_secs(30));
     // Unbounded caller cap is tightened to the exact size, never left open.
-    assert_eq!(bound[0].limits.max_artifact_bytes, Some(exact));
+    assert_eq!(bound[0].limits.max_artifact_bytes, exact);
 }
 
 #[test]

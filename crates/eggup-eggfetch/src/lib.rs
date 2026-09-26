@@ -381,13 +381,11 @@ impl AcquisitionTransport for EggfetchTransport {
                     if chunk.is_empty() {
                         continue;
                     }
-                    if let Some(max) = max_artifact {
-                        written = written.saturating_add(chunk.len() as u64);
-                        if written > max {
-                            return Err(AcquisitionError::TooLarge { limit: max });
-                        }
-                    } else {
-                        written = written.saturating_add(chunk.len() as u64);
+                    written = written.saturating_add(chunk.len() as u64);
+                    if written > max_artifact {
+                        return Err(AcquisitionError::TooLarge {
+                            limit: max_artifact,
+                        });
                     }
                     file.write_all(&chunk).await.map_err(|e| {
                         AcquisitionError::Io(bound(format!("writing part file: {e}")))
@@ -421,7 +419,11 @@ impl AcquisitionTransport for EggfetchTransport {
 fn bound(s: String) -> String {
     let mut s = s;
     if s.len() > 512 {
-        s.truncate(512);
+        let mut end = 512;
+        while !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        s.truncate(end);
     }
     s
 }
@@ -500,6 +502,16 @@ fn map_fetch_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn diagnostic_bound_never_splits_multibyte_code_points() {
+        for (limit, ch) in [(512, "é"), (512, "€"), (512, "🦀")] {
+            let prefix = "x".repeat(limit - 1);
+            let bounded = bound(format!("{prefix}{ch}tail"));
+            assert_eq!(bounded, prefix);
+            assert!(bounded.len() <= limit);
+        }
+    }
     use eggup_acquisition::{AcquisitionRequest, FixtureResponse, FixtureTransport};
     use std::io::{Read, Write};
     use std::net::TcpListener;
@@ -517,7 +529,7 @@ mod tests {
     fn limits() -> FetchLimits {
         FetchLimits {
             max_metadata_bytes: 64 * 1024,
-            max_artifact_bytes: Some(256 * 1024),
+            max_artifact_bytes: 256 * 1024,
             connect_timeout: Duration::from_secs(2),
             total_timeout: Duration::from_secs(10),
         }
@@ -826,7 +838,7 @@ mod tests {
                 &req(&format!("{base}/slow")),
                 FetchLimits {
                     max_metadata_bytes: 64 * 1024,
-                    max_artifact_bytes: Some(256 * 1024),
+                    max_artifact_bytes: 256 * 1024,
                     connect_timeout: Duration::from_millis(300),
                     total_timeout: Duration::from_millis(300),
                 },
@@ -894,7 +906,7 @@ mod tests {
     fn request_limits(connect: Duration, total: Duration) -> FetchLimits {
         FetchLimits {
             max_metadata_bytes: 64 * 1024,
-            max_artifact_bytes: Some(256 * 1024),
+            max_artifact_bytes: 256 * 1024,
             connect_timeout: connect,
             total_timeout: total,
         }
@@ -960,13 +972,9 @@ mod tests {
     #[test]
     fn connect_exceeding_total_is_rejected_in_both_layers() {
         // Seam layer.
-        assert!(FetchLimits::new(
-            1024,
-            Some(1024),
-            Duration::from_secs(5),
-            Duration::from_secs(1),
-        )
-        .is_err());
+        assert!(
+            FetchLimits::new(1024, 1024, Duration::from_secs(5), Duration::from_secs(1),).is_err()
+        );
         // Adapter layer fails closed at construction.
         let cfg = EggfetchConfig::strict().timeouts(Duration::from_secs(5), Duration::from_secs(1));
         assert!(EggfetchTransport::strict(cfg).is_err());

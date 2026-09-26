@@ -12,9 +12,12 @@ use eggup_acquisition::{
     AcquisitionError, AcquisitionRequest, AcquisitionTransport, CancelFlag, FetchLimits,
     FetchOutcome,
 };
-use std::fs;
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Default connect deadline ceiling.
@@ -209,7 +212,8 @@ impl AcquisitionTransport for CurlTransport {
         // machinery as artifact staging, cleaned unconditionally.
         let parent = std::env::temp_dir();
         let _ = fs::create_dir_all(&parent);
-        let (_file, tmp) = eggup_acquisition::__acquire_exclusive_temp(&parent, "eggup-curl-meta")?;
+        let (mut file, tmp) =
+            eggup_acquisition::__acquire_exclusive_temp(&parent, "eggup-curl-meta")?;
         struct Guard {
             path: PathBuf,
             disarm: bool,
@@ -225,14 +229,13 @@ impl AcquisitionTransport for CurlTransport {
             path: tmp.clone(),
             disarm: false,
         };
-        // Close the pre-created handle; curl truncates and writes the path.
-        drop(_file);
         let outcome = run_curl_to_file(
             &self.executable,
             &self.config,
             request,
             &tmp,
-            Some(max as u64),
+            &mut file,
+            max as u64,
             eff_connect,
             eff_total,
             cancel,
@@ -290,7 +293,7 @@ impl AcquisitionTransport for CurlTransport {
         }
         let (eff_connect, eff_total) = self.config.effective_timeouts(limits);
         let max_artifact = limits.max_artifact_bytes;
-        let (file, tmp) = eggup_acquisition::__acquire_exclusive_temp(parent, "eggup-curl")?;
+        let (mut file, tmp) = eggup_acquisition::__acquire_exclusive_temp(parent, "eggup-curl")?;
         struct Guard {
             path: PathBuf,
             disarm: bool,
@@ -306,12 +309,12 @@ impl AcquisitionTransport for CurlTransport {
             path: tmp.clone(),
             disarm: false,
         };
-        drop(file);
         let outcome = run_curl_to_file(
             &self.executable,
             &self.config,
             request,
             &tmp,
+            &mut file,
             max_artifact,
             eff_connect,
             eff_total,
@@ -330,12 +333,12 @@ impl AcquisitionTransport for CurlTransport {
                 let size = fs::metadata(&tmp)
                     .map_err(|e| AcquisitionError::Io(bound(format!("reading part file: {e}"))))?
                     .len();
-                if let Some(max) = max_artifact {
-                    if size > max {
-                        eggup_acquisition::__remove_owned_temp(&tmp);
-                        guard.disarm = true;
-                        return Err(AcquisitionError::TooLarge { limit: max });
-                    }
+                if size > max_artifact {
+                    eggup_acquisition::__remove_owned_temp(&tmp);
+                    guard.disarm = true;
+                    return Err(AcquisitionError::TooLarge {
+                        limit: max_artifact,
+                    });
                 }
                 match eggup_acquisition::__promote_no_clobber(&tmp, dest) {
                     Ok(()) => {
@@ -399,7 +402,11 @@ fn discover_in(path_var: Option<std::ffi::OsString>) -> Result<PathBuf, Acquisit
 
 fn bound(mut s: String) -> String {
     if s.len() > 512 {
-        s.truncate(512);
+        let mut end = 512;
+        while !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        s.truncate(end);
     }
     s
 }
@@ -437,8 +444,7 @@ fn proxy_env_snapshot(proxy: &CurlProxy) -> Vec<(String, String)> {
 fn build_curl_args(
     config: &CurlConfig,
     url: &str,
-    output: &Path,
-    max_bytes: Option<u64>,
+    max_bytes: u64,
     eff_connect: Duration,
     eff_total: Duration,
 ) -> Vec<String> {
@@ -458,10 +464,8 @@ fn build_curl_args(
     args.push(ceil_secs(eff_connect).to_string());
     args.push("--max-time".to_string());
     args.push(ceil_secs(eff_total).to_string());
-    if let Some(max) = max_bytes {
-        args.push("--max-filesize".to_string());
-        args.push(max.to_string());
-    }
+    args.push("--max-filesize".to_string());
+    args.push(max_bytes.to_string());
     if !config.allowed_protocols.is_empty() {
         let list = format!("={}", config.allowed_protocols.join(","));
         args.push("--proto".to_string());
@@ -474,9 +478,9 @@ fn build_curl_args(
         args.push("*".to_string());
     }
     args.push("--output".to_string());
-    args.push(output.to_string_lossy().into_owned());
+    args.push("-".to_string());
     args.push("--write-out".to_string());
-    args.push("%{http_code}".to_string());
+    args.push("%{stderr}%{http_code}".to_string());
     args.push("--".to_string());
     args.push(url.to_string());
     args
@@ -501,23 +505,27 @@ fn run_curl_to_file(
     config: &CurlConfig,
     request: &AcquisitionRequest,
     output: &Path,
-    max_bytes: Option<u64>,
+    output_file: &mut File,
+    max_bytes: u64,
     eff_connect: Duration,
     eff_total: Duration,
     cancel: &CancelFlag,
 ) -> Result<CurlOutcome, AcquisitionError> {
     let url = request.url().to_string();
     let redacted = request.redacted();
-    let args = build_curl_args(config, &url, output, max_bytes, eff_connect, eff_total);
+    let args = build_curl_args(config, &url, max_bytes, eff_connect, eff_total);
     let proxy_env = proxy_env_snapshot(&config.proxy);
     let start = Instant::now();
     let deadline = start + eff_total;
+    let owned_file = output_file
+        .try_clone()
+        .map_err(|e| AcquisitionError::Io(bound(format!("cloning owned output handle: {e}"))))?;
 
     let mut cmd = Command::new(executable);
     cmd.args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .env_clear();
     for (k, v) in &proxy_env {
         cmd.env(k, v);
@@ -525,16 +533,62 @@ fn run_curl_to_file(
     let mut child = cmd.spawn().map_err(|_| {
         AcquisitionError::Unavailable(bound(format!("curl spawn failed for {redacted}")))
     })?;
-    // Take stdout before the wait loop so the pipe stays open; http_code is
-    // at most a few bytes so post-exit bounded read cannot deadlock.
-    let mut stdout = child.stdout.take();
+    // Curl streams the body on stdout. A duplicate of Eggup's exclusive open
+    // file handle is moved to the reader thread; no pathname is reopened.
+    let stdout = child.stdout.take().expect("piped stdout");
+    let mut owned_file = owned_file;
+    let overflow = Arc::new(AtomicBool::new(false));
+    let overflow_reader = Arc::clone(&overflow);
+    let body_reader = std::thread::spawn(move || {
+        use std::io::{Read, Write};
+        let mut reader = stdout.take(max_bytes.saturating_add(1));
+        let mut written = 0u64;
+        let mut buf = [0u8; 16 * 1024];
+        loop {
+            let n = reader.read(&mut buf).map_err(|_| ())?;
+            if n == 0 {
+                break;
+            }
+            written = written.saturating_add(n as u64);
+            if written > max_bytes {
+                overflow_reader.store(true, Ordering::Release);
+            }
+            owned_file.write_all(&buf[..n]).map_err(|_| ())?;
+        }
+        owned_file.flush().map_err(|_| ())?;
+        Ok::<u64, ()>(written)
+    });
+    let stderr = child.stderr.take().expect("piped stderr");
+    let status_reader = std::thread::spawn(move || {
+        use std::io::Read;
+        let mut reader = stderr;
+        let mut kept = Vec::with_capacity(MAX_WRITE_OUT_BYTES as usize);
+        let mut buf = [0u8; 128];
+        loop {
+            let n = reader.read(&mut buf).map_err(|_| ())?;
+            if n == 0 {
+                break;
+            }
+            let room = (MAX_WRITE_OUT_BYTES as usize).saturating_sub(kept.len());
+            kept.extend_from_slice(&buf[..n.min(room)]);
+        }
+        Ok::<Vec<u8>, ()>(kept)
+    });
 
-    // Bounded wait: poll child, cancellation, and the parent wall deadline.
-    // Kill and reap before returning on timeout/cancellation.
     let exit_code: Option<i32> = loop {
+        if overflow.load(Ordering::Acquire) {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = body_reader.join();
+            let _ = status_reader.join();
+            eggup_acquisition::__remove_owned_temp(output);
+            return Err(AcquisitionError::TooLarge { limit: max_bytes });
+        }
         if cancel.is_cancelled() {
             let _ = child.kill();
             let _ = child.wait();
+            let _ = body_reader.join();
+            let _ = status_reader.join();
             eggup_acquisition::__remove_owned_temp(output);
             return Err(AcquisitionError::Cancelled);
         }
@@ -544,6 +598,8 @@ fn run_curl_to_file(
                 if Instant::now() >= deadline {
                     let _ = child.kill();
                     let _ = child.wait();
+                    let _ = body_reader.join();
+                    let _ = status_reader.join();
                     eggup_acquisition::__remove_owned_temp(output);
                     return Err(AcquisitionError::Timeout { phase: "total" });
                 }
@@ -552,6 +608,8 @@ fn run_curl_to_file(
             Err(e) => {
                 let _ = child.kill();
                 let _ = child.wait();
+                let _ = body_reader.join();
+                let _ = status_reader.join();
                 eggup_acquisition::__remove_owned_temp(output);
                 return Err(AcquisitionError::Io(bound(format!(
                     "waiting for curl: {e}"
@@ -559,28 +617,22 @@ fn run_curl_to_file(
             }
         }
     };
-
-    // Bounded stdout capture for `-w "%{http_code}"` (at most a few bytes).
-    let mut code_bytes: Vec<u8> = Vec::new();
-    if let Some(mut out) = stdout.take() {
-        use std::io::Read;
-        let mut chunk = [0u8; 128];
-        loop {
-            match out.read(&mut chunk) {
-                Ok(0) => break,
-                Ok(n) => {
-                    code_bytes.extend_from_slice(&chunk[..n]);
-                    if code_bytes.len() as u64 > MAX_WRITE_OUT_BYTES {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    }
-    // Ensure the child is fully reaped (try_wait already reaped on Some, but
-    // wait again is harmless if still running in a race).
     let _ = child.wait();
+    let bytes_written = body_reader
+        .join()
+        .map_err(|_| AcquisitionError::Io(bound("curl body reader failed".into())))?
+        .map_err(|_| AcquisitionError::Io(bound("writing curl body failed".into())))?;
+    if bytes_written > max_bytes {
+        eggup_acquisition::__remove_owned_temp(output);
+        return Err(AcquisitionError::TooLarge { limit: max_bytes });
+    }
+    output_file
+        .flush()
+        .map_err(|e| AcquisitionError::Io(bound(format!("flushing owned output: {e}"))))?;
+    let code_bytes = status_reader
+        .join()
+        .map_err(|_| AcquisitionError::Io(bound("curl status reader failed".into())))?
+        .map_err(|_| AcquisitionError::Io(bound("reading curl status failed".into())))?;
     classify_curl_result(
         exit_code,
         &code_bytes,
@@ -599,7 +651,7 @@ fn classify_curl_result(
     redacted: &str,
     start: Instant,
     eff_connect: Duration,
-    max_bytes: Option<u64>,
+    max_bytes: u64,
 ) -> Result<CurlOutcome, AcquisitionError> {
     let elapsed = start.elapsed();
     let code_text = String::from_utf8_lossy(code_bytes).trim().to_string();
@@ -619,9 +671,7 @@ fn classify_curl_result(
         // curl --max-filesize exceeded.
         Some(63) => {
             eggup_acquisition::__remove_owned_temp(output);
-            return Err(AcquisitionError::TooLarge {
-                limit: max_bytes.unwrap_or(0),
-            });
+            return Err(AcquisitionError::TooLarge { limit: max_bytes });
         }
         Some(0) => {}
         Some(_) | None => {
@@ -663,6 +713,16 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::thread;
 
+    #[test]
+    fn diagnostic_bound_never_splits_multibyte_code_points() {
+        for ch in ["é", "€", "🦀"] {
+            let prefix = "x".repeat(511);
+            let bounded = bound(format!("{prefix}{ch}tail"));
+            assert_eq!(bounded, prefix);
+            assert!(bounded.len() <= 512);
+        }
+    }
+
     fn req(url: &str) -> AcquisitionRequest {
         AcquisitionRequest::new(url).unwrap()
     }
@@ -670,7 +730,7 @@ mod tests {
     fn limits() -> FetchLimits {
         FetchLimits {
             max_metadata_bytes: 64 * 1024,
-            max_artifact_bytes: Some(256 * 1024),
+            max_artifact_bytes: 256 * 1024,
             connect_timeout: Duration::from_secs(2),
             total_timeout: Duration::from_secs(10),
         }
@@ -749,8 +809,8 @@ mod tests {
         )
     }
 
-    /// Minimal fake curl executable (Unix-only): parses `--output <path>`,
-    /// writes a fixed body, and prints a fixed HTTP code to stdout. Records
+    /// Minimal fake curl executable (Unix-only): writes a fixed body to stdout
+    /// and a fixed HTTP code to stderr. Records
     /// argv/env for policy assertions.
     ///
     /// Unix-only because it relies on `sh` + `xxd` and Unix executable-mode
@@ -774,16 +834,8 @@ mod tests {
             "#!/bin/sh\n\
              echo \"$@\" > \"{rec}/argv\"\n\
              env > \"{rec}/env\"\n\
-             OUT=\"\"\n\
-             PREV=\"\"\n\
-             for A in \"$@\"; do\n\
-               if [ \"$PREV\" = \"--output\" ]; then OUT=\"$A\"; fi\n\
-               PREV=\"$A\"\n\
-             done\n\
-             if [ -n \"$OUT\" ]; then\n\
-               printf '{hex}' | xxd -r -p > \"$OUT\"\n\
-             fi\n\
-             printf '{code}'\n\
+             printf '{hex}' | xxd -r -p\n\\
+             printf '{code}' >&2\n\\
              exit {exit}\n",
             rec = dir.display(),
             hex = body_hex,
@@ -971,7 +1023,7 @@ mod tests {
         let dest = dir.join("app");
         let small = FetchLimits {
             max_metadata_bytes: 64 * 1024,
-            max_artifact_bytes: Some(1024),
+            max_artifact_bytes: 1024,
             connect_timeout: Duration::from_secs(2),
             total_timeout: Duration::from_secs(10),
         };
@@ -994,7 +1046,7 @@ mod tests {
         // Unroutable connect with a short connect ceiling.
         let short_connect = FetchLimits {
             max_metadata_bytes: 64 * 1024,
-            max_artifact_bytes: Some(256 * 1024),
+            max_artifact_bytes: 256 * 1024,
             connect_timeout: Duration::from_millis(500),
             total_timeout: Duration::from_secs(10),
         };
@@ -1020,7 +1072,7 @@ mod tests {
         );
         let short_total = FetchLimits {
             max_metadata_bytes: 64 * 1024,
-            max_artifact_bytes: Some(256 * 1024),
+            max_artifact_bytes: 256 * 1024,
             connect_timeout: Duration::from_millis(500),
             total_timeout: Duration::from_secs(2),
         };
@@ -1105,6 +1157,8 @@ mod tests {
         let argv = fs::read_to_string(dir.join("argv")).unwrap();
         assert!(argv.contains("--noproxy"));
         assert!(argv.contains("--disable"));
+        assert!(argv.contains("--output -"));
+        assert!(!argv.contains("eggup-curl-meta"));
         let env = fs::read_to_string(dir.join("env")).unwrap();
         assert!(!env.contains("HTTP_PROXY=hunter"));
         let _ = fs::remove_dir_all(&dir);
