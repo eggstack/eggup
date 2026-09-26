@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: M001-M006 closed; M007 UTF-8 diagnostic corrective ready
+Status: complete; M001-M007 closed
 
 Long-term references:
 
@@ -170,7 +170,9 @@ Plan: `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-
 
 Status: ready.
 
-Replace panic-capable fixed-byte string truncation in production service diagnostics with UTF-8-boundary-safe byte bounding while preserving existing limits and all M005/M006 lifecycle behavior.
+Status: closed; see `plans/closure/service-lifecycle/007-status.md`.
+
+Replace panic-capable fixed-byte string truncation in production service diagnostics with UTF-8-boundary-safe byte bounding while preserving existing limits and all M005/M006 lifecycle behavior. Closed with the portable diagnostic boundary matrix, full Linux/macOS service suites, and Windows diagnostic/SCM runtime qualification.
 
 ## 8. Cross-cutting requirements
 
@@ -186,7 +188,7 @@ System-level versus user-level service registration differs across consumers. Us
 
 ## 11. Completion definition
 
-Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 must close the bounded-diagnostic panic gap before the subsystem returns to a fully qualified state.
+Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap; no further service-lifecycle milestone is registered.
 
 ## 12. Milestone status
 
@@ -198,4 +200,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M004 | closed | `plans/implementation/service-lifecycle/004-windows-scm-adapter.md` | `plans/closure/service-lifecycle/004-status.md` | — |
 | M005 | closed | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | `plans/closure/service-lifecycle/005-status.md` | — |
 | M006 | closed; hosted evidence reconciled via acquisition M006 | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | — |
-| M007 | ready | `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md` | — | — |
+| M007 | closed | `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md` | `plans/closure/service-lifecycle/007-status.md` | — |
