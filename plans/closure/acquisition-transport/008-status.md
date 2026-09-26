@@ -1,6 +1,8 @@
 # Acquisition Transport M008 — Closure and Verification Record
 
-Status: implementation complete; hosted closure qualification pending
+Status: closed
+
+Hosted qualification supplement (Archive M001b run `36222536670`): the same current-head matrix that closes Archive M001b restores stable-Windows compilation of `eggup-archive` and reaches the M008 portable Windows tests. Windows lane runs `cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl` green (acquisition 34 passed, archive 27/27, curl portable green) plus service portable tests and the workspace all-target check. Stable Linux (fmt/clippy/full workspace tests including acquisition 36 + curl 22/docs), MSRV Rust 1.89 workspace check, and macOS full workspace tests all passed in the same run. The M007 live-loopback limitation remains unchanged and no Windows live-loopback curl behavior is claimed. M008 is therefore fully closure-qualified; no further hosted run is required for this milestone.
 
 Source plan: `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md`
 
@@ -67,6 +69,8 @@ git diff --check                                                passed
 
 The source plan requires hosted Stable/MSRV/macOS/Windows qualification. Current-head run `36220815378` passes Stable, MSRV, and macOS but fails compiling `eggup-archive` on Windows before acquisition/curl portable tests execute. M008 therefore remains implementation-complete but not fully closure-qualified until Archive M001b restores Windows compilation and a fresh full matrix reaches the M008 tests. The existing M007 live-loopback limitation remains unchanged and need not be resolved by M008.
 
+Supplement: hosted run `36222536670` (Archive M001b implementation commit `0573996`) provides that fresh full matrix. All four lanes pass as recorded above, and the Windows lane executes the M008 portable tests. M008 is closed.
+
 ## Invariant review
 
 - Effective connect and total deadlines are never greater than the caller-provided ceilings; `FetchLimits::effective` is unchanged.
@@ -112,7 +116,7 @@ The sub-second path is the same call chain as M007: the parent enforces the effe
 
 ## Roadmap disposition
 
-Acquisition M008 moves from ready to closed. The subsystem's curl deadline contract is now truthful at sub-second resolution. Acquisition M007 remains conditionally closed (Windows loopback) and is unaffected by this corrective. Acquisition M001-M006 remain closed. No later milestone is blocked on M008.
+Acquisition M008 moves from ready to closed. The subsystem's curl deadline contract is now truthful at sub-second resolution and fully hosted-qualified on run `36222536670`. Acquisition M007 remains conditionally closed (Windows loopback) and is unaffected by this corrective. Acquisition M001-M006 remain closed. No later milestone is blocked on M008.
 
 ## Registry updates
 
