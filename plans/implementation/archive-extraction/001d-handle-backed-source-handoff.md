@@ -1,6 +1,6 @@
 # Archive Extraction Milestone 001d — Handle-Backed Source Handoff
 
-Status: ready for handoff
+Status: blocked on planning-hygiene C006; runtime implementation must not begin until C006 closes
 
 Repository baseline: `1388a02356dfa01d72c63c97c1baca09ff6004a1`
 
