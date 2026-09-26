@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001 closed historically; M001a cleanup-authority corrective closed
+Status: active; M001/M001a historical; M001b handle-bound cleanup + Windows portability corrective ready
 
 Long-term references:
 
@@ -116,11 +116,14 @@ core M007 [closed] + acquisition M006 [closed]
 archive M001 bounded allowlisted extraction [CLOSED]
               |
               v
-archive M001a owned-root cleanup authority [CLOSED]
+archive M001a owned-root cleanup authority [HISTORICAL; SUPERSEDED]
               |
-              +--> consumer adoption M006 Egress
+              v
+archive M001b handle-bound cleanup + Windows portability [READY]
               |
-              `--> Eggpack interoperability M002 archive handoff
+              +--> consumer adoption M006 Egress [BLOCKED]
+              |
+              `--> Eggpack interoperability M002 archive handoff [BLOCKED]
 ```
 
 ## 7. Milestones
@@ -135,19 +138,27 @@ Implement the optional extraction layer with tar.gz + zip evidence, regular-file
 
 Plan: `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md`.
 
-Status: closed; see `plans/closure/archive-extraction/001a-status.md`.
+Status: implemented historically but superseded by M001b; see `plans/closure/archive-extraction/001a-status.md`.
 
-Retain cleanup authority beyond a bare pathname so rename/replacement of the extraction root cannot cause recursive deletion of a foreign directory. The captured `(dev, ino)` (Unix) or `file_index` (Windows) is revalidated before any recursive deletion; drop cleanup uses the same identity-checked primitive. Fail-closed residue is accepted where identity cannot be proven.
+M001a added identity revalidation before recursive cleanup, but current review found the remaining check→delete TOCTOU and a stable-Windows compile failure around `MetadataExt::file_index()`. M001b is now the authoritative cleanup corrective.
+
+### M001b — Handle-bound cleanup and Windows portability corrective
+
+Plan: `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md`.
+
+Status: ready.
+
+Replace pathname-authorized recursive cleanup with retained directory authority/capability, repair stable-Windows portability, add deterministic after-check replacement-race tests, and require a fresh full hosted matrix before re-unblocking consumers.
 
 ### M002 — Egress real-consumer archive/pair adoption
 
-Ready to author. This roadmap does not authorize or replace the separate consumer-adoption plan.
+Blocked until M001b closes. This roadmap does not authorize or replace the separate consumer-adoption plan.
 
 Adopt the generic extraction output plus Eggup's existing multi-artifact transaction in Egress while preserving Egress-owned release/version/origin/candidate/CLI policy. Delete duplicated generic extraction/rollback machinery only after parity is qualified.
 
 ### M003 — Eggpack archive projection handoff
 
-Ready to author. This roadmap does not authorize or replace the separate Eggpack interoperability plan.
+Blocked until M001b closes. This roadmap does not authorize or replace the separate Eggpack interoperability plan.
 
 Connect `ManifestProjection::Archive` member evidence to the extraction contract without putting archive policy or producer authority into lower Eggup layers.
 
@@ -182,13 +193,14 @@ The third risk is dependency/footprint growth. Keep the crate optional and forma
 
 ## 11. Completion definition
 
-The subsystem is mature when M001a has closed the cleanup-authority invariant, Egress has removed its duplicated generic archive/pair update mechanics, and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
+The subsystem is mature when M001b has closed the cleanup-authority and Windows-portability invariants with a green hosted matrix, Egress has removed its duplicated generic archive/pair update mechanics, and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
 
 ## 12. Milestone status
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 bounded allowlisted extraction | closed historically; corrective M001a closed | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
-| M001a owned-root cleanup authority | closed | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | `plans/closure/archive-extraction/001a-status.md` | — |
-| M002 Egress adoption | ready to author | — | — | — |
-| M003 Eggpack archive handoff | ready to author | — | — | — |
+| M001 bounded allowlisted extraction | closed historically | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
+| M001a owned-root cleanup authority | historical; superseded by M001b | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | `plans/closure/archive-extraction/001a-status.md` | remaining TOCTOU + Windows compile defect |
+| M001b handle-bound cleanup + Windows portability | ready | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md` | — | — |
+| M002 Egress adoption | blocked | — | — | M001b closure |
+| M003 Eggpack archive handoff | blocked | — | — | M001b closure |
