@@ -8,7 +8,7 @@ Source roadmap: `plans/subsystems/archive-extraction-roadmap.md#M001a--owned-roo
 
 Reviewed repository baseline: `ea51fe12a7c9120028b727eb5e40411e9b10f8e2` (post-M001 review baseline; source tree was clean before implementation)
 
-Implementation commit: `pending` — see git log for the closing commit hash.
+Implementation commit: `0c3af9274c78c36be2051279e10c53abf814ee5a` — owned-root cleanup authority corrective; identity-captured `OwnedRootIdentity`; `DirectoryGuard`/`PersistedExtraction` carry identity; identity-checked removal; drop uses the same primitive; tests + README/CHANGELOG/roadmap updates.
 
 ## Executive finding
 
