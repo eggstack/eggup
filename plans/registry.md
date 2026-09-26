@@ -8,7 +8,7 @@ Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba
 
 Latest planning registration head: `af3c0dd6b6225bd60581225d59b7697ac7f4ef5f` (Acquisition M008 + Archive M001a + planning-hygiene C004 registered; Egress M006 and Eggpack M002 re-gated on M001a)
 
-Latest implementation closure head: `bcf3084c2e31b497b2b9c2de61aa2b6e25c0a486` — Acquisition M008 (sub-second deadline truthfulness) closed; see `plans/closure/acquisition-transport/008-status.md`.
+Latest implementation closure head: `bcf3084c2e31b497b2b9c2de61aa2b6e25c0a486` (Acquisition M008 closed); see `plans/closure/acquisition-transport/008-status.md`. Archive M001a and C004 follow as additional closure heads in this batch.
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -99,23 +99,23 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 | Verified update core | M001-M007 closed/qualified | — |
 | Acquisition transport | M001-M006 closed; M007 conditionally closed; M008 closed | — |
 | Service lifecycle | M001-M007 closed; status-text reconciliation pending C004 | planning cleanup only |
-| Archive extraction | M001 closed historically; M001a ready | owned-root cleanup authority corrective |
+| Archive extraction | M001 closed historically; M001a closed | — |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
-| Eggpack manifest interoperability | M001/M001a closed; M002 blocked on archive M001a; M003 waits on producer convention | archive handoff after M001a |
-| Consumer adoption | simple, eggsearch, and CodeGG M005 closed; Egress M006 blocked on archive M001a | Gregg M004 separately writable/unwritten |
+| Eggpack manifest interoperability | M001/M001a closed; M002 ready to author; M003 waits on producer convention | archive handoff implementation plan |
+| Consumer adoption | simple, eggsearch, and CodeGG M005 closed; Egress M006 ready to author | Gregg M004 separately writable/unwritten |
 
 ## Dependency-ready implementation work
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
 | Acquisition transport | M008 sub-second deadline truthfulness corrective | closed | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md`; `plans/closure/acquisition-transport/008-status.md` | M007 conditionally closed; review baseline `ea51fe12a7c9120028b727eb5e40411e9b10f8e2` |
-| Archive extraction | M001a owned-root cleanup authority corrective | ready | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | M001 closed; review baseline `ea51fe12a7c9120028b727eb5e40411e9b10f8e2` |
+| Archive extraction | M001a owned-root cleanup authority corrective | closed | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md`; `plans/closure/archive-extraction/001a-status.md` | M001 closed; review baseline `ea51fe12a7c9120028b727eb5e40411e9b10f8e2` |
 | Planning/closure hygiene corrective | C004 post-M007/M001 status + baseline reconciliation | ready | `plans/implementation/planning-closure-hygiene-corrective/004-post-m007-m001-status-baseline-reconciliation.md` | docs-only; reconcile the new corrective gates and stale status text |
 | Acquisition transport | M007 boundary safety hardening corrective | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md`; `plans/closure/acquisition-transport/007-status.md` | M001-M006 closed; review baseline `ee1476ef2a9e0d5569d6dc2469e780a4435cc426` |
 | Service lifecycle | M007 UTF-8-safe bounded diagnostics corrective | closed | `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md`; `plans/closure/service-lifecycle/007-status.md` | Hosted Stable/MSRV/macOS/Windows qualification `36215858056` |
 | Archive extraction | M001 bounded allowlisted extraction contract | closed | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md`; `plans/closure/archive-extraction/001-status.md` | hosted Linux/macOS/Windows qualification `36214688691` |
-| Consumer adoption | M006 Egress archive/pair adoption | blocked | — | archive extraction M001a closure |
-| Eggpack manifest interoperability | M002 archive extraction handoff | blocked | — | archive extraction M001a closure |
+| Consumer adoption | M006 Egress archive/pair adoption | ready to author | — | archive extraction M001a closure; consumer plan remains unwritten |
+| Eggpack manifest interoperability | M002 archive extraction handoff | ready to author | — | archive extraction M001a closure; consumer plan remains unwritten |
 | Planning/closure hygiene corrective | C001 post-batch status and evidence reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/001-post-batch-status-and-evidence-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/001-status.md` | CodeGG M005 + core M007 closed |
 | Planning/closure hygiene corrective | C002 C001 commit + registry baseline reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/002-c001-commit-and-registry-baseline-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/002-status.md` | — |
 | Planning/closure hygiene corrective | C003 M003 registry + closure reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/003-m003-registry-and-closure-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/003-status.md` | bounded M003 execution/status record at `da1b4a8048bf863e6a653c25f1ba56bc42f4531b`; docs/evidence only |
@@ -131,14 +131,14 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 | Eggpack manifest interoperability | M003 Eggsact real-consumer manifest adoption | blocked after bounded adapter/API qualification | `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`; `plans/closure/eggpack-manifest-interoperability/003-status.md` | Eggpack/Eggsact must establish producer-owned live artifact mapping and ReleaseManifest publication/addressing convention |
 | Eggpack manifest interoperability | M004 package/API promotion | blocked | roadmap milestone; no implementation plan until ready | M003 adoption must close and eggpack-manifest needs a publishable version |
 
-CodeGG M005, Verified Update Core M007, Service Lifecycle M005-M007, and Acquisition M005-M008 are closed (Acquisition M007 conditionally, due the recorded Windows loopback limit). Archive Extraction M001 is closed historically. Archive M001a is the remaining runtime corrective handoff; C004 is the planning reconciliation handoff. M001a re-blocks Consumer Adoption M006 Egress and Eggpack Interoperability M002 until cleanup authority is requalified. Planning/closure hygiene C001-C003 are closed. Both Gregg-reference feature milestones are closed with green hosted qualification, and M005/M006 closure evidence is reconciled. Gregg M004 prerequisites are satisfied but its plan remains intentionally unwritten; no Gregg migration is authorized. Eggpack Interop M001a is closed with the full adapter regression matrix. M003 bounded parse/project qualification is complete, while real Eggsact updater integration is blocked on producer-owned artifact and manifest conventions; see `plans/closure/eggpack-manifest-interoperability/003-status.md`. M004 package/API promotion remains blocked. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
+CodeGG M005, Verified Update Core M007, Service Lifecycle M005-M007, and Acquisition M005-M008 are closed (Acquisition M007 conditionally, due the recorded Windows loopback limit). Archive Extraction M001 is closed historically and M001a is closed; cleanup authority is now identity-checked and drop cleanup uses the same primitive. Consumer Adoption M006 Egress and Eggpack Interoperability M002 archive handoff are both unblocked to "ready to author"; neither consumer change is part of this corrective batch. Planning/closure hygiene C001-C003 are closed and C004 is the planning reconciliation handoff. Both Gregg-reference feature milestones are closed with green hosted qualification, and M005/M006 closure evidence is reconciled. Gregg M004 prerequisites are satisfied but its plan remains intentionally unwritten; no Gregg migration is authorized. Eggpack Interop M001a is closed with the full adapter regression matrix. M003 bounded parse/project qualification is complete, while real Eggsact updater integration remains blocked on producer-owned artifact and manifest conventions; see `plans/closure/eggpack-manifest-interoperability/003-status.md`. M004 package/API promotion remains blocked. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
 
 ## Planned / blocked work
 
 | Subsystem | Milestone | State | Blocker |
 |---|---|---|---|
 | Acquisition transport | M008 sub-second deadline truthfulness | closed | `plans/closure/acquisition-transport/008-status.md` |
-| Archive extraction | M001a owned-root cleanup authority | ready | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` |
+| Archive extraction | M001a owned-root cleanup authority | closed | `plans/closure/archive-extraction/001a-status.md` |
 | Planning/closure hygiene corrective | C004 post-M007/M001 reconciliation | ready | `plans/implementation/planning-closure-hygiene-corrective/004-post-m007-m001-status-baseline-reconciliation.md` |
 | Acquisition transport | M007 boundary safety hardening | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` |
 | Service lifecycle | M007 UTF-8-safe bounded diagnostics | closed | `plans/closure/service-lifecycle/007-status.md` |
@@ -152,9 +152,9 @@ CodeGG M005, Verified Update Core M007, Service Lifecycle M005-M007, and Acquisi
 | Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
 | Consumer adoption | M004 Gregg | writable; plan intentionally unwritten | prerequisites satisfied (acquisition M005/M006 + service M006 closed, hosted matrix green); no migration authorized |
 | Consumer adoption | M005 CodeGG | closed | `plans/closure/consumer-adoption/005-status.md`; producer release mapping remains application/Eggpack-owned |
-| Consumer adoption | M006 Egress | blocked | archive extraction M001a closure |
+| Consumer adoption | M006 Egress | ready to author | archive extraction M001a closed; consumer plan remains unwritten |
 | Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
-| Eggpack manifest interoperability | M002 archive extraction handoff | blocked | archive extraction M001a closure |
+| Eggpack manifest interoperability | M002 archive extraction handoff | ready to author | archive extraction M001a closed; consumer plan remains unwritten |
 | Eggpack manifest interoperability | M003 Eggsact real-consumer manifest adoption | blocked after bounded API qualification | producer-owned live artifact mapping and ReleaseManifest publication/addressing convention are absent; see `plans/closure/eggpack-manifest-interoperability/003-status.md` |
 | Eggpack manifest interoperability | M004 package/API promotion | blocked | M003 real adoption closure + publishable eggpack-manifest version |
 | Authenticity/signatures | future | ADR required | trust standard not selected |
@@ -200,12 +200,12 @@ core M006 + acquisition M004 [closed] --> CodeGG M005 managed bundle [CLOSED]
                                             `--> producer release mapping stays in application/Eggpack; strict archive extraction stays CodeGG-owned
 
 Archive Extraction M001 [CLOSED; run 36214688691]
-              |
-              v
-Archive M001a cleanup authority [READY]
-              |
-              +--> Egress consumer M006 [BLOCKED UNTIL M001a]
-              `--> Eggpack interoperability M002 [BLOCKED UNTIL M001a]
+               |
+               v
+Archive M001a cleanup authority [CLOSED]
+               |
+               +--> Egress consumer M006 [READY TO AUTHOR]
+               `--> Eggpack interoperability M002 [READY TO AUTHOR]
 
 consumer acquisition M004 + service M003 --> eggsearch M003 [closed]
                                                   |
@@ -215,7 +215,7 @@ review baseline ee1476 -> acquisition M007 boundary safety [CONDITIONALLY CLOSED
                        `-> service M007 UTF-8 diagnostics [CLOSED; hosted run 36215858056]
 
 review baseline ea51fe -> acquisition M008 deadline truthfulness [CLOSED]
-                       `-> archive M001a cleanup authority [READY]
+                       `-> archive M001a cleanup authority [CLOSED]
                        `-> planning hygiene C004 [READY]
 
 Gregg read-only reference evidence -> acquisition M005 curl/composition [CLOSED]
@@ -237,14 +237,14 @@ The earlier 2026-09-26 review opened acquisition M007 and service M007; those ar
 - Service: M001-M007 are closed; M007 keeps bounded service diagnostics UTF-8 safe without changing lifecycle or disposition semantics. See `plans/closure/service-lifecycle/007-status.md`.
 - Distribution: M001-M003 remain historical predecessor evidence; M004 removed the producer crate after Eggpack Contract M002 closure. The subsystem is archived/transferred to Eggpack.
 - Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg M004 prerequisites are satisfied (acquisition M005/M006 + service M006 closed, hosted matrix green) and the milestone is writable, but its plan remains intentionally unwritten pending a separate authoring decision.
-- Archive extraction: ADR-0005 and M001 are closed historically; M001a is ready to correct cleanup authority so a replacement directory cannot be recursively deleted by pathname. Egress M006 and Eggpack interoperability M002 remain blocked until M001a closes.
-- Eggpack interoperability: M001 adapter/M001a qualification remain closed. M002 archive handoff is blocked on Archive M001a. M003 real Eggsact adoption remains separately blocked on producer-owned manifest publication/addressing; M004 promotion remains blocked behind M003 plus a publishable upstream crate.
+- Archive extraction: ADR-0005 and M001 are closed historically; M001a is closed and identity-checked cleanup authority is in place. Egress M006 and Eggpack interoperability M002 archive handoff are now ready to author.
+- Eggpack interoperability: M001 adapter/M001a qualification remain closed. M002 archive handoff is ready to author. M003 real Eggsact adoption remains separately blocked on producer-owned manifest publication/addressing; M004 promotion remains blocked behind M003 plus a publishable upstream crate.
 - Release process: manual crates.io publication only.
 - The lockstep 0.1.1 patch is published (seam-then-adapter order) now that the corrective gates are closed. Eggsearch M003 may use an immutable path/git source for local qualification until downstream adoption moves; no publication is implicit in these plans.
 
 ## Next handoff
 
-Immediate handoff work is Archive Extraction M001a and planning-hygiene C004. M001a and C004 can proceed independently. Egress M006 and Eggpack interoperability M002 stay blocked until M001a closes. Service M007 is closed and no additional service-lifecycle-dependent plan was found blocked on it. Acquisition M008 is closed; no later acquisition plan was found blocked on it. Gregg M004 remains separately writable but intentionally unwritten; do not modify Gregg as part of these upstream passes. Eggsact manifest adoption remains blocked on Eggpack/Eggsact producer convention evidence.
+Immediate handoff work is planning-hygiene C004. Egress M006 and Eggpack interoperability M002 archive handoff are now ready to author but neither consumer change is part of this corrective batch. Service M007 is closed and no additional service-lifecycle-dependent plan was found blocked on it. Acquisition M008 is closed; no later acquisition plan was found blocked on it. Archive M001a is closed; M002 and M003 are ready to author as noted above. Gregg M004 remains separately writable but intentionally unwritten; do not modify Gregg as part of these upstream passes. Eggsact manifest adoption remains blocked on Eggpack/Eggsact producer convention evidence.
 
 Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter. Resume interoperability M003 only after producer-owned evidence resolves its gate.
 

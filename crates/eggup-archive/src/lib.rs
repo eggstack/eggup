@@ -305,9 +305,10 @@ impl ExtractedArchive {
     /// preparation or another explicit ownership handoff.
     pub fn persist(mut self) -> PersistedExtraction {
         let guard = self.guard.take().expect("active extraction guard");
-        let root = guard.disarm();
+        let (root, identity) = guard.disarm();
         PersistedExtraction {
             root,
+            identity,
             members: self.members,
         }
     }
@@ -324,6 +325,7 @@ impl ExtractedArchive {
 #[derive(Debug)]
 pub struct PersistedExtraction {
     root: PathBuf,
+    identity: OwnedRootIdentity,
     members: Vec<ExtractedMember>,
 }
 
@@ -340,7 +342,7 @@ impl PersistedExtraction {
 
     /// Removes the retained directory when the caller no longer needs it.
     pub fn cleanup(self) -> Result<(), ExtractionError> {
-        remove_owned_root(&self.root)
+        remove_owned_root(&self.root, &self.identity)
     }
 }
 
@@ -363,13 +365,13 @@ pub fn extract(
     if archive_meta.len() > plan.limits.max_archive_bytes {
         return Err(ExtractionError::new(ExtractionErrorKind::ArchiveTooLarge));
     }
-    let root = create_private_root(output_parent)?;
+    let (root, identity) = create_private_root(output_parent)?;
     match extract_inner(plan, &root) {
         Ok(members) => Ok(ExtractedArchive {
-            guard: Some(DirectoryGuard::new(root)),
+            guard: Some(DirectoryGuard::new(root, identity)),
             members,
         }),
-        Err(error) => match remove_owned_root(&root) {
+        Err(error) => match remove_owned_root(&root, &identity) {
             Ok(()) => Err(error),
             Err(_) => Err(error.with_residue(root)),
         },
@@ -697,7 +699,7 @@ fn validate_output_name(name: &str, max_path_bytes: usize) -> Result<(), Extract
     Ok(())
 }
 
-fn create_private_root(parent: &Path) -> Result<PathBuf, ExtractionError> {
+fn create_private_root(parent: &Path) -> Result<(PathBuf, OwnedRootIdentity), ExtractionError> {
     let meta = fs::symlink_metadata(parent)
         .map_err(|_| ExtractionError::new(ExtractionErrorKind::InvalidPlan))?;
     if !meta.is_dir() || meta.file_type().is_symlink() {
@@ -713,7 +715,10 @@ fn create_private_root(parent: &Path) -> Result<PathBuf, ExtractionError> {
             builder.mode(0o700);
         }
         match builder.create(&path) {
-            Ok(()) => return Ok(path),
+            Ok(()) => {
+                let identity = OwnedRootIdentity::capture(&path)?;
+                return Ok((path, identity));
+            }
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(_) => return Err(ExtractionError::new(ExtractionErrorKind::Io)),
         }
@@ -734,42 +739,115 @@ fn create_private_file(path: &Path) -> Result<File, ExtractionError> {
         .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))
 }
 
-fn remove_owned_root(path: &Path) -> Result<(), ExtractionError> {
+fn remove_owned_root(path: &Path, identity: &OwnedRootIdentity) -> Result<(), ExtractionError> {
+    if !identity.matches(path)? {
+        return Err(ExtractionError::new(ExtractionErrorKind::CleanupFailed)
+            .with_residue(path.to_path_buf()));
+    }
     fs::remove_dir_all(path).map_err(|_| {
         ExtractionError::new(ExtractionErrorKind::CleanupFailed).with_residue(path.to_path_buf())
     })
 }
 
+/// Strong identity evidence for an extraction root.
+///
+/// Captured immediately after creation and revalidated before any recursive
+/// cleanup. A foreign directory placed at the original pathname — whether by
+/// rename + replace, symlink substitution, junction/reparse-point substitution,
+/// or ordinary racing filesystem activity — yields a different identity and
+/// causes cleanup to fail closed with residue evidence instead of recursively
+/// deleting the foreign tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct OwnedRootIdentity {
+    #[cfg(unix)]
+    dev: u64,
+    #[cfg(unix)]
+    ino: u64,
+    #[cfg(windows)]
+    file_index: u64,
+    is_symlink: bool,
+}
+
+impl OwnedRootIdentity {
+    fn capture(path: &Path) -> Result<Self, ExtractionError> {
+        let meta = fs::symlink_metadata(path)
+            .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
+        Self::from_metadata(&meta)
+    }
+
+    fn from_metadata(meta: &fs::Metadata) -> Result<Self, ExtractionError> {
+        let is_symlink = meta.file_type().is_symlink();
+        #[cfg(unix)]
+        let identity = {
+            use std::os::unix::fs::MetadataExt;
+            Self {
+                dev: meta.dev(),
+                ino: meta.ino(),
+                is_symlink,
+            }
+        };
+        #[cfg(windows)]
+        let identity = {
+            use std::os::windows::fs::MetadataExt;
+            Self {
+                file_index: meta.file_index(),
+                is_symlink,
+            }
+        };
+        Ok(identity)
+    }
+
+    /// Returns `Ok(true)` when the directory at `path` still matches the
+    /// captured identity, `Ok(false)` when the identity differs (foreign
+    /// replacement), and `Err` when the path is gone or unreadable.
+    fn matches(&self, path: &Path) -> Result<bool, ExtractionError> {
+        let meta = match fs::symlink_metadata(path) {
+            Ok(meta) => meta,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(_) => return Err(ExtractionError::new(ExtractionErrorKind::Io)),
+        };
+        let current = Self::from_metadata(&meta)?;
+        Ok(current == *self)
+    }
+}
+
 #[derive(Debug)]
 struct DirectoryGuard {
     path: PathBuf,
+    identity: OwnedRootIdentity,
     active: bool,
 }
 
 impl DirectoryGuard {
-    fn new(path: PathBuf) -> Self {
-        Self { path, active: true }
+    fn new(path: PathBuf, identity: OwnedRootIdentity) -> Self {
+        Self {
+            path,
+            identity,
+            active: true,
+        }
     }
 
     fn path(&self) -> &Path {
         &self.path
     }
 
-    fn disarm(mut self) -> PathBuf {
+    fn disarm(mut self) -> (PathBuf, OwnedRootIdentity) {
         self.active = false;
-        self.path.clone()
+        (self.path.clone(), self.identity)
     }
 
     fn cleanup(mut self) -> Result<(), ExtractionError> {
         self.active = false;
-        remove_owned_root(&self.path)
+        remove_owned_root(&self.path, &self.identity)
     }
 }
 
 impl Drop for DirectoryGuard {
     fn drop(&mut self) {
         if self.active {
-            let _ = fs::remove_dir_all(&self.path);
+            // Use the exact same identity-checked primitive as explicit
+            // cleanup. A foreign replacement must not be silently deleted.
+            let _ = remove_owned_root(&self.path, &self.identity);
         }
     }
 }
@@ -1360,6 +1438,177 @@ mod tests {
         assert_eq!(fs::read(&root).unwrap(), b"foreign replacement");
         fs::remove_file(&root).unwrap();
         fs::remove_dir_all(moved).unwrap();
+    }
+
+    #[test]
+    fn cleanup_preserves_foreign_non_empty_directory_at_original_path() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"binary")],
+            limits(),
+        );
+        let extracted = extract(&plan, dir.path()).unwrap();
+        let root = extracted.root().to_path_buf();
+        let moved = dir.path().join("moved-root");
+        fs::rename(&root, &moved).unwrap();
+        // Replace the old pathname with a foreign non-empty directory that
+        // would be catastrophic if any pathname-only recursive cleanup ran
+        // against it.
+        let foreign = root.clone();
+        fs::create_dir(&foreign).unwrap();
+        for i in 0..6 {
+            fs::write(foreign.join(format!("foreign-{i}")), b"keep").unwrap();
+        }
+
+        let error = extracted.persist().cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(foreign.as_path()));
+        assert!(foreign.exists());
+        for i in 0..6 {
+            assert_eq!(
+                fs::read(foreign.join(format!("foreign-{i}"))).unwrap(),
+                b"keep"
+            );
+        }
+        assert!(moved.exists());
+        fs::remove_dir_all(&foreign).unwrap();
+        fs::remove_dir_all(moved).unwrap();
+    }
+
+    #[test]
+    fn cleanup_preserves_foreign_empty_directory_at_original_path() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"binary")],
+            limits(),
+        );
+        let extracted = extract(&plan, dir.path()).unwrap();
+        let root = extracted.root().to_path_buf();
+        let moved = dir.path().join("moved-root");
+        fs::rename(&root, &moved).unwrap();
+        let foreign = root.clone();
+        fs::create_dir(&foreign).unwrap();
+        // Empty foreign directory: identity still differs, so cleanup must
+        // fail closed rather than rmdir the foreign dir.
+        let error = extracted.persist().cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(foreign.as_path()));
+        assert!(foreign.exists());
+        fs::remove_dir(&foreign).unwrap();
+        fs::remove_dir_all(moved).unwrap();
+    }
+
+    #[test]
+    fn drop_cleanup_preserves_foreign_replacement_at_original_path() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"binary")],
+            limits(),
+        );
+        let root = {
+            let extracted = extract(&plan, dir.path()).unwrap();
+            let root = extracted.root().to_path_buf();
+            let moved = dir.path().join("moved-root");
+            fs::rename(&root, &moved).unwrap();
+            let foreign = root.clone();
+            fs::create_dir(&foreign).unwrap();
+            fs::write(foreign.join("foreign"), b"keep").unwrap();
+            // Drop the extraction; best-effort drop cleanup must NOT
+            // recursively delete the foreign tree.
+            drop(extracted);
+            // The original owned root (now at `moved`) still exists because
+            // drop silently bails on identity mismatch.
+            assert!(moved.exists());
+            assert!(foreign.exists());
+            assert_eq!(fs::read(foreign.join("foreign")).unwrap(), b"keep");
+            moved
+        };
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cleanup_preserves_symlink_substitution_at_original_path() {
+        use std::os::unix::fs::symlink;
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"binary")],
+            limits(),
+        );
+        let extracted = extract(&plan, dir.path()).unwrap();
+        let root = extracted.root().to_path_buf();
+        let moved = dir.path().join("moved-root");
+        fs::rename(&root, &moved).unwrap();
+        // Replace the old pathname with a symlink pointing somewhere else;
+        // recursive cleanup must not follow it.
+        let target = dir.path().join("link-target");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("keep"), b"keep").unwrap();
+        symlink(&target, &root).unwrap();
+
+        let error = extracted.persist().cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert!(target.exists());
+        assert_eq!(fs::read(target.join("keep")).unwrap(), b"keep");
+        fs::remove_dir_all(moved).unwrap();
+        fs::remove_dir_all(&target).unwrap();
+        fs::remove_file(&root).unwrap();
+    }
+
+    #[test]
+    fn explicit_cleanup_after_replacement_fails_closed_and_persists_identity() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"binary")],
+            limits(),
+        );
+        let extracted = extract(&plan, dir.path()).unwrap();
+        let persisted = extracted.persist();
+        let root = persisted.root().to_path_buf();
+        let moved = dir.path().join("moved-root");
+        fs::rename(&root, &moved).unwrap();
+        let foreign = root.clone();
+        fs::create_dir(&foreign).unwrap();
+        fs::write(foreign.join("foreign"), b"keep").unwrap();
+
+        let error = persisted.cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(foreign.as_path()));
+        assert!(foreign.exists());
+        assert!(moved.exists());
+        fs::remove_dir_all(&foreign).unwrap();
+        fs::remove_dir_all(moved).unwrap();
+    }
+
+    #[test]
+    fn normal_explicit_cleanup_still_succeeds_with_identity_check() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"binary")],
+            limits(),
+        );
+        let persisted = extract(&plan, dir.path()).unwrap().persist();
+        let root = persisted.root().to_path_buf();
+        persisted.cleanup().unwrap();
+        assert!(!root.exists());
     }
 
     #[test]

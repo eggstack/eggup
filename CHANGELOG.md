@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Archive M001a (unpublished corrective): extraction cleanup is now
+  authorized by retained filesystem identity rather than a bare pathname.
+  `DirectoryGuard` and `PersistedExtraction` carry the captured `(dev, ino)`
+  on Unix or `file_index` on Windows, and `remove_owned_root` revalidates
+  it before any recursive deletion. A foreign directory or symlink that
+  occupies the original pathname after rename/replace is preserved;
+  cleanup fails closed with residue evidence. Drop cleanup uses the same
+  identity-checked primitive and never falls back to
+  `fs::remove_dir_all(path)`. No `Cargo.toml`, lockfile, or `eggup-core`
+  change. No publication or consumer migration performed.
+
 - Acquisition M008 (unpublished corrective): `eggup-curl` deadline
   arguments now serialize at microsecond precision with a `.` decimal
   separator, so sub-second connect/total ceilings (`100 ms -> "0.1"`,
