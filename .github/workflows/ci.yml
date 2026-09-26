@@ -45,5 +45,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl -p eggup-service --locked
+      - run: cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl --locked
+      - run: cargo test -p eggup-service --lib diagnostic_byte_bounds_preserve_utf8_at_256_and_512_edges --locked
+      - run: cargo test -p eggup-service --lib service_errors_output_and_permission_remediation_stay_utf8_bounded --locked
+      - run: cargo test -p eggup-service --lib lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free --locked
+      - run: cargo test -p eggup-service --lib windows_scm::tests --locked
       - run: cargo check --workspace --all-targets --locked
