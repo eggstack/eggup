@@ -10,7 +10,7 @@ Source roadmap:
 
 Cross-repository implementation owner:
 
-- `eggstack/eggress` delivery milestone registered separately.
+- `eggstack/eggress: plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md` (registered in Egress delivery roadmap, registry, and canonical `docs/ROADMAP.md`; blocked on versioned Eggup core/archive package availability).
 
 Primary class: capability / adoption
 
