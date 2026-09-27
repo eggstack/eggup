@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: `669896b1cc6736285f81b01f856250c15822e047` (C007 reconciliation implementation: C006 exact SHA + M001d historical qualification; C007 closure record committed in this batch, see `plans/closure/planning-closure-hygiene-corrective/007-status.md`)
+Latest planning registration head: `29b3cf997993f4799cf882ad73f4a2e813d8fb63` (C007 closed: C006 exact head `510111f` + failed current-head run `36261671380` recorded, Service M008 ready, M001d contract-ready but execution-blocked on M008 green baseline + rebase)
 
 Latest reviewed runtime/documentation head: `510111fa67bafd0e188dad744eed4d224a015b76` (C006 closure head; docs-only relative to prior green runtime). Hosted run `36261671380` failed only the macOS `unix_tests::transition_deadline_rejects_zero_and_only_shrinks` test; Stable Linux, Rust 1.89 MSRV, and Windows passed. Prior green runs `36257884083` and `36257992801` remain historical qualification evidence, not current-head success. Service M008 is ready to replace the scheduler-sensitive deadline unit proof without changing production deadline semantics. Planning-hygiene C007 is closed. M001d is contract-ready after C006 but runtime execution is blocked on M008 closure + fresh green hosted qualification + exact-baseline rebase. Egress M006 and Eggpack M002 remain blocked on M001d.
 
