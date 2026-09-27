@@ -122,8 +122,7 @@ archive M001a owned-root cleanup authority [HISTORICAL; SUPERSEDED]
 archive M001b handle-bound cleanup + Windows portability [CLOSED via run 36222536670]
                 |
                 v
-archive M001c handle-relative member materialization [BLOCKED: Section 14
-handoff stop; write half implemented in `09c953f`]
+archive M001c handle-relative member materialization [HISTORICAL PREDECESSOR; WRITE AUTHORITY `09c953f`; HANDOFF STOP RESOLVED BY M001d]
                 |
                 v
 archive M001d handle-backed source handoff [CLOSED via run 36335233644]
@@ -227,7 +226,7 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M001 bounded allowlisted extraction | closed historically | `plans/implementation/archive-extraction/001-bounded-allowlisted-extraction-contract.md` | `plans/closure/archive-extraction/001-status.md` | — |
 | M001a owned-root cleanup authority | historical; superseded by M001b | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | `plans/closure/archive-extraction/001a-status.md` | remaining TOCTOU + Windows compile defect |
 | M001b handle-bound cleanup + Windows portability | closed | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md` | `plans/closure/archive-extraction/001b-status.md` | — |
-| M001c handle-relative member materialization | blocked (Section 14 stop; write half implemented) | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md` | `plans/closure/archive-extraction/001c-status.md` | M001d handoff |
+| M001c handle-relative member materialization | historical predecessor; write authority implemented; handoff stop resolved by M001d | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md` | `plans/closure/archive-extraction/001c-status.md` | resolved by M001d closure |
 | M001d handle-backed source handoff | closed | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | `plans/closure/archive-extraction/001d-status.md` | — |
 | M002 Egress adoption | writable; plan unwritten | — | — | M001d closed |
 | M003 Eggpack archive handoff | writable; plan unwritten | — | — | M001d closed |
