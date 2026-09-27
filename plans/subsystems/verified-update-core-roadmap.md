@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: M001-M007 closed/qualified
+Status: active; M001-M007 closed/qualified; M008 core/archive consumer package qualification ready
 
 Long-term references:
 
@@ -162,7 +162,12 @@ M005 pre-qualification safety/API corrective
 M006 core package qualification
         |
         v
-M007 deferred finalization + post-commit policy
+M007 deferred finalization + post-commit policy [closed]
+        |
+        +--> Archive M001d object-bound handoff [closed]
+                    |
+                    v
+M008 core/archive consumer package qualification [READY]
 ```
 
 - M001 -> M002: hard.
@@ -171,6 +176,7 @@ M007 deferred finalization + post-commit policy
 - M003 + M004 -> M005: hard.
 - M005 -> M006: hard.
 - M005 + M006 -> M007: hard and satisfied.
+- M007 + Archive M001d -> M008 package qualification: hard and satisfied.
 - Acquisition consumers may continue using the qualified immediate-commit path.
 - Service Lifecycle M005 is closed; no downstream service-aware consumer migration is currently scheduled.
 
@@ -292,6 +298,22 @@ Exit conditions:
 - no service/network/product policy enters `eggup-core`;
 - drop/interruption semantics for the chosen API shape are fail-safe and documented.
 
+### M008 — Core/archive consumer package qualification
+
+Class: infrastructure/polish.
+
+Plan: `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md`.
+
+Objective: qualify a versioned crates.io-usable package boundary containing the post-M001d `eggup-core` bound-source API plus `eggup-archive`, without automatic publication.
+
+Exit conditions:
+
+- versioning/pin decision is explicit and compatible with existing 0.1.1 consumers;
+- `cargo package` and `cargo publish --dry-run` pass for core/archive;
+- a clean external fixture consumer compiles the object-bound archive -> core staging flow;
+- package contents/dependency trees/MSRV/platform evidence are recorded;
+- manual publish order is explicit; no publication is automatic.
+
 ## 8. Cross-cutting requirements
 
 ### Storage and migration
@@ -341,7 +363,7 @@ Every safety-sensitive public type documents what it proves and what it does not
 
 ## 11. Completion definition
 
-The roadmap closes when eggup-core safely supports one- and multi-member verified local transactions, fault-injected rollback/recovery is closed, the package is independently consumable, and ADR-0002 post-commit failure policy can retain or roll back a coherent newly installed generation before backup finalization.
+The runtime roadmap is functionally closed through M007. M008 is the package-qualification prerequisite that makes the post-M001d core/archive API consumable by publishable downstream crates without git/path dependencies.
 
 ## 12. Milestone status
 
@@ -354,3 +376,4 @@ The roadmap closes when eggup-core safely supports one- and multi-member verifie
 | M005 | closed | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | `plans/closure/verified-update-core/005-status.md` | — |
 | M006 | closed | `plans/implementation/verified-update-core/006-core-package-qualification.md` | `plans/closure/verified-update-core/006-status.md` | — |
 | M007 | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md` | `plans/closure/verified-update-core/007-status.md` | — |
+| M008 | ready | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md` | — | M001d closed; publication remains separate maintainer action |
