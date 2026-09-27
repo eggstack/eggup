@@ -144,7 +144,7 @@ CodeGG M005, Verified Update Core M007, and Service Lifecycle M005-M008 remain c
 
 | Subsystem | Milestone | State | Blocker |
 |---|---|---|---|
-| Archive extraction | M001c handle-relative member materialization | blocked (Section 14 stop; write half `09c953f`) | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md`; `plans/closure/archive-extraction/001c-status.md` |
+| Archive extraction | M001c handle-relative member materialization | historical predecessor; handoff stop resolved by M001d | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md`; `plans/closure/archive-extraction/001c-status.md` |
 | Service lifecycle | M008 OperationDeadline test determinism | closed | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md`; `plans/closure/service-lifecycle/008-status.md` |
 | Planning/closure hygiene corrective | C007 C006 head + current-CI reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/007-c006-head-and-current-ci-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/007-status.md` |
 | Planning/closure hygiene corrective | C006 M001d readiness + bound-source contract reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/006-m001d-readiness-and-bound-source-contract-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/006-status.md` |
@@ -222,8 +222,7 @@ Archive M001a cleanup authority [HISTORICAL; SUPERSEDED by M001b]
 Archive M001b handle-bound cleanup + Windows portability [CLOSED; run 36222536670]
                |
                v
-Archive M001c handle-relative member materialization [BLOCKED: Section 14
-handoff stop; write half `09c953f`]
+Archive M001c handle-relative member materialization [HISTORICAL PREDECESSOR; HANDOFF STOP RESOLVED BY M001d]
                 |
                 v
 Planning C006 M001d readiness correction [CLOSED]
