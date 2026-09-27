@@ -1,6 +1,6 @@
 # Planning / Closure Hygiene Corrective C008 — Post-M001d Status and Handoff Reconciliation
 
-Status: ready for handoff
+Status: implemented; closed by `plans/closure/planning-closure-hygiene-corrective/008-status.md`
 
 Repository baseline: `863f2446a282b78f34fa86d5d7422a1f9c230862`
 
