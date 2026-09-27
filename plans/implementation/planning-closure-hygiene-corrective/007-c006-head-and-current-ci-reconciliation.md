@@ -1,6 +1,6 @@
 # Planning / Closure Hygiene Corrective C007 — C006 Head and Current-CI Reconciliation
 
-Status: ready for handoff
+Status: implemented (see `plans/closure/planning-closure-hygiene-corrective/007-status.md`)
 
 Repository baseline: `510111fa67bafd0e188dad744eed4d224a015b76`
 
