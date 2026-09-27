@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: pending final bookkeeping commit after cross-repo Egress-plan linkage
+Latest planning registration head: `a8b25d55a1cb281af26e925d10283a5453e26eaf` (C008 closed; Core M008 + Eggpack Interop M002 registered ready; Consumer M006 registered and linked to Egress Delivery M003 with the versioned-package gate)
 
 Latest reviewed runtime head: `18d83decd0c894279dd5e5d89407e1423f839d99` (M001d Windows-qualification head). Hosted run `36335233644` passed Stable Linux, Rust 1.89 MSRV, macOS, and Windows; current-head-after-closure run `36335617284` also passed all four lanes. C008 is closed and reconciles the historical M001c stop. Verified Core M008 package qualification and Eggpack Interop M002 archive handoff are ready. Consumer M006/Egress adoption is planned; publishable dependency cutover is gated on a versioned crates.io-usable Eggup core/archive package boundary.
 
