@@ -1,10 +1,11 @@
-use std::fs;
+use std::fs::{self, File};
+use std::io::{Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(unix)]
 use crate::domain::PermissionsIntent;
-use crate::domain::{ArtifactMember, InstallPlan};
+use crate::domain::{ArtifactMember, BoundSources, InstallPlan};
 use crate::error::{Error, Result};
 
 static NEXT_STAGE_ID: AtomicU64 = AtomicU64::new(0);
@@ -17,7 +18,14 @@ pub(crate) struct Stage {
 
 impl Stage {
     pub(crate) fn prepare(plan: InstallPlan) -> Result<PreparedTransaction> {
-        Self::prepare_inner(plan, None)
+        Self::prepare_inner(plan, None, None)
+    }
+
+    pub(crate) fn prepare_bound(
+        plan: InstallPlan,
+        bound: BoundSources,
+    ) -> Result<PreparedTransaction> {
+        Self::prepare_inner(plan, Some(bound), None)
     }
 
     #[cfg(test)]
@@ -30,21 +38,34 @@ impl Stage {
             crate::test_support::FailurePoint::StageCopy => Some(FailureAt::Copy),
             _ => None,
         };
-        Self::prepare_inner(plan, failure)
+        Self::prepare_inner(plan, None, failure)
     }
 
-    fn prepare_inner(plan: InstallPlan, failure: Option<FailureAt>) -> Result<PreparedTransaction> {
+    fn prepare_inner(
+        plan: InstallPlan,
+        mut bound: Option<BoundSources>,
+        failure: Option<FailureAt>,
+    ) -> Result<PreparedTransaction> {
         check_failure(failure, FailureAt::Create)?;
         let (path, parent) = create_stage_directory(plan.installation_root())?;
         let stage = Self { path, parent };
-        if let Err(error) = stage.copy_members(&plan, failure) {
+        if let Err(error) = stage.copy_members(&plan, &mut bound, failure) {
             drop(stage);
             return Err(error);
+        }
+        if bound.is_some_and(|sources| !sources.is_empty()) {
+            drop(stage);
+            return Err(Error::invalid("bound source for unknown artifact member"));
         }
         Ok(PreparedTransaction { plan, stage })
     }
 
-    fn copy_members(&self, plan: &InstallPlan, failure: Option<FailureAt>) -> Result<()> {
+    fn copy_members(
+        &self,
+        plan: &InstallPlan,
+        bound: &mut Option<BoundSources>,
+        failure: Option<FailureAt>,
+    ) -> Result<()> {
         for member in plan.artifacts().iter() {
             check_failure(failure, FailureAt::Copy)?;
             let destination = self.member_path(member);
@@ -59,8 +80,15 @@ impl Stage {
                     let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o700));
                 }
             }
-            fs::copy(member.source(), &destination)
-                .map_err(|source| Error::io("copying artifact into private stage", source))?;
+            let handle = bound.as_mut().and_then(|sources| sources.take(member.id()));
+            match handle {
+                Some(handle) => stage_bound_source(handle, &destination)?,
+                None => {
+                    fs::copy(member.source(), &destination).map_err(|source| {
+                        Error::io("copying artifact into private stage", source)
+                    })?;
+                }
+            }
             apply_permissions(member, &destination)?;
         }
         Ok(())
@@ -69,6 +97,33 @@ impl Stage {
     fn member_path(&self, member: &ArtifactMember) -> PathBuf {
         self.path.join(member.destination())
     }
+}
+
+/// Stages one member from its already-open object without any pathname lookup.
+///
+/// The handle is rewound to byte zero first, so a non-zero cursor (for
+/// example, left at end-of-file by the producer) can never truncate staged
+/// bytes. Read, rewind, or copy failure fails closed; the recorded source
+/// path is never consulted as fallback.
+fn stage_bound_source(mut handle: File, destination: &Path) -> Result<()> {
+    handle
+        .seek(SeekFrom::Start(0))
+        .map_err(|source| Error::io("rewinding bound source for staging", source))?;
+    let mut staged = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(destination)
+        .map_err(|source| Error::io("creating bound stage destination", source))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(destination, fs::Permissions::from_mode(0o600))
+            .map_err(|source| Error::io("securing bound stage destination", source))?;
+    }
+    std::io::copy(&mut handle, &mut staged)
+        .map_err(|source| Error::io("staging bound source into private stage", source))?;
+    Ok(())
 }
 
 /// A validated, privately staged transaction that has not performed live mutation.

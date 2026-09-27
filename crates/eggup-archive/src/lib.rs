@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use zip::ZipArchive;
@@ -277,6 +277,13 @@ impl ExtractedMember {
     }
 
     /// Returns the local regular-file path.
+    ///
+    /// This pathname is advisory diagnostics only, never staging authority:
+    /// a root rename/replacement after extraction can leave it stale or
+    /// foreign while the bytes remain in the handle-owned directory. Stage
+    /// archive members through [`BoundMember`] (see
+    /// [`PersistedExtraction::into_bound_sources`]) so staged bytes come from
+    /// the already-open member object instead of re-resolving this path.
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -297,6 +304,9 @@ impl ExtractedMember {
 pub struct ExtractedArchive {
     guard: Option<DirectoryGuard>,
     members: Vec<ExtractedMember>,
+    /// Already-open readable member objects, paired by index with `members`.
+    /// Retained so the object-bound handoff never re-resolves a pathname.
+    handles: Vec<File>,
 }
 
 impl ExtractedArchive {
@@ -315,10 +325,12 @@ impl ExtractedArchive {
     pub fn persist(mut self) -> PersistedExtraction {
         let guard = self.guard.take().expect("active extraction guard");
         let (root, handle) = guard.disarm();
+        let handles = std::mem::take(&mut self.handles);
         PersistedExtraction {
             root,
             handle,
             members: self.members,
+            handles,
         }
     }
 
@@ -326,6 +338,9 @@ impl ExtractedArchive {
     /// evidence if cleanup fails.
     pub fn cleanup(mut self) -> Result<(), ExtractionError> {
         let guard = self.guard.take().expect("active extraction guard");
+        // Close member objects before emptying the root: cleanup never races
+        // a still-open member, and no pathname fallback is consulted.
+        drop(std::mem::take(&mut self.handles));
         guard.cleanup()
     }
 }
@@ -335,6 +350,8 @@ pub struct PersistedExtraction {
     root: PathBuf,
     handle: File,
     members: Vec<ExtractedMember>,
+    /// Already-open readable member objects, paired by index with `members`.
+    handles: Vec<File>,
 }
 
 impl std::fmt::Debug for PersistedExtraction {
@@ -359,7 +376,232 @@ impl PersistedExtraction {
 
     /// Removes the retained directory when the caller no longer needs it.
     pub fn cleanup(self) -> Result<(), ExtractionError> {
-        remove_owned_root_via_handle(self.root, self.handle)
+        let Self {
+            root,
+            handle,
+            members: _,
+            handles,
+        } = self;
+        // Close member objects before emptying the root (see
+        // `ExtractedArchive::cleanup` for the ordering rationale).
+        drop(handles);
+        remove_owned_root_via_handle(root, handle)
+    }
+
+    /// Converts every member into an object-bound staging source.
+    ///
+    /// This is the handle-backed handoff: each returned [`BoundMember`] owns
+    /// the already-open readable member object created by the atomic
+    /// handle-relative write, rewound to byte zero, so later staging reads
+    /// the verified object instead of re-resolving the recorded pathname or
+    /// member name. Call this before any staging; a root rename or member
+    /// replacement afterwards cannot redirect the bound objects.
+    ///
+    /// Member handles are closed when their [`BoundMember`] is consumed or
+    /// dropped. Run cleanup only after bound handles are consumed or closed
+    /// (see [`BoundExtraction::into_members`]); residue remains acceptable
+    /// under the same semantics as [`cleanup`](Self::cleanup).
+    pub fn into_bound_sources(self) -> Result<BoundExtraction, ExtractionError> {
+        let Self {
+            root,
+            handle: root_handle,
+            members,
+            handles,
+        } = self;
+        assert_eq!(
+            members.len(),
+            handles.len(),
+            "extraction members and retained handles must stay paired"
+        );
+        let mut bound = Vec::with_capacity(members.len());
+        for (evidence, mut file) in members.into_iter().zip(handles.into_iter()) {
+            file.flush()
+                .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
+            file.seek(SeekFrom::Start(0))
+                .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
+            bound.push(BoundMember {
+                source_path: evidence.source_path,
+                output_name: evidence.output_name,
+                advisory_path: evidence.path,
+                bytes_written: evidence.bytes_written,
+                sha256: evidence.sha256,
+                handle: file,
+            });
+        }
+        Ok(BoundExtraction {
+            members: bound,
+            root,
+            root_handle,
+        })
+    }
+}
+
+/// One extracted member proven by its already-open member object.
+///
+/// A bound member carries the same size/digest evidence as
+/// [`ExtractedMember`], but its bytes are proven by object identity: `handle`
+/// is the exact object created by the atomic handle-relative write and
+/// verified during extraction, rewound to byte zero at handoff. Staging from
+/// this object performs no name lookup after the handoff boundary, so a
+/// concurrent member-entry replacement cannot redirect staged bytes.
+///
+/// The handle is single-owner and move-only. [`File`] cursors are shared
+/// across clones, so this type is deliberately not [`Clone`]: move the object
+/// into staging (see [`into_open_object`](Self::into_open_object)), which
+/// rewinds it again before reading. Never [`try_clone`](File::try_clone) a
+/// bound handle and assume an independent offset.
+///
+/// `advisory_path` is diagnostics only and explicitly non-authoritative: it
+/// may be stale (root renamed) or foreign (member entry replaced) while the
+/// handle still proves the owned bytes. Never stage by opening it.
+#[derive(Debug)]
+pub struct BoundMember {
+    source_path: String,
+    output_name: String,
+    advisory_path: PathBuf,
+    bytes_written: u64,
+    sha256: [u8; 32],
+    handle: File,
+}
+
+impl BoundMember {
+    /// Returns the normalized archive path that supplied these bytes.
+    pub fn source_path(&self) -> &str {
+        &self.source_path
+    }
+
+    /// Returns the output filename inside the extraction root.
+    pub fn output_name(&self) -> &str {
+        &self.output_name
+    }
+
+    /// Returns the recorded member pathname for diagnostics only.
+    ///
+    /// Non-authoritative: may be stale or foreign after a root
+    /// rename/replacement. Never open this path to obtain staged bytes; move
+    /// [`into_open_object`](Self::into_open_object) into staging instead.
+    pub fn advisory_path(&self) -> &Path {
+        &self.advisory_path
+    }
+
+    /// Returns the exact bytes written and verified.
+    pub fn bytes_written(&self) -> u64 {
+        self.bytes_written
+    }
+
+    /// Returns the SHA-256 digest of the extracted bytes.
+    pub fn sha256(&self) -> [u8; 32] {
+        self.sha256
+    }
+
+    /// Borrows the open member object, for example to prove cursor ownership
+    /// in tests. The holder owns the shared cursor: any read/seek moves it
+    /// for all borrowers, and staging rewinds to byte zero before reading.
+    pub fn handle_mut(&mut self) -> &mut File {
+        &mut self.handle
+    }
+
+    /// Releases the already-open readable member object for staging.
+    ///
+    /// The object arrives rewound to byte zero by
+    /// [`into_bound_sources`](PersistedExtraction::into_bound_sources);
+    /// staging must still rewind before reading (it does) so a cursor moved
+    /// after handoff cannot truncate staged bytes.
+    pub fn into_open_object(self) -> File {
+        self.handle
+    }
+}
+
+/// Object-bound extraction output awaiting staging and deferred cleanup.
+///
+/// Created by [`PersistedExtraction::into_bound_sources`]. Members stage from
+/// their open objects; the retained root handle stays owned here until
+/// cleanup so directory authority is never lost while bound sources are
+/// outstanding.
+#[derive(Debug)]
+pub struct BoundExtraction {
+    members: Vec<BoundMember>,
+    root: PathBuf,
+    root_handle: File,
+}
+
+impl BoundExtraction {
+    /// Returns the bound members in declaration order.
+    pub fn members(&self) -> &[BoundMember] {
+        &self.members
+    }
+
+    /// Mutably borrows the bound members, for example to prove cursor
+    /// ownership before staging. The holder owns every shared cursor.
+    pub fn members_mut(&mut self) -> &mut [BoundMember] {
+        &mut self.members
+    }
+
+    /// Returns the retained private extraction root.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// Splits bound staging sources from deferred root cleanup.
+    ///
+    /// The returned members own their open objects; stage them first, then
+    /// let their handles close (by consumption into staging or drop) before
+    /// running [`cleanup`](DeferredCleanup::cleanup). Cleanup ordered before
+    /// staging completes fails closed on platforms where open handles pin
+    /// directory entries, and is never pathname-recursive.
+    pub fn into_members(self) -> (Vec<BoundMember>, DeferredCleanup) {
+        let Self {
+            members,
+            root,
+            root_handle,
+        } = self;
+        (members, DeferredCleanup { root, root_handle })
+    }
+
+    /// Removes the retained directory without staging, for abort paths.
+    ///
+    /// Member objects are closed first (see
+    /// [`ExtractedArchive::cleanup`]); residue semantics match
+    /// [`PersistedExtraction::cleanup`].
+    pub fn cleanup(self) -> Result<(), ExtractionError> {
+        let Self {
+            members,
+            root,
+            root_handle,
+        } = self;
+        drop(members);
+        remove_owned_root_via_handle(root, root_handle)
+    }
+}
+
+/// Deferred extraction-root cleanup paired with outstanding bound sources.
+///
+/// Returned by [`BoundExtraction::into_members`]. Run this only after bound
+/// handles are consumed or closed; cleanup empties the owned root solely via
+/// the retained handle, never by traversing a pathname.
+pub struct DeferredCleanup {
+    root: PathBuf,
+    root_handle: File,
+}
+
+impl std::fmt::Debug for DeferredCleanup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DeferredCleanup")
+            .field("root", &self.root)
+            .finish_non_exhaustive()
+    }
+}
+
+impl DeferredCleanup {
+    /// Returns the retained private extraction root for residue diagnostics.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// Empties the owned root via the retained handle and reports residue
+    /// evidence if cleanup fails.
+    pub fn cleanup(self) -> Result<(), ExtractionError> {
+        remove_owned_root_via_handle(self.root, self.root_handle)
     }
 }
 
@@ -385,9 +627,10 @@ pub fn extract(
     }
     let (root, handle) = create_private_root(output_parent)?;
     match extract_with_hook_inner(plan, &root, &handle, None) {
-        Ok(members) => Ok(ExtractedArchive {
+        Ok((members, handles)) => Ok(ExtractedArchive {
             guard: Some(DirectoryGuard::new(root, handle)),
             members,
+            handles,
         }),
         Err(error) => match remove_owned_root_with_hook(root.clone(), handle, None) {
             Ok(()) => Err(error),
@@ -462,9 +705,10 @@ fn extract_with_hook(
     }
     let (root, handle) = create_private_root(output_parent)?;
     match extract_with_hook_inner(plan, &root, &handle, hook) {
-        Ok(members) => Ok(ExtractedArchive {
+        Ok((members, handles)) => Ok(ExtractedArchive {
             guard: Some(DirectoryGuard::new(root, handle)),
             members,
+            handles,
         }),
         Err(error) => match remove_owned_root_with_hook(root.clone(), handle, None) {
             Ok(()) => Err(error),
@@ -478,10 +722,10 @@ fn extract_with_hook_inner(
     root: &Path,
     root_handle: &File,
     hook: MaterializationHook<'_>,
-) -> Result<Vec<ExtractedMember>, ExtractionError> {
+) -> Result<(Vec<ExtractedMember>, Vec<File>), ExtractionError> {
     let mut total = 0u64;
     let mut seen = HashSet::new();
-    let mut extracted = HashMap::new();
+    let mut extracted: HashMap<String, (ExtractedMember, File)> = HashMap::new();
     let mut scope = ExtractionScope {
         root_path: root,
         root_handle,
@@ -495,14 +739,15 @@ fn extract_with_hook_inner(
         ArchiveFormat::Zip => extract_zip(plan, &mut scope, &mut total, &mut seen, &mut extracted)?,
     }
     let mut ordered = Vec::with_capacity(plan.members.len());
+    let mut handles = Vec::with_capacity(plan.members.len());
     for member in &plan.members {
-        ordered.push(
-            extracted
-                .remove(&member.source_path)
-                .ok_or_else(|| ExtractionError::new(ExtractionErrorKind::MissingMember))?,
-        );
+        let (evidence, handle) = extracted
+            .remove(&member.source_path)
+            .ok_or_else(|| ExtractionError::new(ExtractionErrorKind::MissingMember))?;
+        ordered.push(evidence);
+        handles.push(handle);
     }
-    Ok(ordered)
+    Ok((ordered, handles))
 }
 
 fn extract_tar_gz(
@@ -510,7 +755,7 @@ fn extract_tar_gz(
     scope: &mut ExtractionScope<'_>,
     total: &mut u64,
     seen: &mut HashSet<String>,
-    extracted: &mut HashMap<String, ExtractedMember>,
+    extracted: &mut HashMap<String, (ExtractedMember, File)>,
 ) -> Result<(), ExtractionError> {
     let input = File::open(&plan.archive_path)
         .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
@@ -568,13 +813,16 @@ fn extract_tar_gz(
             validate_expected(member, bytes_written, digest)?;
             extracted.insert(
                 normalized.clone(),
-                ExtractedMember {
-                    source_path: normalized,
-                    output_name: member.output_name.clone(),
-                    path,
-                    bytes_written,
-                    sha256: digest,
-                },
+                (
+                    ExtractedMember {
+                        source_path: normalized,
+                        output_name: member.output_name.clone(),
+                        path,
+                        bytes_written,
+                        sha256: digest,
+                    },
+                    output,
+                ),
             );
         } else {
             drain_bounded(&mut entry, plan.limits, total)?;
@@ -608,7 +856,7 @@ fn extract_zip(
     scope: &mut ExtractionScope<'_>,
     total: &mut u64,
     seen: &mut HashSet<String>,
-    extracted: &mut HashMap<String, ExtractedMember>,
+    extracted: &mut HashMap<String, (ExtractedMember, File)>,
 ) -> Result<(), ExtractionError> {
     let input = File::open(&plan.archive_path)
         .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
@@ -654,13 +902,16 @@ fn extract_zip(
             validate_expected(member, bytes_written, digest)?;
             extracted.insert(
                 normalized.clone(),
-                ExtractedMember {
-                    source_path: normalized,
-                    output_name: member.output_name.clone(),
-                    path,
-                    bytes_written,
-                    sha256: digest,
-                },
+                (
+                    ExtractedMember {
+                        source_path: normalized,
+                        output_name: member.output_name.clone(),
+                        path,
+                        bytes_written,
+                        sha256: digest,
+                    },
+                    output,
+                ),
             );
         } else {
             drain_bounded(&mut entry, plan.limits, total)?;
@@ -870,11 +1121,17 @@ fn create_private_root(parent: &Path) -> Result<(PathBuf, File), ExtractionError
 /// to follow a final-component symlink/reparse point. Unix creation mode is
 /// `0600`, preserving the previous owner-private intent.
 ///
+/// The returned object carries read authority from the outset on the same
+/// file description: no later staging step may regain readability by
+/// reopening the member by pathname/name. The object-backed handoff rewinds
+/// it to byte zero before staging consumption.
+///
 /// `name` must be an already-validated single-component `output_name`; no
 /// multi-component archive-controlled path is accepted here.
 fn create_private_file_at(root: &File, name: &Path) -> Result<File, ExtractionError> {
     let mut options = fs_at::OpenOptions::default();
     options
+        .read(true)
         .write(fs_at::OpenOptionsWriteMode::Write)
         .create_new(true)
         .follow(false);
@@ -1061,7 +1318,9 @@ impl Drop for DirectoryGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use eggup_core::{ArtifactMember, ArtifactSet, InstallPlan, MemberId, ProductId, ReleaseId};
+    use eggup_core::{
+        ArtifactMember, ArtifactSet, BoundSources, InstallPlan, MemberId, ProductId, ReleaseId,
+    };
     use flate2::write::GzEncoder;
     use flate2::Compression;
     use std::io::Cursor;
@@ -2035,28 +2294,30 @@ mod tests {
             vec![member("main", "main", b"new binary")],
             limits(),
         );
-        let extracted = extract(&plan, dir.path()).unwrap().persist();
+        // M001d handoff: the member stages from its already-open object, not
+        // by re-resolving the recorded pathname.
+        let bound = extract(&plan, dir.path())
+            .unwrap()
+            .persist()
+            .into_bound_sources()
+            .unwrap();
+        assert_eq!(bound.members()[0].bytes_written(), 10);
         let install_root = dir.path().join("install");
         fs::create_dir(&install_root).unwrap();
-        let artifacts = ArtifactSet::new(vec![ArtifactMember::new(
-            MemberId::new("main").unwrap(),
-            extracted.members()[0].path(),
-            "bin/main",
-        )
-        .unwrap()])
-        .unwrap();
-        let prepared = InstallPlan::new(
-            ProductId::new("example").unwrap(),
-            ReleaseId::new("1.0.0").unwrap(),
-            &install_root,
-            artifacts,
-        )
-        .unwrap()
-        .prepare()
-        .unwrap();
+        let root = bound.root().to_path_buf();
+        let core_plan = bound_plan(&bound, &install_root);
+        let (prepared, cleanup) = stage_bound_members(bound, core_plan);
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("main").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"new binary"
+        );
         assert!(prepared.stage_root().exists());
-        let root = extracted.root().to_path_buf();
-        let error = extracted.cleanup().unwrap_err();
+        let error = cleanup.cleanup().unwrap_err();
         assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
         assert_eq!(error.residue_path(), Some(root.as_path()));
         assert!(root.exists());
@@ -2366,5 +2627,532 @@ mod tests {
             let _ = fs::remove_dir_all(residue);
         }
         fs::remove_file(&target).unwrap();
+    }
+
+    // ---- M001d handle-backed source handoff ----
+    //
+    // These tests prove staged bytes come from the already-open member
+    // object, never from re-resolving a recorded pathname or member name.
+    // All races are deterministic (synchronous hooks or explicit post-handoff
+    // filesystem operations); no test sleeps. The plan is always built from
+    // advisory paths while they are still valid — the attacks below happen
+    // after the handoff boundary, before staging — except where the attack
+    // itself must precede the first write (hook races), in which case bound
+    // reads are proven at the archive level.
+
+    /// Replaces a member directory entry while retaining the original object
+    /// via its open handle. Portable: member handles carry full share access.
+    fn replace_member_entry(path: &Path, foreign: &[u8]) {
+        fs::remove_file(path).unwrap();
+        fs::write(path, foreign).unwrap();
+    }
+
+    /// Builds a core plan from bound advisory paths. Call while advisory
+    /// paths are still valid; attacks happen after this returns.
+    fn bound_plan(extraction: &BoundExtraction, install_root: &Path) -> InstallPlan {
+        let artifacts = ArtifactSet::new(
+            extraction
+                .members()
+                .iter()
+                .map(|member| {
+                    ArtifactMember::new(
+                        MemberId::new(member.output_name()).unwrap(),
+                        member.advisory_path(),
+                        member.output_name(),
+                    )
+                    .unwrap()
+                })
+                .collect(),
+        )
+        .unwrap();
+        InstallPlan::new(
+            ProductId::new("example").unwrap(),
+            ReleaseId::new("1.0.0").unwrap(),
+            install_root,
+            artifacts,
+        )
+        .unwrap()
+    }
+
+    /// Stages bound members from their open objects and returns the prepared
+    /// transaction with deferred root cleanup.
+    fn stage_bound_members(
+        extraction: BoundExtraction,
+        plan: InstallPlan,
+    ) -> (eggup_core::PreparedTransaction, DeferredCleanup) {
+        let (members, cleanup) = extraction.into_members();
+        let mut sources = BoundSources::new();
+        for member in members {
+            let id = MemberId::new(member.output_name()).unwrap();
+            sources.insert(id, member.into_open_object());
+        }
+        (plan.prepare_with_bound_sources(sources).unwrap(), cleanup)
+    }
+
+    /// Asserts handle-authorized cleanup semantics: the owned root is emptied
+    /// via the retained handle and residue evidence names the recorded root.
+    fn assert_cleanup_reports_residue(cleanup: DeferredCleanup, residue: &Path, emptied: &Path) {
+        let error = cleanup.cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(residue));
+        assert_eq!(fs::read_dir(emptied).unwrap().count(), 0);
+        fs::remove_dir(emptied).unwrap();
+    }
+
+    #[test]
+    fn bound_tar_member_entry_replacement_after_handoff_stages_owned_bytes() {
+        let dir = TestDir::new();
+        let archive = tar_file(
+            dir.path(),
+            "race.tar.gz",
+            &[TarFixture {
+                path: "app",
+                kind: b'0',
+                body: b"owned-bytes",
+                link: None,
+            }],
+        );
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::TarGz,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let bound = extract(&plan, dir.path())
+            .unwrap()
+            .persist()
+            .into_bound_sources()
+            .unwrap();
+        let expected: [u8; 32] = Sha256::digest(b"owned-bytes").into();
+        assert_eq!(bound.members()[0].bytes_written(), 11);
+        assert_eq!(bound.members()[0].sha256(), expected);
+        let install_root = dir.path().join("install");
+        fs::create_dir(&install_root).unwrap();
+        let root = bound.root().to_path_buf();
+        let core_plan = bound_plan(&bound, &install_root);
+        // Post-handoff replacement inside the still-owned root: the advisory
+        // path now resolves to foreign bytes while the open object still
+        // proves the owned bytes.
+        let advisory = bound.members()[0].advisory_path().to_path_buf();
+        replace_member_entry(&advisory, b"foreign-bytes");
+        let (prepared, cleanup) = stage_bound_members(bound, core_plan);
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("app").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"owned-bytes"
+        );
+        assert_eq!(fs::read(&advisory).unwrap(), b"foreign-bytes");
+        assert_cleanup_reports_residue(cleanup, &root, &root);
+    }
+
+    #[test]
+    fn bound_zip_member_entry_replacement_after_handoff_stages_owned_bytes() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"owned-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let bound = extract(&plan, dir.path())
+            .unwrap()
+            .persist()
+            .into_bound_sources()
+            .unwrap();
+        let expected: [u8; 32] = Sha256::digest(b"owned-bytes").into();
+        assert_eq!(bound.members()[0].bytes_written(), 11);
+        assert_eq!(bound.members()[0].sha256(), expected);
+        let install_root = dir.path().join("install");
+        fs::create_dir(&install_root).unwrap();
+        let root = bound.root().to_path_buf();
+        let core_plan = bound_plan(&bound, &install_root);
+        let advisory = bound.members()[0].advisory_path().to_path_buf();
+        replace_member_entry(&advisory, b"foreign-bytes");
+        let (prepared, cleanup) = stage_bound_members(bound, core_plan);
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("app").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"owned-bytes"
+        );
+        assert_eq!(fs::read(&advisory).unwrap(), b"foreign-bytes");
+        assert_cleanup_reports_residue(cleanup, &root, &root);
+    }
+
+    #[test]
+    fn bound_two_member_replacement_after_handoff_stages_owned_bytes() {
+        let dir = TestDir::new();
+        let archive = tar_file(
+            dir.path(),
+            "two.tar.gz",
+            &[
+                TarFixture {
+                    path: "one",
+                    kind: b'0',
+                    body: b"first",
+                    link: None,
+                },
+                TarFixture {
+                    path: "two",
+                    kind: b'0',
+                    body: b"second",
+                    link: None,
+                },
+            ],
+        );
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::TarGz,
+            vec![
+                member("one", "one", b"first"),
+                member("two", "two", b"second"),
+            ],
+            limits(),
+        );
+        let bound = extract(&plan, dir.path())
+            .unwrap()
+            .persist()
+            .into_bound_sources()
+            .unwrap();
+        let install_root = dir.path().join("install");
+        fs::create_dir(&install_root).unwrap();
+        let root = bound.root().to_path_buf();
+        let core_plan = bound_plan(&bound, &install_root);
+        // Replace both member entries after the handoff; neither staged byte
+        // may come from the replacements.
+        let first_advisory = bound.members()[0].advisory_path().to_path_buf();
+        let second_advisory = bound.members()[1].advisory_path().to_path_buf();
+        replace_member_entry(&first_advisory, b"foreign-one");
+        replace_member_entry(&second_advisory, b"foreign-two");
+        let (prepared, cleanup) = stage_bound_members(bound, core_plan);
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("one").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"first"
+        );
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("two").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"second"
+        );
+        assert_eq!(fs::read(&first_advisory).unwrap(), b"foreign-one");
+        assert_eq!(fs::read(&second_advisory).unwrap(), b"foreign-two");
+        assert_cleanup_reports_residue(cleanup, &root, &root);
+    }
+
+    #[test]
+    fn bound_post_handoff_root_replacement_stages_owned_bytes() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"owned-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let bound = extract(&plan, dir.path())
+            .unwrap()
+            .persist()
+            .into_bound_sources()
+            .unwrap();
+        let install_root = dir.path().join("install");
+        fs::create_dir(&install_root).unwrap();
+        let root = bound.root().to_path_buf();
+        let core_plan = bound_plan(&bound, &install_root);
+        // Post-handoff root replacement: the recorded root name now belongs
+        // to foreign state while the retained handle still owns the original.
+        let moved = dir.path().join("moved-owned-post-handoff");
+        fs::rename(&root, &moved).unwrap();
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join("foreign"), b"keep").unwrap();
+        let (prepared, cleanup) = stage_bound_members(bound, core_plan);
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("app").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"owned-bytes"
+        );
+        assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+        assert_cleanup_reports_residue(cleanup, &root, &moved);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn bound_tar_root_rename_before_first_write_reads_owned_bytes() {
+        let dir = TestDir::new();
+        let archive = tar_file(
+            dir.path(),
+            "race.tar.gz",
+            &[TarFixture {
+                path: "app",
+                kind: b'0',
+                body: b"owned-bytes",
+                link: None,
+            }],
+        );
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::TarGz,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let moved = dir.path().join("moved-owned-bound-tar");
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                fs::create_dir(root).unwrap();
+                fs::write(root.join("foreign"), b"keep").unwrap();
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
+        // Bound reads resolve the retained object despite the stale pathname.
+        let (members, cleanup) = extracted
+            .persist()
+            .into_bound_sources()
+            .unwrap()
+            .into_members();
+        assert_eq!(members.len(), 1);
+        let mut owned = Vec::new();
+        let mut object = members.into_iter().next().unwrap().into_open_object();
+        use std::io::Read as _;
+        object.read_to_end(&mut owned).unwrap();
+        assert_eq!(owned, b"owned-bytes");
+        assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
+        assert!(!root.join("app").exists());
+        let error = cleanup.cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
+        fs::remove_dir(&moved).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn bound_zip_root_rename_before_first_write_reads_owned_bytes() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"owned-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let moved = dir.path().join("moved-owned-bound-zip");
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                fs::create_dir(root).unwrap();
+                fs::write(root.join("foreign"), b"keep").unwrap();
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
+        let (members, cleanup) = extracted
+            .persist()
+            .into_bound_sources()
+            .unwrap()
+            .into_members();
+        assert_eq!(members.len(), 1);
+        let mut owned = Vec::new();
+        let mut object = members.into_iter().next().unwrap().into_open_object();
+        use std::io::Read as _;
+        object.read_to_end(&mut owned).unwrap();
+        assert_eq!(owned, b"owned-bytes");
+        assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
+        assert!(!root.join("app").exists());
+        let error = cleanup.cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
+        fs::remove_dir(&moved).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn bound_two_member_replacement_between_writes_reads_owned_bytes() {
+        let dir = TestDir::new();
+        let archive = tar_file(
+            dir.path(),
+            "two.tar.gz",
+            &[
+                TarFixture {
+                    path: "one",
+                    kind: b'0',
+                    body: b"first",
+                    link: None,
+                },
+                TarFixture {
+                    path: "two",
+                    kind: b'0',
+                    body: b"second",
+                    link: None,
+                },
+            ],
+        );
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::TarGz,
+            vec![
+                member("one", "one", b"first"),
+                member("two", "two", b"second"),
+            ],
+            limits(),
+        );
+        let moved = dir.path().join("moved-owned-bound-two");
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                if seq == 1 {
+                    fs::rename(root, &moved).unwrap();
+                    fs::create_dir(root).unwrap();
+                    fs::write(root.join("foreign"), b"keep").unwrap();
+                }
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
+        let (members, cleanup) = extracted
+            .persist()
+            .into_bound_sources()
+            .unwrap()
+            .into_members();
+        assert_eq!(members.len(), 2);
+        use std::io::Read as _;
+        let mut bodies = Vec::new();
+        for member in members {
+            let mut object = member.into_open_object();
+            let mut body = Vec::new();
+            object.read_to_end(&mut body).unwrap();
+            bodies.push(body);
+        }
+        assert_eq!(bodies, vec![b"first".to_vec(), b"second".to_vec()]);
+        assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+        let error = cleanup.cleanup().unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
+        fs::remove_dir(&moved).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn bound_nonzero_cursor_stages_full_file_from_byte_zero() {
+        let dir = TestDir::new();
+        let archive = zip_file(dir.path(), "race.zip", &[("app", b"owned-bytes")]);
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::Zip,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let mut bound = extract(&plan, dir.path())
+            .unwrap()
+            .persist()
+            .into_bound_sources()
+            .unwrap();
+        // Move the shared cursor after handoff: staging must still consume
+        // the full file from byte zero, never from the moved cursor.
+        let mut prefix = [0u8; 4];
+        use std::io::Read as _;
+        bound.members_mut()[0]
+            .handle_mut()
+            .read_exact(&mut prefix)
+            .unwrap();
+        assert_eq!(&prefix, b"owne");
+        let install_root = dir.path().join("install");
+        fs::create_dir(&install_root).unwrap();
+        let root = bound.root().to_path_buf();
+        let core_plan = bound_plan(&bound, &install_root);
+        let (prepared, cleanup) = stage_bound_members(bound, core_plan);
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("app").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"owned-bytes"
+        );
+        assert_cleanup_reports_residue(cleanup, &root, &root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bound_sources_preserve_owner_private_mode_and_exact_evidence() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = TestDir::new();
+        let archive = tar_file(
+            dir.path(),
+            "race.tar.gz",
+            &[TarFixture {
+                path: "app",
+                kind: b'0',
+                body: b"owned-bytes",
+                link: None,
+            }],
+        );
+        let plan = make_plan(
+            archive,
+            ArchiveFormat::TarGz,
+            vec![member("app", "app", b"owned-bytes")],
+            limits(),
+        );
+        let bound = extract(&plan, dir.path())
+            .unwrap()
+            .persist()
+            .into_bound_sources()
+            .unwrap();
+        let expected: [u8; 32] = Sha256::digest(b"owned-bytes").into();
+        assert_eq!(bound.members()[0].bytes_written(), 11);
+        assert_eq!(bound.members()[0].sha256(), expected);
+        assert_eq!(bound.members()[0].source_path(), "app");
+        assert_eq!(bound.members()[0].output_name(), "app");
+        // Handle-relative creation stays owner-private with read authority.
+        let mode = fs::metadata(bound.members()[0].advisory_path())
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+        let install_root = dir.path().join("install");
+        fs::create_dir(&install_root).unwrap();
+        let root = bound.root().to_path_buf();
+        let core_plan = bound_plan(&bound, &install_root);
+        let (prepared, cleanup) = stage_bound_members(bound, core_plan);
+        let staged_mode = fs::metadata(
+            prepared
+                .staged_path(&MemberId::new("app").unwrap())
+                .unwrap(),
+        )
+        .unwrap()
+        .permissions()
+        .mode();
+        assert_eq!(staged_mode & 0o777, 0o600);
+        assert_cleanup_reports_residue(cleanup, &root, &root);
     }
 }

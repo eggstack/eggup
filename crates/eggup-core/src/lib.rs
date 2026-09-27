@@ -27,7 +27,7 @@ pub use candidate::{
     CrossMemberAgreementValidator, ExactIdentityValidator, ValidatedTransaction,
 };
 pub use domain::{
-    AbsentOnlyVerifier, AbsentPolicy, ArtifactMember, ArtifactSet, CommitOwnership,
+    AbsentOnlyVerifier, AbsentPolicy, ArtifactMember, ArtifactSet, BoundSources, CommitOwnership,
     ExactDigestVerifier, ExistingAsOwnedVerifier, FileKind, InstallPlan, IntegrityRequirement,
     MemberId, Ownership, OwnershipVerifier, PermissionsIntent, ProductId, ReleaseId,
 };
@@ -51,7 +51,7 @@ mod tests {
     use super::test_support::{FailureInjector, FailurePoint, InstallationRoot};
     use super::transaction::CommitFault;
     use super::{
-        AbsentOnlyVerifier, AbsentPolicy, AllValidators, ArtifactMember, ArtifactSet,
+        AbsentOnlyVerifier, AbsentPolicy, AllValidators, ArtifactMember, ArtifactSet, BoundSources,
         CleanupDisposition, CommitOwnership, Error, ExactDigestVerifier, ExactIdentityValidator,
         ExistingAsOwnedVerifier, InstallPlan, MemberId, MutationLock, Ownership, OwnershipVerifier,
         PostCommitFailurePolicy, ProductId, ReleaseId, TransactionDisposition,
@@ -265,6 +265,142 @@ mod tests {
             "/absolute/path",
         )
         .is_err());
+    }
+
+    #[test]
+    fn bound_source_stages_open_object_despite_foreign_replacement() {
+        use std::fs::File;
+
+        let inputs = InstallationRoot::new().expect("inputs");
+        let install = InstallationRoot::new().expect("install");
+        let source = inputs.write_file("owned", b"owned-bytes").expect("write");
+        let handle = File::open(&source).expect("open");
+        let member =
+            ArtifactMember::new(MemberId::new("main").unwrap(), source.clone(), "bin/main")
+                .unwrap();
+        let plan = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(member).unwrap(),
+        )
+        .unwrap();
+        // Post-handoff replacement: the recorded name now resolves to foreign
+        // bytes while the open object still proves the owned bytes.
+        fs::remove_file(&source).expect("remove");
+        fs::write(&source, b"foreign-bytes").expect("foreign");
+        let mut bound = BoundSources::new();
+        bound.insert(MemberId::new("main").unwrap(), handle);
+        let prepared = plan.prepare_with_bound_sources(bound).unwrap();
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("main").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"owned-bytes"
+        );
+        assert_eq!(fs::read(&source).unwrap(), b"foreign-bytes");
+    }
+
+    #[test]
+    fn bound_source_stages_open_object_after_root_rename() {
+        use std::fs::File;
+
+        let inputs = InstallationRoot::new().expect("inputs");
+        let install = InstallationRoot::new().expect("install");
+        let subdir = inputs.path().join("owned-dir");
+        fs::create_dir(&subdir).expect("mkdir");
+        let source = subdir.join("member");
+        fs::write(&source, b"owned-bytes").expect("write");
+        let handle = File::open(&source).expect("open");
+        let member =
+            ArtifactMember::new(MemberId::new("main").unwrap(), source.clone(), "bin/main")
+                .unwrap();
+        let plan = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(member).unwrap(),
+        )
+        .unwrap();
+        // The recorded advisory path is stale from here on; staging must still
+        // resolve the owned object, never the renamed-away name.
+        fs::rename(&subdir, inputs.path().join("renamed-dir")).expect("rename");
+        let mut bound = BoundSources::new();
+        bound.insert(MemberId::new("main").unwrap(), handle);
+        let prepared = plan.prepare_with_bound_sources(bound).unwrap();
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("main").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"owned-bytes"
+        );
+    }
+
+    #[test]
+    fn bound_source_stages_full_bytes_from_nonzero_cursor() {
+        use std::fs::File;
+        use std::io::{Read, Seek, SeekFrom};
+
+        let inputs = InstallationRoot::new().expect("inputs");
+        let install = InstallationRoot::new().expect("install");
+        let source = inputs.write_file("owned", b"owned-bytes").expect("write");
+        let mut handle = File::open(&source).expect("open");
+        let mut prefix = [0u8; 5];
+        handle.read_exact(&mut prefix).expect("read");
+        assert_eq!(&prefix, b"owned");
+        handle.seek(SeekFrom::Start(2)).expect("seek");
+        let member =
+            ArtifactMember::new(MemberId::new("main").unwrap(), source.clone(), "bin/main")
+                .unwrap();
+        let plan = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(member).unwrap(),
+        )
+        .unwrap();
+        let mut bound = BoundSources::new();
+        bound.insert(MemberId::new("main").unwrap(), handle);
+        let prepared = plan.prepare_with_bound_sources(bound).unwrap();
+        assert_eq!(
+            fs::read(
+                prepared
+                    .staged_path(&MemberId::new("main").unwrap())
+                    .unwrap()
+            )
+            .unwrap(),
+            b"owned-bytes"
+        );
+    }
+
+    #[test]
+    fn bound_source_for_unknown_member_fails_closed() {
+        use std::fs::File;
+
+        let inputs = InstallationRoot::new().expect("inputs");
+        let install = InstallationRoot::new().expect("install");
+        let source = inputs.write_file("owned", b"owned-bytes").expect("write");
+        let handle = File::open(&source).expect("open");
+        let member =
+            ArtifactMember::new(MemberId::new("main").unwrap(), source.clone(), "bin/main")
+                .unwrap();
+        let plan = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(member).unwrap(),
+        )
+        .unwrap();
+        let mut bound = BoundSources::new();
+        bound.insert(MemberId::new("ghost").unwrap(), handle);
+        assert!(plan.prepare_with_bound_sources(bound).is_err());
+        assert!(!install.path().join("bin/main").exists());
     }
 
     #[cfg(unix)]

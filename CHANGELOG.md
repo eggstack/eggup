@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Archive M001d handle-backed source handoff: extracted members now convert
+  into object-bound staging sources (`BoundMember`/`BoundExtraction`, already-
+  open readable objects rewound to byte zero) and stage through a new
+  `eggup-core` seam (`BoundSources` +
+  `InstallPlan::prepare_with_bound_sources`) with no pathname or member-name
+  lookup after the handoff boundary. Deterministic tar/zip races prove staged
+  bytes stay owned under member-entry replacement and root rename while
+  foreign state stays untouched. The ordinary path-source `ArtifactMember::new`
+  API is unchanged. No new dependency and no public API change beyond the
+  additive bound-source path. No publication or consumer migration performed.
+
 - Archive M001c write half (unpublished, Section 14 stop; continued by
   M001d): declared tar/zip member files are now created through the
   retained extraction-root handle (`fs_at` write + create-new + no-follow

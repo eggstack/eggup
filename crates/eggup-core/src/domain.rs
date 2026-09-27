@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fs;
+use std::fs::{self, File};
 use std::path::{Component, Path, PathBuf};
 
 use crate::error::{Error, Result};
@@ -401,6 +401,47 @@ impl ArtifactSet {
     }
 }
 
+/// Already-open member objects staged without pathname re-resolution.
+///
+/// A bound source proves which bytes to stage by object identity: the moved
+/// open [`File`] is the same object whose bytes were acquired and verified,
+/// so no directory-entry replacement after the handoff boundary can redirect
+/// staged bytes. Handles are single-owner and move-only. [`File`] cursors are
+/// shared across clones, so this type is deliberately not [`Clone`]: move the
+/// handle into [`InstallPlan::prepare_with_bound_sources`], which rewinds it
+/// to byte zero before staging. Do not [`try_clone`](File::try_clone) a bound
+/// handle and assume an independent offset.
+///
+/// The recorded [`ArtifactMember::source`] path of a bound member is advisory
+/// diagnostics only once a handle is supplied for its identity.
+#[derive(Debug, Default)]
+pub struct BoundSources {
+    handles: HashMap<MemberId, File>,
+}
+
+impl BoundSources {
+    /// Creates an empty bound-source map, equivalent to no bound members.
+    pub fn new() -> Self {
+        Self {
+            handles: HashMap::new(),
+        }
+    }
+
+    /// Registers the already-open object for `member`, returning any
+    /// previously registered handle for the same identity.
+    pub fn insert(&mut self, member: MemberId, handle: File) -> Option<File> {
+        self.handles.insert(member, handle)
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.handles.is_empty()
+    }
+
+    pub(crate) fn take(&mut self, member: &MemberId) -> Option<File> {
+        self.handles.remove(member)
+    }
+}
+
 /// An explicit installation root and a coherent artifact set ready for private preparation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstallPlan {
@@ -473,6 +514,23 @@ impl InstallPlan {
     /// Copies every member into private owned stage state without mutating a destination.
     pub fn prepare(self) -> Result<PreparedTransaction> {
         Stage::prepare(self)
+    }
+
+    /// Copies every member into private owned stage state, sourcing bound
+    /// members from their already-open objects without any pathname lookup.
+    ///
+    /// Each member identity present in `bound` is staged by reading the moved
+    /// open object from byte zero; its recorded source path is treated as
+    /// advisory diagnostics only and is never opened, even if it now names
+    /// foreign state. Members absent from `bound` stage from their recorded
+    /// source paths exactly as in [`prepare`](Self::prepare).
+    ///
+    /// Every bound identity must name a member of this plan: leftover handles
+    /// fail closed and no staged byte is ever obtained by reopening a member
+    /// name as fallback. A failed bound stage copy never falls back to the
+    /// recorded path.
+    pub fn prepare_with_bound_sources(self, bound: BoundSources) -> Result<PreparedTransaction> {
+        Stage::prepare_bound(self, bound)
     }
 
     #[cfg(test)]

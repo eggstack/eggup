@@ -68,23 +68,30 @@ subsequent reads; extraction makes no crash-durability or restart guarantee.
 The selected output parent must already be a real directory. Extraction creates
 one exclusive sibling root (`mkdir_at` from the parent handle, `0700` on Unix)
 and creates each declared member file relative to the retained root handle
-(`fs_at` write + create-new + no-follow via `open_at`, `0600` on Unix; one
-shared `ExtractionScope` authority object for tar and zip). It never
-creates install-root parents or writes into the live installation. The root
-`File` handle is retained through `DirectoryGuard` into `PersistedExtraction`;
-recursive cleanup deletes only through that handle via `fs_at` `*at`
-operations and never recursively traverses the original pathname. Because no
-portable object-bound root unlink exists, explicit cleanup empties only the
-owned tree and reports the now-empty directory as `CleanupFailed` residue;
-drop best-effort empties the same way. Extraction failure preserves the
-original error category and attaches the empty-residue path.
+(`fs_at` read + write + create-new + no-follow via `open_at`, `0600` on Unix;
+one shared `ExtractionScope` authority object for tar and zip). The same open
+object carries read authority from creation, so no later step regains
+readability by reopening a name. It never creates install-root parents or
+writes into the live installation. The root `File` handle is retained through
+`DirectoryGuard` into `PersistedExtraction`; recursive cleanup deletes only
+through that handle via `fs_at` `*at` operations and never recursively
+traverses the original pathname. Because no portable object-bound root unlink
+exists, explicit cleanup empties only the owned tree and reports the now-empty
+directory as `CleanupFailed` residue; drop best-effort empties the same way.
+Extraction failure preserves the original error category and attaches the
+empty-residue path.
 
-Known limit (M001c Section 14 stop, continued by M001d): the recorded member
-pathname is handoff evidence only, not write authority. A mid-extraction root
-rename leaves bytes in the handle-owned directory while the recorded path
-dangles into the replacement, and no stable cross-platform proof rebinds it;
-the handle-backed source handoff (M001d) must land before Egress M006 or
-Eggpack M002 integrate.
+Handle-backed source handoff (M001d, closed): the recorded member pathname is
+advisory diagnostics only, never staging authority. `into_bound_sources`
+converts each member into a `BoundMember` owning its already-open readable
+object (rewound to byte zero); staging via `BoundSources` +
+`InstallPlan::prepare_with_bound_sources` in `eggup-core` reads the object
+from byte zero with no pathname or member-name lookup after the handoff
+boundary, so a member-entry replacement or root rename cannot redirect staged
+bytes. Member handles are single-owner and move-only (no cloning with assumed
+independent cursors). Supported order is stage, then close/consume handles,
+then handle-authorized cleanup. Egress M006 and Eggpack M002 stay blocked
+until M001d closes with hosted qualification.
 
 `ExtractedArchive` cleans itself on drop, which is safe for unused results.
 After the caller has prepared/copied the members into a later transaction, it

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- Handle-backed source handoff (M001d): `PersistedExtraction::into_bound_sources()`
+  converts each extracted member into a `BoundMember` owning its already-open
+  readable object (created read + write via the same atomic handle-relative
+  create-new/no-follow operation, rewound to byte zero at handoff), and
+  `BoundExtraction::into_members()` splits staging sources from deferred
+  `DeferredCleanup`. The matching `eggup-core` seam (`BoundSources` +
+  `InstallPlan::prepare_with_bound_sources`) stages each object from byte zero
+  with no pathname or member-name lookup after the handoff boundary, so a
+  member-entry replacement or root rename cannot redirect staged bytes and the
+  foreign replacement stays untouched. The recorded `ExtractedMember::path()`
+  is now documented as advisory diagnostics only. Member handles are
+  single-owner and move-only (no assumed-independent clones); supported order
+  is stage, then close/consume handles, then handle-authorized cleanup, which
+  empties only the owned tree with the usual `CleanupFailed` residue. A failed
+  bound stage copy never reopens the recorded path as fallback, and leftover
+  bound handles for unknown members fail closed. The ordinary path-source
+  `ArtifactMember::new` API and semantics are preserved for non-archive
+  callers. Deterministic tar/zip rename/replacement races (pre/between/post
+  writes plus post-handoff member-entry and root replacement), non-zero-cursor
+  staging, Unix `0600`, and exact size/digest evidence are covered by tests.
+  No new dependency; no first-party unsafe; Rust 1.89 holds. No publication
+  or consumer migration performed.
 - Add bounded, allowlisted extraction for verified local tar.gz and zip archives.
 - Handle-relative member materialization (M001c write half, unpublished):
   tar and zip declared-member files are now created through the retained

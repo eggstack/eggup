@@ -1,6 +1,6 @@
 # Archive Extraction Milestone 001d — Handle-Backed Source Handoff
 
-Status: ready for handoff (rebased to Service M008 green head `0b0cdaa`; corrected by planning-hygiene C006, unblocked by Service M008 closure — see `plans/closure/service-lifecycle/008-status.md`)
+Status: implemented (see `plans/closure/archive-extraction/001d-status.md`)
 
 Repository baseline: `0b0cdaafb308e4b27b4ecfa6b7144e90c84a488b` (M008 green head; hosted run `36332823865` passed Stable/MSRV/macOS/Windows)
 
