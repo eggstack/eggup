@@ -1408,20 +1408,32 @@ struct OperationDeadline(Instant);
 
 impl OperationDeadline {
     fn new(timeout: Duration) -> Result<Self, ServiceError> {
+        Self::new_at(Instant::now(), timeout)
+    }
+
+    fn new_at(now: Instant, timeout: Duration) -> Result<Self, ServiceError> {
         if timeout.is_zero() || timeout > MAX_TRANSITION_TIMEOUT {
             return Err(ServiceError::invalid("transition timeout out of range"));
         }
-        Ok(Self(Instant::now() + timeout))
+        Ok(Self(now + timeout))
     }
 
     fn remaining(self) -> Option<Duration> {
+        self.remaining_at(Instant::now())
+    }
+
+    fn remaining_at(self, now: Instant) -> Option<Duration> {
         self.0
-            .checked_duration_since(Instant::now())
+            .checked_duration_since(now)
             .filter(|duration| !duration.is_zero())
     }
 
     fn command_timeout(self) -> Result<Duration, ServiceError> {
-        self.remaining().ok_or_else(|| {
+        self.command_timeout_at(Instant::now())
+    }
+
+    fn command_timeout_at(self, now: Instant) -> Result<Duration, ServiceError> {
+        self.remaining_at(now).ok_or_else(|| {
             ServiceError::manager("transition deadline exhausted before manager command")
         })
     }
@@ -3438,12 +3450,37 @@ mod unix_tests {
     #[test]
     fn transition_deadline_rejects_zero_and_only_shrinks() {
         assert!(OperationDeadline::new(Duration::ZERO).is_err());
-        let deadline = OperationDeadline::new(Duration::from_millis(80)).unwrap();
-        let first = deadline.command_timeout().unwrap();
-        std::thread::sleep(Duration::from_millis(10));
-        let second = deadline.command_timeout().unwrap();
-        assert!(second < first);
-        assert!(second <= Duration::from_millis(70));
+        assert!(OperationDeadline::new(MAX_TRANSITION_TIMEOUT + Duration::from_secs(1)).is_err());
+        // Deterministic injected-time proof: no wall-clock sleep, so hosted
+        // scheduler delays cannot exhaust the deadline mid-assertion.
+        let start = Instant::now();
+        let deadline = OperationDeadline::new_at(start, Duration::from_millis(80)).unwrap();
+        assert_eq!(
+            deadline.remaining_at(start),
+            Some(Duration::from_millis(80))
+        );
+        assert_eq!(
+            deadline.command_timeout_at(start).unwrap(),
+            Duration::from_millis(80)
+        );
+        let ten_ms_later = start + Duration::from_millis(10);
+        assert_eq!(
+            deadline.remaining_at(ten_ms_later),
+            Some(Duration::from_millis(70))
+        );
+        let second = deadline.command_timeout_at(ten_ms_later).unwrap();
+        assert!(second < Duration::from_millis(80));
+        assert_eq!(second, Duration::from_millis(70));
+        assert_eq!(
+            deadline.remaining_at(start + Duration::from_millis(79)),
+            Some(Duration::from_millis(1))
+        );
+        assert!(deadline
+            .command_timeout_at(start + Duration::from_millis(80))
+            .is_err());
+        assert!(deadline
+            .command_timeout_at(start + Duration::from_millis(81))
+            .is_err());
     }
 
     // ---- systemd ----
