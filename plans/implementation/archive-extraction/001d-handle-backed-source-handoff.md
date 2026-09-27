@@ -6,7 +6,7 @@ Repository baseline: `f463aa79398a0b1893eb117dc639d2f262fe1b86` (planning-analys
 
 Planning correction: `plans/implementation/planning-closure-hygiene-corrective/006-m001d-readiness-and-bound-source-contract-reconciliation.md` (closed).
 
-Runtime qualification carried over from `0d2f1f06110e3949755120fa9e80ff5a5b0b4b3c`: M001c hosted write-authority run `36257884083` passed Stable/MSRV/macOS/Windows, and current-head CI run `36257992801` also passed. Commits between `0d2f1f0` and this baseline are planning/registry/roadmap text only (no `.rs`, `Cargo.toml`, `Cargo.lock`, or workflow changes), so that qualification still applies.
+Runtime qualification carried over from `0d2f1f06110e3949755120fa9e80ff5a5b0b4b3c`: M001c hosted write-authority run `36257884083` passed Stable/MSRV/macOS/Windows, and historical CI run `36257992801` also passed at that documentation head (superseded; current-head run `36261671380` is red on one macOS service timing test — runtime execution blocked on Service M008 closure + fresh green hosted qualification + exact-baseline rebase). Commits between `0d2f1f0` and this baseline are planning/registry/roadmap text only (no `.rs`, `Cargo.toml`, `Cargo.lock`, or workflow changes), so that qualification still applies as historical planning evidence only.
 
 Source roadmap:
 
@@ -37,13 +37,13 @@ M001c moved every declared-member write onto the retained root handle (`fs_at` w
 
 ## 2. Why this milestone is ready
 
-M001d is dependency-ready.
+M001d contract is dependency-ready; runtime execution is blocked on Service M008 closure + fresh green hosted qualification + exact-baseline rebase (current-head run `36261671380` red; see header status).
 
 Hard dependencies are recorded:
 
 - Archive M001b cleanup authority remains closed (`0573996`, hosted run `36222536670`);
 - Archive M001c write-authority half is implemented at `09c953fe1fe512717584bb3e5509e79da894b35a` (handle-relative tar/zip creation via one shared `ExtractionScope`, deterministic rename/replacement races green locally; closure `plans/closure/archive-extraction/001c-status.md` records the Section 14 stop);
-- M001c hosted write-authority qualification run `36257884083` passed Stable Linux, Rust 1.89 MSRV, macOS, and Windows; current-head CI run `36257992801` also passed at documentation head `0d2f1f0`, and this plan's baseline `f463aa7` adds only planning/registry/roadmap text on top of that head;
+- M001c hosted write-authority qualification run `36257884083` passed Stable Linux, Rust 1.89 MSRV, macOS, and Windows; historical CI run `36257992801` also passed at documentation head `0d2f1f0` (superseded by red current-head run `36261671380`; execution blocked on Service M008), and this plan's baseline `f463aa7` adds only planning/registry/roadmap text on top of that head;
 - the defect is directly visible: `ExtractedMember` still carries `path: root.join(output_name)` as evidence while bytes live in the handle-owned (possibly renamed) directory, and `ArtifactMember::new(id, source_path, destination)` re-opens that pathname later in core staging;
 - no new filesystem dependency is assumed; the design must choose the smallest sound handoff (handle-carrying member, staging-from-handle, or equivalent) without first-party unsafe/FFI.
 

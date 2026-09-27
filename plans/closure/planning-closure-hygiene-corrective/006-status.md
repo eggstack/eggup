@@ -15,7 +15,7 @@ Reviewed repository baseline: `f463aa79398a0b1893eb117dc639d2f262fe1b86` (pre-im
 
 Implementation commits:
 
-- This closure batch (docs-only; the commit SHA is visible in `git log` at commit time — built directly on `f463aa7`).
+- This closure batch (docs-only; exact closure SHA `510111fa67bafd0e188dad744eed4d224a015b76`, built directly on `f463aa7`).
 - Referenced (not re-implemented here): M001c write authority `09c953fe1fe512717584bb3e5509e79da894b35a`; M001c/C005 closure and M001d registration `f7a18e4762bd0549349eaa6f014b0649f36594c4`.
 
 Hosted qualification: not required — C006 changes no runtime source, Cargo manifests, Cargo.lock, workflow logic, consumer repos, release artifacts, or package versions (docs-only per source plan Section 11). Runtime qualification is carried over: M001c hosted write-authority run `36257884083` passed Stable/MSRV/macOS/Windows, and current-head CI run `36257992801` also passed at documentation head `0d2f1f0`; every commit between `0d2f1f0` and the reviewed baseline `f463aa7` is planning/registry/roadmap text only.
