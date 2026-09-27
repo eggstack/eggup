@@ -6,9 +6,9 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: `29b3cf997993f4799cf882ad73f4a2e813d8fb63` (C007 closed: C006 exact head `510111f` + failed current-head run `36261671380` recorded, Service M008 ready, M001d contract-ready but execution-blocked on M008 green baseline + rebase)
+Latest planning registration head: `29b3cf997993f4799cf882ad73f4a2e813d8fb63` (C007 closed; M008 closure record committed in this batch, see `plans/closure/service-lifecycle/008-status.md`)
 
-Latest reviewed runtime/documentation head: `510111fa67bafd0e188dad744eed4d224a015b76` (C006 closure head; docs-only relative to prior green runtime). Hosted run `36261671380` failed only the macOS `unix_tests::transition_deadline_rejects_zero_and_only_shrinks` test; Stable Linux, Rust 1.89 MSRV, and Windows passed. Prior green runs `36257884083` and `36257992801` remain historical qualification evidence, not current-head success. Service M008 is ready to replace the scheduler-sensitive deadline unit proof without changing production deadline semantics. Planning-hygiene C007 is closed. M001d is contract-ready after C006 but runtime execution is blocked on M008 closure + fresh green hosted qualification + exact-baseline rebase. Egress M006 and Eggpack M002 remain blocked on M001d.
+Latest reviewed runtime/documentation head: `0b0cdaafb308e4b27b4ecfa6b7144e90c84a488b` (M008 implementation head). Hosted run `36332823865` passed Stable Linux, Rust 1.89 MSRV, macOS (including `unix_tests::transition_deadline_rejects_zero_and_only_shrinks`), and Windows. Failed run `36261671380` is superseded context only. Service M008 is closed. Planning-hygiene C007 is closed. Archive M001d is rebased to `0b0cdaa` and ready for handoff. Egress M006 and Eggpack M002 remain blocked on M001d.
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -98,8 +98,8 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 |---|---|---|
 | Verified update core | M001-M007 closed/qualified | — |
 | Acquisition transport | M001-M006 closed; M007 conditionally closed; M008 closed | — |
-| Service lifecycle | M001-M007 closed; M008 ready | deadline-test determinism corrective |
-| Archive extraction | M001/M001a historical; M001b cleanup closed; M001c write half implemented with handoff stop; M001d contract-ready but execution-blocked on Service M008 green-baseline restoration | M001d after M008 closure + rebase |
+| Service lifecycle | M001-M008 closed | — |
+| Archive extraction | M001/M001a historical; M001b cleanup closed; M001c write half implemented with handoff stop; M001d ready (rebased to M008 green head) | M001d handle-backed source handoff |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
 | Eggpack manifest interoperability | M001/M001a closed; M002 blocked on Archive M001d; M003 waits on producer convention | archive handoff after M001d |
 | Consumer adoption | simple, eggsearch, and CodeGG M005 closed; Egress M006 blocked on Archive M001d | Gregg M004 separately writable/unwritten |
@@ -109,10 +109,10 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
 | Archive extraction | M001c handle-relative member materialization corrective | blocked (Section 14 stop; write half `09c953f`) | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md`; `plans/closure/archive-extraction/001c-status.md` | continued by M001d |
-| Service lifecycle | M008 OperationDeadline test determinism corrective | ready | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md` | current-head macOS failure `36261671380`; M001-M007 closed |
+| Service lifecycle | M008 OperationDeadline test determinism corrective | closed | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md`; `plans/closure/service-lifecycle/008-status.md` | hosted run `36332823865` green on all lanes (supersedes `36261671380`); M001-M007 closed |
 | Planning/closure hygiene corrective | C007 C006 head + current-CI reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/007-c006-head-and-current-ci-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/007-status.md` | docs-only; reconciled C006 head, current-CI evidence, M008 registration, M001d gate |
 | Planning/closure hygiene corrective | C006 M001d readiness + bound-source contract reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/006-m001d-readiness-and-bound-source-contract-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/006-status.md` | docs-only; corrected M001d contract |
-| Archive extraction | M001d handle-backed source handoff | contract-ready; execution blocked on M008 | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | Service M008 closure + fresh green hosted qualification + exact-baseline rebase; M001c stop remains runtime predecessor |
+| Archive extraction | M001d handle-backed source handoff | ready | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | rebased to M008 green head `0b0cdaa` (run `36332823865`); M001c stop remains runtime predecessor |
 | Planning/closure hygiene corrective | C005 post-M001b materialization gate reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/005-post-m001b-materialization-gate-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/005-status.md` | docs-only; reconciled M001c stop + M001d gate |
 | Archive extraction | M001b handle-bound cleanup + Windows portability corrective | closed | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md`; `plans/closure/archive-extraction/001b-status.md` | hosted run `36222536670` green on all lanes |
 | Acquisition transport | M008 sub-second deadline truthfulness corrective | closed | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md`; `plans/closure/acquisition-transport/008-status.md` | hosted run `36222536670` reached Windows portable tests |
@@ -138,17 +138,17 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 | Eggpack manifest interoperability | M003 Eggsact real-consumer manifest adoption | blocked after bounded adapter/API qualification | `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`; `plans/closure/eggpack-manifest-interoperability/003-status.md` | Eggpack/Eggsact must establish producer-owned live artifact mapping and ReleaseManifest publication/addressing convention |
 | Eggpack manifest interoperability | M004 package/API promotion | blocked | roadmap milestone; no implementation plan until ready | M003 adoption must close and eggpack-manifest needs a publishable version |
 
-CodeGG M005, Verified Update Core M007, and Service Lifecycle M005-M007 remain closed. Acquisition M008 is closed via hosted run `36222536670`. Archive M001b remains closed for handle-bound cleanup and stable-Windows portability. Archive M001c write authority is implemented (`09c953f`) with a Section 14 handoff stop. C006 corrected M001d's contract, but current-head run `36261671380` is red on one macOS service timing test. Service M008 is ready to make that proof deterministic; C007 closed the current CI/closure bookkeeping. Archive M001d is therefore contract-ready but execution-blocked until M008 closes with a fresh green matrix and M001d is rebased. Consumer Adoption M006 Egress and Eggpack Interoperability M002 remain blocked until M001d closes. Planning/closure hygiene C001-C007 are closed. Both Gregg-reference feature milestones are closed with green hosted qualification, and M005/M006 closure evidence is reconciled. Gregg M004 prerequisites are satisfied but its plan remains intentionally unwritten; no Gregg migration is authorized. Eggpack Interop M001a is closed with the full adapter regression matrix. M003 bounded parse/project qualification is complete, while real Eggsact updater integration remains blocked on producer-owned artifact and manifest conventions; see `plans/closure/eggpack-manifest-interoperability/003-status.md`. M004 package/API promotion remains blocked. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
+CodeGG M005, Verified Update Core M007, and Service Lifecycle M005-M008 remain closed. Acquisition M008 is closed via hosted run `36222536670`. Archive M001b remains closed for handle-bound cleanup and stable-Windows portability. Archive M001c write authority is implemented (`09c953f`) with a Section 14 handoff stop. Service M008 closed the deadline-test determinism gap with green hosted run `36332823865` (supersedes red run `36261671380`); Archive M001d is rebased to `0b0cdaa` and ready for handoff. Consumer Adoption M006 Egress and Eggpack Interoperability M002 remain blocked until M001d closes. Planning/closure hygiene C001-C007 are closed. Both Gregg-reference feature milestones are closed with green hosted qualification, and M005/M006 closure evidence is reconciled. Gregg M004 prerequisites are satisfied but its plan remains intentionally unwritten; no Gregg migration is authorized. Eggpack Interop M001a is closed with the full adapter regression matrix. M003 bounded parse/project qualification is complete, while real Eggsact updater integration remains blocked on producer-owned artifact and manifest conventions; see `plans/closure/eggpack-manifest-interoperability/003-status.md`. M004 package/API promotion remains blocked. There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
 
 ## Planned / blocked work
 
 | Subsystem | Milestone | State | Blocker |
 |---|---|---|---|
 | Archive extraction | M001c handle-relative member materialization | blocked (Section 14 stop; write half `09c953f`) | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md`; `plans/closure/archive-extraction/001c-status.md` |
-| Service lifecycle | M008 OperationDeadline test determinism | ready | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md` |
+| Service lifecycle | M008 OperationDeadline test determinism | closed | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md`; `plans/closure/service-lifecycle/008-status.md` |
 | Planning/closure hygiene corrective | C007 C006 head + current-CI reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/007-c006-head-and-current-ci-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/007-status.md` |
 | Planning/closure hygiene corrective | C006 M001d readiness + bound-source contract reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/006-m001d-readiness-and-bound-source-contract-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/006-status.md` |
-| Archive extraction | M001d handle-backed source handoff | contract-ready; execution blocked | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` (corrected by C006; rebase required after M008) |
+| Archive extraction | M001d handle-backed source handoff | ready | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` (rebased to M008 green head `0b0cdaa`; run `36332823865`) |
 | Planning/closure hygiene corrective | C005 post-M001b materialization gate reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/005-post-m001b-materialization-gate-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/005-status.md` |
 | Archive extraction | M001b handle-bound cleanup + Windows portability | closed | `plans/closure/archive-extraction/001b-status.md` (run `36222536670`) |
 | Acquisition transport | M008 sub-second deadline truthfulness | closed | `plans/closure/acquisition-transport/008-status.md` (run `36222536670`) |
@@ -229,12 +229,12 @@ handoff stop; write half `09c953f`]
 Planning C006 M001d readiness correction [CLOSED]
                 |
                 v
-Service M008 deadline-test determinism [READY] -- restores green repo baseline
+Service M008 deadline-test determinism [CLOSED via run 36332823865] -- green repo baseline restored
                 |
                 +--> Planning C007 current-CI/head reconciliation [CLOSED]
                 |
                 v
-Archive M001d handle-backed source handoff [CONTRACT READY; EXECUTION BLOCKED UNTIL M008 CLOSES + REBASE]
+Archive M001d handle-backed source handoff [READY; rebased to 0b0cdaa]
                 |
                 +--> Egress consumer M006 [BLOCKED]
                 `--> Eggpack interoperability M002 [BLOCKED]
@@ -268,17 +268,17 @@ The earlier 2026-09-26 review opened acquisition M007 and service M007; those ar
 - Rust baseline: 1.89.
 - Core: M001-M007 are qualified; M007 adds the accepted post-commit `KeepInstalled | RollBack` boundary without service coupling. Closure: `plans/closure/verified-update-core/007-status.md`.
 - Acquisition: M001-M006 are closed; M007 is conditionally closed. M008 sub-second deadline truthfulness is closed via hosted run `36222536670`, which executed the Windows portable acquisition/curl tests after Archive M001b restored the Windows lane.
-- Service: M001-M007 remain closed. Current-head run `36261671380` exposed a scheduler-sensitive macOS unit test in the private absolute-deadline helper; M008 is ready to replace the wall-clock sleep proof with deterministic injected-`Instant` arithmetic without changing lifecycle/runtime deadline semantics.
+- Service: M001-M008 remain closed. Service M008 replaced the scheduler-sensitive macOS unit proof with deterministic injected-`Instant` arithmetic without changing lifecycle/runtime deadline semantics; hosted run `36332823865` is green on all lanes (supersedes `36261671380`). See `plans/closure/service-lifecycle/008-status.md`.
 - Distribution: M001-M003 remain historical predecessor evidence; M004 removed the producer crate after Eggpack Contract M002 closure. The subsystem is archived/transferred to Eggpack.
 - Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg M004 prerequisites are satisfied (acquisition M005/M006 + service M006 closed, hosted matrix green) and the milestone is writable, but its plan remains intentionally unwritten pending a separate authoring decision.
-- Archive extraction: ADR-0005 and M001 remain historical foundation. M001a is historical/superseded; M001b is closed for cleanup authority and stable Windows. M001c write authority is implemented with a Section 14 handoff stop. M001d's contract is corrected by C006, but execution is temporarily blocked on Service M008 closure + fresh green hosted qualification + exact-baseline rebase. Egress M006 and Eggpack interoperability M002 remain blocked on M001d.
+- Archive extraction: ADR-0005 and M001 remain historical foundation. M001a is historical/superseded; M001b is closed for cleanup authority and stable Windows. M001c write authority is implemented with a Section 14 handoff stop. M001d is rebased to the M008 green head `0b0cdaa` (hosted run `36332823865`) and ready for handoff. Egress M006 and Eggpack interoperability M002 remain blocked on M001d.
 - Eggpack interoperability: M001 adapter/M001a qualification remain closed. M002 archive handoff is blocked on Archive M001d. M003 real Eggsact adoption remains separately blocked on producer-owned manifest publication/addressing; M004 promotion remains blocked behind M003 plus a publishable upstream crate.
 - Release process: manual crates.io publication only.
 - The lockstep 0.1.1 patch is published (seam-then-adapter order) now that the corrective gates are closed. Eggsearch M003 may use an immutable path/git source for local qualification until downstream adoption moves; no publication is implicit in these plans.
 
 ## Next handoff
 
-Archive M001b and Acquisition M008 remain closed. M001c write authority is hosted-qualified via run `36257884083`. C006 and C007 are closed, but current-head run `36261671380` is red on the macOS service deadline unit test. The immediate dependency-ready work is Service M008. After M008 closes with a fresh green Stable/MSRV/macOS/Windows matrix, rebase M001d to that green head and restore it to executable-ready. Egress M006 and Eggpack interoperability M002 must not be authored or implemented until M001d closes with hosted qualification. Gregg M004 remains separately writable but intentionally unwritten; do not modify Gregg as part of these upstream passes. Eggsact manifest adoption remains blocked on Eggpack/Eggsact producer convention evidence.
+Archive M001b and Acquisition M008 remain closed. M001c write authority is hosted-qualified via run `36257884083`. C006 and C007 are closed. Service M008 is closed with green hosted run `36332823865` on `0b0cdaa`. The immediate dependency-ready work is Archive M001d (rebased to the green head, ready for handoff). Egress M006 and Eggpack interoperability M002 must not be authored or implemented until M001d closes with hosted qualification. Gregg M004 remains separately writable but intentionally unwritten; do not modify Gregg as part of these upstream passes. Eggsact manifest adoption remains blocked on Eggpack/Eggsact producer convention evidence.
 
 Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter. Resume interoperability M003 only after producer-owned evidence resolves its gate.
 

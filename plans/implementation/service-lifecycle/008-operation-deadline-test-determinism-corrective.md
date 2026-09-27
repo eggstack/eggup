@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 008 — OperationDeadline Test Determinism Corrective
 
-Status: ready for handoff
+Status: implemented (see `plans/closure/service-lifecycle/008-status.md`)
 
 Repository baseline: `510111fa67bafd0e188dad744eed4d224a015b76`
 
