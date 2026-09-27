@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001/M001a historical; M001b cleanup closed; M001c write half implemented with Section 14 handoff stop (blocked, continued by M001d); M001d ready (corrected by C006); M002/M003 blocked
+Status: active; M001/M001a historical; M001b cleanup closed; M001c write half implemented with Section 14 handoff stop; M001d contract-ready but execution-blocked on Service M008 green-baseline restoration; M002/M003 blocked
 
 Long-term references:
 
@@ -126,7 +126,7 @@ archive M001c handle-relative member materialization [BLOCKED: Section 14
 handoff stop; write half implemented in `09c953f`]
                 |
                 v
-archive M001d handle-backed source handoff [READY; corrected by C006]
+archive M001d handle-backed source handoff [CONTRACT READY; EXECUTION BLOCKED ON SERVICE M008 GREEN BASELINE]
                 |
                 +--> consumer adoption M006 Egress [BLOCKED]
                 |
@@ -171,9 +171,9 @@ Tar/zip member creation moved onto the retained root handle with exclusive no-fo
 
 Plan: `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md`.
 
-Status: ready for handoff (corrected by planning-hygiene C006; see `plans/closure/planning-closure-hygiene-corrective/006-status.md`). The implementation plan previously carried a stale baseline, permitted root-handle + later member-name reopen as authority, implied path-constructor removal, and underspecified readable-handle/cursor/lifetime semantics; all four defects are corrected in the plan.
+Status: contract-ready, execution-blocked on Service M008 closure + fresh green hosted qualification + exact-baseline rebase. The C006 contract correction remains valid; this temporary gate is repository-baseline hygiene after current-head run `36261671380` failed an unrelated macOS service timing test.
 
-After C006 closes, carry object-bound source authority (already-open member object, direct object-bound stage copy, or equivalent) from extraction into core staging so no staged byte is obtained by re-resolving a recorded pathname or member name. Closes the M001c handoff stop; Egress M006 and Eggpack M002 re-gate on M001d.
+After M008 closes and M001d is rebased to the new green head, carry object-bound source authority (already-open member object, direct object-bound stage copy, or equivalent) from extraction into core staging so no staged byte is obtained by re-resolving a recorded pathname or member name. Closes the M001c handoff stop; Egress M006 and Eggpack M002 re-gate on M001d.
 
 ### M002 — Egress real-consumer archive/pair adoption
 
@@ -228,6 +228,6 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M001a owned-root cleanup authority | historical; superseded by M001b | `plans/implementation/archive-extraction/001a-owned-root-cleanup-authority-corrective.md` | `plans/closure/archive-extraction/001a-status.md` | remaining TOCTOU + Windows compile defect |
 | M001b handle-bound cleanup + Windows portability | closed | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md` | `plans/closure/archive-extraction/001b-status.md` | — |
 | M001c handle-relative member materialization | blocked (Section 14 stop; write half implemented) | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md` | `plans/closure/archive-extraction/001c-status.md` | M001d handoff |
-| M001d handle-backed source handoff | ready | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | — | M001c stop remains the runtime predecessor |
+| M001d handle-backed source handoff | contract-ready; execution blocked | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | — | Service M008 closure + fresh green hosted qualification + exact-baseline rebase; M001c stop remains runtime predecessor |
 | M002 Egress adoption | blocked | — | — | M001d closure |
 | M003 Eggpack archive handoff | blocked | — | — | M001d closure |
