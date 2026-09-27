@@ -112,7 +112,7 @@ qualified core M006 + acquisition M004
                     |
                     +--> multi-artifact consumer evidence
 
-M006 Egress is re-blocked on Archive Extraction M001d. M001b's cleanup authority remains closed and M001c's handle-relative write authority is implemented, but the path-only source handoff stopped under M001c Section 14 (continued by M001d); Egress must not adopt the archive boundary until M001d closes.
+M006 Egress is unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and writable with its plan unwritten. M001b's cleanup authority remains closed and M001c's handle-relative write authority is closed by the M001d object-bound handoff; Egress may now author adoption against the qualified extraction boundary.
 
 M007 EggPool selective adoption is independent/evidence-driven after core maturity.
 ```
@@ -168,7 +168,7 @@ This milestone does not depend on core M007 because CodeGG requires immediate ve
 
 ### M006 — Egress archive/pair adoption
 
-Status: blocked on Archive Extraction M001d; no Egress migration plan is written here.
+Status: writable, plan unwritten (unblocked by Archive Extraction M001d closure `plans/closure/archive-extraction/001d-status.md`; no Egress migration plan is written here).
 
 After M001d closes with green hosted qualification, author the Egress consumer plan to replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
 
@@ -201,5 +201,5 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | writable; plan intentionally unwritten | — | — | prerequisites satisfied (acquisition M005+M006 + service M006 closed, hosted matrix green); no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
-| M006 Egress | blocked | — | — | Archive Extraction M001d closure |
+| M006 Egress | writable; plan unwritten | — | — | M001d closed (hosted run `36335233644`); authoring permitted, not performed |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
