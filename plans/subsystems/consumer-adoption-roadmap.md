@@ -170,7 +170,7 @@ This milestone does not depend on core M007 because CodeGG requires immediate ve
 
 Plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`.
 
-Status: ready for implementation planning/qualification; dependency merge/package closure gated on Verified Update Core M008 publication-ready/published core+archive packages. The consumer-side implementation plan is mirrored in `eggstack/eggress` delivery planning.
+Status: planned; dependency merge/package closure gated on Verified Update Core M008 publication-ready/published core+archive packages. Consumer-owned plan: `eggstack/eggress: plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md` (blocked until versioned Eggup packages are available).
 
 Replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
 
