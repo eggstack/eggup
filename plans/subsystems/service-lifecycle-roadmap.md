@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: complete; M001-M007 closed
+Status: active; M001-M007 closed; M008 deadline-test determinism corrective ready
 
 Long-term references:
 
@@ -74,6 +74,8 @@ Read-only review of `eggstack/gregg@8b18f9ee16461e3fa0ef0d804ed39ebb9183b727` ex
 
 A 2026-09-26 post-closure audit opened narrow corrective M007: several production bounded-diagnostic helpers use fixed-byte `String::truncate` and can panic when a multibyte UTF-8 code point crosses the 256/512-byte limit. M007 changes no lifecycle state-machine semantics.
 
+After C006 closed on head `510111f`, hosted run `36261671380` failed only the macOS `unix_tests::transition_deadline_rejects_zero_and_only_shrinks` test. Stable Linux, Rust 1.89 MSRV, and Windows all passed. The test uses an 80 ms real deadline plus a 10 ms sleep and unconditionally expects a second positive timeout; on the hosted runner the valid production exhaustion error arrived instead. M008 is the narrow deterministic-test corrective and must not widen production deadlines.
+
 ## 5. Target architecture
 
 The service crate exposes manager-neutral types plus platform adapters. Consumer-supplied specifications identify exact executable/config arguments and optional health behavior.
@@ -109,6 +111,9 @@ M006 daemon disposition + revalidation [closed; evidence reconciled via acquisit
                                 |
                                 v
                       M007 UTF-8 bounded diagnostics [CLOSED]
+                                |
+                                v
+                      M008 deadline-test determinism [READY]
 ```
 
 ## 7. Milestones
@@ -172,6 +177,14 @@ Status: closed; see `plans/closure/service-lifecycle/007-status.md`.
 
 Replace panic-capable fixed-byte string truncation in production service diagnostics with UTF-8-boundary-safe byte bounding while preserving existing limits and all M005/M006 lifecycle behavior. Closed with the portable diagnostic boundary matrix, full Linux/macOS service suites, and Windows diagnostic/SCM runtime qualification.
 
+### M008 — OperationDeadline test determinism corrective
+
+Plan: `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md`.
+
+Status: ready.
+
+Replace the scheduler-sensitive 80 ms/sleep-based unit proof with deterministic injected-`Instant` arithmetic while preserving the existing absolute-deadline runtime contract. No production tolerance, deadline extension, retry, API, or dependency change is authorized. Closure requires a fresh Stable/MSRV/macOS/Windows hosted matrix and explicit supersession of failed run `36261671380`.
+
 ## 8. Cross-cutting requirements
 
 No destructive action on Foreign/Unknown. Permission errors return remediation rather than escalating. Service definition rendering must reject unsafe control characters/path ambiguity.
@@ -186,7 +199,7 @@ System-level versus user-level service registration differs across consumers. Us
 
 ## 11. Completion definition
 
-Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap; no further service-lifecycle milestone is registered.
+Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap. M008 remains open until the deadline arithmetic proof is deterministic and a fresh hosted matrix restores a green baseline.
 
 ## 12. Milestone status
 
@@ -199,3 +212,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M005 | closed | `plans/implementation/service-lifecycle/005-prepared-transaction-lifecycle-integration.md` | `plans/closure/service-lifecycle/005-status.md` | — |
 | M006 | closed; hosted evidence reconciled via acquisition M006 | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | — |
 | M007 | closed | `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md` | `plans/closure/service-lifecycle/007-status.md` | — |
+| M008 | ready | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md` | — | current-head macOS timing-test failure `36261671380` |
