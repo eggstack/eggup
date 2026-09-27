@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: `98fbd500cdec75c1a157e60c9523a34f39f212e8` (M008 closed; M001d closure record committed in this batch, see `plans/closure/archive-extraction/001d-status.md`)
+Latest planning registration head: `566110244bc29a7a6b1d9c7324624981fd3ed033` (M001d closed with green run `36335233644`; Egress M006 and Eggpack M002 writable, plans unwritten)
 
 Latest reviewed runtime/documentation head: `18d83decd0c894279dd5e5d89407e1423f839d99` (M001d Windows-qualification head). Hosted run `36335233644` passed Stable Linux, Rust 1.89 MSRV, macOS, and Windows. Earlier M001d run `36334772510` (clippy lint + Windows hold-open rename refusal) is superseded context only. Service M008 is closed. Planning-hygiene C007 is closed. Archive M001d is closed. Egress M006 and Eggpack M002 are writable with plans unwritten.
 
