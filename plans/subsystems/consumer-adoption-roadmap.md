@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple, eggsearch, and CodeGG M005 are closed; Gregg M004 prerequisites satisfied (acquisition M006 green), plan intentionally unwritten
+Status: active; simple, eggsearch, and CodeGG M005 are closed; Gregg M004 remains intentionally unwritten; Egress M006 plan registered with package-publication merge gate
 
 Long-term references:
 
@@ -112,7 +112,7 @@ qualified core M006 + acquisition M004
                     |
                     +--> multi-artifact consumer evidence
 
-M006 Egress is unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and writable with its plan unwritten. M001b's cleanup authority remains closed and M001c's handle-relative write authority is closed by the M001d object-bound handoff; Egress may now author adoption against the qualified extraction boundary.
+M006 Egress is unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and its adoption plan is registered at `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`. Runtime work may qualify against an immutable Eggup revision, but merge/package closure is gated on Verified Update Core M008 producing a crates.io-usable core/archive package boundary; no git/path dependency may enter Egress's publishable release state.
 
 M007 EggPool selective adoption is independent/evidence-driven after core maturity.
 ```
@@ -168,9 +168,11 @@ This milestone does not depend on core M007 because CodeGG requires immediate ve
 
 ### M006 — Egress archive/pair adoption
 
-Status: writable, plan unwritten (unblocked by Archive Extraction M001d closure `plans/closure/archive-extraction/001d-status.md`; no Egress migration plan is written here).
+Plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`.
 
-After M001d closes with green hosted qualification, author the Egress consumer plan to replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
+Status: ready for implementation planning/qualification; dependency merge/package closure gated on Verified Update Core M008 publication-ready/published core+archive packages. The consumer-side implementation plan is mirrored in `eggstack/eggress` delivery planning.
+
+Replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
 
 ### M007 — EggPool selective adoption
 
@@ -201,5 +203,5 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | writable; plan intentionally unwritten | — | — | prerequisites satisfied (acquisition M005+M006 + service M006 closed, hosted matrix green); no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
-| M006 Egress | writable; plan unwritten | — | — | M001d closed (hosted run `36335233644`); authoring permitted, not performed |
+| M006 Egress | planned; implementation qualification ready, merge/package gate on core/archive package availability | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | — | M001d closed; Verified Core M008 package/publication gate |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
