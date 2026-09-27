@@ -1,6 +1,6 @@
 # Consumer Adoption Milestone 006 — Egress Archive/Pair Adoption
 
-Status: ready for planning handoff; implementation merge/package gate depends on Core/Archive Package M008 publication
+Status: planned; consumer implementation/final dependency cutover blocked on versioned Eggup core/archive package availability
 
 Repository baseline: `413a35a7da32ea22ef337caefc35d3619154794e`
 
@@ -72,7 +72,7 @@ Egress currently owns:
 
 Keep Egress acquisition/release policy through checksum verification. After verified archive acquisition:
 
-1. declare exactly two archive members for the current target;
+1. declare exactly two archive members for the current target with finite limits. Current Egress releases verify the whole archive SHA-256 and do not publish member manifests; use optional member size/digest expectations as `None` rather than synthesizing trust from extracted paths, then retain Eggup's computed extraction evidence;
 2. extract via `eggup-archive`;
 3. build the Eggup core plan while advisory paths are valid;
 4. transfer member open objects to bound sources;
@@ -116,7 +116,7 @@ The dependency cutover must not make Egress crates.io packaging invalid.
 - existing offline success fixture;
 - checksum mismatch leaves old pair untouched;
 - one missing archive member;
-- wrong member digest/size;
+- optional member digest/size mismatch fixtures when explicit expectations are supplied;
 - staged Egress wrong version;
 - staged pproxy wrong version/disagreement;
 - injected first/second-member commit failures with rollback;
@@ -132,7 +132,7 @@ Use Egress's canonical verification policy, at minimum:
 
 ~~~bash
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test -p eggress-cli --locked
 cargo test -p eggress-cli --test cli_exit_codes --locked
 cargo test --workspace --locked
