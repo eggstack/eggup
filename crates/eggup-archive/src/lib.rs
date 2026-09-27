@@ -414,7 +414,7 @@ impl PersistedExtraction {
             "extraction members and retained handles must stay paired"
         );
         let mut bound = Vec::with_capacity(members.len());
-        for (evidence, mut file) in members.into_iter().zip(handles.into_iter()) {
+        for (evidence, mut file) in members.into_iter().zip(handles) {
             file.flush()
                 .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
             file.seek(SeekFrom::Start(0))
@@ -1899,6 +1899,15 @@ mod tests {
         fs::remove_dir(&root).unwrap();
     }
 
+    // M001d note: member objects are retained open from creation, and
+    // Windows refuses directory renames while objects inside are held
+    // (fail-safe: the rename attack itself is blocked by the OS). The race
+    // setups below therefore rename before the first write — no object held
+    // yet — so foreign state still lands at the recorded path on every
+    // platform; every cleanup assertion is unchanged. Rename-with-held-object
+    // redirect resistance is proven on Unix by the `#[cfg(unix)]` tests and
+    // the M001d bound-read races; on Windows the member-entry replacement
+    // races prove no pathname re-resolution.
     #[test]
     fn cleanup_failure_reports_residue_without_deleting_replacement() {
         let dir = TestDir::new();
@@ -1909,11 +1918,18 @@ mod tests {
             vec![member("app", "app", b"binary")],
             limits(),
         );
-        let extracted = extract(&plan, dir.path()).unwrap();
-        let root = extracted.root().to_path_buf();
         let moved = dir.path().join("moved-root");
-        fs::rename(&root, &moved).unwrap();
-        fs::write(&root, b"foreign replacement").unwrap();
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                fs::write(root, b"foreign replacement").unwrap();
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
 
         let error = extracted.persist().cleanup().unwrap_err();
         assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
@@ -1933,18 +1949,27 @@ mod tests {
             vec![member("app", "app", b"binary")],
             limits(),
         );
-        let extracted = extract(&plan, dir.path()).unwrap();
-        let root = extracted.root().to_path_buf();
         let moved = dir.path().join("moved-root");
-        fs::rename(&root, &moved).unwrap();
-        // Replace the old pathname with a foreign non-empty directory that
-        // would be catastrophic if any pathname-only recursive cleanup ran
-        // against it.
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                // Pre-write rename: no member object held yet (see note
+                // above `cleanup_failure_reports_residue_...`).
+                fs::rename(root, &moved).unwrap();
+                // Replace the old pathname with a foreign non-empty directory
+                // that would be catastrophic if any pathname-only recursive
+                // cleanup ran against it.
+                fs::create_dir(root).unwrap();
+                for i in 0..6 {
+                    fs::write(root.join(format!("foreign-{i}")), b"keep").unwrap();
+                }
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
         let foreign = root.clone();
-        fs::create_dir(&foreign).unwrap();
-        for i in 0..6 {
-            fs::write(foreign.join(format!("foreign-{i}")), b"keep").unwrap();
-        }
 
         let error = extracted.persist().cleanup().unwrap_err();
         assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
@@ -1972,12 +1997,21 @@ mod tests {
             vec![member("app", "app", b"binary")],
             limits(),
         );
-        let extracted = extract(&plan, dir.path()).unwrap();
-        let root = extracted.root().to_path_buf();
+        // Pre-write rename + foreign install (see note above
+        // `cleanup_failure_reports_residue_...`).
         let moved = dir.path().join("moved-root");
-        fs::rename(&root, &moved).unwrap();
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                fs::create_dir(root).unwrap();
+            }),
+        )
+        .unwrap();
+        let root = extracted.root().to_path_buf();
         let foreign = root.clone();
-        fs::create_dir(&foreign).unwrap();
         // Empty foreign directory: identity still differs, so cleanup must
         // fail closed rather than rmdir the foreign dir.
         let error = extracted.persist().cleanup().unwrap_err();
@@ -1999,13 +2033,23 @@ mod tests {
             limits(),
         );
         let root = {
-            let extracted = extract(&plan, dir.path()).unwrap();
-            let root = extracted.root().to_path_buf();
+            // Pre-write rename + foreign install (see note above
+            // `cleanup_failure_reports_residue_...`).
             let moved = dir.path().join("moved-root");
-            fs::rename(&root, &moved).unwrap();
+            let extracted = extract_with_hook(
+                &plan,
+                dir.path(),
+                Some(&|seq: usize, root: &Path| {
+                    assert_eq!(seq, 0);
+                    fs::rename(root, &moved).unwrap();
+                    let foreign = root.to_path_buf();
+                    fs::create_dir(&foreign).unwrap();
+                    fs::write(foreign.join("foreign"), b"keep").unwrap();
+                }),
+            )
+            .unwrap();
+            let root = extracted.root().to_path_buf();
             let foreign = root.clone();
-            fs::create_dir(&foreign).unwrap();
-            fs::write(foreign.join("foreign"), b"keep").unwrap();
             // Drop the extraction; best-effort drop cleanup empties only the
             // originally opened tree via its handle and never falls back to
             // `fs::remove_dir_all(path)`.
@@ -2063,14 +2107,23 @@ mod tests {
             vec![member("app", "app", b"binary")],
             limits(),
         );
-        let extracted = extract(&plan, dir.path()).unwrap();
+        // Pre-write rename + foreign install (see note above
+        // `cleanup_failure_reports_residue_...`).
+        let moved = dir.path().join("moved-root");
+        let extracted = extract_with_hook(
+            &plan,
+            dir.path(),
+            Some(&|seq: usize, root: &Path| {
+                assert_eq!(seq, 0);
+                fs::rename(root, &moved).unwrap();
+                fs::create_dir(root).unwrap();
+                fs::write(root.join("foreign"), b"keep").unwrap();
+            }),
+        )
+        .unwrap();
         let persisted = extracted.persist();
         let root = persisted.root().to_path_buf();
-        let moved = dir.path().join("moved-root");
-        fs::rename(&root, &moved).unwrap();
         let foreign = root.clone();
-        fs::create_dir(&foreign).unwrap();
-        fs::write(foreign.join("foreign"), b"keep").unwrap();
 
         let error = persisted.cleanup().unwrap_err();
         assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
@@ -2426,6 +2479,11 @@ mod tests {
         fs::remove_dir_all(&root).unwrap();
     }
 
+    // Unix-only: the hook renames after the first member object is already
+    // held open, and Windows refuses directory renames while objects inside
+    // are held (fail-safe). Windows redirect resistance is proven by the
+    // member-entry replacement races, which perform no rename.
+    #[cfg(unix)]
     #[test]
     fn two_member_replacement_between_writes_stays_in_owned_root() {
         let dir = TestDir::new();
@@ -2856,6 +2914,11 @@ mod tests {
         assert_cleanup_reports_residue(cleanup, &root, &root);
     }
 
+    // Unix-only: renames the root while member objects are held open.
+    // Windows refuses that rename (fail-safe OS-enforced binding); the
+    // portable member-entry replacement races above prove no pathname
+    // re-resolution on every platform.
+    #[cfg(unix)]
     #[test]
     fn bound_post_handoff_root_replacement_stages_owned_bytes() {
         let dir = TestDir::new();
@@ -2993,6 +3056,9 @@ mod tests {
         fs::remove_dir_all(&root).unwrap();
     }
 
+    // Unix-only: the hook renames after the first member object is already
+    // held open (see note above `bound_post_handoff_root_replacement_...`).
+    #[cfg(unix)]
     #[test]
     fn bound_two_member_replacement_between_writes_reads_owned_bytes() {
         let dir = TestDir::new();
