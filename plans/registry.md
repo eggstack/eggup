@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: `29b3cf997993f4799cf882ad73f4a2e813d8fb63` (C007 closed; M008 closure record committed in this batch, see `plans/closure/service-lifecycle/008-status.md`)
+Latest planning registration head: `98fbd500cdec75c1a157e60c9523a34f39f212e8` (M008 closed with green run `36332823865`; M001d rebased to `0b0cdaa` and ready for handoff)
 
 Latest reviewed runtime/documentation head: `0b0cdaafb308e4b27b4ecfa6b7144e90c84a488b` (M008 implementation head). Hosted run `36332823865` passed Stable Linux, Rust 1.89 MSRV, macOS (including `unix_tests::transition_deadline_rejects_zero_and_only_shrinks`), and Windows. Failed run `36261671380` is superseded context only. Service M008 is closed. Planning-hygiene C007 is closed. Archive M001d is rebased to `0b0cdaa` and ready for handoff. Egress M006 and Eggpack M002 remain blocked on M001d.
 
