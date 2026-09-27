@@ -1,8 +1,8 @@
 # Archive Extraction Milestone 001d — Handle-Backed Source Handoff
 
-Status: ready for handoff (corrected by planning-hygiene C006; see `plans/closure/planning-closure-hygiene-corrective/006-status.md`)
+Status: contract-ready; runtime handoff temporarily blocked on Service M008 closure + fresh green hosted qualification + exact-baseline rebase (C006 contract correction remains valid)
 
-Repository baseline: `f463aa79398a0b1893eb117dc639d2f262fe1b86`
+Repository baseline: `f463aa79398a0b1893eb117dc639d2f262fe1b86` (planning-analysis baseline only; MUST be rebased to the post-M008 green head before runtime implementation)
 
 Planning correction: `plans/implementation/planning-closure-hygiene-corrective/006-m001d-readiness-and-bound-source-contract-reconciliation.md` (closed).
 
