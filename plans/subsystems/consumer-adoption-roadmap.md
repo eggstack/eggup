@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple, eggsearch, and CodeGG M005 are closed; Gregg M004 remains intentionally unwritten; Egress M006 blocked with execution record (0.1.2 unpublished; no Egress updater surface or delivery plan in available checkout)
+Status: active; simple, eggsearch, and CodeGG M005 are closed; Gregg M004 remains intentionally unwritten; Egress M006 remains blocked on unpublished 0.1.2 packages, while planning-hygiene C009 is ready to correct stale cross-repo evidence about the existing Egress updater surface and Delivery M003 plan
 
 Long-term references:
 
@@ -112,7 +112,7 @@ qualified core M006 + acquisition M004
                     |
                     +--> multi-artifact consumer evidence
 
-M006 Egress was unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and its adoption plan is registered at `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`. The Eggup-side package prerequisite is now qualified (Core M008 closed at workspace 0.1.2), but merge/package closure still needs the separate maintainer publication step, and the inspected Egress checkout presents no updater surface or mirrored delivery plan — see the blocked execution record at `plans/closure/consumer-adoption/006-status.md`. No git/path dependency may enter Egress's publishable release state.
+M006 Egress was unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and its adoption plan is registered at `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`. The Eggup-side 0.1.2 package surface has landed but final qualification evidence is being reconciled by M002a/M008a, and actual registry publication remains a separate maintainer action. Planning-hygiene C009 is ready to correct the stale M006 execution-record claim that Egress lacks an updater surface or mirrored Delivery M003 plan; current `eggstack/eggress` contains both. No git/path dependency may enter Egress's publishable release state.
 
 M007 EggPool selective adoption is independent/evidence-driven after core maturity.
 ```
@@ -170,7 +170,7 @@ This milestone does not depend on core M007 because CodeGG requires immediate ve
 
 Plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`.
 
-Status: blocked execution recorded in `plans/closure/consumer-adoption/006-status.md`. Verified Update Core M008 qualified the 0.1.2 core/archive pair but publication (the Section 14 merge gate) remains a separate maintainer action. Additionally, the available Egress checkout presents no updater surface and no mirrored delivery plan, so work packages B–F have nothing to attach to. Consumer-owned plan: `eggstack/eggress: plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md` (absent in the inspected checkout).
+Status: blocked on versioned-package publication; the current execution record also contains stale cross-repo evidence and is tracked by planning-hygiene C009. Current `eggstack/eggress` contains both the updater surface and consumer-owned `plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md`. After C009, the remaining gate is compatible published Eggup 0.1.2 packages, subject to M002a/M008a final qualification evidence.
 
 Replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
 
@@ -203,5 +203,5 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | writable; plan intentionally unwritten | — | — | prerequisites satisfied (acquisition M005+M006 + service M006 closed, hosted matrix green); no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
-| M006 Egress | blocked (execution record, not closed) | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` | M008 qualified but 0.1.2 unpublished (maintainer action); no updater surface or delivery plan in available Egress checkout |
+| M006 Egress | blocked (execution record contains stale cross-repo evidence) | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` | C009 evidence reconciliation + compatible published Eggup 0.1.2 package pair after M002a/M008a qualification |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
