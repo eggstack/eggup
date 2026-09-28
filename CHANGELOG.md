@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.1.2 — 2026-09-28
+
+crates.io publication set: `eggup-core 0.1.2`, `eggup-archive 0.1.2`. Other
+workspace crates that share the 0.1.2 source version (`eggup-acquisition`,
+`eggup-eggfetch`, `eggup-curl`, `eggup-service`, `eggup-eggpack`,
+`eggup-transport-footprint`) were **not** published as 0.1.2 and remain at
+their last published versions. `eggup-eggpack` remains `publish = false`
+by design. Integrity remains SHA-256 checksum evidence only; no
+authenticity or signature claims.
+
+- `eggup-core 0.1.2`: workspace version bumps to 0.1.2 to carry the M001d
+  additive bound-source API (`BoundSources` +
+  `InstallPlan::prepare_with_bound_sources`). Dependency surface remains
+  `sha2` only.
+
+- `eggup-archive 0.1.2` (first crates.io publication): bounded allowlisted
+  extraction for verified local tar.gz and zip archives; object-bound
+  handoff (`PersistedExtraction::into_bound_sources`,
+  `BoundExtraction::into_members`, `BoundMember`); retain
+  extraction-root authority through `fs_at 0.2.1` (`mkdir_at`,
+  `open_dir_at`, `unlink_at`, `rmdir_at`) for creation, replace-race
+  isolation, and recursive cleanup; no runtime dependency on `eggup-core`;
+  dev-only `eggup-core` path dependency preserved so the package can
+  verify before publication. Package metadata declares explicit
+  `homepage` and `documentation` fields and records the absence of
+  authenticity or signature support.
+
+- `eggup-eggpack` (unpublished, workspace-only): internal exact pins on
+  `eggup-core = "=0.1.1"` and `eggup-acquisition = "=0.1.1"` update to
+  `=0.1.2` so the workspace resolves against the published packages.
+
 ## Unreleased
 
 - Eggpack Interop M002 (unpublished): `eggup-eggpack` gains the archive
@@ -17,67 +48,6 @@
   dependencies are `eggup-archive =0.1.2` (path) and `sha2 0.10.9`;
   `eggup-core` remains archive/Eggpack independent. No publication or
   consumer migration performed.
-
-- Verified Update Core M008 (unpublished): workspace version bumps to 0.1.2 to
-  carry the M001d additive bound-source API (`BoundSources` +
-  `InstallPlan::prepare_with_bound_sources` in `eggup-core`,
-  `PersistedExtraction::into_bound_sources` and friends in `eggup-archive`).
-  Package metadata for `eggup-archive` adds explicit homepage and documentation
-  fields and records the absence of authenticity or signature support. The
-  eggup-archive dev-dependency on eggup-core is path-only so the package can
-  verify before the published eggup-core 0.1.2 lands on crates.io. Internal
-  `=0.1.1` exact pins on eggup-core/eggup-acquisition in eggup-eggpack (which
-  remains `publish = false`) update to `=0.1.2` so the workspace resolves.
-  Manual crates.io publication order remains core before archive. No automatic
-  publication or consumer migration performed.
-
-- Archive M001d handle-backed source handoff: extracted members now convert
-  into object-bound staging sources (`BoundMember`/`BoundExtraction`, already-
-  open readable objects rewound to byte zero) and stage through a new
-  `eggup-core` seam (`BoundSources` +
-  `InstallPlan::prepare_with_bound_sources`) with no pathname or member-name
-  lookup after the handoff boundary. Deterministic tar/zip races prove staged
-  bytes stay owned under member-entry replacement and root rename while
-  foreign state stays untouched. The ordinary path-source `ArtifactMember::new`
-  API is unchanged. No new dependency and no public API change beyond the
-  additive bound-source path. No publication or consumer migration performed.
-
-- Archive M001c write half (unpublished, Section 14 stop; continued by
-  M001d): declared tar/zip member files are now created through the
-  retained extraction-root handle (`fs_at` write + create-new + no-follow
-  via `open_at`, `0600` on Unix, one shared authority object) instead of
-  `root.join(output_name)` + pathname creation. Deterministic
-  rename/replacement races prove foreign state stays untouched. No new
-  dependency and no public API change. Known limit: the recorded member
-  pathname is handoff evidence only and can go stale after a root rename;
-  Egress M006 and Eggpack M002 stay blocked on the M001d handle-backed
-  source handoff. No publication or consumer migration performed.
-
-- Archive M001b (unpublished corrective, supersedes M001a cleanup): recursive
-  cleanup is now authorized by a retained directory handle rather than a
-  pathname identity check. The extraction root is created via `mkdir_at` from
-  the parent handle and its `File` handle is carried through `DirectoryGuard`
-  into `PersistedExtraction`; content deletion uses only `fs_at 0.2.1`
-  handle-relative operations and never recursively traverses the replacement
-  pathname. This removes the stable-Windows dependency on nightly
-  `MetadataExt::file_index()` and closes the M001a check-then-`remove_dir_all`
-  window. No portable object-bound root unlink exists, so explicit cleanup
-  empties only the owned tree and returns `CleanupFailed` with the now-empty
-  directory as residue; drop best-effort empties the same way. Extraction
-  failure preserves its original category with the empty-residue path.
-  `ExtractedArchive`/`PersistedExtraction` are now `Send` but not `Sync`. No
-  `eggup-core` change. No publication or consumer migration performed.
-
-- Archive M001a (unpublished corrective): extraction cleanup is now
-  authorized by retained filesystem identity rather than a bare pathname.
-  `DirectoryGuard` and `PersistedExtraction` carry the captured `(dev, ino)`
-  on Unix or `file_index` on Windows, and `remove_owned_root` revalidates
-  it before any recursive deletion. A foreign directory or symlink that
-  occupies the original pathname after rename/replace is preserved;
-  cleanup fails closed with residue evidence. Drop cleanup uses the same
-  identity-checked primitive and never falls back to
-  `fs::remove_dir_all(path)`. No `Cargo.toml`, lockfile, or `eggup-core`
-  change. No publication or consumer migration performed.
 
 - Acquisition M008 (unpublished corrective): `eggup-curl` deadline
   arguments now serialize at microsecond precision with a `.` decimal
