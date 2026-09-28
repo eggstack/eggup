@@ -122,9 +122,30 @@ No new trust boundary: the helpers translate already-validated manifest facts in
 
 ## Unresolved findings
 
-- LOW: hosted Windows runtime evidence for the new adapter tests was not collected in this pass (local Darwin only). The helpers contain no platform-gated code (portable `std::fs` metadata/open/read + pure mapping); the underlying archive/core Windows behavior is covered by M001d's hosted run `36335233644`. Recommend confirming on the next hosted CI run rather than opening a corrective: no Windows-specific logic exists to qualify.
+- ~~LOW: hosted Windows runtime evidence for the new adapter tests was not collected in this pass (local Darwin only).~~ **Resolved by M002a** (see addendum below): hosted run `36477024102` executes `cargo test -p eggup-eggpack --all-targets --all-features --locked` directly on `windows-latest`, green.
 
 No medium-or-higher finding remains.
+
+## M002a addendum — hosted qualification and clippy corrective (2026-09-28)
+
+Source corrective plan: `plans/implementation/eggpack-manifest-interoperability/002a-hosted-qualification-and-clippy-corrective.md`.
+
+Closure record: `plans/closure/eggpack-manifest-interoperability/002a-status.md`.
+
+Implementation head `9a5500e221e3eec24773a6517ca61a90e1b5afd9` carries exactly two
+deltas over the M002 batch head: the one-line `bind_archive_members` clippy
+correction (`members.iter().zip(bound_members)`, no lint allow) and the Windows
+CI lane addition (`cargo test -p eggup-eggpack --all-targets --all-features
+--locked`). No public API, helper semantics, or archive safety behavior changed.
+
+Hosted run `36477024102` (head `9a5500e`) is green on all four lanes: Stable
+checks (fmt/clippy/workspace tests/doc), MSRV check (1.89.0), macOS tests, and
+Windows archive/acquisition/service/eggpack tests + workspace check. The new
+Windows step `Run cargo test -p eggup-eggpack --all-targets --all-features
+--locked` succeeded, providing the direct adapter runtime evidence this record
+previously lacked. The original failed run `36463041223` (Stable clippy
+`clippy::useless_conversion` at `crates/eggup-eggpack/src/lib.rs:559`) is
+superseded.
 
 ## Roadmap disposition
 

@@ -1,6 +1,6 @@
 # Consumer Adoption Milestone 006 — Egress Archive/Pair Adoption
 
-Status: planned; blocked execution recorded in `plans/closure/consumer-adoption/006-status.md` (M008 qualified/unpublished; Egress updater premise absent in available checkout)
+Status: planned; blocked execution recorded in `plans/closure/consumer-adoption/006-status.md` (M008 qualified/unpublished; Egress updater surface + Delivery M003 exist at `eggstack/eggress@03134f8`, C009-corrected; remaining gate is 0.1.2 publication)
 
 Repository baseline: `413a35a7da32ea22ef337caefc35d3619154794e`
 

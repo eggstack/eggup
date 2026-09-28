@@ -21,23 +21,37 @@ No Eggup production change belongs to M006, and none was made: the plan's handof
 
 ## Blocker evidence
 
-Two independent stops apply, either sufficient alone:
+One stop applies (C009 correction, 2026-09-28: the earlier second stop below was
+based on a stale Egress checkout and is retracted):
 
-1. **Publication gate (plan Section 14).** "Stop before dependency merge if Package M008 is not published in a crates.io-usable form." M008 is qualified but unpublished: publication is a separate maintainer action and this pass performs no publication. A merged/publishable Egress dependency therefore still cannot cut over. Pre-merge qualification against an immutable Eggup revision remains permitted by work package A, but see stop 2.
+1. **Publication gate (plan Section 14).** "Stop before dependency merge if Package M008 is not published in a crates.io-usable form." M008 is qualified but unpublished: publication is a separate maintainer action and this pass performs no publication. A merged/publishable Egress dependency therefore still cannot cut over. Pre-merge qualification against an immutable Eggup revision remains permitted by work package A.
 
-2. **Consumer-premise absence in the available checkout.** The plan's Section 3 premise ("Egress currently owns … curl-based archive/checksum download … bespoke same-filesystem backup/replace/rollback pair transaction") does not hold in the inspected Egress checkout (`/Users/davidbowman/projects/eggress`, head `6b0edc2`):
-   - no updater/self-update module exists (`update.rs`, `self_update`, `updater`, and the `eggress update` command all absent from `crates/`, `tests/`, and `docs/`);
-   - the mirrored delivery plan `plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md` is absent (no `plans/implementation/` tree at all);
-   - `docs/release/RELEASE_PROCESS.md` covers release *publishing* (checksums/SBOM/GitHub Release creation), not release *consumption*.
-   
-   With no Egress updater to migrate and no registered Egress delivery plan, there is no consumer surface for work packages B–F to attach to, and inventing one inside Eggup would violate the plan's ownership rule ("Actual consumer code changes belong in `eggstack/eggress`").
+~~2. **Consumer-premise absence in the available checkout.**~~ **Retracted by C009.**
+The earlier revision of this record claimed the inspected Egress checkout
+(`/Users/davidbowman/projects/eggress`, head `6b0edc2`) had no updater surface
+and no mirrored delivery plan. That checkout was stale. Current
+`eggstack/eggress` at `03134f8ce476e4935dde7ae81d7ddb12b924bc7e`
+(`origin/main`, fetched 2026-09-28) contains both:
+
+- updater surface: `crates/eggress-cli/src/update/mod.rs` (self-update flow),
+  `crates/eggress-cli/src/update/install.rs` (`extract_archive`, `replace_pair`,
+  `copy_or_rename`), plus `download.rs`, `target.rs`, `verify.rs`, `version.rs`;
+- registered consumer-owned delivery plan:
+  `plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md`
+  (status: blocked on versioned Eggup core/archive package availability),
+  registered in the Egress delivery roadmap, registry, and canonical
+  `docs/ROADMAP.md`.
+
+Work packages B–F therefore have a consumer surface to attach to in Egress;
+implementation belongs to `eggstack/eggress` Delivery M003, gated only on the
+publication stop above.
 
 ## Requirement disposition
 
 | Requirement | Result / evidence |
 |---|---|
 | Versioned Eggup core/archive package availability (§2 gate) | Qualified, not published. M008 closure above; `cargo publish` remains a separate maintainer action. Pre-merge qualification against an immutable revision is permitted but not started (see consumer-premise stop). |
-| Egress adapter / pair-transaction replacement (§6–§7, packages B–E) | Not started; no updater exists in the available checkout to adapt or replace. No Egress production source or dependency was changed. |
+| Egress adapter / pair-transaction replacement (§6–§7, packages B–E) | Not started in Eggup (correct: consumer code belongs in Egress). Consumer surface exists at `eggstack/eggress@03134f8` (`crates/eggress-cli/src/update/`, Delivery M003 registered); implementation is Egress-owned. No Egress production source or dependency was changed from this repo. |
 | Local helper deletion after parity (§5, package E) | Not applicable; nothing to delete. |
 | Cross-platform/package/size qualification (§7F, §10–§11) | Not run; Egress verification commands belong to the consumer repo and require the consumer implementation to exist. |
 | CLI exit-code / release-policy preservation (§4) | Not applicable; no consumer behavior changed. |
@@ -49,7 +63,13 @@ All §4 invariants hold vacuously: nothing in Egress was touched, so no release/
 
 ## What unblocks M006
 
-1. Maintainer publishes `eggup-core 0.1.2` then `eggup-archive 0.1.2` to crates.io (M008 manual order), satisfying the §14 merge gate; **and**
-2. Egress registers its delivery plan and presents the updater surface the Eggup plan contracts against (or revises the contract if Egress has no self-updater, in which case this Eggup plan needs a corrective, not an implementation pass).
+1. Maintainer publishes `eggup-core 0.1.2` then `eggup-archive 0.1.2` to crates.io (M008 manual order), satisfying the §14 merge gate.
 
-Until both hold, M006 remains planned/blocked. No corrective is opened: the stops are external gates, not Eggup defects.
+Egress already registers its delivery plan (Delivery M003 at
+`eggstack/eggress@03134f8`) and presents the updater surface
+(`crates/eggress-cli/src/update/`) the Eggup plan contracts against; no
+contract revision is needed on that axis (C009 correction 2026-09-28).
+
+Until the publication gate holds, M006 remains planned/blocked. No further
+corrective is opened: the remaining stop is an external gate, not an Eggup
+defect.

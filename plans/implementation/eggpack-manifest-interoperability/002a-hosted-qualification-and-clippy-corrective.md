@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability M002a — Hosted Qualification and Clippy Corrective
 
-Status: ready for handoff
+Status: implemented; closed by `plans/closure/eggpack-manifest-interoperability/002a-status.md` (hosted run `36477024102` green on all lanes)
 
 Repository baseline: `f708e45ab82a35df740704f1af36a7d2275794cf`
 

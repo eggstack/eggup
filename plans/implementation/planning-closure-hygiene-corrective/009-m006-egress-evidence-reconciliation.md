@@ -1,6 +1,6 @@
 # Planning / Closure Hygiene Corrective C009 — Consumer M006 Egress Evidence Reconciliation
 
-Status: ready for handoff
+Status: implemented; closed by `plans/closure/planning-closure-hygiene-corrective/009-status.md`
 
 Repository baseline: `f708e45ab82a35df740704f1af36a7d2275794cf`
 
