@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: pending final registration commit for Verified Core M009 manual 0.1.2 publication
+Latest planning registration head: `23f94948f3a81660c3ff1503c4018649c7dad183` (Verified Core M009 manual 0.1.2 publication registered; M009 ready for maintainer handoff, Egress M006 blocked specifically on M009 closure)
 
 Latest reviewed runtime head with fully green hosted qualification is `7f3881de3d3f6f5c8f7bb5bc710bf36d550dc7c5` (M002a/C009/M008a closure batch; run `36477960841` green on Stable/MSRV/macOS/Windows). Code qualification was established at `9a5500e` (M002a clippy + Windows-adapter head; run `36477024102` green, superseding failed run `36463041223`); the batch adds only `plans/` records and fixture-vendor refresh over that head (`crates/` byte-identical). Core M008a reran the exact clean-tree package/publish-dry-run evidence on the post-M002a tree with no material delta. Planning-hygiene C009 corrected the stale Consumer M006 claim: current `eggstack/eggress@03134f8` has both the updater surface and registered Delivery M003 plan. Publication of compatible 0.1.2 packages remains a separate maintainer action.
 
