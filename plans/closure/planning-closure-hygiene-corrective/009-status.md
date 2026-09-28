@@ -66,10 +66,10 @@ None. No medium-or-higher finding; the stale-evidence finding is corrected, not 
 
 ## Roadmap disposition
 
-Planning-hygiene C009 is closed. Consumer M006 stays blocked on the publication gate; after M002a/M008a restore green package qualification and a maintainer publishes the compatible 0.1.2 pair, Egress Delivery M003 becomes the consumer-side implementation handoff. No new downstream Eggup work is unblocked by C009 beyond the already-registered Egress-side plan.
+Planning-hygiene C009 is closed. Consumer M006 stays blocked on the publication gate; M002a/M008a restored green package qualification in the same batch, so after a maintainer publishes the compatible 0.1.2 pair, Egress Delivery M003 becomes the consumer-side implementation handoff. No new downstream Eggup work is unblocked by C009 beyond the already-registered Egress-side plan.
 
 ## Registry updates
 
 - C009 row: ready → closed.
 - M006 rows: "stale execution evidence tracked by C009 / C009 will reconcile" → "C009 reconciled; blocked solely on published 0.1.2 pair".
-- Next handoff: M002a + C009 removed from dependency-ready; M008a ready.
+- Next handoff: M002a + C009 removed from dependency-ready; M008a proceeded on the green M002a head and closed in the same batch.

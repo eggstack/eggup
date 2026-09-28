@@ -1,6 +1,6 @@
 # Verified Update Core M008a — Clean Package and Current-Head Qualification Evidence Corrective
 
-Status: blocked on Eggpack Interop M002a closure
+Status: implemented; closed by `plans/closure/verified-update-core/008a-status.md` (exact clean-tree package/dry-run + fixture + green hosted head)
 
 Repository baseline: `f708e45ab82a35df740704f1af36a7d2275794cf`
 

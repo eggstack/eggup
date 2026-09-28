@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M007 closed/qualified; M008 package surface landed but final closure evidence is under corrective M008a after current-head CI failure; publication of the 0.1.2 core/archive pair remains a separate maintainer action
+Status: active; M001-M007 closed/qualified; M008 package surface qualified with exact clean-tree evidence under corrective M008a (closed); publication of the 0.1.2 core/archive pair remains a separate maintainer action
 
 Long-term references:
 
@@ -363,7 +363,7 @@ Every safety-sensitive public type documents what it proves and what it does not
 
 ## 11. Completion definition
 
-The runtime roadmap is functionally closed through M007. M008's 0.1.2 package surface has landed, but final closure evidence is not complete until M002a restores a green current head and M008a reruns the exact clean-tree package/publish-dry-run commands required by the source plan. Manual crates.io publication remains a separate maintainer action after those correctives.
+The runtime roadmap is functionally closed through M007. M008's 0.1.2 package surface is qualified with exact clean-tree package/publish-dry-run evidence under corrective M008a (closed; hosted head green via run `36477024102` plus final-head confirmation). Manual crates.io publication remains a separate maintainer action.
 
 ## 12. Milestone status
 
@@ -376,5 +376,5 @@ The runtime roadmap is functionally closed through M007. M008's 0.1.2 package su
 | M005 | closed | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | `plans/closure/verified-update-core/005-status.md` | — |
 | M006 | closed | `plans/implementation/verified-update-core/006-core-package-qualification.md` | `plans/closure/verified-update-core/006-status.md` | — |
 | M007 | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md` | `plans/closure/verified-update-core/007-status.md` | — |
-| M008 | implementation/package surface landed; closure evidence corrective open | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md` | `plans/closure/verified-update-core/008-status.md` | M008a clean-package/current-head evidence corrective |
-| M008a | blocked | `plans/implementation/verified-update-core/008a-clean-package-evidence-corrective.md` | — | hard dependency: Eggpack Interop M002a closure restores green current head |
+| M008 | closed with clean package evidence (M008a) | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md` | `plans/closure/verified-update-core/008-status.md` (M008a addendum) | 0.1.2 unpublished; maintainer publication (core before archive) |
+| M008a | closed | `plans/implementation/verified-update-core/008a-clean-package-evidence-corrective.md` | `plans/closure/verified-update-core/008a-status.md` | — (was: hard dependency on M002a green head; satisfied by run `36477024102`) |

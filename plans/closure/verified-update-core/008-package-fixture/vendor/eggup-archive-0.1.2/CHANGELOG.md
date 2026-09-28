@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Verified Update Core M008 package qualification: workspace version bumps
+  to 0.1.2 to carry the M001d object-bound handoff API for downstream
+  Egress adoption. Package metadata now declares explicit `homepage` and
+  `documentation` fields and broadened keywords; the crate description
+  records the absence of authenticity/signature support. The dev-dependency
+  on `eggup-core` is path-only (no version constraint) so
+  `cargo package`/`cargo publish --dry-run` for `eggup-archive` can verify
+  against the in-tree `eggup-core` before eggup-core 0.1.2 is on
+  crates.io. The exact `=0.1.1` pin was deliberately exact in the
+  in-workspace sense; removing the version string keeps the workspace
+  resolution unchanged while letting the package tool resolve the
+  dev-dependency from the local source. No public API change. No
+  automatic publication or consumer migration performed.
 - Handle-backed source handoff (M001d): `PersistedExtraction::into_bound_sources()`
   converts each extracted member into a `BoundMember` owning its already-open
   readable object (created read + write via the same atomic handle-relative

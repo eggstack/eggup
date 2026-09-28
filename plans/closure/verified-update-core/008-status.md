@@ -177,3 +177,11 @@ After both publishes, Egress M006's publishable dependency cutover gate is satis
 Verified Update Core M008 is closed. Eggpack Interop M002 is unblocked (in-repo implementation may begin; it does not require publication to be in flight). Consumer Adoption M006 remains gated on the separate maintainer publication action, which is out of scope for this milestone.
 
 The package fixture and packaged tarballs are archived under `plans/closure/verified-update-core/008-package-fixture/` for reproducibility.
+
+## M008a addendum — clean package and current-head qualification evidence (2026-09-28)
+
+Source corrective plan: `plans/implementation/verified-update-core/008a-clean-package-evidence-corrective.md`.
+
+Closure record: `plans/closure/verified-update-core/008a-status.md`.
+
+The `--allow-dirty` qualification above is superseded by exact clean-tree evidence: `cargo package` + `cargo publish --dry-run` (no `--allow-dirty`) pass for both `eggup-core` (19 files, 180.3 KiB / 35.5 KiB compressed) and `eggup-archive` (7 files, 138.2 KiB / 26.7 KiB compressed), with no material difference from the provisional results, so no version bump or metadata corrective was required. The fixture vendor copies were refreshed from the clean tarballs (only deltas: `.cargo_vcs_info.json` now records the clean commit instead of dirty state, plus the since-landed archive CHANGELOG entry) and the clean external fixture passes 3/3 against them. The final repository head carries a green hosted matrix (see the M008a closure for the run ID). Crates.io publication remains a separate maintainer action: `eggup-core 0.1.2` first, then `eggup-archive 0.1.2`.

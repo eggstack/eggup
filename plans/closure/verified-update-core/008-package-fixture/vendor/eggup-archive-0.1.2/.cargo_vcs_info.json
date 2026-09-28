@@ -1,7 +1,6 @@
 {
   "git": {
-    "sha1": "e535d2c1f672f34ac6912c38686cd56d8e231414",
-    "dirty": true
+    "sha1": "05433dbc953ec99af6eca1b8947a92f4719371e1"
   },
   "path_in_vcs": "crates/eggup-archive"
 }
