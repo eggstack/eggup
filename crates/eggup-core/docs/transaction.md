@@ -8,6 +8,15 @@ existing members into an owned sibling backup set and renames staged members
 into their exact destinations. The artifact set is the mutation unit;
 a single-member update uses the same engine as a bundle.
 
+`InstallPlan::prepare_with_bound_sources(bound)` is the additive staging
+seam used by archive callers. Members present in `bound` are staged by
+reading the moved open object from byte zero, so a member-entry replacement
+or root rename after the handoff boundary cannot redirect staged bytes.
+Members absent from `bound` stage from their recorded source paths exactly
+as in `prepare`. Every bound identity must name a member of this plan;
+leftover handles fail closed and no staged byte is ever obtained by
+reopening a member name as fallback.
+
 Ownership uses `Absent | Owned | Foreign | Unknown`. `Owned` allows
 replacement; `Absent` allows installation only with
 `AbsentPolicy::AllowCreate`; `Foreign` and `Unknown` fail closed, as does any

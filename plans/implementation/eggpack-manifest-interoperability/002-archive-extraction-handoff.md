@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 002 — Archive Extraction Handoff
 
-Status: ready for handoff
+Status: implemented; closed by `plans/closure/eggpack-manifest-interoperability/002-status.md`
 
 Repository baseline: `413a35a7da32ea22ef337caefc35d3619154794e`
 

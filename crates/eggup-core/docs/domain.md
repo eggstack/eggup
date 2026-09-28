@@ -14,6 +14,15 @@ live destination. Dropping the prepared transaction removes only its own
 stage after verifying stage ownership (expected prefix, real directory, no
 symlink, recorded parent).
 
+`InstallPlan::prepare_with_bound_sources(bound)` is the additive staging
+seam used by archive callers. Each member identity present in `bound` is
+staged by reading the moved open object from byte zero; the recorded source
+path is treated as advisory diagnostics only and is never opened, even if it
+now names foreign state. Members absent from `bound` stage from their
+recorded source paths exactly as in `prepare`. Every bound identity must
+name a member of this plan; leftover handles fail closed and a failed bound
+stage copy never reopens the recorded path as fallback.
+
 Members declare an `IntegrityRequirement`, but the declaration is not evidence.
 Only `Sha256` members can be verified and committed; `None` is observable
 during preparation but rejected by validation and by the final staged-digest

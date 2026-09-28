@@ -1,6 +1,6 @@
 # Consumer Adoption Milestone 006 — Egress Archive/Pair Adoption
 
-Status: planned; consumer implementation/final dependency cutover blocked on versioned Eggup core/archive package availability
+Status: planned; blocked execution recorded in `plans/closure/consumer-adoption/006-status.md` (M008 qualified/unpublished; Egress updater premise absent in available checkout)
 
 Repository baseline: `413a35a7da32ea22ef337caefc35d3619154794e`
 

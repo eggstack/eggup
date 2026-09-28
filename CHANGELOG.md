@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- Eggpack Interop M002 (unpublished): `eggup-eggpack` gains the archive
+  extraction handoff (`archive_format_for_name`, `validate_acquired_archive`,
+  `archive_plan_for`, `core_plan_for_archive`, `bind_archive_members`) that
+  translates `ManifestProjection::Archive` into a validated
+  `eggup_archive::ArchivePlan` plus a core `InstallPlan` and `BoundSources`
+  for `prepare_with_bound_sources`, with exact member size/digest facts and
+  fail-closed format/count/permission mapping. New `AdapterError::
+  UnsupportedArchiveFormat` variant (the error enum is `non_exhaustive`, so
+  this is additive). The adapter performs no extraction, commit, or cleanup
+  itself; orchestration and deferred cleanup stay caller-owned. Direct/bundle
+  APIs are unchanged and `materialize_artifact_set` still returns
+  `ArchiveExtractionRequired` for archive projections. New runtime
+  dependencies are `eggup-archive =0.1.2` (path) and `sha2 0.10.9`;
+  `eggup-core` remains archive/Eggpack independent. No publication or
+  consumer migration performed.
+
+- Verified Update Core M008 (unpublished): workspace version bumps to 0.1.2 to
+  carry the M001d additive bound-source API (`BoundSources` +
+  `InstallPlan::prepare_with_bound_sources` in `eggup-core`,
+  `PersistedExtraction::into_bound_sources` and friends in `eggup-archive`).
+  Package metadata for `eggup-archive` adds explicit homepage and documentation
+  fields and records the absence of authenticity or signature support. The
+  eggup-archive dev-dependency on eggup-core is path-only so the package can
+  verify before the published eggup-core 0.1.2 lands on crates.io. Internal
+  `=0.1.1` exact pins on eggup-core/eggup-acquisition in eggup-eggpack (which
+  remains `publish = false`) update to `=0.1.2` so the workspace resolves.
+  Manual crates.io publication order remains core before archive. No automatic
+  publication or consumer migration performed.
+
 - Archive M001d handle-backed source handoff: extracted members now convert
   into object-bound staging sources (`BoundMember`/`BoundExtraction`, already-
   open readable objects rewound to byte zero) and stage through a new

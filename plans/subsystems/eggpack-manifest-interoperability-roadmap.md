@@ -178,9 +178,9 @@ Implementation plan: `plans/implementation/eggpack-manifest-interoperability/001
 
 ### M002 — Archive extraction handoff
 
-Status: ready. Plan: `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md`. Archive M001d is closed and provides the required object-bound handoff. No Eggpack producer schema/code change is required by this plan.
+Status: closed. Plan: `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md`; closure: `plans/closure/eggpack-manifest-interoperability/002-status.md`. Archive M001d is closed and provides the required object-bound handoff. No Eggpack producer schema/code change was required.
 
-Connect `ManifestProjection::Archive` evidence to the qualified local extraction layer and then to ArtifactSet construction. Do not put archive format dependencies into `eggup-core` and do not make `eggup-eggpack` itself a live-destination extractor.
+`ManifestProjection::Archive` evidence now connects to the qualified local extraction layer and then to ArtifactSet construction through five typed adapter helpers (`archive_format_for_name`, `validate_acquired_archive`, `archive_plan_for`, `core_plan_for_archive`, `bind_archive_members`). Archive format dependencies stay out of `eggup-core` (still `sha2`-only) and `eggup-eggpack` itself performs no extraction, commit, or cleanup.
 
 ### M003 — Eggsact real-consumer manifest adoption
 
@@ -244,6 +244,6 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 |---|---|---|---|---|
 | M001 ReleaseManifest v1 direct/bundle adapter | closed (historical) | plans/implementation/eggpack-manifest-interoperability/001-release-manifest-v1-adapter.md | plans/closure/eggpack-manifest-interoperability/001-status.md | post-closure qualification/scope findings tracked by M001a |
 | M001a adapter qualification + closure hardening | closed | plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md | plans/closure/eggpack-manifest-interoperability/001a-status.md | — |
-| M002 archive extraction handoff | ready | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md` | — | M001d closed (hosted run `36335233644`) |
+| M002 archive extraction handoff | closed | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md` | `plans/closure/eggpack-manifest-interoperability/002-status.md` | — |
 | M003 Eggsact real-consumer manifest adoption | blocked after bounded adapter/API qualification | plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md | plans/closure/eggpack-manifest-interoperability/003-status.md | producer-owned Eggsact artifact mapping and ReleaseManifest publication convention are absent |
 | M004 package/API promotion | blocked | — | — | M003 real adoption must close and eggpack-manifest must have a publishable version |

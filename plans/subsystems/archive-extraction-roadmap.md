@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001/M001a historical; M001b cleanup closed; M001c write half implemented with Section 14 handoff stop closed by M001d; M001d closed with green hosted qualification; M002/M003 archive-side ready-to-author
+Status: active; M001/M001a historical; M001b cleanup closed; M001c write half implemented with Section 14 handoff stop closed by M001d; M001d closed with green hosted qualification; M003 Eggpack handoff closed; M002 Egress adoption blocked with execution record
 
 Long-term references:
 
@@ -127,9 +127,9 @@ archive M001c handle-relative member materialization [HISTORICAL PREDECESSOR; WR
                 v
 archive M001d handle-backed source handoff [CLOSED via run 36335233644]
                 |
-                +--> consumer adoption M006 Egress [WRITABLE; plan unwritten]
+                +--> consumer adoption M006 Egress [BLOCKED; see plans/closure/consumer-adoption/006-status.md]
                 |
-                `--> Eggpack interoperability M002 archive handoff [WRITABLE; plan unwritten]
+                `--> Eggpack interoperability M002 archive handoff [CLOSED]
 ```
 
 ## 7. Milestones
@@ -172,19 +172,19 @@ Plan: `plans/implementation/archive-extraction/001d-handle-backed-source-handoff
 
 Status: closed; see `plans/closure/archive-extraction/001d-status.md` (hosted run `36332823865`-green M008 head `0b0cdaa` baseline; final hosted run `36335233644` green on all lanes, superseding `36334772510`).
 
-Carries object-bound source authority (already-open member object, direct object-bound stage copy) from extraction into core staging so no staged byte is obtained by re-resolving a recorded pathname or member name. Closed the M001c handoff stop; Egress M006 and Eggpack M002 re-gate on M001d closure (satisfied — both writable, plans unwritten).
+Carries object-bound source authority (already-open member object, direct object-bound stage copy) from extraction into core staging so no staged byte is obtained by re-resolving a recorded pathname or member name. Closed the M001c handoff stop; downstream Core M008 and Eggpack M002 are now closed, while Egress M006 is blocked (see `plans/closure/consumer-adoption/006-status.md`).
 
 ### M002 — Egress real-consumer archive/pair adoption
 
 Plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`.
 
-Status: planned; consumer-side implementation is mirrored in `eggstack/eggress`. Adopt the generic extraction output plus Eggup's existing multi-artifact transaction while preserving Egress-owned release/version/origin/candidate/CLI policy. Delete duplicated generic extraction/rollback machinery only after parity is qualified. Publishable dependency cutover is gated on Verified Core M008 package qualification/publication.
+Status: blocked; see `plans/closure/consumer-adoption/006-status.md`. Consumer-side implementation was expected to be mirrored in `eggstack/eggress`, but the available checkout presents no updater surface or mirrored delivery plan, and the 0.1.2 publication gate (Core M008, now qualified) still needs its separate maintainer action. Adopt the generic extraction output plus Eggup's existing multi-artifact transaction while preserving Egress-owned release/version/origin/candidate/CLI policy. Delete duplicated generic extraction/rollback machinery only after parity is qualified. Publishable dependency cutover is gated on 0.1.2 publication.
 
 ### M003 — Eggpack archive projection handoff
 
 Plan: `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md`.
 
-Status: ready. Connect `ManifestProjection::Archive` member evidence to the extraction contract without putting archive policy or producer authority into lower Eggup layers.
+Status: closed; see `plans/closure/eggpack-manifest-interoperability/002-status.md`. `ManifestProjection::Archive` member evidence now connects to the extraction contract through the adapter's typed handoff helpers, without putting archive policy or producer authority into lower Eggup layers.
 
 The existing Eggpack interoperability roadmap may retain its historical M002 numbering; this roadmap's M003 describes the archive subsystem side of that integration only.
 
@@ -228,5 +228,5 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M001b handle-bound cleanup + Windows portability | closed | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md` | `plans/closure/archive-extraction/001b-status.md` | — |
 | M001c handle-relative member materialization | historical predecessor; write authority implemented; handoff stop resolved by M001d | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md` | `plans/closure/archive-extraction/001c-status.md` | resolved by M001d closure |
 | M001d handle-backed source handoff | closed | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | `plans/closure/archive-extraction/001d-status.md` | — |
-| M002 Egress adoption | planned; package merge gate | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | — | M001d closed; core/archive package M008 for publishable dependency |
-| M003 Eggpack archive handoff | ready | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md` | — | M001d closed |
+| M002 Egress adoption | blocked (execution record, not closed) | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` | 0.1.2 unpublished; no Egress updater surface/delivery plan in available checkout |
+| M003 Eggpack archive handoff | closed | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md` | `plans/closure/eggpack-manifest-interoperability/002-status.md` | — |

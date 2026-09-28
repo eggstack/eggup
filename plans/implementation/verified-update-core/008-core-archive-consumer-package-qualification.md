@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 008 — Core/Archive Consumer Package Qualification
 
-Status: ready for handoff
+Status: implemented; closed by `plans/closure/verified-update-core/008-status.md`
 
 Repository baseline: `413a35a7da32ea22ef337caefc35d3619154794e`
 

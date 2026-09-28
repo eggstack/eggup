@@ -235,11 +235,11 @@ dependencies = [
 
 [[package]]
 name = "eggup-acquisition"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "eggup-archive"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eggup-core",
  "flate2",
@@ -251,21 +251,21 @@ dependencies = [
 
 [[package]]
 name = "eggup-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "sha2",
 ]
 
 [[package]]
 name = "eggup-curl"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eggup-acquisition",
 ]
 
 [[package]]
 name = "eggup-eggfetch"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eggfetch-core",
  "eggup-acquisition",
@@ -276,18 +276,23 @@ dependencies = [
 
 [[package]]
 name = "eggup-eggpack"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eggpack-manifest",
  "eggup-acquisition",
+ "eggup-archive",
  "eggup-core",
+ "flate2",
  "serde",
  "serde_json",
+ "sha2",
+ "tar",
+ "zip",
 ]
 
 [[package]]
 name = "eggup-service"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eggup-core",
  "windows-args",
@@ -296,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "eggup-transport-footprint"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "eggup-acquisition",
  "eggup-curl",

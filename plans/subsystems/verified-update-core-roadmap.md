@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M007 closed/qualified; M008 core/archive consumer package qualification ready
+Status: active; M001-M008 closed/qualified; publication of the 0.1.2 core/archive pair remains a separate maintainer action
 
 Long-term references:
 
@@ -363,7 +363,7 @@ Every safety-sensitive public type documents what it proves and what it does not
 
 ## 11. Completion definition
 
-The runtime roadmap is functionally closed through M007. M008 is the package-qualification prerequisite that makes the post-M001d core/archive API consumable by publishable downstream crates without git/path dependencies.
+The runtime roadmap is functionally closed through M007. M008 is closed: the package-qualification prerequisite that makes the post-M001d core/archive API consumable by publishable downstream crates without git/path dependencies is qualified at workspace 0.1.2; only the manual crates.io publication step remains.
 
 ## 12. Milestone status
 
@@ -376,4 +376,4 @@ The runtime roadmap is functionally closed through M007. M008 is the package-qua
 | M005 | closed | `plans/implementation/verified-update-core/005-prequalification-safety-and-api-corrective.md` | `plans/closure/verified-update-core/005-status.md` | — |
 | M006 | closed | `plans/implementation/verified-update-core/006-core-package-qualification.md` | `plans/closure/verified-update-core/006-status.md` | — |
 | M007 | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md` | `plans/closure/verified-update-core/007-status.md` | — |
-| M008 | ready | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md` | — | M001d closed; publication remains separate maintainer action |
+| M008 | closed | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md` | `plans/closure/verified-update-core/008-status.md` | publication of 0.1.2 remains a separate maintainer action |
