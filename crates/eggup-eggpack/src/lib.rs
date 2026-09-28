@@ -556,7 +556,7 @@ pub fn bind_archive_members(
         return Err(AdapterError::MapMismatch("archive bound members"));
     }
     let mut sources = BoundSources::new();
-    for (declared, bound) in members.iter().zip(bound_members.into_iter()) {
+    for (declared, bound) in members.iter().zip(bound_members) {
         let id = MemberId::new(declared.install.clone())
             .map_err(|e| AdapterError::Eggup(e.to_string()))?;
         sources.insert(id, bound.into_open_object());
