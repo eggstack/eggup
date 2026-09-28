@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M008a closed/qualified; M009 manual 0.1.2 core/archive publication ready for maintainer handoff
+Status: active; M001-M009 closed; 0.1.2 core/archive pair published to crates.io
 
 Long-term references:
 
@@ -170,7 +170,7 @@ M007 deferred finalization + post-commit policy [closed]
 M008 core/archive consumer package qualification [CLOSED via M008a]
                     |
                     v
-M009 core/archive 0.1.2 publication [READY; MAINTAINER-GATED]
+M009 core/archive 0.1.2 publication [CLOSED 2026-09-28]
 ```
 
 - M001 -> M002: hard.
@@ -180,7 +180,11 @@ M009 core/archive 0.1.2 publication [READY; MAINTAINER-GATED]
 - M005 -> M006: hard.
 - M005 + M006 -> M007: hard and satisfied.
 - M007 + Archive M001d -> M008 package qualification: hard and satisfied.
-- M008 + M008a -> M009 publication: hard and satisfied; operational credential/authorization gate remains maintainer-owned.
+- M008 + M008a -> M009 publication: hard and satisfied; `eggup-core 0.1.2`
+  then `eggup-archive 0.1.2` published 2026-09-28, `v0.1.2` + GitHub Release
+  `0.1.2` recorded in `plans/closure/verified-update-core/009-status.md`.
+- M009 -> Consumer M006 / Egress Delivery M003: hard Eggup-side gate
+  satisfied; consumer implementation is Egress-owned and now executable.
 - Acquisition consumers may continue using the qualified immediate-commit path.
 - Service Lifecycle M005 is closed; no downstream service-aware consumer migration is currently scheduled.
 
@@ -387,7 +391,12 @@ Every safety-sensitive public type documents what it proves and what it does not
 
 ## 11. Completion definition
 
-The runtime roadmap is functionally closed through M008a. M009 is the explicit maintainer-controlled publication milestone for the already-qualified 0.1.2 core/archive pair; it must remain manual and irreversible-step aware. After M009 closes, no further core publication work is required for Egress M006 dependency cutover.
+The runtime roadmap is functionally closed through M009. The already-qualified
+0.1.2 core/archive pair is published (`eggup-core 0.1.2` then
+`eggup-archive 0.1.2`, 2026-09-28, from release-prep commit `e8e07eb`,
+tagged `v0.1.2` with GitHub Release `0.1.2`); publication stayed manual and
+irreversible-step aware throughout. No further core publication work is
+required for the Egress M006 dependency cutover.
 
 ## 12. Milestone status
 
@@ -402,4 +411,4 @@ The runtime roadmap is functionally closed through M008a. M009 is the explicit m
 | M007 | closed | `plans/implementation/verified-update-core/007-post-commit-policy-and-deferred-finalization.md` | `plans/closure/verified-update-core/007-status.md` | — |
 | M008 | closed with clean package evidence (M008a) | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md` | `plans/closure/verified-update-core/008-status.md` (M008a addendum) | 0.1.2 unpublished; maintainer publication (core before archive) |
 | M008a | closed | `plans/implementation/verified-update-core/008a-clean-package-evidence-corrective.md` | `plans/closure/verified-update-core/008a-status.md` | — (was: hard dependency on M002a green head; satisfied by run `36477024102`) |
-| M009 | ready for maintainer handoff | `plans/implementation/verified-update-core/009-core-archive-0.1.2-publication.md` | — | explicit maintainer authorization + crates.io credentials; M008/M008a closed |
+| M009 | closed | `plans/implementation/verified-update-core/009-core-archive-0.1.2-publication.md` | `plans/closure/verified-update-core/009-status.md` | — (pair published 2026-09-28; Consumer M006 gate satisfied) |

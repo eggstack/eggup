@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 009 — eggup-core / eggup-archive 0.1.2 Publication
 
-Status: ready for maintainer handoff
+Status: implemented; closed by `plans/closure/verified-update-core/009-status.md` (pair published 2026-09-28, smoke 3/3, `v0.1.2` + GitHub Release `0.1.2`)
 
 Repository baseline: `71eb9bdf44cb739adc3701b00310f58430fa7bd1`
 

@@ -1,6 +1,6 @@
 # Consumer Adoption M006 — Execution Status
 
-Disposition: **blocked; consumer milestone not closed**
+Disposition: **executable; consumer milestone not closed** (publication gate satisfied by M009 closure 2026-09-28; implementation is Egress-owned)
 
 Source plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`
 
@@ -50,7 +50,7 @@ publication stop above.
 
 | Requirement | Result / evidence |
 |---|---|
-| Versioned Eggup core/archive package availability (§2 gate) | Qualified, not published. M008 closure above; `cargo publish` remains a separate maintainer action. Pre-merge qualification against an immutable revision is permitted but not started (see consumer-premise stop). |
+| Versioned Eggup core/archive package availability (§2 gate) | Satisfied 2026-09-28 by M009 closure: `eggup-core 0.1.2` + `eggup-archive 0.1.2` registry-visible (see addendum below). Registry dependency cutover is now permitted. |
 | Egress adapter / pair-transaction replacement (§6–§7, packages B–E) | Not started in Eggup (correct: consumer code belongs in Egress). Consumer surface exists at `eggstack/eggress@03134f8` (`crates/eggress-cli/src/update/`, Delivery M003 registered); implementation is Egress-owned. No Egress production source or dependency was changed from this repo. |
 | Local helper deletion after parity (§5, package E) | Not applicable; nothing to delete. |
 | Cross-platform/package/size qualification (§7F, §10–§11) | Not run; Egress verification commands belong to the consumer repo and require the consumer implementation to exist. |
@@ -73,3 +73,22 @@ contract revision is needed on that axis (C009 correction 2026-09-28).
 Until the publication gate holds, M006 remains planned/blocked. No further
 corrective is opened: the remaining stop is an external gate, not an Eggup
 defect.
+
+## M009-closure addendum — publication gate satisfied (2026-09-28)
+
+Verified Update Core M009 is closed (`plans/closure/verified-update-core/009-status.md`):
+
+- `eggup-core 0.1.2` published 2026-09-28T21:53:21Z (registry id `3351376`,
+  checksum `0f44129c…cc8e6`), then `eggup-archive 0.1.2` published
+  2026-09-28T21:53:39Z (registry id `3351378`, checksum `758e9564…1c8292`),
+  both from release-prep commit `e8e07eb`, tagged `v0.1.2` with GitHub
+  Release `0.1.2`.
+- A registry-only external fixture resolved both `=0.1.2` crates from
+  crates.io (no path/git overrides) and passed the tar.gz + zip
+  bound-source flows plus the mismatch rejection (3/3).
+
+The §14 merge gate ("Package M008 published in a crates.io-usable form") is
+therefore satisfied. M006 moves from publication-blocked to executable:
+Egress Delivery M003 may now cut over to registry dependencies. M006 itself
+is not closed — work packages B–F remain Egress-owned implementation, and
+their evidence belongs to the consumer repo.

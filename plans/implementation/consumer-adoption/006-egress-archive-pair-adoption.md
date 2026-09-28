@@ -1,6 +1,6 @@
 # Consumer Adoption Milestone 006 — Egress Archive/Pair Adoption
 
-Status: planned; blocked execution recorded in `plans/closure/consumer-adoption/006-status.md` (M008 qualified/unpublished; Egress updater surface + Delivery M003 exist at `eggstack/eggress@03134f8`, C009-corrected; remaining gate is 0.1.2 publication)
+Status: executable; M009 publication gate satisfied 2026-09-28 (`eggup-core 0.1.2` + `eggup-archive 0.1.2` registry-visible; see `plans/closure/verified-update-core/009-status.md` and the M009-closure addendum in `plans/closure/consumer-adoption/006-status.md`). Implementation belongs to Egress Delivery M003.
 
 Repository baseline: `413a35a7da32ea22ef337caefc35d3619154794e`
 
