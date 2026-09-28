@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: pending final registration commit for Eggpack Interop M002a + Core M008a + planning-hygiene C009
+Latest planning registration head: `02fb5eafeaad9deda1bae037fdad6a01bb51c6e7` (Eggpack Interop M002a + Core M008a + planning-hygiene C009 registered; M002a/C009 ready, M008a blocked on M002a)
 
 Latest reviewed runtime head with fully green hosted qualification remains `18d83decd0c894279dd5e5d89407e1423f839d99` (M001d Windows-qualification head; run `36335233644`). The later M008/M002 implementation batch landed at `ba869f167d15038097129b52b90bfa5e6e3e2cf5`, but current-head run `36463041223` failed Stable Linux clippy at `crates/eggup-eggpack/src/lib.rs:559` (`clippy::useless_conversion`); macOS, Rust 1.89 MSRV, and Windows passed. Eggpack Interop M002a is ready to fix that lint and add direct Windows adapter runtime execution. Core M008a is blocked on M002a and will rerun the exact clean-tree package/publish-dry-run evidence. Planning-hygiene C009 is ready to correct stale Consumer M006 evidence: current `eggstack/eggress` does have both the updater surface and registered Delivery M003 plan. Publication of compatible 0.1.2 packages remains a separate maintainer action.
 
