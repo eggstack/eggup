@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: `02fb5eafeaad9deda1bae037fdad6a01bb51c6e7` (Eggpack Interop M002a + Core M008a + planning-hygiene C009 registered; all three closed in this batch)
+Latest planning registration head: pending final registration commit for Verified Core M009 manual 0.1.2 publication
 
 Latest reviewed runtime head with fully green hosted qualification is `7f3881de3d3f6f5c8f7bb5bc710bf36d550dc7c5` (M002a/C009/M008a closure batch; run `36477960841` green on Stable/MSRV/macOS/Windows). Code qualification was established at `9a5500e` (M002a clippy + Windows-adapter head; run `36477024102` green, superseding failed run `36463041223`); the batch adds only `plans/` records and fixture-vendor refresh over that head (`crates/` byte-identical). Core M008a reran the exact clean-tree package/publish-dry-run evidence on the post-M002a tree with no material delta. Planning-hygiene C009 corrected the stale Consumer M006 claim: current `eggstack/eggress@03134f8` has both the updater surface and registered Delivery M003 plan. Publication of compatible 0.1.2 packages remains a separate maintainer action.
 
@@ -96,13 +96,13 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
-| Verified update core | M001-M008 closed/qualified incl. M008a clean package evidence | publication (maintainer action) → Egress M006 cutover |
+| Verified update core | M001-M008a closed/qualified; M009 publication ready for maintainer handoff | M009 core/archive 0.1.2 publication |
 | Acquisition transport | M001-M006 closed; M007 conditionally closed; M008 closed | — |
 | Service lifecycle | M001-M008 closed | — |
 | Archive extraction | M001/M001a historical; M001b closed; M001c historical predecessor with stop resolved by M001d; M001d closed | — |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
 | Eggpack manifest interoperability | M001/M001a/M002/M002a closed; M003 waits on producer convention | — |
-| Consumer adoption | simple, eggsearch, and CodeGG M005 closed; Egress M006 blocked on package publication; C009 evidence reconciliation closed | M006 unblocks on compatible published 0.1.2 packages; Gregg M004 separately unwritten |
+| Consumer adoption | simple, eggsearch, and CodeGG M005 closed; Egress M006 blocked specifically on M009 publication closure; C009 evidence reconciliation closed | M006 after M009; Gregg M004 separately unwritten |
 
 ## Dependency-ready implementation work
 
@@ -117,9 +117,10 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 | Eggpack manifest interoperability | M002a hosted qualification + clippy corrective | closed | `plans/implementation/eggpack-manifest-interoperability/002a-hosted-qualification-and-clippy-corrective.md`; `plans/closure/eggpack-manifest-interoperability/002a-status.md` | hosted run `36477024102` green on all lanes (supersedes failed `36463041223`); direct Windows adapter runtime evidence collected |
 | Planning/closure hygiene corrective | C009 Consumer M006 Egress evidence reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/009-m006-egress-evidence-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/009-status.md` | docs-only; Egress updater + Delivery M003 evidence confirmed at `03134f8`; M006 record corrected |
 | Verified update core | M008a clean package/current-head evidence corrective | closed | `plans/implementation/verified-update-core/008a-clean-package-evidence-corrective.md`; `plans/closure/verified-update-core/008a-status.md` | exact clean-tree package/dry-run + fixture green; no material delta from provisional evidence |
+| Verified update core | M009 eggup-core / eggup-archive 0.1.2 publication | ready for maintainer handoff | `plans/implementation/verified-update-core/009-core-archive-0.1.2-publication.md` | M008/M008a closed; requires explicit maintainer authorization + crates.io credentials; manual only |
 | Verified update core | M008 core/archive consumer package qualification | closed with clean evidence (M008a) | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md`; `plans/closure/verified-update-core/008-status.md` (M008a addendum) | maintainer publication (core before archive) remains the gate to Egress M006 |
 | Eggpack manifest interoperability | M002 archive extraction handoff | closed with hosted qualification (M002a) | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md`; `plans/closure/eggpack-manifest-interoperability/002-status.md` (M002a addendum) | — |
-| Consumer adoption | M006 Egress archive/pair adoption | blocked; execution record corrected by C009 | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`; `plans/closure/consumer-adoption/006-status.md` | compatible published 0.1.2 packages after M002a/M008a qualification; Egress updater + Delivery M003 exist at `eggress@03134f8` |
+| Consumer adoption | M006 Egress archive/pair adoption | blocked; execution record corrected by C009 | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`; `plans/closure/consumer-adoption/006-status.md` | Verified Core M009 publication closure; Egress updater + Delivery M003 exist at `eggress@03134f8` |
 | Planning/closure hygiene corrective | C005 post-M001b materialization gate reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/005-post-m001b-materialization-gate-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/005-status.md` | docs-only; reconciled M001c stop + M001d gate |
 | Archive extraction | M001b handle-bound cleanup + Windows portability corrective | closed | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md`; `plans/closure/archive-extraction/001b-status.md` | hosted run `36222536670` green on all lanes |
 | Acquisition transport | M008 sub-second deadline truthfulness corrective | closed | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md`; `plans/closure/acquisition-transport/008-status.md` | hosted run `36222536670` reached Windows portable tests |
@@ -173,7 +174,8 @@ CodeGG M005, Verified Update Core M007, and Service Lifecycle M005-M008 remain c
 | Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
 | Consumer adoption | M004 Gregg | writable; plan intentionally unwritten | prerequisites satisfied (acquisition M005/M006 + service M006 closed, hosted matrix green); no migration authorized |
 | Consumer adoption | M005 CodeGG | closed | `plans/closure/consumer-adoption/005-status.md`; producer release mapping remains application/Eggpack-owned |
-| Consumer adoption | M006 Egress | blocked; C009 reconciliation closed | compatible 0.1.2 packages remain unpublished; Egress updater surface + Delivery M003 confirmed at `eggress@03134f8` |
+| Verified update core | M009 core/archive 0.1.2 publication | ready for maintainer handoff | explicit authorization + crates.io credentials; publish core before archive; registry-only smoke + v0.1.2 release required |
+| Consumer adoption | M006 Egress | blocked; C009 reconciliation closed | Verified Core M009 publication closure; Egress updater surface + Delivery M003 confirmed at `eggress@03134f8` |
 | Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
 | Eggpack manifest interoperability | M002 archive extraction handoff | closed with hosted qualification (M002a) | M002a green run `36477024102` (Stable clippy/tests/docs + MSRV + macOS + Windows adapter runtime) |
 | Eggpack manifest interoperability | M003 Eggsact real-consumer manifest adoption | blocked after bounded API qualification | producer-owned live artifact mapping and ReleaseManifest publication/addressing convention are absent; see `plans/closure/eggpack-manifest-interoperability/003-status.md` |
@@ -248,9 +250,9 @@ Archive M001d handle-backed source handoff [CLOSED via run 36335233644]
                 |                   |
                 |                   `--> Core M008a clean package/current-head evidence [CLOSED; exact clean-tree evidence, no delta]
                 |                             |
-                |                             `--> manual 0.1.2 crates.io publication [MAINTAINER ACTION]
+                |                             `--> Core M009 manual 0.1.2 publication [READY; MAINTAINER-GATED]
                 |                                       |
-                |                                       `--> Egress consumer M006 [BLOCKED UNTIL PUBLISHED; record corrected by C009]
+                |                                       `--> Egress consumer M006 [BLOCKED UNTIL M009 CLOSES; record corrected by C009]
                 |
                 `--> Planning C009 M006 Egress evidence reconciliation [CLOSED; docs-only]
 
@@ -281,11 +283,11 @@ The earlier 2026-09-26 review opened acquisition M007 and service M007; those ar
 ## Current project state
 
 - Rust baseline: 1.89.
-- Core: M001-M007 remain qualified. M008's 0.1.2 package surface is qualified with exact clean-tree evidence under M008a (closed): `cargo package` + `cargo publish --dry-run` without `--allow-dirty` pass for core (19 files) and archive (7 files), fixture 3/3 green, hosted head green. Publication remains the separate maintainer gate.
+- Core: M001-M008a are qualified. M009 is the ready maintainer-controlled publication milestone for `eggup-core 0.1.2` then `eggup-archive 0.1.2`, followed by registry-only smoke, `v0.1.2`, GitHub Release, and Egress gate reconciliation. No automatic publication is authorized.
 - Acquisition: M001-M006 are closed; M007 is conditionally closed. M008 sub-second deadline truthfulness is closed via hosted run `36222536670`, which executed the Windows portable acquisition/curl tests after Archive M001b restored the Windows lane.
 - Service: M001-M008 remain closed. Service M008 replaced the scheduler-sensitive macOS unit proof with deterministic injected-`Instant` arithmetic without changing lifecycle/runtime deadline semantics; hosted run `36332823865` is green on all lanes (supersedes `36261671380`). See `plans/closure/service-lifecycle/008-status.md`.
 - Distribution: M001-M003 remain historical predecessor evidence; M004 removed the producer crate after Eggpack Contract M002 closure. The subsystem is archived/transferred to Eggpack.
-- Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg M004 prerequisites are satisfied and the milestone remains intentionally unwritten. Egress M006 remains blocked on compatible published 0.1.2 packages; C009 (closed) corrected the stale claim that Egress lacks an updater surface/Delivery M003 — both exist at `eggress@03134f8`.
+- Consumer adoption: eggsact/stegoeggo and eggsearch M003 are closed; Gregg M004 prerequisites are satisfied and the milestone remains intentionally unwritten. Egress M006 remains blocked specifically on M009 publication closure; C009 (closed) confirmed the updater surface and Delivery M003 exist at `eggress@03134f8`.
 - Archive extraction: ADR-0005/M001 are historical foundation; M001a is superseded; M001b is closed; M001c is a historical write-authority predecessor whose Section 14 stop was resolved by M001d; M001d is closed with green run `36335233644`.
 - Eggpack interoperability: M001/M001a remain closed. M002 archive handoff is closed with full hosted qualification via M002a (green run `36477024102`: Stable clippy/tests/docs + MSRV + macOS + Windows adapter runtime). M003 real Eggsact adoption remains separately blocked on producer-owned manifest publication/addressing; M004 promotion remains blocked.
 - Release process: manual crates.io publication only.
@@ -293,7 +295,7 @@ The earlier 2026-09-26 review opened acquisition M007 and service M007; those ar
 
 ## Next handoff
 
-No Eggup implementation work remains dependency-ready in this batch: M002a, C009, and M008a are all closed. The next handoff is a maintainer action — publish compatible 0.1.2 crates.io packages (`eggup-core` before `eggup-archive`); only after that publication may Egress Delivery M003/M006 perform the final registry dependency cutover. Gregg M004 remains intentionally unwritten; Eggsact manifest adoption remains independently blocked on producer convention evidence.
+Verified Core M009 is the immediate ready handoff. It is a manual maintainer-controlled publication pass: preflight exact crate/version ownership, cut the 0.1.2 changelogs, requalify the exact release-prep commit, publish `eggup-core 0.1.2` then `eggup-archive 0.1.2`, prove registry-only consumption, then create `v0.1.2`/GitHub Release and unblock Egress Delivery M003/M006. No other 0.1.2 workspace crate is authorized for publication. Gregg M004 remains intentionally unwritten; Eggsact manifest adoption remains independently blocked on producer convention evidence.
 
 Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter. Resume interoperability M003 only after producer-owned evidence resolves its gate.
 
