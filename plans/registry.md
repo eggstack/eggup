@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: `741cb11144e836565ec2fa4375803e62d5d699da` (C008 closed; Core M008 + Eggpack Interop M002 ready; Consumer M006 blocked on versioned package availability and mirrored by Egress Delivery M003)
+Latest planning registration head: `ba869f1` (Core M008 closed; Eggpack Interop M002 closed; Consumer M006 blocked with execution record)
 
 Latest reviewed runtime head: `18d83decd0c894279dd5e5d89407e1423f839d99` (M001d Windows-qualification head). Hosted run `36335233644` passed Stable Linux, Rust 1.89 MSRV, macOS, and Windows; current-head-after-closure run `36335617284` also passed all four lanes. C008 is closed and reconciles the historical M001c stop. Verified Core M008 package qualification is closed (workspace 0.1.2 qualified; publication remains a separate maintainer action) and Eggpack Interop M002 archive handoff is closed. Consumer M006/Egress adoption has a blocked execution record: M008 is qualified-but-unpublished and the available Egress checkout presents no updater surface or mirrored delivery plan.
 
