@@ -1,6 +1,6 @@
 # Consumer Adoption Milestone 006 — Egress Archive/Pair Adoption
 
-Status: executable; M009 publication gate satisfied 2026-09-28 (`eggup-core 0.1.2` + `eggup-archive 0.1.2` registry-visible; see `plans/closure/verified-update-core/009-status.md` and the M009-closure addendum in `plans/closure/consumer-adoption/006-status.md`). Implementation belongs to Egress Delivery M003.
+Status: implemented; closed by `plans/closure/consumer-adoption/006-status.md` (M003-landed addendum 2026-09-29: Egress Delivery M003 adopted registry `eggup-core`/`eggup-archive` 0.1.2 with hosted Linux/macOS/Windows updater evidence)
 
 Repository baseline: `413a35a7da32ea22ef337caefc35d3619154794e`
 

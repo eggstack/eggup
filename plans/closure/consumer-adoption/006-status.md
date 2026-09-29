@@ -1,6 +1,6 @@
 # Consumer Adoption M006 — Execution Status
 
-Disposition: **executable; consumer milestone not closed** (publication gate satisfied by M009 closure 2026-09-28; implementation is Egress-owned)
+Disposition: **closed** (consumer implementation landed in Egress; see M003-landed addendum below)
 
 Source plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`
 
@@ -92,3 +92,38 @@ therefore satisfied. M006 moves from publication-blocked to executable:
 Egress Delivery M003 may now cut over to registry dependencies. M006 itself
 is not closed — work packages B–F remain Egress-owned implementation, and
 their evidence belongs to the consumer repo.
+
+## M003-landed addendum — consumer adoption complete (2026-09-29)
+
+Egress Delivery M003 is closed (`eggstack/eggress`
+`plans/closure/delivery/003-status.md`, implementation head `19e6dc7`).
+This satisfies every remaining M006 acceptance row from the Eggup side:
+
+- **Registry cutover**: Egress `eggress-cli` depends on `eggup-core = "=0.1.2"`
+  + `eggup-archive = "=0.1.2"` from crates.io (lockfile registry sources,
+  M009 checksums); no git/path dependency in the publishable workspace.
+- **Generic mechanics deleted**: `extract_archive` (tar/PowerShell shell-out),
+  `replace_pair` (bespoke backup/rollback), `copy_or_rename`, and
+  `make_executable` removed; only Eggress-specific path policy remains.
+- **Bound-source flow**: verified archive → bounded extraction → object-bound
+  sources → `prepare_with_bound_sources` → staged exact-version checks →
+  Eggup commit/rollback with truthful disposition mapping; member
+  size/digest expectations stay `None` per the release contract (no member
+  manifest; whole-archive SHA-256 gate plus extraction-computed evidence).
+- **Policy preserved**: GitHub authority, target mapping, checksum sidecars,
+  exact staged-version agreement, CLI exit codes, sibling-pair requirement,
+  0755 installed modes, no Cargo fallback, no elevation.
+- **Fault evidence**: all-disposition mapping tests, pre-mutation failures
+  with untouched installs, lock-contention failure, upstream fault-injection
+  qualification; mid-commit e2e rollback unreachable via the public API
+  (recorded upstream-consumer limitation, not an M006 gap).
+- **Package/size**: clean-tree `cargo package -p eggress-cli` (45 files,
+  verify green); release `eggress` +2.8% (+270,864 B), `pproxy` unchanged.
+- **Qualification**: Rust 1.89; hosted run `36639694985` green on Rust smoke
+  (full workspace) plus updater lanes on Linux, macOS, and Windows executing
+  the updater/archive path.
+
+M006 is closed. No further Eggup work is unblocked by this closure beyond
+what M009 already opened; remaining Eggup plans keep their own gates
+(Gregg M004 intentionally unwritten, Eggpack M003/M004 producer-blocked,
+EggPool M007 deferred).

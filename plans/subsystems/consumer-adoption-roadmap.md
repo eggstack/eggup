@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple, eggsearch, and CodeGG M005 are closed; Gregg M004 remains intentionally unwritten; Egress M006 is executable after Verified Core M009 publication closure (2026-09-28); C009 confirmed the Egress updater surface and Delivery M003 exist at `eggress@03134f8`
+Status: active; simple, eggsearch, CodeGG M005, and Egress M006 are closed; Gregg M004 remains intentionally unwritten
 
 Long-term references:
 
@@ -112,7 +112,7 @@ qualified core M006 + acquisition M004
                     |
                     +--> multi-artifact consumer evidence
 
-M006 Egress was unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and its adoption plan is registered at `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`. Verified Core M009 closed the publication gate on 2026-09-28 (`eggup-core 0.1.2` + `eggup-archive 0.1.2` registry-visible; `plans/closure/verified-update-core/009-status.md`). Planning-hygiene C009 closed the stale M006 execution-record claim that Egress lacks an updater surface or mirrored Delivery M003 plan; current `eggstack/eggress@03134f8` contains both. No git/path dependency may enter Egress's publishable release state.
+M006 Egress was unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and its adoption plan is registered at `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`. Verified Core M009 closed the publication gate on 2026-09-28 (`eggup-core 0.1.2` + `eggup-archive 0.1.2` registry-visible; `plans/closure/verified-update-core/009-status.md`), and Egress Delivery M003 landed the adoption on 2026-09-29 with hosted Linux/macOS/Windows updater evidence — M006 is closed (see `plans/closure/consumer-adoption/006-status.md` M003-landed addendum). No git/path dependency entered Egress's publishable release state.
 
 M007 EggPool selective adoption is independent/evidence-driven after core maturity.
 ```
@@ -170,14 +170,7 @@ This milestone does not depend on core M007 because CodeGG requires immediate ve
 
 Plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`.
 
-Status: executable after Verified Core M009 publication closure (2026-09-28:
-`eggup-core 0.1.2` + `eggup-archive 0.1.2` registry-visible; see
-`plans/closure/verified-update-core/009-status.md`). The former stale
-cross-repo evidence was corrected by planning-hygiene C009 (closed). Current
-`eggstack/eggress` contains both the updater surface and consumer-owned
-`plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md`.
-Implementation belongs to Egress Delivery M003; no git/path dependency may
-enter Egress's publishable release state.
+Status: closed 2026-09-29 by Egress Delivery M003 (registry `eggup-core`/`eggup-archive` 0.1.2 adopted, hosted Linux/macOS/Windows updater evidence; see `plans/closure/consumer-adoption/006-status.md` M003-landed addendum). The former stale cross-repo evidence was corrected by planning-hygiene C009 (closed).
 
 Replace duplicated generic tar.gz/zip extraction and pair rollback with the qualified extraction boundary plus Eggup's existing multi-artifact transaction. Preserve Egress-owned GitHub release/version/origin, checksum, candidate-version, CLI, and provenance policy.
 
@@ -210,5 +203,5 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
 | M004 Gregg | writable; plan intentionally unwritten | — | — | prerequisites satisfied (acquisition M005+M006 + service M006 closed, hosted matrix green); no migration authorized yet |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
-| M006 Egress | executable (M009 publication gate satisfied; implementation Egress-owned) | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` (+ M009-closure addendum) | Egress Delivery M003 implementation |
+| M006 Egress | closed 2026-09-29 | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` (+ M003-landed addendum) | — (Egress Delivery M003 landed) |
 | M007 EggPool | deferred/evidence-driven | — | — | core maturity |
