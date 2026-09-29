@@ -6,7 +6,7 @@ Last implementation/closure baseline reviewed: `ea51fe12a7c9120028b727eb5e40411e
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record)
 
-Latest planning registration head: `f66d6277596d0f3f7b8e6ce5ae64466c187568ff` (Verified Core M009 publication closed 2026-09-28; Egress M006 executable)
+Latest planning registration head: `111c96b2fe306af278b892d40aa3c73e26fb00ab` (Consumer M006 closed on Egress Delivery M003 landing; see closure addendum)
 
 Latest reviewed runtime head with fully green hosted qualification is `e8e07eb538d0eef18ea4cb4ace3bb905c316da72` (M009 release-prep changelog cut; run `36487099388` green on Stable/MSRV/macOS/Windows). Code qualification was established at `9a5500e` (M002a clippy + Windows-adapter head; run `36477024102` green, superseding failed run `36463041223`); the release-prep head adds only changelog cuts over the green `2011bb6` plans head (`crates/` byte-identical to the M002a code head). Core M008a reran the exact clean-tree package/publish-dry-run evidence on the post-M002a tree with no material delta. Planning-hygiene C009 corrected the stale Consumer M006 claim: current `eggstack/eggress@03134f8` has both the updater surface and registered Delivery M003 plan. Eggup M009 published the compatible 0.1.2 pair on 2026-09-28; Egress M006 is executable.
 
