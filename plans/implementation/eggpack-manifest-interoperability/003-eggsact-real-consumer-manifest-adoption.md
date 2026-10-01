@@ -1,19 +1,26 @@
 # Eggpack Manifest Interoperability Milestone 003 — Eggsact Real-Consumer Manifest Adoption
 
-Status: blocked after bounded adapter/API qualification; real-consumer adoption is not closed (see `plans/closure/eggpack-manifest-interoperability/003-status.md`)
+Status: ready to resume after bounded adapter/API qualification; producer-evidence gate satisfied by Eggpack Ecosystem M001 / Eggsact Distribution M005 on `v1.2.7`; real-consumer adoption is not closed (see `plans/closure/eggpack-manifest-interoperability/003-status.md`)
 
 Eggup plan-authoring baseline: 77fe72a9f6e34e48e1f667d2869b05fd010c1462
 
-Selected consumer baseline:
+Historical selected consumer baseline for the bounded pass:
 
 - eggstack/eggsact@576f4b0ac09238a42e5561c2da6da8ff4a47bce6
 
-External producer/interface baseline:
+Historical producer/interface baseline for the bounded pass:
 
 - eggstack/eggpack@678bbf04f5a02827003a1d9ab83ba4f0e6360e41
 - Eggpack ReleaseManifest M001/M001a/M002: closed
 - Eggpack interoperability M001a: closed
 - Eggup adapter M001a: closed at 19935ec3610a5238af33a9d4f05a14925ceac25c
+
+Resume/reconciliation evidence reviewed 2026-10-01:
+
+- eggstack/eggpack@57c150f34ddffea34dac03b5fc0a9a0c956b2865 — Ecosystem M001 closed and M003h integration/status reconciliation recorded;
+- eggstack/eggsact@f90e85bc6eb09ea3fb94eab0f07d3407247d6472 — current reviewed planning head after Distribution M005 closure and M005a readiness;
+- `eggstack/eggsact: release/eggpack/distribution.toml` — producer authority for the five live unversioned asset names;
+- Eggsact `v1.2.7` live release evidence — 15 staged/published assets including `release-manifest.json`.
 
 Source roadmap:
 
@@ -86,47 +93,45 @@ Stegoeggo remains a useful second consumer later, but using it first would repea
 
 CodeGG is not selected because its real release path is archive-based and the adapter intentionally refuses archive materialization before the generic extraction contract. Eggsearch adds service and target-diversity concerns unnecessary for this proof.
 
-## 3. Execution gates and known producer-side mismatch
+## 3. Execution gates and producer-side reconciliation
 
-### 3.1 Required preflight before consumer production edits
+### 3.1 Producer contract gate — satisfied 2026-10-01
 
-Before changing Eggsact's normal update flow, inspect and record:
+The first bounded execution pass correctly stopped because the then-current Eggsact release workflow used live unversioned asset names while only version-qualified Eggpack fixtures existed, and no producer-owned manifest filename/publication convention had been adopted.
 
-1. current Eggsact release workflow and actual release asset names;
-2. the current Eggpack DistributionContract/ReleaseManifest producer mapping intended for Eggsact;
-3. the producer-owned filename/location convention, if any, for the ReleaseManifest artifact itself;
-4. whether a current Eggpack producer path can emit a manifest over Eggsact's existing release artifacts without renaming them;
-5. whether the selected release/tag can expose that manifest at an exact caller-owned URL.
+That condition is now resolved by producer-owned evidence:
 
-The copied M001/M001a direct fixture is compatibility evidence, not live naming authority. At this plan baseline it uses artifact names such as:
+1. Eggpack Ecosystem M001 is closed at `plans/closure/ecosystem-adoption/001-status.md` in `eggstack/eggpack`;
+2. Eggsact Distribution M005 is closed at `plans/closure/distribution-update-release/005-status.md` in `eggstack/eggsact`;
+3. `release/eggpack/distribution.toml` is now the producer authority for the existing public names `eggsact-{target}` / `eggsact-{target}.exe` and their sidecars;
+4. the maintainer-authorized `v1.2.7` generated release staged and then published `release-manifest.json` alongside those exact artifacts.
 
-~~~text
-eggsact-1.2.6-x86_64-unknown-linux-gnu
-~~~
+M003 therefore MUST consume the established producer contract rather than the historical fixture naming. It still MUST NOT rename public assets, synthesize a second producer contract, or move release naming/origin policy into Eggup.
 
-while the current Eggsact updater constructs live asset names such as:
+Before production edits, refresh the exact current Eggup and Eggsact SHAs and verify that the live DistributionContract and `release-manifest.json` convention remain unchanged. If they have materially changed, stop and re-review rather than mechanically applying this plan.
 
-~~~text
-eggsact-x86_64-unknown-linux-gnu
-~~~
+### 3.2 Manifest artifact availability gate — satisfied; consumer path still required
 
-M003 MUST NOT resolve that difference by silently changing Eggsact release asset names, by hard-coding the fixture convention into the updater, or by adding producer naming policy to Eggup.
+The producer-owned manifest asset convention is now `release-manifest.json`, proven by the real `v1.2.7` release pipeline and publication evidence. Eggsact may construct the exact manifest URL only after its existing policy has selected and authorized the release/tag and release origin.
 
-If current Eggpack producer authority cannot describe the existing Eggsact release layout, stop the consumer cutover and route the producer-side correction/adoption work to Eggpack. Record the exact blocker. Do not duplicate a second contract in Eggsact or Eggup.
+This resolves the external availability gate; it does **not** close M003. The normal Eggsact updater still must:
 
-### 3.2 Manifest artifact availability gate
+- fetch the exact manifest as bounded metadata;
+- distinguish manifest `NotFound` from all other acquisition failures;
+- parse/project through `eggup-eggpack`;
+- bind product/release/target identity to the release already selected by Eggsact;
+- acquire the manifest-selected artifact under the already-authorized release origin;
+- materialize and commit through the existing Eggup transaction path;
+- retain the legacy sidecar path only for the explicit manifest-`NotFound` compatibility case;
+- execute the complete failure/fallback/rollback matrix and hosted consumer verification.
 
-At plan authoring, Eggpack can construct ReleaseManifest v1 from explicitly supplied finalized files, but its broader CI/release staging and ecosystem-adoption work is not yet complete. M003 therefore must not pretend that public Eggsact releases already contain an Eggpack manifest.
+A valid manifest whose selected artifact is absent remains an inconsistent-release hard failure; it MUST NOT become Cargo or legacy-sidecar fallback.
 
-Consumer/API qualification may proceed with deterministic locally served manifest-bearing release fixtures after the preflight contract is proven. The milestone may close only when the normal Eggsact updater contains the manifest path and that path is exercised end-to-end against producer-valid ReleaseManifest evidence.
+### 3.3 Package/API promotion gate
 
-If the normal updater cannot name an exact producer-owned manifest asset without inventing a new convention, leave M003 blocked after the API/fixture work rather than choosing a filename in Eggup.
+`eggup-eggpack` remains `publish = false` and currently pins the lightweight `eggpack-manifest` interface by immutable Git revision. M003 may use immutable revisions for consumer qualification, with all Eggup packages aligned to one source identity.
 
-### 3.3 Publication gate
-
-eggup-eggpack and eggpack-manifest are currently unpublished. Any Eggsact qualification using them must use immutable Git revisions and MUST NOT publish a new Eggsact crate/release as part of M003.
-
-Package/API promotion remains M004.
+M003 does not authorize publication of `eggup-eggpack`, a new Eggsact release containing Git-only dependencies, or broader API stabilization. Package/API promotion remains M004.
 
 ## 4. Current implementation evidence
 
