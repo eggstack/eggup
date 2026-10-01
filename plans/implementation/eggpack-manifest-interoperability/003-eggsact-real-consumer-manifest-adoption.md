@@ -456,4 +456,4 @@ The closure record must include:
 - explicit confirmation that no public release/package publication occurred;
 - unresolved findings by severity.
 
-The closure must update this roadmap and plans/registry.md. If M003 closes cleanly, M004 package/API promotion becomes the next interoperability decision point, subject to a publishable eggpack-manifest version. M002 archive extraction remains independently blocked on the Phase 10 extraction contract.
+The closure must update this roadmap and plans/registry.md. If M003 closes cleanly, M004 package/API promotion becomes the next interoperability decision point, subject to a publishable eggpack-manifest version. The historical statement that "M002 archive extraction remains independently blocked on the Phase 10 extraction contract" was correct at the time of the bounded pass and was resolved externally by Archive M001d closure, Eggpack Interop M002/M002a closure (hosted run `36477024102`), Core M009 publication (`eggup-core 0.1.2` + `eggup-archive 0.1.2`), and Egress consumer M006 closure (2026-09-29); the runtime archive handoff therefore no longer blocks the M003 consumer-path half.

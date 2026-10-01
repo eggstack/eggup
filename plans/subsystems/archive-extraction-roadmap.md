@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001/M001a historical; M001b cleanup closed; M001c write half implemented with Section 14 handoff stop closed by M001d; M001d closed with green hosted qualification; M003 Eggpack handoff closed; M002 Egress adoption blocked with execution record
+Status: active; M001/M001a historical; M001b cleanup closed; M001c write half implemented with Section 14 handoff stop closed by M001d; M001d closed with green hosted qualification; M003 Eggpack handoff closed with hosted qualification (M002a); M002 Egress adoption closed 2026-09-29 via Egress Delivery M003
 
 Long-term references:
 
@@ -127,9 +127,9 @@ archive M001c handle-relative member materialization [HISTORICAL PREDECESSOR; WR
                 v
 archive M001d handle-backed source handoff [CLOSED via run 36335233644]
                 |
-                +--> consumer adoption M006 Egress [BLOCKED; see plans/closure/consumer-adoption/006-status.md]
+                +--> consumer adoption M006 Egress [CLOSED 2026-09-29 via Egress Delivery M003; see plans/closure/consumer-adoption/006-status.md M003-landed addendum]
                 |
-                `--> Eggpack interoperability M002 archive handoff [CLOSED]
+                `--> Eggpack interoperability M002 archive handoff [CLOSED with hosted qualification via M002a]
 ```
 
 ## 7. Milestones
@@ -172,13 +172,13 @@ Plan: `plans/implementation/archive-extraction/001d-handle-backed-source-handoff
 
 Status: closed; see `plans/closure/archive-extraction/001d-status.md` (hosted run `36332823865`-green M008 head `0b0cdaa` baseline; final hosted run `36335233644` green on all lanes, superseding `36334772510`).
 
-Carries object-bound source authority (already-open member object, direct object-bound stage copy) from extraction into core staging so no staged byte is obtained by re-resolving a recorded pathname or member name. Closed the M001c handoff stop; downstream Core M008 and Eggpack M002 are now closed, while Egress M006 is blocked (see `plans/closure/consumer-adoption/006-status.md`).
+Carries object-bound source authority (already-open member object, direct object-bound stage copy) from extraction into core staging so no staged byte is obtained by re-resolving a recorded pathname or member name. Closed the M001c handoff stop. Downstream Core M008 and Eggpack M002 are closed, and Egress M006 closed on 2026-09-29 after Egress Delivery M003 landed against the published 0.1.2 pair (see `plans/closure/consumer-adoption/006-status.md` M003-landed addendum).
 
 ### M002 — Egress real-consumer archive/pair adoption
 
 Plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`.
 
-Status: blocked; see `plans/closure/consumer-adoption/006-status.md`. The Egress updater surface (`crates/eggress-cli/src/update/`) and mirrored delivery plan (`plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md`) exist at `eggstack/eggress@03134f8` (C009-corrected; the earlier "no updater surface" wording was based on stale checkout `6b0edc2`); the 0.1.2 publication gate (Core M008, now qualified) still needs its separate maintainer action. Adopt the generic extraction output plus Eggup's existing multi-artifact transaction while preserving Egress-owned release/version/origin/candidate/CLI policy. Delete duplicated generic extraction/rollback machinery only after parity is qualified. Publishable dependency cutover is gated on 0.1.2 publication.
+Status: closed 2026-09-29 via Egress Delivery M003 (`plans/closure/consumer-adoption/006-status.md` M003-landed addendum; hosted run `36639694985` green on Linux/macOS/Windows updater lanes). Egress `eggress-cli` cut over to registry `eggup-core` + `eggup-archive` `=0.1.2` (lockfile registry sources, no git/path dependency in the publishable workspace), deleted its bespoke `extract_archive`/`replace_pair`/`copy_or_rename`/`make_executable` machinery in favor of the qualified extraction boundary plus Eggup's existing multi-artifact transaction, and preserved Egress-owned release/version/origin/candidate/CLI policy. The earlier "blocked" wording recorded the publication gate that Core M009 satisfied on 2026-09-28 (`eggup-core 0.1.2` + `eggup-archive 0.1.2`, smoke 3/3, `v0.1.2` + GitHub Release `0.1.2`; see `plans/closure/verified-update-core/009-status.md`); Egress's updater surface (`crates/eggress-cli/src/update/`) and mirrored delivery plan (`plans/implementation/delivery/003-eggup-archive-pair-self-update-adoption.md`) remain at `eggstack/eggress@03134f8` (C009-corrected; the earlier "no updater surface" wording was based on stale checkout `6b0edc2`).
 
 ### M003 — Eggpack archive projection handoff
 
@@ -217,7 +217,7 @@ The third risk is dependency/footprint growth. Keep the crate optional and forma
 
 ## 11. Completion definition
 
-The subsystem is mature when M001b cleanup, M001c materialization write authority, and M001d handle-backed handoff are all closed with green hosted qualification (satisfied: M001b via run `36222536670`, M001c write half `09c953f` via run `36257884083`, M001d via run `36335233644`), Egress has removed its duplicated generic archive/pair update mechanics, and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core`.
+The subsystem is mature when M001b cleanup, M001c materialization write authority, and M001d handle-backed handoff are all closed with green hosted qualification (satisfied: M001b via run `36222536670`, M001c write half `09c953f` via run `36257884083`, M001d via run `36335233644`), Egress has removed its duplicated generic archive/pair update mechanics (satisfied by Egress M006 closure 2026-09-29 via Delivery M003 with hosted Linux/macOS/Windows updater evidence), and Eggpack archive evidence can flow through the same extraction boundary without adding archive code to `eggup-core` (satisfied by M002 archive extraction handoff closed with hosted qualification via M002a, green run `36477024102`).
 
 ## 12. Milestone status
 
@@ -228,5 +228,5 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M001b handle-bound cleanup + Windows portability | closed | `plans/implementation/archive-extraction/001b-handle-bound-cleanup-and-windows-portability-corrective.md` | `plans/closure/archive-extraction/001b-status.md` | — |
 | M001c handle-relative member materialization | historical predecessor; write authority implemented; handoff stop resolved by M001d | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md` | `plans/closure/archive-extraction/001c-status.md` | resolved by M001d closure |
 | M001d handle-backed source handoff | closed | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | `plans/closure/archive-extraction/001d-status.md` | — |
-| M002 Egress adoption | blocked (execution record, not closed) | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` | 0.1.2 unpublished; Egress updater surface + Delivery M003 exist at `03134f8` (C009-corrected) |
+| M002 Egress adoption | closed 2026-09-29 via Egress Delivery M003 | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` (+ M003-landed addendum) | — |
 | M003 Eggpack archive handoff | closed | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md` | `plans/closure/eggpack-manifest-interoperability/002-status.md` | — |

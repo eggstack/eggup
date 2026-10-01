@@ -150,3 +150,7 @@ superseded.
 ## Roadmap disposition
 
 Eggpack Interop M002 is closed. M003 real-consumer adoption remains blocked on producer-owned live artifact mapping and ReleaseManifest publication/addressing (unchanged; see `003-eggsact-real-consumer-manifest-adoption.md`). M004 promotion remains blocked behind M003. No new downstream work is unblocked by M002 beyond the already-ready Egress-side archive flow, which consumes `eggup-archive` directly per its own plan rather than this adapter.
+
+## Current-state addendum — 2026-10-01 (planning-hygiene C010)
+
+The producer-evidence blocker recorded above was correct at the time of this closure and was resolved externally by Eggpack Ecosystem M001 and Eggsact Distribution M005, which closed on the real `v1.2.7` producer contract (`release/eggpack/distribution.toml` authority for the unversioned asset names; `release-manifest.json` published alongside the binaries, checksum sidecars, and installers). M003 consumer-path adoption is now ready to resume after baseline refresh under the existing implementation plan; see `plans/closure/eggpack-manifest-interoperability/003-status.md` 2026-10-01 producer-gate resolution addendum and `plans/closure/planning-closure-hygiene-corrective/010-status.md`. M004 promotion remains blocked on M003 real-consumer closure plus a publishable `eggpack-manifest` version.

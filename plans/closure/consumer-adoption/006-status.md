@@ -127,3 +127,7 @@ M006 is closed. No further Eggup work is unblocked by this closure beyond
 what M009 already opened; remaining Eggup plans keep their own gates
 (Gregg M004 intentionally unwritten, Eggpack M003/M004 producer-blocked,
 EggPool M007 deferred).
+
+## Current-state addendum — 2026-10-01 (planning-hygiene C010)
+
+The "Eggpack M003/M004 producer-blocked" line above recorded the active state when this M003-landed addendum was written (2026-09-29). The producer-evidence gate was correct at that time and was resolved externally on 2026-10-01 by Eggpack Ecosystem M001 and Eggsact Distribution M005, which closed on the real `v1.2.7` producer contract (`release/eggpack/distribution.toml` authority for the unversioned asset names; `release-manifest.json` published alongside the binaries, checksum sidecars, and installers). M003 consumer-path adoption is now ready to resume under the existing implementation plan after baseline refresh; M004 promotion remains blocked on M003 real-consumer closure plus a publishable `eggpack-manifest` version. See `plans/closure/planning-closure-hygiene-corrective/010-status.md` and the 2026-10-01 addendum in `plans/closure/eggpack-manifest-interoperability/003-status.md`.
