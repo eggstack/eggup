@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 003a — Caller-Bound Destination Policy Corrective
 
-Status: ready
+Status: implemented; closed by `plans/closure/eggpack-manifest-interoperability/003a-status.md` (implementation `39ff626`, hosted run `36890986000` green on all lanes)
 
 Repository baseline: `229b61c920f54b50b7c953b060e54ca2673a201b`
 

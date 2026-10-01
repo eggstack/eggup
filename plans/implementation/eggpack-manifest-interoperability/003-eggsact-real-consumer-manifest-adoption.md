@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 003 — Eggsact Real-Consumer Manifest Adoption
 
-Status: blocked only on ready M003a caller-bound destination policy corrective; producer-evidence gate and bounded JSON adapter qualification are satisfied; real-consumer adoption is not closed (see `plans/closure/eggpack-manifest-interoperability/003-status.md`)
+Status: ready; M003a caller-bound destination policy corrective is closed (see `plans/closure/eggpack-manifest-interoperability/003a-status.md`); producer-evidence gate and bounded JSON adapter qualification remain satisfied; real-consumer adoption is not closed (see `plans/closure/eggpack-manifest-interoperability/003-status.md`)
 
 Eggup plan-authoring baseline: 229b61c920f54b50b7c953b060e54ca2673a201b (post-C010 M003 baseline refresh). M003a was subsequently registered at `plans/implementation/eggpack-manifest-interoperability/003a-caller-bound-destination-policy-corrective.md`.
 
