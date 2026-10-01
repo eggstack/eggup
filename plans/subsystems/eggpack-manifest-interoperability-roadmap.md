@@ -90,7 +90,9 @@ Eggpack ReleaseManifest v1 is implemented and its consumer interface is now corr
 - hosted CI run: 35998756491, all required lanes passed;
 - corrected CodeGG bundle projection SHA-256: f0b227442e2a2a28dc4e2100301233f2698703d15251b6f2459e6387df6c53ce.
 
-The previous Eggup planning block on Eggpack M001a is satisfied. Eggup adapter M001 then implemented and closed historically, but post-closure review found an incomplete adapter regression matrix and an out-of-scope service-manifest edit in the implementation commit. Corrective M001a has since closed with the full regression matrix and service packageability reconciliation. M003 bounded adapter/API qualification is complete, but real-consumer adoption is blocked: Eggsact's pinned release workflow publishes unversioned `eggsact-{target}` artifacts plus `.sha256` sidecars and no ReleaseManifest; the current Eggpack Eggsact fixture uses version-qualified artifacts; and no adopted Eggsact manifest publication convention or producer contract is present. See `plans/closure/eggpack-manifest-interoperability/003-status.md`. Eggup must not invent producer naming or silently change release assets.
+The previous Eggup planning block on Eggpack M001a is satisfied. Eggup adapter M001 then implemented and closed historically, but post-closure review found an incomplete adapter regression matrix and an out-of-scope service-manifest edit in the implementation commit. Corrective M001a has since closed with the full regression matrix and service packageability reconciliation. M003 bounded adapter/API qualification is also complete.
+
+The producer-side stop recorded by the first M003 execution pass has now been resolved externally. Eggpack Ecosystem M001 and Eggsact Distribution M005 closed on the real `v1.2.7` release: `eggstack/eggsact: release/eggpack/distribution.toml` is the producer authority for the live unversioned `eggsact-{target}[.exe]` names, and the generated release staged and the maintainer published `release-manifest.json` alongside the binaries, checksum sidecars, and installers. M003 is therefore **ready to resume**, not closed. The remaining work is consumer-owned: refresh the current Eggup/Eggsact baselines, add the normal Eggsact updater manifest path, preserve the explicit legacy fallback boundary, and run the full end-to-end consumer matrix. Eggup still must not invent producer naming or move release policy into the adapter.
 
 ## 5. Target architecture
 
@@ -156,7 +158,7 @@ eggup-core/acquisition/service -X-> eggpack-manifest
 
 ### Operational
 
-- eggpack-manifest is currently an unpublished 0.1.0 workspace crate. Initial adapter qualification may use an exact Git revision and remain publish = false; publication promotion is a separate milestone/action.
+- `eggup-eggpack` remains an unpublished leaf adapter and currently pins `eggpack-manifest` by immutable Git revision. M003 may continue to use immutable revisions for consumer qualification; registry/package promotion is a separate M004 decision.
 
 ### Soft
 
@@ -190,7 +192,7 @@ Implementation plan: plans/implementation/eggpack-manifest-interoperability/003-
 
 Adopt the adapter in Eggsact's real updater path so producer-valid ReleaseManifest evidence can replace duplicated manifest-to-update mapping while Eggsact retains release/version/origin/fallback/install/candidate policy.
 
-The producer-evidence gate was inspected and remains unmet. The bounded JSON parse/project API and its tests are implemented in Eggup, but M003 is not closed: the normal Eggsact updater has no manifest path, and producer-owned artifact/manifest publication conventions remain unestablished. Resume only after Eggpack/Eggsact evidence resolves both contracts. M003 must not change release naming or invent a manifest filename inside Eggup.
+The bounded JSON parse/project API and its tests are implemented in Eggup. The former producer-evidence gate is now satisfied by Eggpack Ecosystem M001 / Eggsact Distribution M005: the live producer contract preserves the existing unversioned artifact names and `v1.2.7` published `release-manifest.json`. M003 remains open because the normal Eggsact updater still has no manifest path. Resume the already-registered plan after refreshing current repository baselines; preserve Eggsact-owned release/origin/fallback policy and treat `release-manifest.json` as producer-established evidence rather than an Eggup naming decision.
 
 ### M004 — Package/API promotion
 
@@ -246,5 +248,5 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 | M001a adapter qualification + closure hardening | closed | plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md | plans/closure/eggpack-manifest-interoperability/001a-status.md | — |
 | M002 archive extraction handoff | closed with hosted qualification | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md` | `plans/closure/eggpack-manifest-interoperability/002-status.md` (M002a addendum) | — |
 | M002a hosted qualification + clippy corrective | closed | `plans/implementation/eggpack-manifest-interoperability/002a-hosted-qualification-and-clippy-corrective.md` | `plans/closure/eggpack-manifest-interoperability/002a-status.md` | — (was: current head failed Stable clippy in run `36463041223`; superseded by green run `36477024102`) |
-| M003 Eggsact real-consumer manifest adoption | blocked after bounded adapter/API qualification | plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md | plans/closure/eggpack-manifest-interoperability/003-status.md | producer-owned Eggsact artifact mapping and ReleaseManifest publication convention are absent |
+| M003 Eggsact real-consumer manifest adoption | ready to resume after bounded adapter/API qualification | plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md | plans/closure/eggpack-manifest-interoperability/003-status.md (bounded-pass record; milestone not closed) | producer gate satisfied by Eggpack Ecosystem M001 / Eggsact M005 `v1.2.7`; refresh Eggup/Eggsact baselines and complete normal updater manifest adoption |
 | M004 package/API promotion | blocked | — | — | M003 real adoption must close and eggpack-manifest must have a publishable version |
