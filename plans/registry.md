@@ -4,7 +4,7 @@ Status: active
 
 Last implementation/closure baseline reviewed: `4c8c0e05a01f8d22fe50b4d616621ee6c32cc9d1` (post-M004a roadmap registration head; pre-C011/M004a closure baseline)
 
-Latest planning/closure head: post-C011/M004a closure head (this pass; C011 + M004a closed — see implementation commits in `plans/closure/planning-closure-hygiene-corrective/011-status.md` and `plans/closure/eggpack-manifest-interoperability/004a-status.md`)
+Latest planning/closure head: `e937c3f` (C011 + M004a closed; see `plans/closure/planning-closure-hygiene-corrective/011-status.md` and `plans/closure/eggpack-manifest-interoperability/004a-status.md`)
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record; historical)
 
