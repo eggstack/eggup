@@ -10,6 +10,7 @@ Affected records:
 - `plans/subsystems/archive-extraction-roadmap.md`
 - `plans/subsystems/eggpack-manifest-interoperability-roadmap.md`
 - `plans/subsystems/consumer-adoption-roadmap.md` (verification-only unless drift is found)
+- `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`
 - `plans/closure/consumer-adoption/006-status.md` (historical evidence; amend only if an active-status addendum is required)
 - `plans/closure/eggpack-manifest-interoperability/003-status.md` (historical execution record; preserve stop history)
 
@@ -66,6 +67,10 @@ The registry's large execution graph still contains the old:
 edge even though later current-state text says the producer gate is satisfied.
 
 Historical stop evidence belongs in M003's closure/execution record; the active execution graph must show the current dependency state.
+
+### 3.4 The active M003 plan retains an obsolete archive-handoff blocker
+
+`plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md` currently ends its closure-evidence section by saying Eggpack Interop M002/archive extraction remains blocked on the Phase 10 extraction contract. That dependency has since closed through Archive M001d, Interop M002/M002a, Core M009 publication, and Egress M006. Reconcile that sentence so the M003 handoff does not reintroduce an already-closed blocker.
 
 ## 4. Invariants that must not regress
 
@@ -141,6 +146,10 @@ Change only concrete stale text found during execution.
 
 Verify that M006 remains closed and Gregg/EggPool states remain unchanged. Change only concrete contradictory text.
 
+### 6.5 Active M003 implementation plan
+
+Correct only stale dependency/status prose discovered during reconciliation. In particular, remove the obsolete statement that Interop M002/archive extraction remains blocked. Preserve the M003 execution scope, acceptance matrix, stop conditions, producer/consumer boundary, and historical producer-gate record.
+
 ## 7. Ordered work packages
 
 1. Re-read the current Eggup head and capture exact active contradictory statements.
@@ -148,11 +157,12 @@ Verify that M006 remains closed and Gregg/EggPool states remain unchanged. Chang
 3. Reconfirm M003 producer-gate resolution from the current interoperability plan/roadmap/status record.
 4. Correct the archive extraction roadmap.
 5. Correct the registry ownership guard and immediate execution graph.
-6. Search all active planning surfaces for stale Egress publication-block and M003 producer-block language.
-7. Amend only active status surfaces; retain historical execution/closure evidence.
-8. Run planning consistency checks.
-9. Write `plans/closure/planning-closure-hygiene-corrective/010-status.md`.
-10. Update registry registration/closure head to the actual docs commit.
+6. Correct stale dependency prose in the active M003 implementation plan without changing its implementation contract.
+7. Search all active planning surfaces for stale Egress publication-block and M003 producer-block language.
+8. Amend only active status surfaces; retain historical execution/closure evidence.
+9. Run planning consistency checks.
+10. Write `plans/closure/planning-closure-hygiene-corrective/010-status.md`.
+11. Update registry registration/closure head to the actual docs commit.
 
 ## 8. Failure, cancellation, restart, and contention semantics
 
@@ -197,6 +207,7 @@ Required:
 
 - `plans/subsystems/archive-extraction-roadmap.md`;
 - `plans/registry.md`;
+- `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`;
 - `plans/closure/planning-closure-hygiene-corrective/010-status.md`.
 
 Conditional only if concrete drift is found:
