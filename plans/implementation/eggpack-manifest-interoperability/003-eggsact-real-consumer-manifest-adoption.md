@@ -2,7 +2,7 @@
 
 Status: ready to resume after bounded adapter/API qualification; producer-evidence gate satisfied by Eggpack Ecosystem M001 / Eggsact Distribution M005 on `v1.2.7`; real-consumer adoption is not closed (see `plans/closure/eggpack-manifest-interoperability/003-status.md`)
 
-Eggup plan-authoring baseline: 77fe72a9f6e34e48e1f667d2869b05fd010c1462
+Eggup plan-authoring baseline: 605fa8f7a50f5bd53f7f294e71290d53282f62e9 (post-C010 closure head; bounded-pass adapter/API state re-verified intact, see §12 addendum)
 
 Historical selected consumer baseline for the bounded pass:
 
@@ -20,7 +20,8 @@ Resume/reconciliation evidence reviewed 2026-10-01:
 - eggstack/eggpack@57c150f34ddffea34dac03b5fc0a9a0c956b2865 — Ecosystem M001 closed and M003h integration/status reconciliation recorded;
 - eggstack/eggsact@f90e85bc6eb09ea3fb94eab0f07d3407247d6472 — current reviewed planning head after Distribution M005 closure and M005a readiness;
 - `eggstack/eggsact: release/eggpack/distribution.toml` — producer authority for the five live unversioned asset names;
-- Eggsact `v1.2.7` live release evidence — 15 staged/published assets including `release-manifest.json`.
+- Eggsact `v1.2.7` live release evidence — 15 staged/published assets including `release-manifest.json`;
+- Eggup planning-hygiene C010 closed at `54c48dede5df87f91498806153b4cacbc321401c` (head refresh at `605fa8f7a50f5bd53f7f294e71290d53282f62e9`) — registry, archive-roadmap, M003 plan dependency prose, and Verified Update Core M008 blockers reconciled; the consumer-path half of M003 is therefore the remaining readiness gap and is unblocked to resume.
 
 Source roadmap:
 
@@ -457,3 +458,20 @@ The closure record must include:
 - unresolved findings by severity.
 
 The closure must update this roadmap and plans/registry.md. If M003 closes cleanly, M004 package/API promotion becomes the next interoperability decision point, subject to a publishable eggpack-manifest version. The historical statement that "M002 archive extraction remains independently blocked on the Phase 10 extraction contract" was correct at the time of the bounded pass and was resolved externally by Archive M001d closure, Eggpack Interop M002/M002a closure (hosted run `36477024102`), Core M009 publication (`eggup-core 0.1.2` + `eggup-archive 0.1.2`), and Egress consumer M006 closure (2026-09-29); the runtime archive handoff therefore no longer blocks the M003 consumer-path half.
+
+### 12.1 Bounded-pass-still-holds verification (post-C010, plan-authoring baseline `605fa8f`)
+
+The bounded-pass adapter/API implementation (`MAX_MANIFEST_BYTES`, `project_json`, focused tests) was re-verified intact on the post-C010 Eggup HEAD with the plan §9 commands on the local macOS ARM64 host:
+
+- `cargo fmt --all -- --check` — clean.
+- `cargo check --workspace --all-targets --locked` — clean.
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` — clean.
+- `cargo test -p eggup-eggpack --all-targets --all-features --locked` — 7 + 11 + 28 = 46 passed (unit, focused, M001a interoperability).
+- `cargo doc --workspace --no-deps --locked` — clean.
+- `cargo +1.89.0 check --workspace --all-targets --locked` — clean (MSRV unchanged).
+- `cargo tree -p eggup-eggpack --locked` — pins `eggpack-manifest v0.1.0` by immutable Git rev `678bbf04f5a02827003a1d9ab83ba4f0e6360e41`; no other Eggpack edge; lower crates absent.
+- `cargo tree -p eggup-core --locked` — `sha2` only.
+- `cargo tree -p eggup-acquisition --locked` — no internal Eggup edge.
+- `cargo tree -p eggup-service --locked` — depends only on `eggup-core`.
+
+The dependency-boundary invariants in §5 hold unchanged: no Eggpack edge below `eggup-eggpack`, `eggup-core` remains `sha2`-only, `eggup-acquisition` remains transport-neutral, `eggup-service` is Eggpack-independent. The Eggsact cross-repo work in §8 is the remaining readiness gap; no further Eggup-side code change is required by C010, this verification, or the bounded-pass review.
