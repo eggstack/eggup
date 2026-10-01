@@ -1,6 +1,6 @@
 # Planning / Closure Hygiene Corrective C011 — Post-M003 Closure and Registration Reconciliation
 
-Status: ready for handoff
+Status: implemented; closed by `plans/closure/planning-closure-hygiene-corrective/011-status.md` (docs-only reconciliation; M003a/M003 closed, M004a closed concurrently, M004 blocked on proven prerequisites; zero runtime/Cargo delta)
 
 Repository baseline: `538e3e5605cf3c315c10e5be200c8896de7379b1`
 

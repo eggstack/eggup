@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 004a — Package/API Promotion Readiness Preflight
 
-Status: ready for handoff
+Status: implemented; closed by `plans/closure/eggpack-manifest-interoperability/004a-status.md` (readiness preflight complete 2026-10-01; M004 remains blocked on Eggpack-owned `eggpack-manifest 0.1.0` + Eggup-owned `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2`; no publication occurred)
 
 Repository baseline: `538e3e5605cf3c315c10e5be200c8896de7379b1`
 

@@ -214,17 +214,17 @@ The bounded JSON parse/project API and its tests are implemented in Eggup. The f
 
 ### M004a — Package/API promotion readiness preflight
 
-Status: ready.
+Status: closed (see `plans/closure/eggpack-manifest-interoperability/004a-status.md`; readiness preflight complete 2026-10-01).
 
-Implementation plan: `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md`.
+Implementation plan: `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md` (implemented).
 
-Now that M003 real-consumer adoption is closed, mechanically determine the minimum registry-resolvable publication graph before any irreversible publication action. Verify exact crates.io availability for `eggpack-manifest` and every Eggup dependency, simulate a registry-only `eggup-eggpack` package, prove the minimum missing Eggup publication set, determine whether `eggup-eggfetch 0.1.2` is actually required for an Eggsact-shaped registry-only graph, and record any Eggpack-owned publication prerequisite.
+M004a proved the minimum registry-resolvable publication graph without publishing anything: `eggpack-manifest 0.1.0` is absent from crates.io (Eggpack-owned prerequisite); `eggup-core`/`eggup-archive 0.1.2` are published; `eggup-acquisition 0.1.2` and `eggup-eggfetch 0.1.2` are absent and both required (the latter proven by an `E0308` incompatibility between published `eggfetch 0.1.1` source and the `0.1.2` seam); the minimum Eggup publication set is `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2` after the Eggpack prerequisite. No public API/version adjustment is required; adapter package-metadata gaps are polish.
 
-M004a MUST NOT publish crates or mutate the committed package graph. Its closure is the readiness gate for M004 proper.
+M004a published no crates and mutated no committed package graph. Its closure is the readiness gate for M004 proper.
 
 ### M004 — Package/API promotion
 
-If M004a proves a coherent registry-only graph and all external registry prerequisites are resolvable, replace the immutable Git dependency with the qualified registry dependency set, qualify packaging, and decide/publish the exact Eggup package set under a separately authorized implementation plan. M004 remains blocked until M004a closes and every required external package version is registry-resolvable.
+Status: blocked on the M004a-proven prerequisites: Eggpack-owned `eggpack-manifest 0.1.0` publication, then Eggup-owned `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2` in dependency order (`eggup-core`/`eggup-archive 0.1.2` already published). If and when every required external package version is actually registry-resolvable, replace the immutable Git dependency with the qualified registry dependency set, qualify packaging, and decide/publish the exact Eggup package set under a separately authorized implementation plan. No M004 implementation plan exists yet.
 
 ## 8. Cross-cutting requirements
 
@@ -278,5 +278,5 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 | M002a hosted qualification + clippy corrective | closed | `plans/implementation/eggpack-manifest-interoperability/002a-hosted-qualification-and-clippy-corrective.md` | `plans/closure/eggpack-manifest-interoperability/002a-status.md` | — (was: current head failed Stable clippy in run `36463041223`; superseded by green run `36477024102`) |
 | M003a caller-bound destination policy corrective | closed | `plans/implementation/eggpack-manifest-interoperability/003a-caller-bound-destination-policy-corrective.md` | `plans/closure/eggpack-manifest-interoperability/003a-status.md` | — (was: hard dependency for M003; closed via `39ff626` + hosted run `36890986000`) |
 | M003 Eggsact real-consumer manifest adoption | closed | plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md | plans/closure/eggpack-manifest-interoperability/003-status.md | — (closed via consumer `65c916b` + hosted CI `36902758482` and drift `36902758396`) |
-| M004a package/API promotion readiness preflight | ready | `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md` | — | M003/M003a closed; no publication authorized |
-| M004 package/API promotion | blocked pending M004a + external registry prerequisites | — | — | M004a must prove exact registry graph and identify/clear any Eggpack-owned `eggpack-manifest` publication prerequisite |
+| M004a package/API promotion readiness preflight | closed | `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md` | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | M004 blocked on the proven set below; no publication occurred |
+| M004 package/API promotion | blocked on M004a evidence + all required external registry versions | — | — | Eggpack-owned `eggpack-manifest 0.1.0`, then Eggup-owned `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2`; core/archive 0.1.2 already published |
