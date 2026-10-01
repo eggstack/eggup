@@ -1,8 +1,8 @@
 # Eggpack Manifest Interoperability Milestone 003 — Eggsact Real-Consumer Manifest Adoption
 
-Status: ready to resume after bounded adapter/API qualification; producer-evidence gate satisfied by Eggpack Ecosystem M001 / Eggsact Distribution M005 on `v1.2.7`; real-consumer adoption is not closed (see `plans/closure/eggpack-manifest-interoperability/003-status.md`)
+Status: blocked only on ready M003a caller-bound destination policy corrective; producer-evidence gate and bounded JSON adapter qualification are satisfied; real-consumer adoption is not closed (see `plans/closure/eggpack-manifest-interoperability/003-status.md`)
 
-Eggup plan-authoring baseline: 605fa8f7a50f5bd53f7f294e71290d53282f62e9 (post-C010 closure head; bounded-pass adapter/API state re-verified intact, see §12 addendum)
+Eggup plan-authoring baseline: 229b61c920f54b50b7c953b060e54ca2673a201b (post-C010 M003 baseline refresh). M003a was subsequently registered at `plans/implementation/eggpack-manifest-interoperability/003a-caller-bound-destination-policy-corrective.md`.
 
 Historical selected consumer baseline for the bounded pass:
 
@@ -17,11 +17,12 @@ Historical producer/interface baseline for the bounded pass:
 
 Resume/reconciliation evidence reviewed 2026-10-01:
 
-- eggstack/eggpack@57c150f34ddffea34dac03b5fc0a9a0c956b2865 — Ecosystem M001 closed and M003h integration/status reconciliation recorded;
-- eggstack/eggsact@f90e85bc6eb09ea3fb94eab0f07d3407247d6472 — current reviewed planning head after Distribution M005 closure and M005a readiness;
+- eggstack/eggpack@56ed7e747fd39e4d6a32a9f1fe3e09dd44355069 — current reviewed producer/planning head; manifest schema crate remains unchanged from Eggup's immutable `678bbf04` pin;
+- eggstack/eggsact@f1352101dab748066c788e65e21e1bf303cfe995 — current reviewed consumer head after M005a Windows deterministic-link implementation; updater destination/fallback semantics remain unchanged;
 - `eggstack/eggsact: release/eggpack/distribution.toml` — producer authority for the five live unversioned asset names;
 - Eggsact `v1.2.7` live release evidence — 15 staged/published assets including `release-manifest.json`;
-- Eggup planning-hygiene C010 closed at `54c48dede5df87f91498806153b4cacbc321401c` (head refresh at `605fa8f7a50f5bd53f7f294e71290d53282f62e9`) — registry, archive-roadmap, M003 plan dependency prose, and Verified Update Core M008 blockers reconciled; the consumer-path half of M003 is therefore the remaining readiness gap and is unblocked to resume.
+- Eggup planning-hygiene C010 closed at `54c48dede5df87f91498806153b4cacbc321401c` (head refresh at `605fa8f7a50f5bd53f7f294e71290d53282f62e9`) — registry, archive-roadmap, M003 plan dependency prose, and Verified Update Core M008 blockers reconciled;
+- M003 refresh then identified one generic adapter authority gap: the current materializer uses manifest `install` directly as the deployment destination even though Eggpack's consumer contract says the manifest does not select destinations. M003a owns the additive caller-bound destination seam and is the sole hard prerequisite before consumer edits.
 
 Source roadmap:
 
@@ -147,7 +148,7 @@ At the Eggup baseline:
 - archive projection remains extraction-required;
 - M001a qualified the direct/bundle/archive positive matrix and 20 negative classes.
 
-One consumer-facing API gap is visible before adoption: project accepts an eggpack_manifest::ReleaseManifest value, while a consumer fetching JSON should not need a second direct dependency on eggpack-manifest merely to parse the document. M003 should close that leaf-boundary ergonomics gap in Eggup rather than teaching Eggsact about the upstream parser crate.
+`MAX_MANIFEST_BYTES` and `project_json(&[u8], canonical_target)` are already implemented and qualified in `eggup-eggpack`; Eggsact does not need a direct `eggpack-manifest` dependency. The remaining generic API gap is destination authority: direct/bundle materialization and archive plan construction currently use manifest `install` values directly as relative destinations. Eggpack's consumer contract defines those values as logical/default install identities and explicitly leaves destination/replacement authorization to the consumer. M003a corrects that boundary before Eggsact integration.
 
 At the selected Eggsact baseline:
 
@@ -199,11 +200,11 @@ At the selected Eggsact baseline:
 
 ### In Eggup
 
-- add a bounded consumer-facing JSON parse/project helper to eggup-eggpack so downstream consumers do not need a direct eggpack-manifest dependency;
-- expose the upstream manifest document byte bound through the adapter, or otherwise provide a stable adapter-owned bound for acquisition;
-- add focused API tests proving malformed/oversized/unsupported manifests remain AdapterError::InvalidManifest without leaking raw document content;
-- retain the existing project(&ReleaseManifest, ...) API for callers that already own a parsed manifest;
-- update eggup-eggpack README/rustdoc with the intended real-consumer flow;
+- close M003a caller-bound destination policy corrective before Eggsact production edits;
+- retain the already-qualified bounded `project_json` / `MAX_MANIFEST_BYTES` API and its full regression matrix;
+- expose caller-owned exact relative destination binding without weakening manifest artifact/member identity, size, digest, or relationship evidence;
+- retain current manifest-default materialization helpers as compatibility wrappers;
+- update eggup-eggpack README/rustdoc with the caller-owned destination distinction;
 - do not modify lower Eggup crates unless a genuine generic defect is found.
 
 ### In Eggsact
@@ -239,49 +240,25 @@ At the selected Eggsact baseline:
 - publishing an Eggsact release with Git dependencies;
 - removing legacy sidecar compatibility before producer adoption proves it is safe.
 
-## 7. Required Eggup adapter changes
+## 7. Required Eggup prerequisite — M003a
 
-### 7.1 Bounded parse/project entry point
+The bounded JSON parse/project work described by the original M003 pass is already implemented and qualified. Do not reimplement it.
 
-Add an API equivalent in behavior to:
+Before Eggsact production edits, close:
 
-~~~text
-pub const MAX_MANIFEST_BYTES: usize = <upstream schema bound>;
+- `plans/implementation/eggpack-manifest-interoperability/003a-caller-bound-destination-policy-corrective.md`.
 
-pub fn project_json(
-    input: &[u8],
-    canonical_target: &str,
-) -> Result<ManifestProjection, AdapterError>
-~~~
+M003a must provide an additive caller-bound destination materialization seam for direct/bundle projections and the equivalent archive plan construction path while keeping current manifest-default helpers compatible.
 
-Exact naming may differ.
+For M003, the required consumer contract after M003a is:
 
-Requirements:
+1. manifest artifact name / exact size / SHA-256 / relationship remain producer evidence;
+2. projected member identity remains stable;
+3. Eggsact supplies the exact relative destination authorized by its current installation policy;
+4. ownership verification still proves that exact current executable before mutation;
+5. no destination or ownership inference moves into the adapter.
 
-1. reject input above the upstream ReleaseManifest bound before allocation-heavy parsing;
-2. reject invalid UTF-8 as InvalidManifest;
-3. delegate schema parsing/validation to eggpack-manifest::ReleaseManifest::from_json rather than reimplementing the schema;
-4. delegate target projection to the existing project path;
-5. never return parser messages containing raw JSON or caller URLs;
-6. keep project(&ReleaseManifest, ...) public and behavior-compatible;
-7. do not re-export producer build/contract types.
-
-If re-exporting the leaf ReleaseManifest type is demonstrably cleaner than a parse helper, document the dependency consequence and stop for review before making Eggsact depend directly on eggpack-manifest. The default implementation direction is the adapter-owned parse helper.
-
-### 7.2 Tests
-
-Add focused tests for:
-
-- valid direct fixture through JSON bytes;
-- exact MAX_MANIFEST_BYTES boundary behavior;
-- oversized document rejection;
-- invalid UTF-8;
-- malformed JSON;
-- unsupported schema;
-- wrong canonical target after successful parse;
-- diagnostics that contain neither raw JSON fragments nor credential-bearing URL material.
-
-Re-run the full M001a interoperability suite; M003 must not weaken any existing negative case.
+M003 must use the qualified M003a path rather than working around destination authority in Eggsact.
 
 ## 8. Required Eggsact implementation sequence
 
@@ -293,7 +270,7 @@ The implementation record must explicitly resolve the version-qualified-fixture 
 
 ### B. Dependency-source alignment
 
-Because eggup-eggpack is unpublished, pin eggup-core, eggup-acquisition, eggup-eggfetch, and eggup-eggpack to one exact Eggup Git revision containing the M003 adapter helper.
+Because eggup-eggpack is unpublished, pin eggup-core, eggup-acquisition, eggup-eggfetch, and eggup-eggpack to one exact Eggup Git revision containing the closed M003a adapter API.
 
 Verify cargo tree contains one source identity for each Eggup package and no duplicate crates.io/git copy of eggup-core or eggup-acquisition.
 
@@ -301,15 +278,17 @@ No floating branch dependency.
 
 ### C. Manifest acquisition
 
-Use the existing strict Eggfetch policy and a bounded metadata call.
+Use the existing strict Eggfetch policy and a bounded metadata call. Current Eggup `FetchLimits` requires a finite positive `u64` artifact ceiling; do not carry forward Eggsact's historical `max_artifact_bytes: None` literal when aligning to the current Git revision. Use a finite Eggsact-owned ceiling (the current Eggup default 128 MiB is sufficient for the observed ~11–17 MiB v1.2.7 binaries) and allow `bind_requests` to tighten it to the manifest exact size.
 
 The exact manifest URL is application policy and must come from the producer convention established in the preflight. Do not put release-origin construction into eggup-eggpack.
 
-A manifest fetch outcome must distinguish:
+A manifest fetch outcome must distinguish structurally, not by parsing error strings:
 
 - Success -> parse/project path;
 - NotFound -> explicit legacy sidecar compatibility path;
 - any other error -> hard failure.
+
+If the current `eggup_get_text` helper erases metadata `NotFound` into a string error, introduce a narrow typed metadata helper for the updater rather than inspecting formatted text.
 
 ### D. Product/release/target binding
 
@@ -336,7 +315,8 @@ A manifest-backed artifact NotFound is hard failure.
 
 After acquisition:
 
-- pass the exact artifact-name -> absolute path map to materialize_artifact_set;
+- pass the exact artifact-name -> absolute path map to the M003a caller-bound materialization API;
+- bind the projected member to the exact basename of `env::current_exe()` under the existing `current_exe.parent()` installation root; this preserves canonical and renamed executable update-in-place behavior;
 - supply explicit Executable permission intent;
 - use install_ids/projection identities only after Eggsact's product/release equality checks;
 - preserve ExactIdentityValidator policy for eggsact <version>;
@@ -398,7 +378,9 @@ Required behavior matrix:
 13. ownership conflict -> no mutation;
 14. rollback and RecoveryRequired mapping remain distinct;
 15. unsupported host -> existing Cargo fallback policy unchanged;
-16. dependency tree has one Eggup source identity and no direct Eggpack producer crates.
+16. dependency tree has one Eggup source identity and no direct Eggpack producer crates;
+17. renamed current-executable basename is updated in place rather than retargeted to the manifest default basename;
+18. finite caller artifact ceiling is never widened and is tightened to manifest exact size.
 
 Use a deterministic local HTTP fixture for manifest and artifact behavior. Public GitHub is not required for correctness tests.
 
@@ -409,10 +391,10 @@ Where available, run hosted Linux/macOS/Windows checks. Record native versus cro
 M003 closes only when all of the following are true:
 
 - Eggsact's normal updater contains and exercises the eggup-eggpack manifest path;
-- a producer-valid direct ReleaseManifest flows through real Eggsact update code to Eggup acquisition, ArtifactSet materialization, candidate validation, and commit;
+- a producer-valid direct ReleaseManifest flows through real Eggsact update code to Eggup acquisition, M003a caller-bound ArtifactSet materialization, candidate validation, and commit;
 - Eggsact does not directly parse/reimplement ReleaseManifest schema semantics;
 - exact product/release/target policy remains in Eggsact;
-- manifest-provided artifact identity/size/digest replace duplicate manifest-branch mapping;
+- manifest-provided artifact identity/size/digest replace duplicate manifest-branch mapping while Eggsact remains authoritative for the exact deployment destination;
 - lower Eggup crates remain Eggpack-independent;
 - a valid manifest cannot silently downgrade to legacy sidecar/Cargo fallback on any later failure;
 - legacy compatibility is entered only on exact manifest NotFound while producer rollout requires it;
@@ -433,7 +415,7 @@ Stop and write the appropriate corrective or cross-repository plan if:
 - Cargo creates duplicate incompatible Eggup source identities that cannot be eliminated by one immutable revision;
 - consumer adoption requires release discovery/version ordering inside eggup-eggpack;
 - a present invalid manifest would have to fall back silently to legacy evidence;
-- a generic adapter defect would otherwise be worked around in Eggsact;
+- M003a is not closed or a generic adapter defect would otherwise be worked around in Eggsact;
 - implementation attempts to publish unpublished Git dependencies.
 
 If a generic eggup-eggpack defect is found, correct and requalify Eggup first, then resume consumer adoption. If the issue is producer naming/manifest publication, route it to Eggpack rather than expanding Eggup authority.
@@ -448,7 +430,7 @@ The closure record must include:
 - before/after Eggsact updater authority map;
 - exact legacy-fallback truth table;
 - focused end-to-end manifest fixture description;
-- adapter API delta and M001a regression result;
+- M003a closure/API delta plus M001a/M002 regression result;
 - dependency trees proving one Eggup source identity and no producer-crate leakage;
 - before/after updater code inventory;
 - release binary-size delta using the same profile/toolchain;
@@ -474,4 +456,4 @@ The bounded-pass adapter/API implementation (`MAX_MANIFEST_BYTES`, `project_json
 - `cargo tree -p eggup-acquisition --locked` — no internal Eggup edge.
 - `cargo tree -p eggup-service --locked` — depends only on `eggup-core`.
 
-The dependency-boundary invariants in §5 hold unchanged: no Eggpack edge below `eggup-eggpack`, `eggup-core` remains `sha2`-only, `eggup-acquisition` remains transport-neutral, `eggup-service` is Eggpack-independent. The Eggsact cross-repo work in §8 is the remaining readiness gap; no further Eggup-side code change is required by C010, this verification, or the bounded-pass review.
+The dependency-boundary invariants in §5 hold unchanged: no Eggpack edge below `eggup-eggpack`, `eggup-core` remains `sha2`-only, `eggup-acquisition` remains transport-neutral, `eggup-service` is Eggpack-independent. The bounded JSON adapter work remains qualified, but the current consumer-contract review discovered the separately planned M003a destination-authority corrective. After M003a closes, the Eggsact cross-repo work in §8 becomes the remaining implementation gap.
