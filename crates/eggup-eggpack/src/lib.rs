@@ -10,7 +10,7 @@ use eggup_core::{
     PermissionsIntent, ProductId, ReleaseId,
 };
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt, fs,
     path::{Path, PathBuf},
 };
@@ -136,6 +136,31 @@ impl ManifestProjection {
         }
     }
 
+    /// Manifest-default destinations keyed by stable member identity.
+    ///
+    /// Pure helper with no I/O. For installable projections each entry maps
+    /// the projected `MemberId` to its manifest `install` default
+    /// destination. For archive projections each entry maps
+    /// `MemberId::new(install)` to the manifest `install` identity. Callers
+    /// that bind their own destinations do not need this helper; the
+    /// compatibility wrappers use it to preserve prior default behavior.
+    pub fn default_destinations(&self) -> Result<HashMap<MemberId, String>, AdapterError> {
+        match self {
+            Self::Installable { artifacts, .. } => Ok(artifacts
+                .iter()
+                .map(|a| (a.member_id.clone(), a.destination.clone()))
+                .collect()),
+            Self::Archive { members, .. } => members
+                .iter()
+                .map(|m| {
+                    let id = MemberId::new(m.install.clone())
+                        .map_err(|e| AdapterError::Eggup(e.to_string()))?;
+                    Ok((id, m.install.clone()))
+                })
+                .collect(),
+        }
+    }
+
     /// Bind every artifact to one exact caller-selected request and tightened limit.
     pub fn bind_requests(
         &self,
@@ -196,10 +221,24 @@ impl ManifestProjection {
             .collect()
     }
 
-    /// Validate acquired files and build one all-or-nothing direct/bundle ArtifactSet.
-    pub fn materialize_artifact_set(
+    /// Validate acquired files and build one all-or-nothing direct/bundle
+    /// `ArtifactSet` with caller-bound destinations.
+    ///
+    /// Manifest `install` values remain producer default identity only: the
+    /// exact relative destination of every member comes from `destinations`,
+    /// which must contain exactly the projected member set. Missing, extra,
+    /// or colliding destinations fail closed before any set is returned, and
+    /// invalid destinations fail through Eggup destination validation into a
+    /// bounded adapter error. Artifact filename to acquired-path
+    /// relationships, stable member identities, exact sizes, regular-file
+    /// checks, SHA-256 evidence, and permission binding are unchanged.
+    /// Replacement authorization stays outside this helper: it records where
+    /// bytes should be installed and never proves control of a live
+    /// destination. No URL or filesystem content is echoed in diagnostics.
+    pub fn materialize_artifact_set_with_destinations(
         &self,
         acquired: HashMap<String, PathBuf>,
+        destinations: HashMap<MemberId, String>,
         permissions: HashMap<MemberId, PermissionsIntent>,
     ) -> Result<ArtifactSet, AdapterError> {
         let (_, _, reqs) = self.installable()?;
@@ -209,6 +248,13 @@ impl ManifestProjection {
                 .any(|r| !acquired.contains_key(&r.artifact_name))
         {
             return Err(AdapterError::MapMismatch("acquired path"));
+        }
+        if destinations.len() != reqs.len()
+            || reqs
+                .iter()
+                .any(|r| !destinations.contains_key(&r.member_id))
+        {
+            return Err(AdapterError::MapMismatch("destinations"));
         }
         if permissions.len() != reqs.len()
             || reqs.iter().any(|r| !permissions.contains_key(&r.member_id))
@@ -226,14 +272,36 @@ impl ManifestProjection {
             if !meta.file_type().is_file() || meta.len() != r.exact_size {
                 return Err(AdapterError::InvalidAcquiredFile(r.artifact_name.clone()));
             }
+            let destination = destinations.get(&r.member_id).expect("checked map");
             members.push(
-                ArtifactMember::new(r.member_id.clone(), path, &r.destination)
+                ArtifactMember::new(r.member_id.clone(), path, destination)
                     .map_err(|e| AdapterError::Eggup(e.to_string()))?
                     .with_permissions(*permissions.get(&r.member_id).expect("checked map"))
                     .with_integrity(IntegrityRequirement::Sha256(r.sha256)),
             );
         }
+        let mut seen = HashSet::with_capacity(members.len());
+        for member in &members {
+            if !seen.insert(member.destination().to_path_buf()) {
+                return Err(AdapterError::MapMismatch("destinations"));
+            }
+        }
         ArtifactSet::new(members).map_err(|e| AdapterError::Eggup(e.to_string()))
+    }
+
+    /// Validate acquired files and build one all-or-nothing direct/bundle ArtifactSet.
+    ///
+    /// Compatibility wrapper: builds the manifest-default destination map and
+    /// delegates to
+    /// [`materialize_artifact_set_with_destinations`](Self::materialize_artifact_set_with_destinations).
+    /// There is one materialization implementation.
+    pub fn materialize_artifact_set(
+        &self,
+        acquired: HashMap<String, PathBuf>,
+        permissions: HashMap<MemberId, PermissionsIntent>,
+    ) -> Result<ArtifactSet, AdapterError> {
+        let destinations = self.default_destinations()?;
+        self.materialize_artifact_set_with_destinations(acquired, destinations, permissions)
     }
 }
 
@@ -488,8 +556,87 @@ pub fn archive_plan_for(
         .map_err(|e| AdapterError::Eggup(e.to_string()))
 }
 
+/// Build the core `InstallPlan` for an archive projection with caller-bound
+/// destinations, recording each member's advisory path as
+/// `extraction_root.join(manifest install)`.
+///
+/// The caller destination map must exactly match the projected member
+/// identities: missing, extra, or colliding destinations fail closed before
+/// any plan is returned, and invalid destinations fail through Eggup
+/// destination validation into a bounded adapter error. Archive member
+/// identity, advisory extraction source paths, and member size/digest facts
+/// remain manifest-derived while destination strings come from caller policy.
+/// `BoundSources` and the object-bound extraction handoff are unchanged: the
+/// returned plan still carries empty bound sources until the caller transfers
+/// them via `bind_archive_members`.
+///
+/// The caller is responsible for capturing `extraction_root` (typically
+/// `ExtractedArchive::root()`) before any handle-bound handoff, and for
+/// keeping the path reachable until staging no longer needs it.
+/// Advisory paths are never opened during staging when a bound handle is
+/// supplied; the path is recorded solely to satisfy
+/// `ArtifactMember::new`'s validation and to expose diagnostics.
+///
+/// Replacement authorization stays outside this helper: it records where
+/// extracted bytes should be installed and never proves control of a live
+/// destination.
+pub fn core_plan_for_archive_with_destinations(
+    projection: &ManifestProjection,
+    extraction_root: &Path,
+    destination_root: &Path,
+    destinations: HashMap<MemberId, String>,
+    permissions: HashMap<MemberId, PermissionsIntent>,
+) -> Result<InstallPlan, AdapterError> {
+    let (product, release, members) = match projection {
+        ManifestProjection::Archive {
+            product,
+            release,
+            members,
+            ..
+        } => (product, release, members),
+        _ => return Err(AdapterError::ArchiveExtractionRequired),
+    };
+    if destinations.len() != members.len() {
+        return Err(AdapterError::MapMismatch("destinations"));
+    }
+    if permissions.len() != members.len() {
+        return Err(AdapterError::MapMismatch("permissions"));
+    }
+    let mut artifacts = Vec::with_capacity(members.len());
+    for m in members {
+        let id =
+            MemberId::new(m.install.clone()).map_err(|e| AdapterError::Eggup(e.to_string()))?;
+        let destination = destinations
+            .get(&id)
+            .ok_or(AdapterError::MapMismatch("destinations"))?;
+        let advisory = extraction_root.join(&m.install);
+        let permissions_intent = permissions
+            .get(&id)
+            .copied()
+            .ok_or(AdapterError::MapMismatch("permissions"))?;
+        let member = ArtifactMember::new(id.clone(), &advisory, destination)
+            .map_err(|e| AdapterError::Eggup(e.to_string()))?
+            .with_permissions(permissions_intent)
+            .with_integrity(IntegrityRequirement::Sha256(m.sha256));
+        artifacts.push(member);
+    }
+    let mut seen = HashSet::with_capacity(artifacts.len());
+    for member in &artifacts {
+        if !seen.insert(member.destination().to_path_buf()) {
+            return Err(AdapterError::MapMismatch("destinations"));
+        }
+    }
+    let set = ArtifactSet::new(artifacts).map_err(|e| AdapterError::Eggup(e.to_string()))?;
+    InstallPlan::new(product.clone(), release.clone(), destination_root, set)
+        .map_err(|e| AdapterError::Eggup(e.to_string()))
+}
+
 /// Build the core `InstallPlan` for an archive projection, recording each
 /// member's advisory path as `extraction_root.join(member.install)`.
+///
+/// Compatibility wrapper: builds the manifest-default destination map and
+/// delegates to [`core_plan_for_archive_with_destinations`]. There is one
+/// archive plan implementation.
 ///
 /// The caller is responsible for capturing `extraction_root` (typically
 /// `ExtractedArchive::root()`) before any handle-bound handoff, and for
@@ -506,36 +653,14 @@ pub fn core_plan_for_archive(
     destination_root: &Path,
     permissions: HashMap<MemberId, PermissionsIntent>,
 ) -> Result<InstallPlan, AdapterError> {
-    let (product, release, members) = match projection {
-        ManifestProjection::Archive {
-            product,
-            release,
-            members,
-            ..
-        } => (product, release, members),
-        _ => return Err(AdapterError::ArchiveExtractionRequired),
-    };
-    if permissions.len() != members.len() {
-        return Err(AdapterError::MapMismatch("permissions"));
-    }
-    let mut artifacts = Vec::with_capacity(members.len());
-    for m in members {
-        let id =
-            MemberId::new(m.install.clone()).map_err(|e| AdapterError::Eggup(e.to_string()))?;
-        let advisory = extraction_root.join(&m.install);
-        let permissions_intent = permissions
-            .get(&id)
-            .copied()
-            .ok_or(AdapterError::MapMismatch("permissions"))?;
-        let member = ArtifactMember::new(id.clone(), &advisory, &m.install)
-            .map_err(|e| AdapterError::Eggup(e.to_string()))?
-            .with_permissions(permissions_intent)
-            .with_integrity(IntegrityRequirement::Sha256(m.sha256));
-        artifacts.push(member);
-    }
-    let set = ArtifactSet::new(artifacts).map_err(|e| AdapterError::Eggup(e.to_string()))?;
-    InstallPlan::new(product.clone(), release.clone(), destination_root, set)
-        .map_err(|e| AdapterError::Eggup(e.to_string()))
+    let destinations = projection.default_destinations()?;
+    core_plan_for_archive_with_destinations(
+        projection,
+        extraction_root,
+        destination_root,
+        destinations,
+        permissions,
+    )
 }
 
 /// Build a `BoundSources` map from the projection's archive member list and
