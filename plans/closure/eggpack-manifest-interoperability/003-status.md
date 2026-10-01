@@ -1,12 +1,12 @@
 # Eggpack Manifest Interoperability M003 — Execution Status
 
-Disposition: **blocked; real-consumer milestone not closed**
+Disposition: **ready to resume; real-consumer milestone not closed** (historical bounded-pass blocker resolved externally 2026-10-01)
 
 Source plan: `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`
 
 Roadmap: `plans/subsystems/eggpack-manifest-interoperability-roadmap.md`
 
-This record closes the current bounded execution pass and preserves its evidence. It does not claim M003 acceptance: the required normal Eggsact updater path, producer-valid release fixture through commit, and consumer verification matrix remain unimplemented because the plan's producer-evidence gate is not met.
+This record preserves the historical bounded execution pass and its evidence. It does not claim M003 acceptance: the required normal Eggsact updater path, producer-valid release fixture through commit, and consumer verification matrix remain unimplemented. The producer-evidence gate that stopped this pass was valid at the time and is now resolved by the 2026-10-01 reconciliation addendum below.
 
 ## Baselines
 
@@ -16,7 +16,7 @@ This record closes the current bounded execution pass and preserves its evidence
 - Eggpack current repository head inspected: `00a3399773045121baabbe86f062d41a4c2ce1fb`.
 - Eggsact selected consumer baseline inspected: `576f4b0ac09238a42e5561c2da6da8ff4a47bce6`.
 
-## Producer evidence and blocker
+## Historical producer evidence and blocker
 
 At the pinned Eggsact baseline, `.github/workflows/release-binaries.yml` creates these release assets:
 
@@ -33,6 +33,20 @@ The workflow assembles and uploads those binary assets, sidecars, and the instal
 Eggpack HEAD's `crates/eggpack-contract/tests/fixtures/simple-direct.toml` is an Eggsact-shaped contract fixture with `{product}-{version}-{target}` artifact names; `observed-simple.toml` records `eggsact-1.2.6-x86_64-unknown-linux-gnu`. This is fixture evidence, not a live Eggsact producer contract. No Eggsact producer contract or adopted manifest artifact URL/name convention was found in the inspected Eggpack interface/workflow evidence. Eggpack's manifest roadmap describes a generic builder/`eggpack-release.json` architecture, but that does not establish which artifact a normal Eggsact release publishes or how Eggsact policy should address it.
 
 Therefore the version-qualified-fixture versus live-unversioned-asset difference remains unresolved by producer authority, and no exact producer-owned manifest URL exists for the updater to fetch. M003 section 3's stop condition applies. No Eggsact production source or dependency was changed, and no manifest filename or release asset policy was invented in Eggup.
+
+## Producer-gate resolution addendum — 2026-10-01
+
+The external producer condition recorded above is now satisfied without moving producer authority into Eggup.
+
+- Eggpack Ecosystem M001 is closed in `eggstack/eggpack: plans/closure/ecosystem-adoption/001-status.md`.
+- Eggsact Distribution M005 is closed in `eggstack/eggsact: plans/closure/distribution-update-release/005-status.md`.
+- `eggstack/eggsact: release/eggpack/distribution.toml` is now the producer authority for the real unversioned five-target artifact names, resolving the historical fixture/live-name mismatch.
+- The real `v1.2.7` generated release staged a 15-asset set containing five binaries, five checksum sidecars, four installers, and `release-manifest.json`; the maintainer subsequently published that release.
+- Current reviewed reconciliation heads are `eggstack/eggpack@57c150f34ddffea34dac03b5fc0a9a0c956b2865` and `eggstack/eggsact@f90e85bc6eb09ea3fb94eab0f07d3407247d6472`.
+
+Therefore the historical stop condition no longer blocks M003. The milestone is **ready to resume**, but it is not closed: Eggsact still has to adopt the manifest path in its normal updater, preserve the manifest-NotFound-only legacy fallback boundary, align immutable Eggup dependency identities for qualification, and complete the end-to-end consumer/hosted verification matrix.
+
+The original blocker analysis and requirement table below remain historical evidence of the bounded pass; their `Blocked` entries describe that pass, not the current execution gate.
 
 ## Completed bounded Eggup work
 
@@ -104,8 +118,8 @@ This qualifies the current Eggup repository HEAD reviewed for the bounded adapte
 
 ## Future-plan transition
 
-- M004 package/API promotion remains blocked: M003 has not met real-consumer acceptance, and `eggpack-manifest` remains unpublished at the inspected Eggpack head.
-- M002 archive extraction remains independently blocked on the Phase 10 extraction contract; this execution supplies no evidence to unblock it.
-- No other downstream plan is unblocked by this partial M003 qualification.
+- M003 is ready to resume under the existing implementation plan. Before consumer edits, refresh the exact current Eggup/Eggsact SHAs and re-confirm the producer contract plus `release-manifest.json` convention.
+- M002 archive extraction handoff has subsequently closed with M002a hosted qualification; the historical blocked statement from this bounded pass is superseded by `plans/closure/eggpack-manifest-interoperability/002a-status.md`.
+- M004 package/API promotion remains blocked until M003 meets real-consumer acceptance and the publication/versioning decision for the adapter boundary is separately authorized.
+- No new Eggpack producer implementation is required merely to resume M003; runtime manifest acquisition/projection and update policy remain Eggup/Eggsact-owned. Any newly discovered producer defect should still be routed back to Eggpack rather than duplicated locally.
 
-Resume M003 only after Eggpack/Eggsact establish a producer-owned Eggsact contract that describes the live artifact names and a manifest publication/addressing convention, then refresh all repository SHAs and implement the normal updater path. See the source plan for the complete acceptance matrix.
