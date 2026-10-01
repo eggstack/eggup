@@ -212,9 +212,19 @@ Adopt the adapter in Eggsact's real updater path so producer-valid ReleaseManife
 
 The bounded JSON parse/project API and its tests are implemented in Eggup. The former producer-evidence gate is now satisfied by Eggpack Ecosystem M001 / Eggsact Distribution M005: the live producer contract preserves the existing unversioned artifact names and `v1.2.7` published `release-manifest.json`. M003 landed on the M003a caller-bound seam against current repository baselines (Eggup pin `e336b32`, Eggsact `65c916b` rebased over the M005a closure); Eggsact-owned release/origin/fallback/destination policy is preserved and `release-manifest.json` is treated as producer-established evidence rather than an Eggup naming decision.
 
+### M004a — Package/API promotion readiness preflight
+
+Status: ready.
+
+Implementation plan: `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md`.
+
+Now that M003 real-consumer adoption is closed, mechanically determine the minimum registry-resolvable publication graph before any irreversible publication action. Verify exact crates.io availability for `eggpack-manifest` and every Eggup dependency, simulate a registry-only `eggup-eggpack` package, prove the minimum missing Eggup publication set, determine whether `eggup-eggfetch 0.1.2` is actually required for an Eggsact-shaped registry-only graph, and record any Eggpack-owned publication prerequisite.
+
+M004a MUST NOT publish crates or mutate the committed package graph. Its closure is the readiness gate for M004 proper.
+
 ### M004 — Package/API promotion
 
-If adoption justifies the crate and eggpack-manifest has a publishable stable version, replace the immutable Git dependency with a compatible registry dependency, qualify packaging, and decide whether eggup-eggpack should join Eggup's published lockstep crates. M004 is the next interoperability decision point now that M003 real-consumer adoption has closed; it remains subject to a publishable eggpack-manifest version.
+If M004a proves a coherent registry-only graph and all external registry prerequisites are resolvable, replace the immutable Git dependency with the qualified registry dependency set, qualify packaging, and decide/publish the exact Eggup package set under a separately authorized implementation plan. M004 remains blocked until M004a closes and every required external package version is registry-resolvable.
 
 ## 8. Cross-cutting requirements
 
