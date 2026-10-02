@@ -160,7 +160,7 @@ eggup-core/acquisition/service -X-> eggpack-manifest
 
 ### Operational
 
-- `eggup-eggpack` remains an unpublished leaf adapter and currently pins `eggpack-manifest` by immutable Git revision. M003 may continue to use immutable revisions for consumer qualification; registry/package promotion is a separate M004 decision.
+- `eggup-eggpack` remains an unpublished leaf adapter and currently pins `eggpack-manifest` by immutable Git revision. M003 may continue to use immutable revisions for consumer qualification; registry/package promotion is a separate M004 decision. Since Eggpack published `eggpack-manifest 0.1.0` on 2026-10-02 with published bytes identical to that qualified Git source, a registry pin is now available as an alternative when M004 authorizes it, but the switch is M004's decision and is not made by this update.
 
 ### Current M003 dependency
 
@@ -222,11 +222,17 @@ M004a proved the minimum registry-resolvable publication graph without publishin
 
 That external prerequisite is now concretely registered in Eggpack as Release Manifest M003: `eggstack/eggpack: plans/implementation/release-manifest/003-eggpack-manifest-0.1.0-publication-and-compatibility-baseline.md` (initial plan registration `b8cfce59fa8da76f5563f25812c00dd4d22c90a0`; Eggpack active registry reconciliation `338ba64233f6a1d19f28608f5ed8194610fd851f`). Eggpack M003 owns source-identity/package qualification, explicit manual publication of only `eggpack-manifest 0.1.0`, and registry-only post-publication proof.
 
+**That prerequisite is now satisfied.** Eggpack Release Manifest M003 closed: `eggpack-manifest 0.1.0` was published to crates.io on 2026-10-02 from Eggpack `8d661e4eb9da1806e5d7c7606939d24e9aceb2c0` (checksum `2a08f24b05e9652878dd49145cdc3cbd38c7a76032d7b01a5fe1535d9446b629`, non-yanked, tag `eggpack-manifest-v0.1.0`, Eggpack hosted run `37064833069` green, closure at `eggstack/eggpack: plans/closure/release-manifest/003-status.md`). M004a's registry audit no longer observes the crate as absent. The published `src/lib.rs` is byte-identical to the consumer-qualified Git source at Eggup's pin, so no Eggup-side semantic requalification of the parser is implied by the promotion; the compatibility-incident branch is not triggered. Only `eggpack-manifest` was published — no other Eggpack package became a prerequisite.
+
 M004a published no crates and mutated no committed package graph. Its closure is the readiness gate for M004 proper.
 
 ### M004 — Package/API promotion
 
-Status: blocked on the M004a-proven prerequisites. The first gate is closure of Eggpack Release Manifest M003 (`eggstack/eggpack: plans/implementation/release-manifest/003-eggpack-manifest-0.1.0-publication-and-compatibility-baseline.md`) with exact `eggpack-manifest =0.1.0` registry resolution. After that, Eggup still owns `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2` publication in dependency order (`eggup-core`/`eggup-archive 0.1.2` already published). If and when every required external package version is actually registry-resolvable, replace the immutable Git dependency with the qualified registry dependency set, qualify packaging, and decide/publish the exact Eggup package set under a separately authorized implementation plan. No M004 implementation plan exists yet.
+Status: blocked on Eggup's own M004a-proven prerequisites. The former first gate — closure of Eggpack Release Manifest M003 (`eggstack/eggpack: plans/implementation/release-manifest/003-eggpack-manifest-0.1.0-publication-and-compatibility-baseline.md`) with exact `eggpack-manifest =0.1.0` registry resolution — is **satisfied** (Eggpack published `0.1.0` on 2026-10-02 from `8d661e4`, checksum `2a08f24b…b629`, closure `eggstack/eggpack: plans/closure/release-manifest/003-status.md`).
+
+Every remaining gate is now Eggup-owned. A 2026-10-02 registry re-audit against the M004a-proven set shows: `eggup-acquisition 0.1.2` still absent (max `0.1.1`); `eggup-eggfetch 0.1.2` still absent (max `0.1.1`), with the `E0308` incompatibility against published `eggfetch 0.1.1` still in force; `eggup-eggpack 0.1.2` still absent (crate unpublished); `eggup-core 0.1.2` and `eggup-archive 0.1.2` still published and non-yanked. So M004 must publish `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2` in dependency order before the promotion itself.
+
+When that chain is registry-resolvable, replace the immutable Git dependency on `eggpack-manifest` with the qualified registry dependency `eggpack-manifest = "=0.1.0"`, qualify packaging, and decide/publish the exact Eggup package set under a separately authorized implementation plan. No M004 implementation plan exists yet, and writing it is now unblocked by cross-repo evidence. Eggpack owes M004 nothing further; do not wait on it.
 
 ## 8. Cross-cutting requirements
 
@@ -258,7 +264,7 @@ Status: blocked on the M004a-proven prerequisites. The first gate is closure of 
 
 The main risk is turning the adapter into a new release-policy or archive framework. Keep it as a translation layer.
 
-A second risk is premature publication coupling while eggpack-manifest is unpublished. M001 therefore pins an immutable Git revision and keeps the adapter unpublished. Do not vendor or reimplement the Manifest parser to avoid this constraint.
+A second risk is premature publication coupling. M001 pinned an immutable Git revision and kept the adapter unpublished for that reason. `eggpack-manifest` is now published, so that specific constraint is lifted for the adapter's manifest dependency, but `eggup-eggpack` itself is still unpublished and the coupling risk now applies to `eggup-acquisition`/`eggup-eggfetch`/`eggup-eggpack` 0.1.2, which are still absent. Do not vendor or reimplement the Manifest parser to avoid a constraint.
 
 ## 11. Completion definition
 
@@ -280,5 +286,5 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 | M002a hosted qualification + clippy corrective | closed | `plans/implementation/eggpack-manifest-interoperability/002a-hosted-qualification-and-clippy-corrective.md` | `plans/closure/eggpack-manifest-interoperability/002a-status.md` | — (was: current head failed Stable clippy in run `36463041223`; superseded by green run `36477024102`) |
 | M003a caller-bound destination policy corrective | closed | `plans/implementation/eggpack-manifest-interoperability/003a-caller-bound-destination-policy-corrective.md` | `plans/closure/eggpack-manifest-interoperability/003a-status.md` | — (was: hard dependency for M003; closed via `39ff626` + hosted run `36890986000`) |
 | M003 Eggsact real-consumer manifest adoption | closed | plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md | plans/closure/eggpack-manifest-interoperability/003-status.md | — (closed via consumer `65c916b` + hosted CI `36902758482` and drift `36902758396`) |
-| M004a package/API promotion readiness preflight | closed | `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md` | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | M004 blocked on the proven set below; no publication occurred |
-| M004 package/API promotion | blocked on M004a evidence + all required external registry versions | — | — | first gate: Eggpack Release Manifest M003 plan `plans/implementation/release-manifest/003-eggpack-manifest-0.1.0-publication-and-compatibility-baseline.md` in `eggstack/eggpack` must close with exact `eggpack-manifest =0.1.0` registry resolution; then Eggup-owned `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2`; core/archive 0.1.2 already published |
+| M004a package/API promotion readiness preflight | closed | `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md` | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | M004 blocked on the proven set below; no publication occurred; its Eggpack-owned item is now satisfied — `eggpack-manifest 0.1.0` published 2026-10-02 |
+| M004 package/API promotion | blocked on Eggup-owned prerequisites only | — | — | Eggpack gate satisfied (`eggpack-manifest 0.1.0` published 2026-10-02 from Eggpack `8d661e4`, checksum `2a08f24b…b629`); remaining gate is Eggup's own `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2`; core/archive 0.1.2 already published; no M004 implementation plan yet |
