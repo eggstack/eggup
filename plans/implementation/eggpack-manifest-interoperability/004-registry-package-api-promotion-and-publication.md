@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 004 — Registry Package/API Promotion and Publication
 
-Status: active
+Status: implemented; closed by `plans/closure/eggpack-manifest-interoperability/004-status.md` (three crates published 2026-10-02 from `02a1d32`; hosted run `37090397398` green; registry-only proofs green)
 
 Eggup plan-authoring baseline: `3f4e99e381b233bfd4be1a676218e9ba2cdce2d4`
 
