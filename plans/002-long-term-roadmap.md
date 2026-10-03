@@ -245,6 +245,8 @@ Resolve CodeGG's documented generic-updater blocker.
 
 ## Phase 9 — Eggpack authority cutover and manifest interoperability
 
+Status: **complete**.
+
 ### Objective
 
 End Eggup's temporary ownership of producer-side distribution contracts and establish a narrow producer/consumer seam with Eggpack.
@@ -252,21 +254,31 @@ End Eggup's temporary ownership of producer-side distribution contracts and esta
 ### Deliverables
 
 - preserve Eggup distribution M001-M003 as predecessor/closure evidence;
-- freeze `eggup-dist` except for migration-critical correctness fixes (completed during migration; crate retired by M004);
-- require Eggpack Contract M002 to port and independently qualify the closed Eggup M003 conformance behavior;
-- execute Eggup distribution M004 to remove `eggup-dist` after that Eggpack closure (completed; see `plans/closure/distribution-bootstrap/004-status.md`);
+- retire `eggup-dist` after Eggpack Contract M002 independently qualified the transferred producer behavior (completed by Eggup Distribution M004; see `plans/closure/distribution-bootstrap/004-status.md`);
 - keep installer generation, release conformance, package construction, release manifests, CI, and publication in Eggpack;
-- after Eggpack ReleaseManifest v1 stabilizes, optionally add a small `eggup-eggpack` manifest-consumer adapter.
+- provide the optional `eggup-eggpack` manifest-consumer adapter without importing producer build/CI machinery into lower Eggup layers;
+- prove the seam through a real consumer and a registry-resolvable package graph.
+
+Completion evidence:
+
+- Eggpack ReleaseManifest v1 and the lightweight `eggpack-manifest 0.1.0` consumer crate are established and published;
+- Eggup Interoperability M003 closed on real Eggsact consumption of manifest evidence while Eggsact retained release/origin/fallback/destination policy;
+- M004 published `eggup-acquisition 0.1.2`, `eggup-eggfetch 0.1.2`, and `eggup-eggpack 0.1.2`, with registry-only adapter and Eggsact-shaped graphs qualified (see `plans/closure/eggpack-manifest-interoperability/004-status.md`);
+- `eggup-core`, acquisition, archive, and service remain independent of Eggpack producer build/CI/bootstrap crates.
 
 ### Exit criteria
 
+All satisfied:
+
 - Eggup has no active producer distribution crate; the historical distribution roadmap is archived/transferred to Eggpack;
-- Eggpack is the sole active authority for DistributionContract/conformance;
+- Eggpack is the sole active authority for DistributionContract/conformance and producer release evidence;
 - `eggup-core` has no Eggpack dependency;
-- any future manifest adapter translates producer evidence into explicit Eggup deployment inputs without deciding update policy;
+- `eggup-eggpack` translates producer evidence into explicit Eggup deployment inputs without deciding update policy;
 - Eggup remains usable with non-Eggpack releases.
 
 ## Phase 10 — Eggress archive/bundle convergence
+
+Status: **complete**.
 
 ### Objective
 
@@ -274,15 +286,25 @@ Prove archive extraction and two-binary transaction support.
 
 ### Deliverables
 
-- safe archive adapter or consumer-supplied extraction contract;
-- archive traversal guards;
-- `eggress` + `pproxy` cross-member verification;
+- safe bounded archive extraction with traversal/link/special-file/no-clobber guards;
+- handle-backed extracted-member handoff into Eggup transaction preparation;
+- Eggpack archive-evidence handoff through the same qualified extraction boundary;
+- `eggress` + `pproxy` staged cross-member/version verification;
 - transactional pair replacement through Eggup.
+
+Completion evidence:
+
+- Archive M001d closed the handle-backed source handoff with hosted qualification;
+- Eggpack Interoperability M002/M002a closed the archive projection/extraction handoff with hosted qualification;
+- Consumer Adoption M006 closed through Egress Delivery M003 at `19e6dc7`: Egress removed its bespoke `replace_pair` backup/rollback and extraction helpers, retained only application-specific path/release policy, and moved the pair through bounded extraction, staged exact-version checks, and Eggup commit/rollback;
+- Egress hosted updater/archive lanes passed on Linux, macOS, and Windows (run `36639694985`).
 
 ### Exit criteria
 
-- Egress removes bespoke pair rollback code;
-- no successful result permits mismatched pair versions.
+All satisfied:
+
+- Egress removed bespoke pair rollback code;
+- exact staged-version agreement plus sibling-pair policy prevents a successful mismatched pair, while Eggup provides the transaction/rollback disposition.
 
 ## Phase 11 — EggPool selective adoption
 
