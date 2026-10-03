@@ -90,6 +90,14 @@ Apply §3. Confirm `cargo package -p eggup-eggpack` now succeeds where it failed
 
 Run `scripts/check-local.sh`, MSRV, `cargo doc`, and for each of the three crates `cargo package --locked` and `cargo publish --locked --dry-run`. Record exact outputs, packaged file lists, and `.crate` checksums. Require hosted CI green on the release-prep commit before any upload.
 
+**Ordering constraint found during execution, not merely by reasoning.** The verification step of `cargo package` and `cargo publish` resolves the *packaged* manifest's dependencies from crates.io. That makes the publication order a hard mechanical constraint rather than a stylistic convention:
+
+- `cargo package -p eggup-acquisition --locked` verifies green immediately; it has no Eggup dependency.
+- `cargo package -p eggup-eggfetch --locked` **fails to compile** with two `E0308` mismatches at `src/lib.rs:385` and `src/lib.rs:387` (`expected u64, found Option<u64>`). The `0.1.2` eggfetch source is migrated to `eggup-acquisition 0.1.2`'s finite `u64` `max_artifact_bytes` seam, but the registry only offers `eggup-acquisition 0.1.1`, whose field is `Option<u64>`. This is the same incompatibility M004a proved from the other direction. `--no-verify` packages it (7 files, contents proof only).
+- `cargo package -p eggup-eggpack --locked` cannot produce a `.crate` at all, even with `--no-verify`, because dependency *resolution* of its packaged manifest fails on `eggup-acquisition = "=0.1.2"` (candidates `0.1.1`, `0.1.0`).
+
+So full `cargo package` and `cargo publish --dry-run` verification for `eggup-eggfetch` and `eggup-eggpack` can only be obtained after the preceding crate is registry-visible. The plan's WP4/WP5 order is therefore mandatory, and each crate's full verification is re-run immediately after its predecessor is published. No `--allow-dirty` is used anywhere, and no verification is skipped for the crate actually being uploaded.
+
 ### WP4 — First-publication gate
 
 Immediately before each upload, prove the exact version is absent, confirm publisher authority is the intended Eggstack account, and reconfirm a clean tree on the same commit. Verify the previous crate in the order is already visible before starting the next.
