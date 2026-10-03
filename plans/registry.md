@@ -4,11 +4,11 @@ Status: active
 
 Last implementation/closure baseline reviewed: `af62ede4b70ad81bea0e2ea493985ef0cc51e486` (C012 docs-only roadmap/registry reconciliation closed; runtime/package baseline remains M004 publication at `02a1d32` with closure `ea1f1c5`)
 
-Latest planning/closure head: `af62ede4` (C012 closure record; Phase 9/10 and post-M004 active docs reconciled)
+Latest planning/closure head: `d9cefc0960e86965ca8ac95aebc1b22febf64bab` (C012 source plan marked closed; closure record `af62ede4`)
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record; historical)
 
-Latest planning registration head: `af62ede4b70ad81bea0e2ea493985ef0cc51e486` (C012 closure recorded; registry closure-state refresh follows)
+Latest planning registration head: `d71d75af90ab9d5913238de16ffeb562576ef4fe` (C012 closure state registered in the active control surface)
 
 Newest qualified Eggup runtime delta with fully green hosted qualification is M003a implementation `39ff62602e39b14b31f5a8f154905d3343034db7` (feat(eggpack): caller-bound destination binding; hosted run `36890986000` green on Stable/MSRV/macOS/Windows). No runtime commit landed after `39ff626` (`git log 39ff626..HEAD -- crates/` empty; `e336b32`/`538e3e5` are docs/closure commits). M003 Eggsact real-consumer adoption is closed at consumer `eggstack/eggsact@65c916ba3b0f02916203ec1aad09d7e5c023c278` on Eggup pin `e336b32` (hosted CI run `36902758482` + drift run `36902758396` green). The M009 release-prep head `e8e07eb538d0eef18ea4cb4ace3bb905c316da72` (run `36487099388` green) remains the provenance for the published `eggup-core`/`eggup-archive 0.1.2` pair, not the latest qualified runtime. Code qualification was established at `9a5500e` (M002a clippy + Windows-adapter head; run `36477024102` green, superseding failed run `36463041223`); Core M008a reran the exact clean-tree package/publish-dry-run evidence on the post-M002a tree with no material delta. Planning-hygiene C009 corrected the stale Consumer M006 claim: current `eggstack/eggress@03134f8` has both the updater surface and registered Delivery M003 plan. Eggup M009 published the compatible 0.1.2 pair on 2026-09-28; Egress M006 subsequently closed on 2026-09-29 after Egress Delivery M003 landed with hosted Linux/macOS/Windows updater evidence. The prior Eggpack cross-repo drift is now reconciled: Eggpack interoperability M003 records the downstream closure, and Eggpack Release Manifest M003 is closed: `eggpack-manifest 0.1.0` is published to crates.io from Eggpack `8d661e4` (checksum `2a08f24b…b629`, tag `eggpack-manifest-v0.1.0`, closure `eggstack/eggpack: plans/closure/release-manifest/003-status.md`).
 
