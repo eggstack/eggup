@@ -1,6 +1,6 @@
 # Planning / Closure Hygiene Corrective C012 — Post-M004 Roadmap and Registry Reconciliation
 
-Status: ready for handoff
+Status: implemented; closure pending
 
 Repository baseline: `3b82d5397e728649a666690868a1e2d0fe42460d`
 
