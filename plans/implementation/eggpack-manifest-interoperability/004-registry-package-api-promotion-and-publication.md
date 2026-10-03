@@ -49,8 +49,9 @@ The only production change is the mechanical promotion M004a identified, plus th
 - `crates/eggup-eggpack/README.md`: the final paragraph currently states the crate "is unpublished and pins the currently unpublished `eggpack-manifest` crate to an immutable Eggpack revision". That is rendered on crates.io and becomes false at publication, so it is corrected to the published registry state.
 - `Cargo.lock`: refresh the yanked `yoke-derive 0.8.3` entry to `0.8.4` (M004a info finding). `yoke-derive` is a transitive dependency of `eggfetch-core` and so only affects the `eggup-eggfetch` graph.
 - root `CHANGELOG.md`: the `## 0.1.2` section currently states that acquisition/eggfetch/curl/service/eggpack "were **not** published as 0.1.2" and that `eggup-eggpack` "remains `publish = false` by design". Completing a partially-shipped workspace version makes those lines false, so the section is updated to record the completed 0.1.2 publication set with dates and checksums. Nothing is erased and no earlier statement is silently dropped; the correction is explicit.
+- `crates/eggup-eggpack/tests/interoperability.rs`: the regression `adapter_pins_immutable_eggpack_manifest_and_no_producer_crates` asserted that the manifest contains the Git revision `678bbf04f5a02827003a1d9ab83ba4f0e6360e41`. M004 changes exactly that, so the test fails by design until its invariant is restated. It is replaced by `adapter_pins_registry_eggpack_manifest_and_no_producer_crates`, which asserts the same *purpose* more strongly: the exact registry dependency `eggpack-manifest = "=0.1.0"`, absence of every VCS source edge (`git =`, `rev =`, `branch =`, `tag =`, `eggstack/eggpack.git`), retention of the three exact `=0.1.2` Eggup pins, and the pre-existing absence of producer crates. The producer-source provenance (published checksum, publication commit, and byte-identity with `678bbf04`) is recorded next to the constant so a future pin change is reviewable in place. This is a restatement of a deliberate invariant change, not a weakening: the old test would have passed a Git edge that `cargo publish` cannot use.
 
-No `src/` change, no public API change, no version change. The workspace is already at `0.1.2`, and `eggup-eggpack`'s `=0.1.2` pins to `eggup-core`/`eggup-archive` align with what is already on the registry, so no version bump is performed or needed.
+No `src/lib.rs` change, no public API change, no version change. The workspace is already at `0.1.2`, and `eggup-eggpack`'s `=0.1.2` pins to `eggup-core`/`eggup-archive` align with what is already on the registry, so no version bump is performed or needed.
 
 ## 4. Invariants
 
@@ -59,6 +60,7 @@ No `src/` change, no public API change, no version change. The workspace is alre
 - No `--allow-dirty` on any package or publish command. The tree must be clean at every upload.
 - No weakenable exact-pin: `eggup-eggpack` keeps `=0.1.2` on core/archive/acquisition and `=0.1.0` on `eggpack-manifest`.
 - Do not vendor, duplicate, or reimplement the manifest parser to avoid the registry dependency.
+- A test may be restated only when the milestone deliberately changes the invariant it guards, and the restatement must be at least as strong and must be recorded here and in the closure. No invariant may be relaxed to make publication pass.
 - No API, schema, or semantic change to satisfy packaging. Integrity remains SHA-256 checksum evidence only; no authenticity or signature claim.
 - Do not change `eggup-core`, `eggup-archive`, `eggup-curl`, or `eggup-service` source.
 - Publication is a manual maintainer action. Add no CI publication workflow and no release automation.

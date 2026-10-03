@@ -18,7 +18,15 @@ use std::time::Duration;
 
 const LINUX_TARGET: &str = "x86_64-unknown-linux-gnu";
 const ALIAS_TARGET: &str = "linux-x64";
-const PINNED_EGGPACK_REV: &str = "678bbf04f5a02827003a1d9ab83ba4f0e6360e41";
+// Producer-source identity for the registry pin below. `eggpack-manifest 0.1.0`
+// was published to crates.io from `eggstack/eggpack@8d661e4` on 2026-10-02 with
+// checksum `2a08f24b05e9652878dd49145cdc3cbd38c7a76032d7b01a5fe1535d9446b629`, and
+// its `src/lib.rs` is byte-identical to the source at this revision, which the
+// adapter previously pinned by immutable Git revision. The registry pin is
+// therefore a promotion of the same bytes, not a substitution. Evidence:
+// `eggstack/eggpack: plans/closure/release-manifest/003-status.md`.
+const PROMOTED_EGGPACK_REV: &str = "678bbf04f5a02827003a1d9ab83ba4f0e6360e41";
+const PROMOTED_EGGPACK_CRATE_VERSION: &str = "=0.1.0";
 
 const DIRECT_MANIFEST: &str = include_str!("fixtures/direct-manifest.json");
 const DIRECT_PROJECTION_JSON: &str = include_str!("fixtures/projection-direct.json");
@@ -961,12 +969,44 @@ fn negative_20_crossed_bundle_relationship_fails_comparison() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn adapter_pins_immutable_eggpack_manifest_and_no_producer_crates() {
+fn adapter_pins_registry_eggpack_manifest_and_no_producer_crates() {
     let cargo_toml = include_str!("../Cargo.toml");
+    // The adapter must reach the producer schema only through an exact
+    // crates.io version. A Git or local-path edge is not publishable, so this
+    // also gates `cargo publish` succeeding at all.
     assert!(
-        cargo_toml.contains(PINNED_EGGPACK_REV),
-        "eggpack-manifest must stay pinned to {PINNED_EGGPACK_REV}"
+        cargo_toml.contains(&format!(
+            "eggpack-manifest = \"{PROMOTED_EGGPACK_CRATE_VERSION}\""
+        )),
+        "eggpack-manifest must be the exact registry dependency \
+         eggpack-manifest = \"{PROMOTED_EGGPACK_CRATE_VERSION}\" (crates.io \
+         version of the source at {PROMOTED_EGGPACK_REV})"
     );
+    for forbidden in [
+        "git =",
+        "rev =",
+        "eggstack/eggpack.git",
+        "branch =",
+        "tag =",
+    ] {
+        assert!(
+            !cargo_toml.contains(forbidden),
+            "adapter manifest must not carry a Git or VCS source edge ({forbidden}); \
+             the producer schema comes from the registry"
+        );
+    }
+    // The adapter's Eggup edges stay exact-pinned at the published 0.1.2 set so
+    // it cannot silently resolve a different published seam.
+    for eggup_dep in [
+        "eggup-core = { version = \"=0.1.2\"",
+        "eggup-archive = { version = \"=0.1.2\"",
+        "eggup-acquisition = { version = \"=0.1.2\"",
+    ] {
+        assert!(
+            cargo_toml.contains(eggup_dep),
+            "adapter must keep its exact {eggup_dep} pin"
+        );
+    }
     for producer in ["eggpack-core", "eggpack-contract", "eggpack-bootstrap"] {
         assert!(
             !cargo_toml.contains(producer),

@@ -1,19 +1,28 @@
 # Changelog
 
-## 0.1.2 — 2026-09-28
+## 0.1.2 — 2026-09-28, completed 2026-10-02
 
-crates.io publication set: `eggup-core 0.1.2`, `eggup-archive 0.1.2`. Other
-workspace crates that share the 0.1.2 source version (`eggup-acquisition`,
-`eggup-eggfetch`, `eggup-curl`, `eggup-service`, `eggup-eggpack`,
-`eggup-transport-footprint`) were **not** published as 0.1.2 and remain at
-their last published versions. `eggup-eggpack` remains `publish = false`
-by design. Integrity remains SHA-256 checksum evidence only; no
-authenticity or signature claims.
+The 0.1.2 source version was published to crates.io in two steps. On 2026-09-28
+(M009) `eggup-core 0.1.2` and `eggup-archive 0.1.2` were published. On 2026-10-02
+(Eggpack Manifest Interoperability M004) the remaining crates of the same
+0.1.2 source version were published, completing the workspace version on the
+registry.
+
+**Complete crates.io 0.1.2 publication set:** `eggup-core`, `eggup-archive`,
+`eggup-acquisition`, `eggup-eggfetch`, `eggup-eggpack`.
+
+`eggup-curl`, `eggup-service`, and `eggup-transport-footprint` share the 0.1.2
+source version and are still **not** published; they remain at their last
+published versions or unpublished. `eggup-transport-footprint` is
+`publish = false` by design and has no edge in the published adapter graph.
+
+Integrity remains SHA-256 checksum evidence only; no authenticity or signature
+claims are made by any of these crates.
 
 - `eggup-core 0.1.2`: workspace version bumps to 0.1.2 to carry the M001d
   additive bound-source API (`BoundSources` +
   `InstallPlan::prepare_with_bound_sources`). Dependency surface remains
-  `sha2` only.
+  `sha2` only. Published 2026-09-28.
 
 - `eggup-archive 0.1.2` (first crates.io publication): bounded allowlisted
   extraction for verified local tar.gz and zip archives; object-bound
@@ -25,15 +34,39 @@ authenticity or signature claims.
   dev-only `eggup-core` path dependency preserved so the package can
   verify before publication. Package metadata declares explicit
   `homepage` and `documentation` fields and records the absence of
-  authenticity or signature support.
+  authenticity or signature support. Published 2026-09-28.
 
-- `eggup-eggpack` (unpublished, workspace-only): internal exact pins on
-  `eggup-core = "=0.1.1"` and `eggup-acquisition = "=0.1.1"` update to
-  `=0.1.2` so the workspace resolves against the published packages.
+- `eggup-acquisition 0.1.2` (first publication of this version): the
+  transport-neutral acquisition seam and its deterministic fixture transport.
+  The `FetchLimits` finite-bounds corrective is carried here: `max_artifact_bytes`
+  is a plain `u64` and `None` is no longer representable. No Eggup or producer
+  dependency. Published 2026-10-02.
+
+- `eggup-eggfetch 0.1.2`: native `eggfetch-core` HTTP adapter carrying the
+  matching `FetchLimits` migration (`max_artifact_bytes: u64`, UTF-8-safe
+  `bound()`), plus the `Unavailable`/composition API qualified against the
+  0.1.2 acquisition seam. This publication is required for registry coherence:
+  published `eggup-eggfetch 0.1.1` declares `eggup-acquisition ^0.1.0` but its
+  source uses `Option<u64>`, so a fresh resolve after `eggup-acquisition 0.1.2`
+  publishes would otherwise select an incompatible pair. Published 2026-10-02.
+
+- `eggup-eggpack 0.1.2` (first crates.io publication): optional Eggpack
+  ReleaseManifest adapter. This version replaces the immutable-Git
+  `eggpack-manifest` dependency with the registry dependency
+  `eggpack-manifest = "=0.1.0"` (published 2026-10-02 from
+  `eggstack/eggpack@8d661e4`, checksum `2a08f24b…b629`, whose `src/lib.rs` is
+  byte-identical to the previously pinned `678bbf04` source), and removes
+  `publish = false`. It carries the M003a caller-bound destination seam
+  (`materialize_artifact_set_with_destinations`,
+  `core_plan_for_archive_with_destinations`, `ManifestProjection::default_destinations`)
+  alongside the M002 archive extraction handoff. Package metadata gains
+  `homepage`, `documentation`, `authors`, `keywords`, and `categories`. The
+  adapter still selects no release, verifies no authenticity, and authorizes
+  no filesystem destination. Published 2026-10-02.
 
 ## Unreleased
 
-- Eggpack Interop M002 (unpublished): `eggup-eggpack` gains the archive
+- Eggpack Interop M002 (published in `eggup-eggpack 0.1.2` on 2026-10-02; see the 0.1.2 section above): `eggup-eggpack` gains the archive
   extraction handoff (`archive_format_for_name`, `validate_acquired_archive`,
   `archive_plan_for`, `core_plan_for_archive`, `bind_archive_members`) that
   translates `ManifestProjection::Archive` into a validated
@@ -45,9 +78,11 @@ authenticity or signature claims.
   itself; orchestration and deferred cleanup stay caller-owned. Direct/bundle
   APIs are unchanged and `materialize_artifact_set` still returns
   `ArchiveExtractionRequired` for archive projections. New runtime
-  dependencies are `eggup-archive =0.1.2` (path) and `sha2 0.10.9`;
-  `eggup-core` remains archive/Eggpack independent. No publication or
-  consumer migration performed.
+  dependencies are `eggup-archive =0.1.2` and `sha2 0.10.9`; `eggup-core`
+  remains archive/Eggpack independent. The later M003a caller-bound
+  destination seam and the M004 registry promotion shipped in the same
+  `0.1.2` version; Eggsact's own Git-to-registry consumer migration is still
+  separately authorized in `eggstack/eggsact` and is not claimed here.
 
 - Acquisition M008 (unpublished corrective): `eggup-curl` deadline
   arguments now serialize at microsecond precision with a `.` decimal

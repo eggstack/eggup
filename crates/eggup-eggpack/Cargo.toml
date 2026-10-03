@@ -5,9 +5,13 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Optional Eggpack ReleaseManifest adapter for Eggup deployment inputs"
+homepage = "https://github.com/eggstack/eggup"
+documentation = "https://docs.rs/eggup-eggpack"
+description = "Optional Eggpack ReleaseManifest adapter for Eggup deployment inputs (no release policy, authenticity, or destination selection)"
 readme = "README.md"
-publish = false
+authors = ["David Bowman"]
+keywords = ["update", "eggpack", "manifest", "adapter"]
+categories = ["development-tools"]
 
 [lints]
 workspace = true
@@ -16,7 +20,7 @@ workspace = true
 eggup-core = { version = "=0.1.2", path = "../eggup-core" }
 eggup-archive = { version = "=0.1.2", path = "../eggup-archive" }
 eggup-acquisition = { version = "=0.1.2", path = "../eggup-acquisition" }
-eggpack-manifest = { version = "=0.1.0", git = "https://github.com/eggstack/eggpack.git", rev = "678bbf04f5a02827003a1d9ab83ba4f0e6360e41", package = "eggpack-manifest" }
+eggpack-manifest = "=0.1.0"
 sha2 = "0.10.9"
 
 [dev-dependencies]
