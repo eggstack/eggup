@@ -41,7 +41,7 @@ It does not own archive construction, release naming, release discovery, artifac
 - materialize multiple declared members under one bounded extraction operation;
 - return exact local paths/evidence suitable for `ArtifactSet` construction;
 - support the two-binary Egress archive model;
-- later consume Eggpack `ManifestProjection::Archive` member evidence.
+- consume Eggpack `ManifestProjection::Archive` member evidence through the qualified M002/M002a archive handoff.
 
 ### Infrastructure
 
@@ -72,11 +72,11 @@ It does not own archive construction, release naming, release discovery, artifac
 
 CodeGG M005 is closed using CodeGG-owned strict extraction of one verified archive before Eggup multi-artifact commit. That proves the transaction seam but intentionally leaves extraction outside Eggup.
 
-Egress currently publishes one version-aligned archive containing `eggress` and `pproxy`: tar.gz on Linux/macOS and zip on Windows. Its updater verifies the archive SHA-256, extracts both staged executables, verifies both versions, then replaces the pair as one release unit. This is the concrete Phase 10 consumer pattern.
+Egress is the completed concrete Phase 10 consumer proof. Delivery M003 / Eggup Consumer Adoption M006 moved its version-aligned `eggress` + `pproxy` archive flow onto registry `eggup-core 0.1.2` + `eggup-archive 0.1.2`, removed bespoke extraction and pair backup/rollback helpers, preserves whole-archive SHA-256 plus exact staged-version/sibling-pair policy, and uses Eggup commit/rollback disposition mapping. Hosted updater/archive lanes passed on Linux, macOS, and Windows (run `36639694985`).
 
-Eggpack `eggup-eggpack` already preserves archive artifact size/digest plus declared member source/install/size/digest facts, but returns `ArchiveExtractionRequired`. With M001 closed, interoperability M002 can define the handoff without adding archive dependencies to lower layers.
+Eggpack Interoperability M002/M002a is also closed. `eggup-eggpack` preserves archive artifact and declared-member evidence, builds the qualified archive/extraction handoff, and keeps archive dependencies outside `eggup-core`; the earlier `ArchiveExtractionRequired`-only state is historical predecessor evidence.
 
-Current generic archive APIs are useful primitives but do not by themselves satisfy Eggup's contract. Tar's safer `unpack_in` path can overwrite existing output; Zip's `enclosed_name` helps contain paths, while convenience extraction can overwrite files and support links. Eggup needs explicit iteration, allowlisting, no-clobber, and bounds.
+The qualified archive implementation uses explicit iteration, allowlisting, no-clobber writes, finite bounds, regular-file-only semantics, handle-relative materialization, and handle-backed source handoff rather than relying on general-purpose archive convenience extraction.
 
 ## 5. Target architecture
 
