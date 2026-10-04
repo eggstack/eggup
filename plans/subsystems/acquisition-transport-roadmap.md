@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M006 closed; M007 conditionally closed; M008 closed via Archive M001b hosted run 36222536670
+Status: M001-M006 closed; M007 conditionally closed; M008 closed via Archive M001b hosted run 36222536670; M009 eggup-curl 0.1.2 publication ready
 
 Long-term references:
 
@@ -110,6 +110,9 @@ M007 boundary safety hardening [CONDITIONALLY CLOSED]
                       |
                       v
                  M008 sub-second deadline truthfulness [CLOSED via run 36222536670]
+                      |
+                      v
+                 M009 eggup-curl 0.1.2 publication [READY]
 ```
 
 ## 7. Milestones
@@ -190,6 +193,18 @@ Status: closed (hosted-qualified on Archive M001b run `36222536670`); see `plans
 
 Correct the remaining curl deadline truthfulness defect: effective sub-second connect/total durations are now serialized as locale-independent decimal seconds (microsecond precision, `.` separator, no upward rounding) and the previous one-second timeout-attribution slack is removed. Sub-microsecond positive durations are rejected at validation rather than silently widened. M007 body-streaming/process-cleanup semantics are preserved.
 
+### M009 — eggup-curl 0.1.2 publication
+
+Class: package promotion / downstream unblock.
+
+Plan: `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md`.
+
+Status: ready.
+
+M009 publishes the already-qualified lightweight external-curl adapter without changing its transport semantics. The immediate downstream trigger is cargo-cleanme Phase 10 self-update, which should consume the registry package instead of copying Gregg's local updater. Publication must prove a registry-only external graph against published `eggup-acquisition`, rerun current Stable/MSRV/macOS/Windows qualification, and retain M007's explicit Windows hosted live-loopback limitation.
+
+M009 does not authorize a Gregg migration, add release-selection policy, or publish `eggup-service` / `eggup-transport-footprint`.
+
 ## 8. Cross-cutting requirements
 
 Transport adapters must preserve bounded body/output behavior, redaction, cancellation cleanup, and partial-file cleanup. Proxy behavior must be explicit rather than inherited accidentally. Transport fallback is never release/source fallback: `NotFound`, verification failure, cancellation, size-limit failure, and staging/promotion failure do not silently select another source.
@@ -204,7 +219,7 @@ Eggfetch version/feature choice may materially affect binary size. Measure rathe
 
 ## 11. Completion definition
 
-The subsystem's primary path is complete when M008 has current-head hosted Stable/MSRV/macOS/Windows qualification, the corrected native Eggfetch path and lightweight curl path both satisfy the common bounded acquisition contract and truthful deadline ceilings, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains.
+The subsystem's mechanism path is complete through M008 when current-head hosted Stable/MSRV/macOS/Windows qualification is green, the corrected native Eggfetch and lightweight curl paths satisfy the common bounded acquisition contract and truthful deadline ceilings, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. M009 is a separate package-promotion gate that makes the already-qualified curl path registry-consumable; it must not reopen transport semantics.
 
 ## 12. Milestone status
 
@@ -218,3 +233,4 @@ The subsystem's primary path is complete when M008 has current-head hosted Stabl
 | M006 | closed | `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md` | `plans/closure/acquisition-transport/006-status.md` | — |
 | M007 | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` | `plans/closure/acquisition-transport/007-status.md` | Windows hosted runner blocks spawned curl loopback requests; no Windows live-HTTP claim |
 | M008 | closed | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md` | `plans/closure/acquisition-transport/008-status.md` | — |
+| M009 | ready | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md` | — | Current package/publish simulation + registry-only external graph; downstream trigger cargo-cleanme Phase 10 M010C |
