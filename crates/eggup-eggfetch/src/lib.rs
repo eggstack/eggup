@@ -193,6 +193,12 @@ pub struct EggfetchTransport {
     config: EggfetchConfig,
 }
 
+thread_local! {
+    /// One current-thread runtime per calling thread, built lazily on first use.
+    static RUNTIME: std::cell::RefCell<Option<tokio::runtime::Runtime>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 impl EggfetchTransport {
     /// Builds a strict adapter. Invalid proxy configuration fails closed here,
     /// never silently direct.
@@ -212,7 +218,7 @@ impl EggfetchTransport {
         "eggfetch-core 0.2.0 (http1,tls-rustls,tls-native-roots,proxy; no compression/cookies/retry/json)"
     }
 
-    fn block_on<F, T>(&self, fut: F) -> T
+    fn block_on<F, T>(&self, fut: F) -> Result<T, AcquisitionError>
     where
         F: std::future::Future<Output = T>,
     {
@@ -220,11 +226,47 @@ impl EggfetchTransport {
         // async runtime into eggup-core or lightweight consumers. Async
         // consumers should call the sync seam via spawn_blocking per their
         // own policy.
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("eggfetch current-thread runtime");
-        rt.block_on(fut)
+        //
+        // The runtime is cached per calling thread. A `current_thread` runtime
+        // is `Send` but not `Sync`, so storing one on the transport would make
+        // `EggfetchTransport` `!Sync` and break callers that share a single
+        // transport across threads; a thread-local keeps the type's auto-traits
+        // intact while still building the reactor and driver once per thread
+        // instead of once per artifact.
+        RUNTIME
+            .try_with(|slot| {
+                let mut slot = slot.borrow_mut();
+                if slot.is_none() {
+                    *slot = Some(
+                        tokio::runtime::Builder::new_current_thread()
+                            .enable_all()
+                            .build()
+                            .map_err(|e| {
+                                // A runtime-build failure (fd exhaustion, driver
+                                // creation failure) is an adapter availability
+                                // problem, not a process abort: this is a
+                                // `Result` API and must not panic. `Unavailable`
+                                // also lets `ComposedTransport` fall back safely.
+                                AcquisitionError::__adapter_unavailable(format!(
+                                    "eggfetch runtime unavailable: {e}"
+                                ))
+                            })?,
+                    );
+                }
+                match slot.as_ref() {
+                    Some(rt) => Ok(rt.block_on(fut)),
+                    // Unreachable: the slot was just populated above.
+                    None => Err(AcquisitionError::__adapter_unavailable(
+                        "eggfetch runtime unavailable",
+                    )),
+                }
+            })
+            .unwrap_or_else(|_| {
+                // The thread-local is being destroyed during thread teardown.
+                Err(AcquisitionError::__adapter_unavailable(
+                    "eggfetch runtime unavailable during thread teardown",
+                ))
+            })
     }
 }
 
@@ -255,7 +297,7 @@ impl AcquisitionTransport for EggfetchTransport {
                 .max_decoded_body_size(max)
                 .send()
                 .await
-                .map_err(|e| map_fetch_error(&e, request, Some(max)))?;
+                .map_err(|e| map_fetch_error(&e, request, max as u64))?;
             let status = response.status().as_u16();
             match classify(status) {
                 StatusClass::NotFound => Ok(FetchOutcome::NotFound),
@@ -275,7 +317,7 @@ impl AcquisitionTransport for EggfetchTransport {
                     let bytes = response
                         .bytes()
                         .await
-                        .map_err(|e| map_fetch_error(&e, request, Some(max)))?;
+                        .map_err(|e| map_fetch_error(&e, request, max as u64))?;
                     if bytes.len() > max {
                         return Err(AcquisitionError::TooLarge { limit: max as u64 });
                     }
@@ -289,7 +331,7 @@ impl AcquisitionTransport for EggfetchTransport {
         // the inner Timeout already covers connect/total, so a Timeout error
         // here is authoritative. No extra wall-clock wrapper is needed for the
         // sync bridge because block_on inherits the client deadlines.
-        result
+        result?
     }
 
     fn fetch_artifact(
@@ -326,93 +368,92 @@ impl AcquisitionTransport for EggfetchTransport {
         let effective = self.config.effective_request_timeout(limits);
         let parent_owned = parent.to_path_buf();
         let dest_owned = dest.to_path_buf();
-        let result: Result<FetchOutcome<ArtifactEvidence>, AcquisitionError> =
-            self.block_on(async {
-                use futures_util::StreamExt;
-                use tokio::io::AsyncWriteExt;
-                let mut response = self
-                    .client
-                    .get(&url)
-                    .map_err(|e| map_request_error(&e, request))?
-                    .timeout(effective)
-                    .send()
-                    .await
-                    .map_err(|e| map_fetch_error(&e, request, None))?;
-                let status = response.status().as_u16();
-                match classify(status) {
-                    StatusClass::NotFound => return Ok(FetchOutcome::NotFound),
-                    StatusClass::HardFailure => {
-                        return Err(AcquisitionError::Transport(bound(format!(
-                            "HTTP {status} from {redacted} while fetching artifact"
-                        ))));
-                    }
-                    StatusClass::Success => {}
+        let result = self.block_on(async {
+            use futures_util::StreamExt;
+            use tokio::io::AsyncWriteExt;
+            let mut response = self
+                .client
+                .get(&url)
+                .map_err(|e| map_request_error(&e, request))?
+                .timeout(effective)
+                .send()
+                .await
+                .map_err(|e| map_fetch_error(&e, request, max_artifact))?;
+            let status = response.status().as_u16();
+            match classify(status) {
+                StatusClass::NotFound => return Ok(FetchOutcome::NotFound),
+                StatusClass::HardFailure => {
+                    return Err(AcquisitionError::Transport(bound(format!(
+                        "HTTP {status} from {redacted} while fetching artifact"
+                    ))));
                 }
-                // Exclusive owner-private temp plus race-safe no-clobber
-                // promotion. The temp lives in the exact destination parent
-                // so promotion stays on the same filesystem.
-                let (std_file, tmp) =
-                    eggup_acquisition::__acquire_exclusive_temp(&parent_owned, "eggup-eggfetch")?;
-                struct Guard {
-                    path: std::path::PathBuf,
-                    disarm: bool,
-                }
-                impl Drop for Guard {
-                    fn drop(&mut self) {
-                        if !self.disarm {
-                            eggup_acquisition::__remove_owned_temp(&self.path);
-                        }
+                StatusClass::Success => {}
+            }
+            // Exclusive owner-private temp plus race-safe no-clobber
+            // promotion. The temp lives in the exact destination parent
+            // so promotion stays on the same filesystem.
+            let (std_file, tmp) =
+                eggup_acquisition::__acquire_exclusive_temp(&parent_owned, "eggup-eggfetch")?;
+            struct Guard {
+                path: std::path::PathBuf,
+                disarm: bool,
+            }
+            impl Drop for Guard {
+                fn drop(&mut self) {
+                    if !self.disarm {
+                        eggup_acquisition::__remove_owned_temp(&self.path);
                     }
                 }
-                let mut guard = Guard {
-                    path: tmp.clone(),
-                    disarm: false,
-                };
-                let mut file = tokio::fs::File::from_std(std_file);
-                let mut stream = response
-                    .bytes_stream()
-                    .map_err(|e| map_fetch_error(&e, request, None))?;
-                let mut written: u64 = 0;
-                while let Some(chunk) = stream.next().await {
-                    if cancel.is_cancelled() {
-                        return Err(AcquisitionError::Cancelled);
-                    }
-                    let chunk = chunk.map_err(|e| map_fetch_error(&e, request, None))?;
-                    if chunk.is_empty() {
-                        continue;
-                    }
-                    written = written.saturating_add(chunk.len() as u64);
-                    if written > max_artifact {
-                        return Err(AcquisitionError::TooLarge {
-                            limit: max_artifact,
-                        });
-                    }
-                    file.write_all(&chunk).await.map_err(|e| {
-                        AcquisitionError::Io(bound(format!("writing part file: {e}")))
-                    })?;
-                }
-                file.flush()
-                    .await
-                    .map_err(|e| AcquisitionError::Io(bound(format!("flushing part file: {e}"))))?;
-                drop(file);
+            }
+            let mut guard = Guard {
+                path: tmp.clone(),
+                disarm: false,
+            };
+            let mut file = tokio::fs::File::from_std(std_file);
+            let mut stream = response
+                .bytes_stream()
+                .map_err(|e| map_fetch_error(&e, request, max_artifact))?;
+            let mut written: u64 = 0;
+            while let Some(chunk) = stream.next().await {
                 if cancel.is_cancelled() {
                     return Err(AcquisitionError::Cancelled);
                 }
-                match eggup_acquisition::__promote_no_clobber(&tmp, &dest_owned) {
-                    Ok(()) => {
-                        guard.disarm = true;
-                        Ok(FetchOutcome::Success(
-                            eggup_acquisition::__adapter_artifact(written),
-                        ))
-                    }
-                    Err(e) => {
-                        eggup_acquisition::__remove_owned_temp(&tmp);
-                        guard.disarm = true;
-                        Err(e)
-                    }
+                let chunk = chunk.map_err(|e| map_fetch_error(&e, request, max_artifact))?;
+                if chunk.is_empty() {
+                    continue;
                 }
-            });
-        result
+                written = written.saturating_add(chunk.len() as u64);
+                if written > max_artifact {
+                    return Err(AcquisitionError::TooLarge {
+                        limit: max_artifact,
+                    });
+                }
+                file.write_all(&chunk)
+                    .await
+                    .map_err(|e| AcquisitionError::Io(bound(format!("writing part file: {e}"))))?;
+            }
+            file.flush()
+                .await
+                .map_err(|e| AcquisitionError::Io(bound(format!("flushing part file: {e}"))))?;
+            drop(file);
+            if cancel.is_cancelled() {
+                return Err(AcquisitionError::Cancelled);
+            }
+            match eggup_acquisition::__promote_no_clobber(&tmp, &dest_owned) {
+                Ok(()) => {
+                    guard.disarm = true;
+                    Ok(FetchOutcome::Success(
+                        eggup_acquisition::__adapter_artifact(written),
+                    ))
+                }
+                Err(e) => {
+                    eggup_acquisition::__remove_owned_temp(&tmp);
+                    guard.disarm = true;
+                    Err(e)
+                }
+            }
+        });
+        result?
     }
 }
 
@@ -466,16 +507,18 @@ fn map_request_error(e: &eggfetch_core::Error, request: &AcquisitionRequest) -> 
     }
 }
 
+/// `byte_bound` is the bound this call site actually enforces. It is reported
+/// verbatim in `TooLarge`, whose `limit` field is documented as "the bound that
+/// was exceeded", so every call site must pass a real bound rather than an
+/// absent one.
 fn map_fetch_error(
     e: &eggfetch_core::Error,
     request: &AcquisitionRequest,
-    max: Option<usize>,
+    byte_bound: u64,
 ) -> AcquisitionError {
     use eggfetch_core::Error as E;
     match e {
-        E::DecodedBodyTooLarge => AcquisitionError::TooLarge {
-            limit: max.unwrap_or(0) as u64,
-        },
+        E::DecodedBodyTooLarge => AcquisitionError::TooLarge { limit: byte_bound },
         E::Timeout { phase, .. } => AcquisitionError::Timeout {
             phase: match phase {
                 eggfetch_core::TimeoutPhase::Connect => "connect",
@@ -1157,7 +1200,7 @@ mod tests {
         assert!(fake.to_string().contains(proxy_pw));
         // Our mapper must not echo that detail.
         let req2 = req("https://example.com/x");
-        let mapped = super::map_fetch_error(&fake, &req2, None);
+        let mapped = super::map_fetch_error(&fake, &req2, 1024);
         let mapped_msg = format!("{mapped}");
         assert!(
             !mapped_msg.contains(proxy_pw),

@@ -194,14 +194,8 @@ pub(crate) fn report_for_error(
         ),
         Error::VerificationFailed(m) => (FailureCategory::Verification, m.clone()),
         Error::CandidateExecution(m) => (FailureCategory::Verification, m.clone()),
-        Error::InvalidInput(m) => {
-            let category = if m.contains("injected") {
-                FailureCategory::Injected
-            } else {
-                FailureCategory::InvalidInput
-            };
-            (category, m.clone())
-        }
+        Error::Injected(m) => (FailureCategory::Injected, m.clone()),
+        Error::InvalidInput(m) => (FailureCategory::InvalidInput, m.clone()),
         Error::UnknownMember(m) => (FailureCategory::InvalidInput, format!("unknown member {m}")),
         Error::Io { operation, source } => (
             FailureCategory::Filesystem,
@@ -248,6 +242,13 @@ impl TransactionReceipt {
     }
 
     /// Returns whether every restoration check passed.
+    ///
+    /// This describes restoration of live destinations only. A rolled-back
+    /// transaction whose restoration fully succeeded stays `true` even when
+    /// the backup set could not be removed; that cleanup problem is reported
+    /// in [`Self::failure`] with a [`FailurePhase::Finalize`] phase and
+    /// `false` is never reported without a [`Self::rollback_failure`] or a
+    /// recorded cleanup failure to explain it.
     pub fn rollback_verified(&self) -> bool {
         self.rollback_verified
     }
@@ -260,9 +261,10 @@ impl TransactionReceipt {
     /// Returns retained backup/lock evidence when manual recovery is required.
     ///
     /// When present, the path always refers to real retained evidence. A
-    /// cleanup failure after an otherwise successful commit retains the real
-    /// backup root and reports the cleanup problem in [`Self::failure`];
-    /// no synthetic non-existent path is ever returned.
+    /// cleanup failure after an otherwise successful commit — or after a fully
+    /// verified rollback — retains the real backup root and reports the cleanup
+    /// problem in [`Self::failure`]; no synthetic non-existent path is ever
+    /// returned.
     pub fn recovery_path(&self) -> Option<&Path> {
         self.recovery_path.as_deref()
     }
@@ -272,7 +274,8 @@ impl TransactionReceipt {
     /// A rolled-back transaction remains a first-class terminal result, but
     /// the caller can answer "what failed?" from this report without scraping
     /// logs. Successful commits with cleanup trouble also report the finalize
-    /// problem here.
+    /// problem here, as does a fully verified rollback whose backup set could
+    /// not be cleaned up.
     pub fn failure(&self) -> Option<&FailureReport> {
         self.failure.as_ref()
     }
@@ -324,7 +327,7 @@ impl PreparedTransaction {
         post_commit: Option<PostCommitCheck<'_>>,
     ) -> Result<TransactionReceipt> {
         if fault == Some(CommitFault::LockCreation) {
-            return Err(Error::invalid("injected lock creation failure"));
+            return Err(Error::injected("injected lock creation failure"));
         }
         // Preflight ownership classification before taking the lock so a
         // change between preflight and locked revalidation is detectable.
@@ -364,7 +367,7 @@ impl PreparedTransaction {
             return finish_failure(self, lock, backup_root, verified, rollback_failure, report);
         }
         if fault == Some(CommitFault::BeforeFirstCommit) {
-            let error = Error::invalid("injected pre-commit failure");
+            let error = Error::injected("injected pre-commit failure");
             let report = report_for_error(FailurePhase::Commit, None, &error);
             let (verified, rollback_failure) =
                 restore_entries(&entries, &HashSet::new(), fault.clone());
@@ -381,7 +384,7 @@ impl PreparedTransaction {
                 _ => false,
             });
             if commit_should_fail {
-                let error = Error::invalid(format!("injected commit failure at {}", member.id()));
+                let error = Error::injected(format!("injected commit failure at {}", member.id()));
                 let report =
                     report_for_error(FailurePhase::Commit, Some(member.id().clone()), &error);
                 let (verified, rollback_failure) =
@@ -560,7 +563,7 @@ impl PreparedTransaction {
             if fault == Some(CommitFault::Backup(member.id().clone())) {
                 return Err((
                     Some(member.id().clone()),
-                    Error::invalid(format!("injected backup failure at {}", member.id())),
+                    Error::injected(format!("injected backup failure at {}", member.id())),
                 ));
             }
             let destination = self
@@ -941,19 +944,44 @@ fn finish_failure(
     rollback_failure: Option<FailureReport>,
     report: FailureReport,
 ) -> Result<TransactionReceipt> {
-    if rollback_verified && rollback_failure.is_none() && fs::remove_dir_all(&backup_root).is_ok() {
-        return Ok(TransactionReceipt {
-            product: transaction.plan.product().clone(),
-            release: transaction.plan.release().clone(),
-            disposition: TransactionDisposition::RolledBack,
-            rollback_performed: true,
-            rollback_verified: true,
-            cleanup: CleanupDisposition::Cleaned,
-            recovery_path: None,
-            failure: Some(report),
-            rollback_failure: None,
-            post_commit_failure: None,
-        });
+    if rollback_verified && rollback_failure.is_none() {
+        match fs::remove_dir_all(&backup_root) {
+            Ok(()) => {
+                return Ok(TransactionReceipt {
+                    product: transaction.plan.product().clone(),
+                    release: transaction.plan.release().clone(),
+                    disposition: TransactionDisposition::RolledBack,
+                    rollback_performed: true,
+                    rollback_verified: true,
+                    cleanup: CleanupDisposition::Cleaned,
+                    recovery_path: None,
+                    failure: Some(report),
+                    rollback_failure: None,
+                    post_commit_failure: None,
+                });
+            }
+            // Restoration itself fully succeeded; only the backup-set cleanup
+            // failed. Mirror the committed path: keep the receipt `RolledBack`,
+            // carry the verified flag truthfully, and attribute the problem to
+            // the `Finalize` phase in `failure()` rather than leaving a
+            // `RecoveryRequired` receipt that claims unverified rollback with
+            // no rollback failure recorded.
+            Err(source) => {
+                let error = Error::io("removing backup set after rollback", source);
+                return Ok(TransactionReceipt {
+                    product: transaction.plan.product().clone(),
+                    release: transaction.plan.release().clone(),
+                    disposition: TransactionDisposition::RolledBack,
+                    rollback_performed: true,
+                    rollback_verified: true,
+                    cleanup: CleanupDisposition::RetainedForRecovery,
+                    recovery_path: Some(backup_root),
+                    failure: Some(report_for_error(FailurePhase::Finalize, None, &error)),
+                    rollback_failure: None,
+                    post_commit_failure: None,
+                });
+            }
+        }
     }
     lock.preserve();
     Ok(TransactionReceipt {
@@ -961,7 +989,7 @@ fn finish_failure(
         release: transaction.plan.release().clone(),
         disposition: TransactionDisposition::RecoveryRequired,
         rollback_performed: true,
-        rollback_verified: false,
+        rollback_verified,
         cleanup: CleanupDisposition::RetainedForRecovery,
         recovery_path: Some(backup_root),
         failure: Some(report),

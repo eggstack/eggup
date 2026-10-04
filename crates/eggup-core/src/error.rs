@@ -32,11 +32,23 @@ pub enum Error {
     VerificationFailed(String),
     /// Candidate execution could not produce an accepted bounded result.
     CandidateExecution(String),
+    /// A failure deliberately produced by the built-in test fault harness.
+    ///
+    /// This variant exists so fault injection is identified structurally,
+    /// never by matching caller-supplied message text. Production paths must
+    /// not construct it.
+    Injected(String),
 }
 
 impl Error {
     pub(crate) fn invalid(message: impl Into<String>) -> Self {
         Self::InvalidInput(message.into())
+    }
+
+    /// Builds a fault-harness failure. Only the built-in fault injection
+    /// points may call this.
+    pub(crate) fn injected(message: impl Into<String>) -> Self {
+        Self::Injected(message.into())
     }
 
     pub(crate) fn io(operation: &'static str, source: io::Error) -> Self {
@@ -68,6 +80,9 @@ impl fmt::Display for Error {
             Self::CandidateExecution(message) => {
                 write!(formatter, "candidate execution failed: {message}")
             }
+            Self::Injected(message) => {
+                write!(formatter, "injected failure: {message}")
+            }
         }
     }
 }
@@ -81,7 +96,8 @@ impl std::error::Error for Error {
             | Self::UpdateInProgress { .. }
             | Self::DestinationConflict { .. }
             | Self::VerificationFailed(_)
-            | Self::CandidateExecution(_) => None,
+            | Self::CandidateExecution(_)
+            | Self::Injected(_) => None,
         }
     }
 }

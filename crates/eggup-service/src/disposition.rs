@@ -835,7 +835,7 @@ where
             crate::RestoreIntent::EnsureStopped => LifecycleState::Stopped,
         },
     };
-    transition_owned_to(
+    safe_transition_owned_to(
         manager,
         spec,
         wanted,
@@ -855,6 +855,32 @@ where
     check
         .check(spec, &snapshot, budget)
         .map_err(|e| mk_failure(spec, Phase::PostInstallCheck, e, Some(&snapshot)))
+}
+
+/// Panic-safe [`transition_owned_to`].
+///
+/// The caller's `catch_unwind` wraps the whole post-commit block, so a panic
+/// escaping here would be labelled with the wrong phase. Catching it at the
+/// point of execution records it under `phase` — so a panicking `start`/`stop`
+/// during `RestoreNew` cannot be reported as a post-install check failure.
+fn safe_transition_owned_to<M: ServiceManager>(
+    manager: &mut M,
+    spec: &ServiceSpec,
+    wanted: LifecycleState,
+    timeout: Duration,
+    phase: crate::LifecycleUpdatePhase,
+) -> Result<(), crate::LifecycleFailure> {
+    match catch_unwind(AssertUnwindSafe(|| {
+        transition_owned_to(manager, spec, wanted, timeout, phase)
+    })) {
+        Ok(result) => result,
+        Err(_) => Err(mk_failure(
+            spec,
+            phase,
+            "service manager panicked while transitioning",
+            None,
+        )),
+    }
 }
 
 fn transition_owned_to<M: ServiceManager>(
@@ -941,7 +967,20 @@ fn quiesce_manager_for_rollback<M: ServiceManager>(
             None,
         ));
     }
-    let observed = manager.inspect(spec).ok();
+    // An inspect failure is not "no information, proceed": ownership could not
+    // be established, so the destructive `stop` below would run against an
+    // unproven target. Treat it as Unknown and refuse to quiesce.
+    let observed = match manager.inspect(spec) {
+        Ok(snapshot) => Some(snapshot),
+        Err(e) => {
+            return Some(mk_failure(
+                spec,
+                Phase::QuiesceForRollback,
+                format!("refusing to quiesce unobservable service before rollback: {e}"),
+                None,
+            ))
+        }
+    };
     if observed
         .as_ref()
         .is_some_and(|s| s.ownership == Ownership::Owned && s.state == LifecycleState::Stopped)
@@ -1019,39 +1058,59 @@ where
                 _ => DirectState::Running,
             };
             let work = catch_unwind(AssertUnwindSafe(|| {
-                if wanted == DirectState::Running {
-                    let budget = remaining(deadline);
-                    if budget.is_zero() {
+                // The `RestoreNew` work is caught separately from the check, so a
+                // panicking direct `start` is recorded under the phase that was
+                // actually executing. The outer panic arm can then only be
+                // reached by the check itself.
+                let restored = catch_unwind(AssertUnwindSafe(
+                    || -> Result<LifecycleSnapshot, crate::LifecycleFailure> {
+                        if wanted == DirectState::Running {
+                            let budget = remaining(deadline);
+                            if budget.is_zero() {
+                                return Err(mk_failure(
+                                    spec,
+                                    Phase::RestoreNew,
+                                    "lifecycle operation deadline exhausted",
+                                    Some(&before_c),
+                                ));
+                            }
+                            let Some(d) = direct.as_mut() else {
+                                return Err(mk_failure(
+                                    spec,
+                                    Phase::RestoreNew,
+                                    "direct control missing during restore",
+                                    Some(&before_c),
+                                ));
+                            };
+                            let r = (**d).start(budget).map_err(|e| {
+                                mk_failure(spec, Phase::RestoreNew, e, Some(&before_c))
+                            })?;
+                            if !r.completed {
+                                return Err(mk_failure(
+                                    spec,
+                                    Phase::RestoreNew,
+                                    "direct transition did not complete",
+                                    Some(&before_c),
+                                ));
+                            }
+                        }
+                        // Read-only manager observation for the check snapshot; direct
+                        // state is caller-owned and not part of LifecycleSnapshot.
+                        safe_manager_inspect(manager, spec, Phase::RestoreNew)
+                    },
+                ));
+                let snapshot = match restored {
+                    Ok(Ok(snapshot)) => snapshot,
+                    Ok(Err(failure)) => return Err(failure),
+                    Err(_) => {
                         return Err(mk_failure(
                             spec,
                             Phase::RestoreNew,
-                            "lifecycle operation deadline exhausted",
+                            "direct runtime panicked while restoring",
                             Some(&before_c),
-                        ));
+                        ))
                     }
-                    let Some(d) = direct.as_mut() else {
-                        return Err(mk_failure(
-                            spec,
-                            Phase::RestoreNew,
-                            "direct control missing during restore",
-                            Some(&before_c),
-                        ));
-                    };
-                    let r = (**d)
-                        .start(budget)
-                        .map_err(|e| mk_failure(spec, Phase::RestoreNew, e, Some(&before_c)))?;
-                    if !r.completed {
-                        return Err(mk_failure(
-                            spec,
-                            Phase::RestoreNew,
-                            "direct transition did not complete",
-                            Some(&before_c),
-                        ));
-                    }
-                }
-                // Read-only manager observation for the check snapshot; direct
-                // state is caller-owned and not part of LifecycleSnapshot.
-                let snapshot = safe_manager_inspect(manager, spec, Phase::RestoreNew)?;
+                };
                 let budget = remaining(deadline);
                 if budget.is_zero() {
                     return Err(mk_failure(
@@ -1211,18 +1270,31 @@ fn quiesce_direct_for_rollback<D: DirectRuntimeControl>(
             None,
         ));
     };
-    // If already stopped with proven ownership, nothing to do.
-    if let Ok(obs) = d.inspect() {
-        if obs.state == DirectState::Stopped && obs.exact_ownership_proven {
-            return None;
+    // If already stopped with proven ownership, nothing to do. An inspect
+    // failure is not "no information, proceed": `DirectRuntimeControl` is a
+    // caller-supplied seam with no second ownership check inside `stop`, so an
+    // unobservable runtime must fail closed rather than be stopped blind.
+    match d.inspect() {
+        Ok(obs) => {
+            if obs.state == DirectState::Stopped && obs.exact_ownership_proven {
+                return None;
+            }
+            if !obs.exact_ownership_proven {
+                return Some(mk_failure(
+                    spec,
+                    Phase::QuiesceForRollback,
+                    "refusing to quiesce unproven direct runtime before rollback",
+                    None,
+                ));
+            }
         }
-        if !obs.exact_ownership_proven {
+        Err(e) => {
             return Some(mk_failure(
                 spec,
                 Phase::QuiesceForRollback,
-                "refusing to quiesce unproven direct runtime before rollback",
+                format!("refusing to quiesce unobservable direct runtime before rollback: {e}"),
                 None,
-            ));
+            ))
         }
     }
     match d.stop(budget) {
@@ -1556,6 +1628,7 @@ mod tests {
         events: Rc<RefCell<Vec<&'static str>>>,
         fail_stop: bool,
         fail_start: bool,
+        fail_inspect: bool,
         drift_after_stop: bool,
     }
 
@@ -1566,6 +1639,7 @@ mod tests {
                 events,
                 fail_stop: false,
                 fail_start: false,
+                fail_inspect: false,
                 drift_after_stop: false,
             }
         }
@@ -1574,6 +1648,11 @@ mod tests {
     impl DirectRuntimeControl for FakeDirect {
         fn inspect(&self) -> Result<DirectObservation, ServiceError> {
             self.events.borrow_mut().push("direct-inspect");
+            if self.fail_inspect {
+                return Err(ServiceError::manager(
+                    "injected unobservable direct runtime",
+                ));
+            }
             Ok(self.obs.clone())
         }
 
@@ -1610,6 +1689,117 @@ mod tests {
     }
 
     static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    /// A manager that cannot be observed, so ownership can never be proven.
+    #[derive(Debug)]
+    struct UnobservableManager {
+        inner: TestDoubleManager,
+        events: Rc<RefCell<Vec<&'static str>>>,
+    }
+
+    impl ServiceManager for UnobservableManager {
+        fn inspect(&self, _spec: &ServiceSpec) -> Result<LifecycleSnapshot, ServiceError> {
+            self.events.borrow_mut().push("inspect");
+            Err(ServiceError::manager("injected unobservable service"))
+        }
+
+        fn install(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
+            self.events.borrow_mut().push("install");
+            self.inner.install(spec)
+        }
+
+        fn start(
+            &mut self,
+            spec: &ServiceSpec,
+            timeout: Duration,
+        ) -> Result<TransitionResult, ServiceError> {
+            self.events.borrow_mut().push("start");
+            self.inner.start(spec, timeout)
+        }
+
+        fn stop(
+            &mut self,
+            spec: &ServiceSpec,
+            timeout: Duration,
+        ) -> Result<TransitionResult, ServiceError> {
+            self.events.borrow_mut().push("stop");
+            self.inner.stop(spec, timeout)
+        }
+
+        fn restart(
+            &mut self,
+            spec: &ServiceSpec,
+            timeout: Duration,
+        ) -> Result<TransitionResult, ServiceError> {
+            self.events.borrow_mut().push("restart");
+            self.inner.restart(spec, timeout)
+        }
+
+        fn uninstall(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
+            self.events.borrow_mut().push("uninstall");
+            self.inner.uninstall(spec)
+        }
+    }
+
+    #[test]
+    fn unobservable_direct_runtime_is_not_stopped_before_rollback() {
+        use crate::LifecycleUpdatePhase as Phase;
+
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let mut direct = FakeDirect::running(events.clone());
+        direct.fail_inspect = true;
+        let spec = ServiceSpec::new(
+            crate::ServiceId::new("unobservable").unwrap(),
+            std::env::current_exe().unwrap(),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+
+        let failure = quiesce_direct_for_rollback(
+            Some(&mut direct),
+            &spec,
+            Instant::now() + Duration::from_secs(5),
+        )
+        .expect("an unobservable direct runtime must refuse to quiesce");
+        assert_eq!(failure.phase, Phase::QuiesceForRollback);
+        let events = events.borrow();
+        assert!(
+            events.iter().all(|e| *e != "direct-stop"),
+            "no destructive stop may be issued without proven ownership, got {events:?}"
+        );
+    }
+
+    #[test]
+    fn unobservable_service_is_not_stopped_before_rollback() {
+        use crate::LifecycleUpdatePhase as Phase;
+
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let spec = ServiceSpec::new(
+            crate::ServiceId::new("unobservable").unwrap(),
+            std::env::current_exe().unwrap(),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        let mut manager = UnobservableManager {
+            inner: TestDoubleManager::new(),
+            events: events.clone(),
+        };
+
+        let failure = quiesce_manager_for_rollback(
+            &mut manager,
+            &spec,
+            Instant::now() + Duration::from_secs(5),
+        )
+        .expect("an unobservable service must refuse to quiesce");
+        assert_eq!(failure.phase, Phase::QuiesceForRollback);
+        let events = events.borrow();
+        assert!(
+            events.iter().all(|e| *e != "stop"),
+            "no destructive stop may be issued without proven ownership, got {events:?}"
+        );
+    }
 
     fn setup() -> (TempfileGuard, std::path::PathBuf, ValidatedTransaction) {
         let base = std::env::temp_dir().join(format!(
@@ -1942,6 +2132,7 @@ mod tests {
             events,
             fail_stop: false,
             fail_start: false,
+            fail_inspect: false,
             drift_after_stop: false,
         };
         let err = commit_with_disposition(

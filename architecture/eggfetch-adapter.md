@@ -66,8 +66,18 @@ Built in `EggfetchConfig::build_client()` (`lib.rs:155-183`):
 - `RedirectPolicy::strict(max_redirects)` (`lib.rs:151-153`).
 - `automatic_decompression(false)` (`lib.rs:172`).
 - No retry / cookies / JSON features enabled (see Cargo features below).
-- Downgrade policy: strict HTTPS→HTTP downgrade rejection; tested explicitly
-  in `downgrade_policy_denies_https_to_http` (`lib.rs:612-623`).
+- Downgrade policy: strict HTTPS→HTTP downgrade rejection, scoped to this native
+  adapter and implemented by eggfetch's `RedirectPolicy::strict`; tested
+  explicitly in `downgrade_policy_denies_https_to_http` (`lib.rs:612-623`).
+
+This downgrade rejection is implemented differently per adapter. The external
+`eggup-curl` adapter enforces the same rule per request:
+`CurlConfig::allowed_protocols` bounds the initial request via `--proto`, while
+`--proto-redir` is narrowed so an `https` URL never lists `http` as a permitted
+redirect target (`redirect_protocols()` in `eggup-curl/src/lib.rs`). An `https`
+request answering `302 Location: http://…` is therefore refused rather than
+followed in cleartext, matching the posture above. Curl's redirect, protocol,
+and proxy policy remains explicit and caller-configurable by design.
 
 Cargo features (`Cargo.toml:25`):
 
@@ -192,8 +202,9 @@ pub enum ProxyDecision {
    - `Guard` drops → `__remove_owned_temp` unless disarmed.
 7. Streaming (`lib.rs:372-395`):
    - `response.bytes_stream()`; per-chunk cancel check; skip empty chunks.
-   - `written.saturating_add(len)`; if `max_artifact = Some(max)` and
-     `written > max` → `TooLarge { limit: max }`. Unbounded (`None`) still counts.
+   - `written.saturating_add(len)`; if `written > max_artifact_bytes` →
+     `TooLarge { limit: max_artifact_bytes }`. The bound is always a finite
+     positive `u64`; there is no unbounded case.
    - `tokio::fs::File::from_std`, `write_all`, `flush`; I/O errors →
      `Io("writing/flushing part file: ...")`.
 8. Post-stream cancel check, then `__promote_no_clobber(&tmp, &dest)` (`lib.rs:400-415`):

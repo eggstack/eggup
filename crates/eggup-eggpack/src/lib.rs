@@ -668,7 +668,16 @@ pub fn core_plan_for_archive(
 ///
 /// Identity is the projection's `install` string converted into a `MemberId`;
 /// bound members are paired to the projection's archive members in declaration
-/// order. Mismatched counts fail closed.
+/// order. Mismatched counts fail closed, and so does a member whose own
+/// recorded identity (`source_path`/`output_name`) does not match the declared
+/// member it would be bound to.
+///
+/// The identity cross-check is what stops bytes being labelled positionally
+/// rather than by proven identity: a `BoundExtraction` produced from a
+/// different `ArchivePlan`, or reused after a re-projection, pairs by count
+/// alone and would otherwise commit foreign bytes under a declared identity.
+/// That substitution is digest-invisible whenever two declared members happen
+/// to share identical content, which is exactly when it is most dangerous.
 pub fn bind_archive_members(
     projection: &ManifestProjection,
     bound_members: Vec<BoundMember>,
@@ -682,8 +691,18 @@ pub fn bind_archive_members(
     }
     let mut sources = BoundSources::new();
     for (declared, bound) in members.iter().zip(bound_members) {
+        // `archive_plan_for` builds each `ArchiveMember` with
+        // `source_path = declared.source` and `output_name = declared.install`,
+        // so these are the exact identities a correctly-projected extraction
+        // carries.
+        if bound.source_path() != declared.source || bound.output_name() != declared.install {
+            return Err(AdapterError::MapMismatch("archive bound member identity"));
+        }
         let id = MemberId::new(declared.install.clone())
             .map_err(|e| AdapterError::Eggup(e.to_string()))?;
+        // `insert` returns the displaced handle; declaration order and the
+        // validated projection make a duplicate `install` impossible here, and
+        // it is dropped with the map on the error paths above.
         sources.insert(id, bound.into_open_object());
     }
     Ok(sources)

@@ -81,15 +81,27 @@ impl Stage {
                 }
             }
             let handle = bound.as_mut().and_then(|sources| sources.take(member.id()));
-            match handle {
-                Some(handle) => stage_bound_source(handle, &destination)?,
+            let source_executable = match handle {
+                Some(handle) => {
+                    // Executable intent is read from the handle's own metadata,
+                    // before the fresh owner-private staged file exists. Reading
+                    // it back from the staged copy instead would always read back
+                    // the 0600 set below and silently drop the source's
+                    // executable bit.
+                    let executable = bound_handle_is_executable(&handle)?;
+                    stage_bound_source(handle, &destination)?;
+                    executable
+                }
                 None => {
                     fs::copy(member.source(), &destination).map_err(|source| {
                         Error::io("copying artifact into private stage", source)
                     })?;
+                    // `fs::copy` carries the source mode onto the staged copy,
+                    // so the staged file is a faithful stand-in here.
+                    staged_is_executable(&destination)?
                 }
-            }
-            apply_permissions(member, &destination)?;
+            };
+            apply_permissions(member, &destination, source_executable)?;
         }
         Ok(())
     }
@@ -118,6 +130,10 @@ fn stage_bound_source(mut handle: File, destination: &Path) -> Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+        // The staged file is created fresh, so it starts out owner-private by
+        // construction. This hardcoded 0600 is hardening, not executable
+        // intent: the source's executable bit is captured from the handle
+        // before this point and re-applied by `apply_permissions`.
         fs::set_permissions(destination, fs::Permissions::from_mode(0o600))
             .map_err(|source| Error::io("securing bound stage destination", source))?;
     }
@@ -229,7 +245,44 @@ fn create_stage_directory(installation_root: &Path) -> Result<(PathBuf, PathBuf)
     Err(Error::invalid("could not create a unique stage directory"))
 }
 
-fn apply_permissions(member: &ArtifactMember, destination: &Path) -> Result<()> {
+/// Reads executable intent from an already-open bound source handle itself.
+///
+/// `File::metadata` is an `fstat` on the handle, so this is unaffected by the
+/// staged file and cannot be masked by the stage's own `0600` hardening.
+#[cfg(unix)]
+fn bound_handle_is_executable(handle: &File) -> Result<bool> {
+    use std::os::unix::fs::PermissionsExt;
+    handle
+        .metadata()
+        .map(|meta| meta.permissions().mode() & 0o111 != 0)
+        .map_err(|source| Error::io("reading bound source permissions", source))
+}
+
+#[cfg(not(unix))]
+fn bound_handle_is_executable(_handle: &File) -> Result<bool> {
+    Ok(false)
+}
+
+/// Reads executable intent from an already-staged member whose mode was
+/// carried over from the source by `fs::copy`.
+#[cfg(unix)]
+fn staged_is_executable(destination: &Path) -> Result<bool> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::metadata(destination)
+        .map(|meta| meta.permissions().mode() & 0o111 != 0)
+        .map_err(|source| Error::io("reading staged permissions", source))
+}
+
+#[cfg(not(unix))]
+fn staged_is_executable(_destination: &Path) -> Result<bool> {
+    Ok(false)
+}
+
+fn apply_permissions(
+    member: &ArtifactMember,
+    destination: &Path,
+    source_executable: bool,
+) -> Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -241,11 +294,7 @@ fn apply_permissions(member: &ArtifactMember, destination: &Path) -> Result<()> 
         let mode = match member.permissions() {
             PermissionsIntent::Executable => 0o700,
             PermissionsIntent::Preserve => {
-                let staged_mode = fs::metadata(destination)
-                    .map_err(|source| Error::io("reading staged permissions", source))?
-                    .permissions()
-                    .mode();
-                if staged_mode & 0o111 != 0 {
+                if source_executable {
                     0o700
                 } else {
                     0o600
@@ -256,7 +305,7 @@ fn apply_permissions(member: &ArtifactMember, destination: &Path) -> Result<()> 
             .map_err(|source| Error::io("setting staged permissions", source))?;
     }
     #[cfg(not(unix))]
-    let _ = (member, destination);
+    let _ = (member, destination, source_executable);
     Ok(())
 }
 
@@ -268,7 +317,7 @@ enum FailureAt {
 
 fn check_failure(configured: Option<FailureAt>, point: FailureAt) -> Result<()> {
     if configured == Some(point) {
-        return Err(Error::invalid(format!(
+        return Err(Error::injected(format!(
             "injected preparation failure at {point:?}"
         )));
     }

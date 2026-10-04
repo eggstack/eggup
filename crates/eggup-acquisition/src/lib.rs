@@ -478,17 +478,27 @@ pub fn __acquire_exclusive_temp(
         match opts.open(&candidate) {
             Ok(file) => {
                 // Enforce owner-private permissions even under permissive umask.
+                // Any failure here happens after the file exists, so this
+                // function is the only owner that can clean it up: callers build
+                // their `Guard` only after this returns `Ok`.
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::PermissionsExt;
-                    let mut perms = file
-                        .metadata()
-                        .map_err(|e| AcquisitionError::io("reading part permissions", e))?
-                        .permissions();
+                    let mut perms = match file.metadata() {
+                        Ok(meta) => meta.permissions(),
+                        Err(e) => {
+                            drop(file);
+                            let _ = fs::remove_file(&candidate);
+                            return Err(AcquisitionError::io("reading part permissions", e));
+                        }
+                    };
                     if perms.mode() & 0o777 != 0o600 {
                         perms.set_mode(0o600);
-                        std::fs::set_permissions(&candidate, perms)
-                            .map_err(|e| AcquisitionError::io("securing part file", e))?;
+                        if let Err(e) = fs::set_permissions(&candidate, perms) {
+                            drop(file);
+                            let _ = fs::remove_file(&candidate);
+                            return Err(AcquisitionError::io("securing part file", e));
+                        }
                     }
                 }
                 return Ok((file, candidate));
@@ -983,6 +993,34 @@ impl<'a> ComposedTransport<'a> {
             _ => false,
         }
     }
+
+    /// Reduces the caller's budget to what is left after the primary attempt.
+    ///
+    /// `FetchLimits::total_timeout` is the *total* wall-clock deadline for the
+    /// fetch, so handing the secondary adapter the original limits would let
+    /// one composed fetch run for roughly twice the caller's deadline. The
+    /// connect bound is clamped alongside it because the seam requires
+    /// `connect_timeout <= total_timeout`. Exhausting the budget is reported as
+    /// a total timeout rather than starting a doomed attempt.
+    fn remaining_limits(
+        &self,
+        limits: FetchLimits,
+        started: Instant,
+    ) -> Result<FetchLimits, AcquisitionError> {
+        let elapsed = started.elapsed();
+        let remaining = limits
+            .total_timeout
+            .checked_sub(elapsed)
+            .ok_or(AcquisitionError::Timeout { phase: "total" })?;
+        if remaining.is_zero() {
+            return Err(AcquisitionError::Timeout { phase: "total" });
+        }
+        Ok(FetchLimits {
+            connect_timeout: limits.connect_timeout.min(remaining),
+            total_timeout: remaining,
+            ..limits
+        })
+    }
 }
 
 impl AcquisitionTransport for ComposedTransport<'_> {
@@ -999,11 +1037,14 @@ impl AcquisitionTransport for ComposedTransport<'_> {
         if cancel.is_cancelled() {
             return Err(AcquisitionError::Cancelled);
         }
+        let started = Instant::now();
         match self.primary.fetch_metadata(request, limits, cancel) {
             Ok(outcome) => Ok(outcome),
             Err(err) => {
                 if self.should_fallback(&err) {
-                    self.secondary.fetch_metadata(request, limits, cancel)
+                    // The fallback shares the caller's single total budget.
+                    let remaining = self.remaining_limits(limits, started)?;
+                    self.secondary.fetch_metadata(request, remaining, cancel)
                 } else {
                     Err(err)
                 }
@@ -1022,11 +1063,15 @@ impl AcquisitionTransport for ComposedTransport<'_> {
         if cancel.is_cancelled() {
             return Err(AcquisitionError::Cancelled);
         }
+        let started = Instant::now();
         match self.primary.fetch_artifact(request, dest, limits, cancel) {
             Ok(outcome) => Ok(outcome),
             Err(err) => {
                 if self.should_fallback(&err) {
-                    self.secondary.fetch_artifact(request, dest, limits, cancel)
+                    // The fallback shares the caller's single total budget.
+                    let remaining = self.remaining_limits(limits, started)?;
+                    self.secondary
+                        .fetch_artifact(request, dest, remaining, cancel)
                 } else {
                     Err(err)
                 }
@@ -1793,6 +1838,131 @@ mod tests {
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             self.inner.fetch_artifact(request, dest, limits, cancel)
         }
+    }
+
+    /// Burns wall-clock time, then fails, so the composed budget can be
+    /// exercised against a real elapsed duration rather than a simulated one.
+    struct StallingTransport {
+        delay: Duration,
+        error: fn() -> AcquisitionError,
+        seen: std::sync::Mutex<Vec<FetchLimits>>,
+    }
+
+    impl AcquisitionTransport for StallingTransport {
+        fn fetch_metadata(
+            &self,
+            _request: &AcquisitionRequest,
+            limits: FetchLimits,
+            _cancel: &CancelFlag,
+        ) -> Result<FetchOutcome<MetadataBytes>, AcquisitionError> {
+            self.seen.lock().unwrap().push(limits);
+            std::thread::sleep(self.delay);
+            Err((self.error)())
+        }
+
+        fn fetch_artifact(
+            &self,
+            _request: &AcquisitionRequest,
+            _dest: &Path,
+            limits: FetchLimits,
+            _cancel: &CancelFlag,
+        ) -> Result<FetchOutcome<ArtifactEvidence>, AcquisitionError> {
+            self.seen.lock().unwrap().push(limits);
+            std::thread::sleep(self.delay);
+            Err((self.error)())
+        }
+    }
+
+    fn unavailable() -> AcquisitionError {
+        AcquisitionError::__adapter_unavailable("stalled then unavailable")
+    }
+
+    fn totals(transport: &StallingTransport) -> Vec<Duration> {
+        transport
+            .seen
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|l| l.total_timeout)
+            .collect()
+    }
+
+    #[test]
+    fn composition_fallback_shares_one_total_budget() {
+        let primary = StallingTransport {
+            delay: Duration::from_millis(300),
+            error: unavailable,
+            seen: std::sync::Mutex::new(Vec::new()),
+        };
+        let secondary = StallingTransport {
+            delay: Duration::ZERO,
+            error: unavailable,
+            seen: std::sync::Mutex::new(Vec::new()),
+        };
+        let composed =
+            ComposedTransport::new(&primary, &secondary, CompositionPolicy::UnavailableOnly);
+        let caller = FetchLimits {
+            connect_timeout: Duration::from_secs(1),
+            total_timeout: Duration::from_secs(10),
+            ..limits()
+        };
+
+        // The failure is expected; what matters is what the secondary was handed.
+        let _ =
+            composed.fetch_metadata(&req("https://example.com/meta"), caller, &CancelFlag::new());
+
+        assert_eq!(totals(&primary), vec![caller.total_timeout]);
+        let secondary_totals = totals(&secondary);
+        assert_eq!(secondary_totals.len(), 1, "fallback must be attempted once");
+        assert!(
+            secondary_totals[0] < caller.total_timeout,
+            "fallback must not restart the caller's budget: got {:?} of {:?}",
+            secondary_totals[0],
+            caller.total_timeout
+        );
+        // The budget actually left is close to the original minus the stall.
+        assert!(
+            caller.total_timeout - secondary_totals[0] >= Duration::from_millis(250),
+            "the consumed time must be subtracted, not ignored"
+        );
+    }
+
+    #[test]
+    fn composition_fallback_does_not_start_after_budget_exhaustion() {
+        let primary = StallingTransport {
+            delay: Duration::from_millis(300),
+            error: unavailable,
+            seen: std::sync::Mutex::new(Vec::new()),
+        };
+        let secondary = StallingTransport {
+            delay: Duration::ZERO,
+            error: unavailable,
+            seen: std::sync::Mutex::new(Vec::new()),
+        };
+        let composed =
+            ComposedTransport::new(&primary, &secondary, CompositionPolicy::UnavailableOnly);
+        let caller = FetchLimits {
+            connect_timeout: Duration::from_millis(20),
+            total_timeout: Duration::from_millis(50),
+            ..limits()
+        };
+
+        let err = composed
+            .fetch_artifact(
+                &req("https://example.com/app"),
+                &temp_dir("acq-exhausted").join("app"),
+                caller,
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(
+            matches!(err, AcquisitionError::Timeout { .. }),
+            "an exhausted total budget is a timeout, not a second attempt"
+        );
+        assert!(
+            totals(&secondary).is_empty(),
+            "no doomed attempt may start once the total budget is spent"
+        );
     }
 
     #[test]

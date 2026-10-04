@@ -113,6 +113,41 @@ fn patched_archive_projection(contents: &[(&str, &[u8])]) -> ManifestProjection 
     project(&manifest, LINUX_TARGET).expect("Linux target must be present")
 }
 
+/// The standard fixture with every member identity rewritten, so it has the
+/// same member count but provably different `source`/`output_name` identities.
+fn renamed_archive_projection() -> ManifestProjection {
+    let mut value: serde_json::Value =
+        serde_json::from_str(ARCHIVE_MANIFEST).expect("fixture must be JSON");
+    let members = value
+        .pointer_mut("/targets/0/form/members")
+        .expect("fixture must have archive members")
+        .as_array_mut()
+        .expect("members must be an array");
+    for member in members.iter_mut() {
+        let source = member
+            .get("source")
+            .and_then(|s| s.as_str())
+            .expect("member must have a source")
+            .to_string();
+        member["source"] = serde_json::Value::from(format!("foreign/{source}"));
+        // Install names must be plain filenames, so flatten the basename.
+        let basename = source.rsplit('/').next().unwrap_or(source.as_str());
+        member["install"] = serde_json::Value::from(format!("foreign-{basename}"));
+        // Identical content to the standard fixture: the substitution is
+        // digest-invisible.
+        let bytes = if source == MAIN_SOURCE {
+            MAIN_BYTES
+        } else {
+            HELPER_BYTES
+        };
+        member["bytes"]["size"] = serde_json::Value::from(bytes.len() as u64);
+        member["bytes"]["sha256"] = serde_json::Value::from(sha256_hex(bytes));
+    }
+    let manifest =
+        ReleaseManifest::from_json(&value.to_string()).expect("renamed manifest must validate");
+    project(&manifest, LINUX_TARGET).expect("Linux target must be present")
+}
+
 fn standard_projection() -> ManifestProjection {
     patched_archive_projection(&[(MAIN_SOURCE, MAIN_BYTES), (HELPER_SOURCE, HELPER_BYTES)])
 }
@@ -441,6 +476,110 @@ fn bind_archive_members_fails_closed_on_count_mismatch() {
 
     let err = bind_archive_members(&projection, truncated).unwrap_err();
     assert!(matches!(err, AdapterError::MapMismatch(_)));
+}
+
+#[test]
+fn bind_archive_members_cross_checks_bound_identity_not_just_count() {
+    let projection = standard_projection();
+    let tmp = TempDir::new("bind-identity");
+    let archive_bytes = build_tar_gz(&[(MAIN_SOURCE, MAIN_BYTES), (HELPER_SOURCE, HELPER_BYTES)]);
+    let archive_path = tmp.path().join("archive.tar.gz");
+    fs::write(&archive_path, &archive_bytes).unwrap();
+    let limits = ArchiveLimits::new(archive_bytes.len() as u64 + 1, 16, 4096, 64, 64).unwrap();
+    let plan = archive_plan_for(&projection, ArchiveFormat::TarGz, &archive_path, limits).unwrap();
+    let extracted = extract(&plan, tmp.path()).unwrap();
+    let bound = extracted.persist().into_bound_sources().unwrap();
+    let (members, cleanup): (Vec<BoundMember>, DeferredCleanup) = bound.into_members();
+    assert_eq!(members.len(), 2);
+
+    // A re-projection that reorders members still satisfies the count check, so
+    // only an identity cross-check can reject it. Positional labelling would
+    // commit each member's bytes under the other member's declared identity.
+    let reversed: Vec<BoundMember> = members.into_iter().rev().collect();
+    let err = bind_archive_members(&projection, reversed).unwrap_err();
+    assert!(
+        matches!(err, AdapterError::MapMismatch(_)),
+        "count-matching but identity-mismatched members must fail closed, got {err:?}"
+    );
+    cleanup.cleanup().ok();
+
+    // Declaration order is the correct pairing and must still succeed, so the
+    // cross-check is not over-strict.
+    let plan2 = archive_plan_for(
+        &projection,
+        ArchiveFormat::TarGz,
+        &archive_path,
+        ArchiveLimits::new(archive_bytes.len() as u64 + 1, 16, 4096, 64, 64).unwrap(),
+    )
+    .unwrap();
+    let extracted2 = extract(&plan2, tmp.path()).unwrap();
+    let extraction_root2 = extracted2.root().to_path_buf();
+    let bound2 = extracted2.persist().into_bound_sources().unwrap();
+    let (ordered, cleanup2): (Vec<BoundMember>, DeferredCleanup) = bound2.into_members();
+    let sources = bind_archive_members(&projection, ordered).unwrap();
+    let install_root = tmp.path().join("install");
+    fs::create_dir_all(&install_root).unwrap();
+    let core_plan = core_plan_for_archive(
+        &projection,
+        &extraction_root2,
+        &install_root,
+        permissions_for(&projection),
+    )
+    .unwrap();
+    let prepared = core_plan
+        .prepare_with_bound_sources(sources)
+        .expect("the correct declaration-order pairing must still stage");
+    assert_eq!(
+        fs::read(
+            prepared
+                .staged_path(&MemberId::new(MAIN_INSTALL).unwrap())
+                .unwrap()
+        )
+        .unwrap(),
+        MAIN_BYTES
+    );
+    assert_eq!(
+        fs::read(
+            prepared
+                .staged_path(&MemberId::new(HELPER_INSTALL).unwrap())
+                .unwrap()
+        )
+        .unwrap(),
+        HELPER_BYTES
+    );
+    cleanup2.cleanup().ok();
+}
+
+#[test]
+fn bind_archive_members_rejects_an_extraction_of_a_different_projection() {
+    let declared = standard_projection();
+    // Same member count, different identities, and identical member content:
+    // only an identity cross-check can catch this substitution.
+    let foreign = renamed_archive_projection();
+    let tmp = TempDir::new("bind-foreign");
+    let archive_bytes = build_tar_gz(&[
+        ("foreign/egress", MAIN_BYTES),
+        ("foreign/bin/egress-helper", HELPER_BYTES),
+    ]);
+    let archive_path = tmp.path().join("archive.tar.gz");
+    fs::write(&archive_path, &archive_bytes).unwrap();
+    let limits = ArchiveLimits::new(archive_bytes.len() as u64 + 1, 16, 4096, 64, 64).unwrap();
+    let plan = archive_plan_for(&foreign, ArchiveFormat::TarGz, &archive_path, limits).unwrap();
+    let extracted = extract(&plan, tmp.path()).unwrap();
+    let bound = extracted.persist().into_bound_sources().unwrap();
+    let (members, cleanup): (Vec<BoundMember>, DeferredCleanup) = bound.into_members();
+    assert_eq!(
+        members.len(),
+        2,
+        "counts must match for the test to be meaningful"
+    );
+
+    let err = bind_archive_members(&declared, members).unwrap_err();
+    assert!(
+        matches!(err, AdapterError::MapMismatch(_)),
+        "an extraction of a different projection must fail closed, got {err:?}"
+    );
+    cleanup.cleanup().ok();
 }
 
 #[test]

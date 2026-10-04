@@ -465,7 +465,13 @@ fn restore_success_state<M: ServiceManager, C: PostInstallCheck>(
         RestoreIntent::EnsureRunning => LifecycleState::Running,
         RestoreIntent::EnsureStopped => LifecycleState::Stopped,
     };
-    transition_to(
+    // `safe_restore_state` catches a panicking `start`/`stop`/`inspect` and
+    // records it under the phase that was actually executing. The enclosing
+    // `catch_unwind` cannot do this: it wraps the transition *and* the
+    // post-install check together, so labelling its panic arm
+    // `PostInstallCheck` would misreport a panicking service transition as a
+    // check failure and let the receipt claim `Restored`.
+    safe_restore_state(
         manager,
         spec,
         wanted,
@@ -732,6 +738,7 @@ mod tests {
         fail_stop: bool,
         incomplete_stop: bool,
         fail_start_calls: Vec<usize>,
+        panic_start_calls: Vec<usize>,
         start_calls: usize,
         stop_calls: usize,
         drift_to_foreign_after_stop: bool,
@@ -783,6 +790,9 @@ mod tests {
             }
             if self.fail_start_calls.contains(&self.start_calls) {
                 return Err(ServiceError::manager("injected start failure"));
+            }
+            if self.panic_start_calls.contains(&self.start_calls) {
+                panic!("test panic payload must not escape");
             }
             self.inner.start(spec, timeout)
         }
@@ -1295,6 +1305,52 @@ mod tests {
         assert!(
             manager.stop_calls >= 2,
             "old and new generations should each be quiesced"
+        );
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn panicking_restore_transition_is_recorded_as_restore_new_not_a_check() {
+        let (base, root, tx) = setup(true);
+        let service = spec(&root);
+        // Running before the update, so pre-commit quiesce stops it and the
+        // post-commit restore starts it again. That restore-phase `start` is
+        // the one that panics, so the true phase is RestoreNew.
+        let mut manager = ScriptedManager::with_service(service.clone(), LifecycleState::Running);
+        manager.panic_start_calls = vec![1];
+        let called = Rc::new(Cell::new(false));
+        let receipt = commit_with_lifecycle(
+            &mut manager,
+            &service,
+            tx,
+            CoreCommitOwnership::new(
+                &FixedVerifier(CoreOwnership::Owned),
+                AbsentPolicy::AllowCreate,
+            ),
+            policy(
+                RestoreIntent::Preserve,
+                PostCommitFailurePolicy::KeepInstalled,
+            ),
+            &PanicCheck {
+                called: called.clone(),
+            },
+        )
+        .unwrap();
+        assert!(
+            !called.get(),
+            "the post-install check must not run after the restore transition panicked"
+        );
+        assert_eq!(
+            receipt.post_commit_failure.as_ref().unwrap().phase,
+            LifecycleUpdatePhase::RestoreNew
+        );
+        assert_eq!(
+            receipt.restoration,
+            crate::LifecycleRestorationStatus::Failed
+        );
+        assert!(
+            !receipt.service_state_restored(),
+            "a panicking restore must never be reported as Restored"
         );
         let _ = fs::remove_dir_all(base);
     }

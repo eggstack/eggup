@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+Fixes from the workspace bug audit; no API change, no new feature. Integrity
+remains SHA-256 checksum evidence only.
+
+- **Fixed: incomplete Windows device-name validation.** `validate_output_name`
+  rejected `COM1`..`COM9` and `LPT1`..`LPT9` but accepted `COM0`/`LPT0`, which
+  Windows also maps to a device, and did not reject the reserved console names
+  `CONIN$`, `CONOUT$`, or `CLOCK$`. All of these are now rejected as
+  `InvalidPath`. Near-miss names (`console`, `com10`, `auxiliary`) remain valid
+  output names.
+- **Fixed: `residue_path()` could describe a non-empty directory as cleaned.**
+  `with_empty_residue` recorded a residue path without verifying the private
+  root was actually empty, so a partially failed cleanup was reported under the
+  operation's original error kind. The root is now verified, and a root that
+  still holds evidence is promoted to `CleanupFailed`, which is what actually
+  happened. `residue_path()`'s documented "the directory is empty" guarantee is
+  now true.
+- **Tests: hostile entry names are now covered on the real untrusted path.**
+  Existing coverage fed traversal names to `ArchiveMember::new` (the
+  caller-declared plan path). New tests write them as *actual tar and zip
+  entries* — raw unvalidated ustar name fields and verbatim zip names — and
+  assert each is rejected as `InvalidPath` with nothing escaping the parent
+  directory and no partial extraction retained, including a hostile entry placed
+  after a valid declared member. This is the crate's most important invariant.
+
 ## 0.1.2 — 2026-09-28
 
 First crates.io publication of `eggup-archive`. Integrity is SHA-256

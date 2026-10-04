@@ -458,6 +458,116 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn bound_source_preserves_executable_intent_that_the_fresh_stage_masks() {
+        use std::fs::File;
+        use std::os::unix::fs::PermissionsExt;
+
+        let inputs = InstallationRoot::new().expect("inputs");
+        let install = InstallationRoot::new().expect("install");
+        let source = inputs.write_file("owned", b"owned-bytes").expect("write");
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o755)).expect("chmod source");
+        let handle = File::open(&source).expect("open");
+        let digest = super::hash_file(&source).unwrap();
+        fs::create_dir_all(install.path().join("bin")).expect("bin");
+        // `PermissionsIntent::Preserve` is the default set by `ArtifactMember::new`.
+        let member =
+            ArtifactMember::new(MemberId::new("main").unwrap(), source.clone(), "bin/main")
+                .unwrap()
+                .with_integrity(super::IntegrityRequirement::Sha256(digest));
+        let plan = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(member).unwrap(),
+        )
+        .unwrap();
+        let mut bound = BoundSources::new();
+        bound.insert(MemberId::new("main").unwrap(), handle);
+        let prepared = plan.prepare_with_bound_sources(bound).unwrap();
+
+        let staged = prepared
+            .staged_path(&MemberId::new("main").unwrap())
+            .unwrap();
+        let staged_mode = fs::metadata(&staged).unwrap().permissions().mode();
+        assert_ne!(
+            staged_mode & 0o111,
+            0,
+            "bound staging must not read the hardcoded 0600 back as source intent"
+        );
+        assert_eq!(staged_mode & 0o777, 0o700);
+
+        // Commit installs by rename, so the staged mode becomes the live mode.
+        let receipt =
+            commit_verified(prepared, &allow_create(), AbsentPolicy::AllowCreate).unwrap();
+        assert_eq!(receipt.disposition(), TransactionDisposition::Committed);
+        let live_mode = fs::metadata(install.path().join("bin/main"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_ne!(
+            live_mode & 0o111,
+            0,
+            "installed executable must land executable"
+        );
+        assert_eq!(live_mode & 0o777, 0o700);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bound_source_does_not_widen_a_non_executable_source() {
+        use std::fs::File;
+        use std::os::unix::fs::PermissionsExt;
+
+        let inputs = InstallationRoot::new().expect("inputs");
+        let install = InstallationRoot::new().expect("install");
+        let source = inputs.write_file("owned", b"owned-bytes").expect("write");
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o644)).expect("chmod source");
+        let handle = File::open(&source).expect("open");
+        let member =
+            ArtifactMember::new(MemberId::new("main").unwrap(), source.clone(), "bin/main")
+                .unwrap();
+        let plan = InstallPlan::new(
+            ProductId::new("eggup").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            install.path(),
+            ArtifactSet::single(member).unwrap(),
+        )
+        .unwrap();
+        let mut bound = BoundSources::new();
+        bound.insert(MemberId::new("main").unwrap(), handle);
+        let prepared = plan.prepare_with_bound_sources(bound).unwrap();
+        let staged_mode = fs::metadata(
+            prepared
+                .staged_path(&MemberId::new("main").unwrap())
+                .unwrap(),
+        )
+        .unwrap()
+        .permissions()
+        .mode();
+        assert_eq!(staged_mode & 0o777, 0o600);
+    }
+
+    #[test]
+    fn fault_category_is_structural_not_message_substring() {
+        // A legitimate caller-supplied invalid input that merely mentions the
+        // word must not be reported as the test-harness category.
+        let report = super::transaction::report_for_error(
+            super::FailurePhase::Ownership,
+            None,
+            &Error::invalid("member name 'injected' is reserved"),
+        );
+        assert_eq!(report.category(), super::FailureCategory::InvalidInput);
+
+        let injected = super::transaction::report_for_error(
+            super::FailurePhase::Ownership,
+            None,
+            &Error::injected("injected preparation failure at Copy"),
+        );
+        assert_eq!(injected.category(), super::FailureCategory::Injected);
+    }
+
     fn prepared_bundle(
         existing: bool,
     ) -> (
@@ -943,7 +1053,7 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(matches!(error, Error::InvalidInput(_)));
+        assert!(matches!(error, Error::Injected(_)));
         assert_eq!(
             fs::read(install.path().join("bin/main")).unwrap(),
             b"old-main"

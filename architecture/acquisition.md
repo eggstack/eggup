@@ -22,7 +22,9 @@ trait plus a deterministic in-memory `FixtureTransport` for correctness tests
 Key invariant: `NotFound` is data (exact URL absent, HTTP-404 equivalent); the
 consumer decides its meaning. Hard failures (`Transport | TooLarge | Timeout |
 Cancelled | Io | InvalidInput`) never trigger fallback inside a transport
-(`lib.rs:177-187,246-269`).
+(`lib.rs:177-187,246-269`). `Unavailable` is the one exception: it reports that
+an adapter could not attempt the request at all, and only `ComposedTransport`
+(see below) treats it as a fallback input.
 
 ## 2. Public API (factual)
 
@@ -31,10 +33,13 @@ Cancelled | Io | InvalidInput`) never trigger fallback inside a transport
   non-`http(s)` scheme, `len > 8192`; stores URL **verbatim** — redaction is
   diagnostics-only.
 - `FetchLimits` (`lib.rs:63-149`): public fields for 0.1.x source compat —
-  `max_metadata_bytes: usize`, `max_artifact_bytes: Option<u64>`,
-  `connect_timeout / total_timeout: Duration`. `Default`: 256 KiB metadata,
-  128 MiB artifact, 10 s connect, 120 s total. `validate()` requires
-  `1..=16 MiB` metadata, non-zero timeouts, `connect <= total` (connect is part
+  `max_metadata_bytes: usize`, `max_artifact_bytes: u64`,
+  `connect_timeout / total_timeout: Duration`. Every fetch is finitely bounded:
+  there is no unbounded/`None` representation, so migration from the pre-0.1.2
+  `Option<u64>` field is `Some(n) -> n` and every `None` case must pick a
+  positive bound. `Default`: 256 KiB metadata, 128 MiB artifact, 10 s connect,
+  120 s total. `validate()` requires `1..=16 MiB` metadata, a strictly positive
+  artifact bound, non-zero timeouts, `connect <= total` (connect is part
   of total budget). `new()` = construct + `validate()`. `effective(adapter_
   connect_ceiling, adapter_total_ceiling) -> (Duration, Duration)` returns
   per-phase `min(request, adapter ceiling)` — an adapter may tighten, never
@@ -50,7 +55,8 @@ Cancelled | Io | InvalidInput`) never trigger fallback inside a transport
   + getter).
 - `AcquisitionError` (`lib.rs:248-298`, `#[non_exhaustive]`): `InvalidInput(
   String)`, `Transport(String)` (already redacted), `TooLarge{limit: u64}`,
-  `Timeout{phase: &'static str}`, `Cancelled`, `Io(String)`. `Display` prefixes
+  `Timeout{phase: &'static str}`, `Cancelled`, `Io(String)`,
+  `Unavailable(String)`. `Display` prefixes
   per variant; `bound_detail()` truncates details to 512 chars. Constructors
   `invalid / transport_redacted / io` are `pub(crate)`.
 - `AcquisitionTransport` trait (`lib.rs:526-554`): `fetch_metadata(request,
@@ -75,6 +81,46 @@ Cancelled | Io | InvalidInput`) never trigger fallback inside a transport
   path)` (`lib.rs:512`), `__adapter_metadata(Vec<u8>)` / `__adapter_artifact(
   u64)` (adapter-only constructors, `lib.rs:842/850`), `SharedTransport = Arc<
   FixtureTransport>` (`lib.rs:834`).
+
+### `Unavailable`, `CompositionPolicy`, and `ComposedTransport`
+
+Three public items extend the seam for multi-adapter callers. They exist for the
+`eggup-curl` external-process adapter so a caller can run curl-only,
+Eggfetch-only, or dual binaries against the same seam.
+
+**`AcquisitionError::Unavailable(String)`** (`lib.rs:272-278`): the adapter could
+not attempt the request at all — missing executable, failed discovery, or spawn
+failure. Distinct from `Transport`, which means the request *was* attempted and
+failed (TLS, proxy, 5xx, malformed response, early disconnect). Adapters build it
+through the `#[doc(hidden)]` `AcquisitionError::__adapter_unavailable`, so the seam
+does not widen with a general public constructor. URL material is already
+redacted.
+
+**`CompositionPolicy`** (`lib.rs:913-930`, `#[derive(Default)]`): the
+caller-selected fallback scope for one composed transport. Transport fallback
+(`curl <-> Eggfetch` for the same exact URL) is never release/source fallback.
+`NotFound` is terminal for the exact URL under every policy, and
+`InvalidInput` / `Cancelled` / `TooLarge` / `Io` (staging/promotion) are terminal
+under every policy. Verification and candidate failures occur above this layer
+and are never transport-fallback inputs.
+
+- `UnavailableOnly` — the `#[default]`. Fall back only when the preferred adapter
+  is unavailable.
+- `UnavailableOrTransport` — explicit opt-in. Also fall back on ordinary
+  `Transport` and `Timeout` failures.
+
+**`ComposedTransport<'a>`** (`lib.rs:932-1036`): explicit preferred/fallback
+composition over two `&dyn AcquisitionTransport` values. It implements
+`AcquisitionTransport` itself, so callers keep a single seam.
+`ComposedTransport::new(primary, secondary, policy)` records policy and ordering
+only — no network, filesystem, or process work. Preferred order is construction
+order: `primary` is attempted first and `secondary` only when `policy` allows
+fallback for the primary outcome. `policy()` returns the policy. Fallback is
+decided from typed outcomes (`Unavailable`, and `Transport`/`Timeout` only under
+`UnavailableOrTransport`) — never by parsing human-readable errors. Both methods
+call `limits.validate()` and check cancellation at the composition boundary
+before either adapter performs route/filesystem/network I/O; adapters revalidate
+again at their own boundaries.
 
 ## 3. Safety rules (as coded)
 

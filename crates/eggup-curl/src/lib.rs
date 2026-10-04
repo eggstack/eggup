@@ -56,6 +56,11 @@ pub struct CurlConfig {
     /// Whether HTTP redirects are followed.
     pub follow_redirects: bool,
     /// Allowed URL protocols (default `http`, `https`).
+    ///
+    /// This list bounds the *initial* request. The redirect target set is
+    /// narrowed further: an `https` request never follows a redirect down to
+    /// `http`, so a `302 Location: http://...` is refused rather than followed
+    /// in cleartext.
     pub allowed_protocols: Vec<String>,
     /// Proxy routing decision.
     pub proxy: CurlProxy,
@@ -473,6 +478,36 @@ fn proxy_env_snapshot(proxy: &CurlProxy) -> Vec<(String, String)> {
     }
 }
 
+/// Protocols a redirect may target.
+///
+/// The initial request's own scheme bounds the redirect target set: an `https`
+/// request never follows a redirect down to `http`. Without this, a
+/// `302 Location: http://attacker/...` would be followed in cleartext with no
+/// error and no diagnostic, and the cleartext body would be promoted to the
+/// destination as a normal success. This matches the strict downgrade denial
+/// the native eggfetch adapter already enforces.
+fn redirect_protocols(config: &CurlConfig, url: &str) -> Vec<String> {
+    let starts_https = url
+        .split_once("://")
+        .is_some_and(|(scheme, _)| scheme.eq_ignore_ascii_case("https"));
+    if !starts_https {
+        return config.allowed_protocols.clone();
+    }
+    let narrowed: Vec<String> = config
+        .allowed_protocols
+        .iter()
+        .filter(|proto| !proto.eq_ignore_ascii_case("http"))
+        .cloned()
+        .collect();
+    if narrowed.is_empty() {
+        // An https request with no non-http protocol allowed cannot succeed at
+        // all; `--proto` already rejects the initial scheme. Emit a well-formed
+        // list rather than an empty `--proto-redir`.
+        return config.allowed_protocols.clone();
+    }
+    narrowed
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_curl_args(
     config: &CurlConfig,
@@ -504,9 +539,9 @@ fn build_curl_args(
     if !config.allowed_protocols.is_empty() {
         let list = format!("={}", config.allowed_protocols.join(","));
         args.push("--proto".to_string());
-        args.push(list.clone());
-        args.push("--proto-redir".to_string());
         args.push(list);
+        args.push("--proto-redir".to_string());
+        args.push(format!("={}", redirect_protocols(config, url).join(",")));
     }
     if matches!(proxy_kind(config), ProxyKind::Disabled) {
         args.push("--noproxy".to_string());
@@ -675,10 +710,12 @@ fn run_curl_to_file(
         &redacted,
         start,
         eff_connect,
+        eff_total,
         max_bytes,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn classify_curl_result(
     exit_code: Option<i32>,
     code_bytes: &[u8],
@@ -686,6 +723,7 @@ fn classify_curl_result(
     redacted: &str,
     start: Instant,
     eff_connect: Duration,
+    eff_total: Duration,
     max_bytes: u64,
 ) -> Result<CurlOutcome, AcquisitionError> {
     let elapsed = start.elapsed();
@@ -700,10 +738,17 @@ fn classify_curl_result(
         // against the effective connect ceiling using only the parent
         // scheduling tolerance, not whole-second slack.
         Some(28) => {
-            if elapsed <= eff_connect + tolerance {
-                return Err(AcquisitionError::Timeout { phase: "connect" });
-            }
-            return Err(AcquisitionError::Timeout { phase: "total" });
+            // When the effective connect and total ceilings are equal the two
+            // are indistinguishable, and `elapsed <= eff_connect + tolerance`
+            // would hold for every exit 28 — including one caused by the total
+            // deadline. Claim only the weaker fact in that case rather than
+            // misattributing a total timeout to connection setup.
+            let phase = if eff_connect < eff_total && elapsed <= eff_connect + tolerance {
+                "connect"
+            } else {
+                "total"
+            };
+            return Err(AcquisitionError::Timeout { phase });
         }
         // curl --max-filesize exceeded.
         Some(63) => {
@@ -753,6 +798,51 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     #[cfg(not(windows))]
     use std::thread;
+
+    #[test]
+    fn exit_28_is_labelled_total_when_connect_and_total_ceilings_coincide() {
+        let dir = temp_dir("curl-phase");
+        let output = dir.join("body");
+        std::fs::write(&output, b"partial").unwrap();
+
+        let timed_out = |eff_connect: Duration, elapsed: Duration| {
+            let start = Instant::now() - elapsed;
+            match classify_curl_result(
+                Some(28),
+                b"",
+                &output,
+                "https://example.com/app",
+                start,
+                eff_connect,
+                Duration::from_secs(5),
+                1024,
+            ) {
+                Err(AcquisitionError::Timeout { phase }) => phase,
+                other => panic!("expected a timeout, got {other:?}"),
+            }
+        };
+
+        // Equal ceilings: a timeout past the total deadline is not a connect
+        // timeout, and must not be reported as one.
+        let equal = Duration::from_secs(1);
+        assert_eq!(
+            timed_out(equal, Duration::from_secs(5)),
+            "total",
+            "coincident ceilings must not label a total timeout as connect"
+        );
+
+        // Genuinely tighter connect ceiling, expired: still a connect timeout.
+        assert_eq!(
+            timed_out(Duration::from_secs(1), Duration::from_millis(1)),
+            "connect"
+        );
+
+        // Connect ceiling not expired: the total deadline is what expired.
+        assert_eq!(
+            timed_out(Duration::from_secs(1), Duration::from_secs(5)),
+            "total"
+        );
+    }
 
     #[test]
     fn diagnostic_bound_never_splits_multibyte_code_points() {
@@ -1162,6 +1252,64 @@ mod tests {
         // represented without widening and must be rejected.
         let sub_micros = Duration::from_nanos(500);
         assert!(duration_decimal_seconds(sub_micros).is_err());
+    }
+
+    #[test]
+    fn https_request_never_allows_a_cleartext_redirect_target() {
+        let cfg = CurlConfig::strict();
+        let value_after = |args: &[String], flag: &str| -> String {
+            let idx = args.iter().position(|a| a == flag).expect("flag present");
+            args[idx + 1].clone()
+        };
+
+        // The initial request may still use http; only the redirect target set
+        // is narrowed.
+        let https = build_curl_args(
+            &cfg,
+            "https://example.com/artifact",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(5),
+        )
+        .expect("builds");
+        assert_eq!(value_after(&https, "--proto"), "=http,https");
+        assert_eq!(value_after(&https, "--proto-redir"), "=https");
+
+        // A cleartext request may still be redirected to either scheme.
+        let http = build_curl_args(
+            &cfg,
+            "http://example.com/artifact",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(5),
+        )
+        .expect("builds");
+        assert_eq!(value_after(&http, "--proto"), "=http,https");
+        assert_eq!(value_after(&http, "--proto-redir"), "=http,https");
+
+        // Scheme comparison is case-insensitive, as URLs are.
+        let upper = build_curl_args(
+            &cfg,
+            "HTTPS://example.com/artifact",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(5),
+        )
+        .expect("builds");
+        assert_eq!(value_after(&upper, "--proto-redir"), "=https");
+
+        // A configuration that allows only http cannot fetch https at all; the
+        // list stays well-formed rather than becoming empty.
+        let http_only = CurlConfig::strict().allowed_protocols(vec!["http".to_string()]);
+        let denied = build_curl_args(
+            &http_only,
+            "https://example.com/artifact",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(5),
+        )
+        .expect("builds");
+        assert_eq!(value_after(&denied, "--proto-redir"), "=http");
     }
 
     #[test]

@@ -231,7 +231,18 @@ impl ExtractionError {
         self
     }
 
+    /// Records residue at `path` after a cleanup that is only *believed* to
+    /// have emptied the private root.
+    ///
+    /// Cleanup can fail before the root is empty, in which case the residue is
+    /// retained evidence, not leftover space. This verifies the root before
+    /// promising emptiness, so `kind()` and `residue_path()` can never report a
+    /// partial cleanup as a clean one: a non-empty root is promoted to
+    /// `CleanupFailed`, which is what actually happened.
     fn with_empty_residue(mut self, path: PathBuf) -> Self {
+        if !private_root_is_empty(&path) {
+            return self.with_residue(path);
+        }
         self.residue_path = Some(path);
         self
     }
@@ -242,6 +253,9 @@ impl ExtractionError {
     }
 
     /// Returns the private-root residue location when cleanup failed.
+    ///
+    /// When present, the directory is empty: `with_empty_residue` verifies that
+    /// and promotes a non-empty root to [`ExtractionErrorKind::CleanupFailed`].
     pub fn residue_path(&self) -> Option<&Path> {
         self.residue_path.as_deref()
     }
@@ -1054,16 +1068,37 @@ fn validate_output_name(name: &str, max_path_bytes: usize) -> Result<(), Extract
         return Err(ExtractionError::new(ExtractionErrorKind::InvalidPath));
     }
     let stem = name.split('.').next().unwrap_or(name).to_ascii_uppercase();
-    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || ["COM", "LPT"].iter().any(|prefix| {
-            stem.strip_prefix(prefix).is_some_and(|suffix| {
-                suffix.len() == 1 && (b'1'..=b'9').contains(&suffix.as_bytes()[0])
-            })
-        });
+    let reserved = matches!(
+        stem.as_str(),
+        // `CONIN$`/`CONOUT$` are the console device names and are reserved too.
+        "CON" | "PRN" | "AUX" | "NUL" | "CLOCK$" | "CONIN$" | "CONOUT$"
+    ) || ["COM", "LPT"].iter().any(|prefix| {
+        // `COM0`/`LPT0` are reserved alongside `COM1`..`COM9`: Windows maps every
+        // digit, not just 1-9, and `COM0` in particular is a documented device
+        // name. Accepting the whole digit range is strictly safer.
+        stem.strip_prefix(prefix)
+            .is_some_and(|suffix| suffix.len() == 1 && suffix.as_bytes()[0].is_ascii_digit())
+    });
     if reserved {
         return Err(ExtractionError::new(ExtractionErrorKind::InvalidPath));
     }
+    // A name that would be reserved only because of a trailing digit appended to
+    // a device stem is covered above; the `name.ends_with('.')`/`ends_with(' ')`
+    // rejections above additionally stop `NUL.` / `NUL ` style aliases that
+    // Windows would otherwise normalise onto a device.
     Ok(())
+}
+
+/// Returns true only when `path` holds no entries.
+///
+/// A root that has already been removed also counts as empty: nothing can
+/// remain, and reporting that as non-empty would invent a cleanup failure.
+fn private_root_is_empty(path: &Path) -> bool {
+    match fs::read_dir(path) {
+        Ok(mut entries) => entries.next().is_none(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+        Err(_) => false,
+    }
 }
 
 fn open_dir_handle(path: &Path) -> std::io::Result<File> {
@@ -1187,6 +1222,11 @@ fn empty_dir_contents_at_depth(dir: &mut File, depth: usize) -> Result<(), Extra
                         .metadata()
                         .map(|metadata| metadata.is_dir())
                         .unwrap_or(false);
+                    // On Unix `openat2`/`O_NOFOLLOW` means this `metadata()` is
+                    // an `fstat` of the opened child, so a symlink is already
+                    // excluded: `is_symlink` is always false and the check below
+                    // is belt-and-braces. On Windows there is no `O_NOFOLLOW`
+                    // equivalent, so this check is load-bearing there.
                     let is_symlink = child
                         .metadata()
                         .map(|metadata| metadata.is_symlink())
@@ -1420,6 +1460,189 @@ mod tests {
         path
     }
 
+    /// Writes a tar.gz whose single entry carries a **raw, unvalidated** path.
+    ///
+    /// `Header::set_path` sanitises traversal names outright, so a genuinely
+    /// hostile tar entry can only be produced by writing the raw ustar name
+    /// field. That is exactly the untrusted input the extraction loop must
+    /// defend against, so the test must be able to build it.
+    fn tar_file_raw_path(dir: &Path, name: &str) -> PathBuf {
+        let archive_path = dir.join("hostile.tar.gz");
+        let gzip = GzEncoder::new(Vec::new(), Compression::default());
+        let mut builder = TarBuilder::new(gzip);
+        let mut header = Header::new_gnu();
+        header.set_entry_type(TarEntryType::new(b'0'));
+        header.set_size(1);
+        header.set_mode(0o644);
+        {
+            // ustar name field is bytes 0..100; the prefix field is 345..500 and
+            // must be empty so the entry name is exactly `name`.
+            let raw = header.as_mut_bytes();
+            raw[0..100].fill(0);
+            let bytes = name.as_bytes();
+            assert!(bytes.len() <= 100, "probe name must fit the raw field");
+            raw[0..bytes.len()].copy_from_slice(bytes);
+            raw[345..500].fill(0);
+        }
+        header.set_cksum();
+        builder.append(&header, &b"x"[..]).unwrap();
+        let gzip = builder.into_inner().unwrap();
+        fs::write(&archive_path, gzip.finish().unwrap()).unwrap();
+        archive_path
+    }
+
+    /// Sorted directory listing, used to prove nothing escaped or persisted.
+    fn names_in(dir: &Path) -> Vec<String> {
+        let mut out: Vec<String> = fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        out.sort();
+        out
+    }
+
+    /// Asserts a failed extraction created nothing outside its owned root, and
+    /// left nothing inside it.
+    ///
+    /// The crate's documented contract is that a failure empties the owned
+    /// private root and leaves it as residue, so the invariant to check is that
+    /// the parent holds only the archive and (at most) an empty owned root, and
+    /// that the owned root holds no partial extraction.
+    fn assert_no_escape_or_residue(dir: &Path, archive_name: &str, context: &str) {
+        for name in names_in(dir) {
+            if name == archive_name {
+                continue;
+            }
+            assert!(
+                name.starts_with(".eggup-extract-"),
+                "{context}: unexpected entry {name:?} escaped into the parent directory"
+            );
+            let path = dir.join(&name);
+            let meta = fs::symlink_metadata(&path).unwrap();
+            assert!(
+                meta.is_dir() && !meta.file_type().is_symlink(),
+                "{context}: owned root {name:?} is not a real directory"
+            );
+            let mut inside: Vec<String> = fs::read_dir(&path)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                .collect();
+            inside.sort();
+            assert!(
+                inside.is_empty(),
+                "{context}: owned root {name:?} retained a partial extraction {inside:?}"
+            );
+        }
+    }
+
+    /// Every traversal vector in the crate, fed through a real archive entry.
+    ///
+    /// The pre-existing coverage feeds these names to `ArchiveMember::new`, the
+    /// *caller-declared plan* path. This test drives the untrusted path instead:
+    /// an archive that declares nothing, containing a hostile entry name that a
+    /// refactor moving validation after `create_member`, or dropping the
+    /// non-`Normal` component check, would happily write through.
+    const HOSTILE_ENTRY_NAMES: [&str; 8] = [
+        "../escape",
+        "a/../../escape",
+        "/etc/passwd",
+        "..\\..\\evil.exe",
+        "a\\b",
+        "a//b",
+        "./app",
+        "C:/Windows/x",
+    ];
+
+    #[test]
+    fn hostile_undeclared_tar_entry_names_fail_closed() {
+        for name in HOSTILE_ENTRY_NAMES {
+            let dir = TestDir::new();
+            let archive = tar_file_raw_path(dir.path(), name);
+            let plan = make_plan(
+                archive,
+                ArchiveFormat::TarGz,
+                vec![member("app", "app", b"v1")],
+                limits(),
+            );
+            assert_eq!(
+                extract_error(&plan, dir.path()),
+                ExtractionErrorKind::InvalidPath,
+                "tar entry {name:?} must be rejected on its raw entry bytes"
+            );
+            assert_no_escape_or_residue(dir.path(), "hostile.tar.gz", &format!("tar {name:?}"));
+        }
+    }
+
+    #[test]
+    fn hostile_undeclared_zip_entry_names_fail_closed() {
+        for name in HOSTILE_ENTRY_NAMES {
+            let dir = TestDir::new();
+            // The zip writer stores the entry name verbatim.
+            let archive = zip_file(dir.path(), "hostile.zip", &[(name, b"x")]);
+            let plan = make_plan(
+                archive,
+                ArchiveFormat::Zip,
+                vec![member("app", "app", b"v1")],
+                limits(),
+            );
+            assert_eq!(
+                extract_error(&plan, dir.path()),
+                ExtractionErrorKind::InvalidPath,
+                "zip entry {name:?} must be rejected on its raw entry bytes"
+            );
+            assert_no_escape_or_residue(dir.path(), "hostile.zip", &format!("zip {name:?}"));
+        }
+    }
+
+    /// Validation runs on raw entry bytes *before* any write, so a hostile
+    /// entry that follows a valid declared member must still leave nothing
+    /// observable: the private root is removed and the caller sees only `Err`.
+    #[test]
+    fn hostile_entry_after_a_valid_member_leaves_no_partial_extraction() {
+        for name in ["../escape", "/etc/passwd", "a\\b"] {
+            let dir = TestDir::new();
+            // Valid declared member first, hostile undeclared entry second.
+            let archive_path = dir.path().join("mixed.tar.gz");
+            let gzip = GzEncoder::new(Vec::new(), Compression::default());
+            let mut builder = TarBuilder::new(gzip);
+            let mut good = Header::new_gnu();
+            good.set_entry_type(TarEntryType::new(b'0'));
+            good.set_size(2);
+            good.set_mode(0o644);
+            good.set_path("app").unwrap();
+            good.set_cksum();
+            builder.append(&good, &b"v1"[..]).unwrap();
+            let mut bad = Header::new_gnu();
+            bad.set_entry_type(TarEntryType::new(b'0'));
+            bad.set_size(1);
+            bad.set_mode(0o644);
+            {
+                let raw = bad.as_mut_bytes();
+                raw[0..100].fill(0);
+                let bytes = name.as_bytes();
+                raw[0..bytes.len()].copy_from_slice(bytes);
+                raw[345..500].fill(0);
+            }
+            bad.set_cksum();
+            builder.append(&bad, &b"x"[..]).unwrap();
+            let gzip = builder.into_inner().unwrap();
+            fs::write(&archive_path, gzip.finish().unwrap()).unwrap();
+
+            let plan = make_plan(
+                archive_path,
+                ArchiveFormat::TarGz,
+                vec![member("app", "app", b"v1")],
+                limits(),
+            );
+            assert_eq!(
+                extract_error(&plan, dir.path()),
+                ExtractionErrorKind::InvalidPath,
+                "hostile entry {name:?} after a valid member must still fail closed"
+            );
+            assert_no_escape_or_residue(dir.path(), "mixed.tar.gz", &format!("mixed tar {name:?}"));
+        }
+    }
+
     fn extract_error(plan: &ArchivePlan, dir: &Path) -> ExtractionErrorKind {
         extract(plan, dir).unwrap_err().kind()
     }
@@ -1576,6 +1799,71 @@ mod tests {
             .kind(),
             ExtractionErrorKind::InvalidPlan
         );
+    }
+
+    #[test]
+    fn output_names_reject_every_windows_device_name_not_just_1_to_9() {
+        // Windows reserves every digit suffix, not just 1-9, and additionally
+        // reserves the console device names. Each of these resolves to a device
+        // on Windows, so accepting one would let a declared member alias a
+        // device instead of writing a file.
+        for name in [
+            "COM0",
+            "LPT0",
+            "com0.txt",
+            "lpt9",
+            "LPT0.bin",
+            "CONIN$",
+            "CONOUT$",
+            "conin$.txt",
+            "CLOCK$",
+        ] {
+            assert_eq!(
+                ArchiveMember::new("app", name, None, None)
+                    .unwrap_err()
+                    .kind(),
+                ExtractionErrorKind::InvalidPath,
+                "name {name:?} must be rejected as a reserved Windows device name"
+            );
+        }
+        // The 1-9 forms stay rejected, and near-miss names are still usable.
+        for name in ["COM1", "LPT9"] {
+            assert_eq!(
+                ArchiveMember::new("app", name, None, None)
+                    .unwrap_err()
+                    .kind(),
+                ExtractionErrorKind::InvalidPath,
+                "name {name:?}"
+            );
+        }
+        for name in ["console", "com10", "auxiliary", "clock"] {
+            assert!(
+                ArchiveMember::new("app", name, None, None).is_ok(),
+                "name {name:?} must remain a usable output name"
+            );
+        }
+    }
+
+    #[test]
+    fn residue_path_is_only_reported_when_the_root_is_actually_empty() {
+        use crate::{ExtractionError, ExtractionErrorKind};
+
+        let dir = TestDir::new();
+        let empty = dir.path().join("empty");
+        fs::create_dir(&empty).unwrap();
+        // An emptied root keeps the original category: the operation's real
+        // failure is still what the caller must handle.
+        let err = ExtractionError::new(ExtractionErrorKind::InvalidPath).with_empty_residue(empty);
+        assert_eq!(err.kind(), ExtractionErrorKind::InvalidPath);
+        assert!(err.residue_path().is_some());
+
+        let full = dir.path().join("full");
+        fs::create_dir(&full).unwrap();
+        fs::write(full.join("leftover"), b"x").unwrap();
+        // A root that still holds evidence is a cleanup failure, not a clean one.
+        let err = ExtractionError::new(ExtractionErrorKind::InvalidPath).with_empty_residue(full);
+        assert_eq!(err.kind(), ExtractionErrorKind::CleanupFailed);
+        assert!(err.residue_path().is_some());
     }
 
     #[test]

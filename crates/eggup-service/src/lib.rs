@@ -738,21 +738,8 @@ impl CommandExecutor for SystemExecutor {
             }
             _ => ServiceError::manager(format!("manager spawn failed for {program}: {e}")),
         })?;
-        // Bounded stdin write (only for short-lived filters like `crontab -`).
-        if let Some(data) = stdin_data {
-            if let Some(mut stdin) = child.stdin.take() {
-                use std::io::Write;
-                // Best-effort bounded write; failure fails closed.
-                if stdin.write_all(data).is_err() || stdin.flush().is_err() {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(ServiceError::manager(format!(
-                        "manager stdin failed for {program}"
-                    )));
-                }
-            }
-            // `stdin` is dropped here, closing the pipe (EOF for the child).
-        }
+        // Reader threads are attached before the stdin write, so a child that
+        // fills stdout/stderr before draining stdin cannot deadlock both sides.
         let stdout_pipe: Option<Box<dyn std::io::Read + Send>> = child
             .stdout
             .take()
@@ -772,9 +759,68 @@ impl CommandExecutor for SystemExecutor {
             let out = read_bounded_generic(stderr_pipe, max);
             let _ = tx_err.send(out);
         });
+        // Bounded stdin write (only for short-lived filters like `crontab -`).
+        //
+        // The write runs on its own thread: a blocking `write_all` on a pipe
+        // cannot be interrupted from this thread, and the only thing that
+        // unblocks it is closing the child's read end, which `child.kill()`
+        // does. The write is therefore bounded by driving it through the same
+        // deadline-checked wait loop below, which kills the child once
+        // `command_deadline` passes.
+        let stdin_result: Option<std::sync::mpsc::Receiver<std::io::Result<()>>> = match stdin_data
+        {
+            Some(data) => {
+                let Some(mut stdin) = child.stdin.take() else {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(ServiceError::manager(format!(
+                        "manager stdin unavailable for {program}"
+                    )));
+                };
+                let (tx_in, rx_in) = std::sync::mpsc::channel();
+                // The writer thread needs owned bytes; the bound above keeps
+                // this copy small.
+                let owned = data.to_vec();
+                std::thread::spawn(move || {
+                    use std::io::Write;
+                    // Best-effort write; failure fails closed. `stdin` is
+                    // dropped on this thread, closing the pipe (EOF for the child).
+                    let _ = tx_in.send(stdin.write_all(&owned).and_then(|()| stdin.flush()));
+                });
+                Some(rx_in)
+            }
+            None => None,
+        };
         loop {
+            // A completed write that failed fails closed. A write that is still
+            // pending is not itself a failure: the deadline below bounds it.
+            if let Some(rx) = stdin_result.as_ref() {
+                if let Ok(Err(_)) = rx.try_recv() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(ServiceError::manager(format!(
+                        "manager stdin failed for {program}"
+                    )));
+                }
+            }
             match child.try_wait() {
                 Ok(Some(status)) => {
+                    // The child has exited, so its stdin read end is closed and
+                    // the writer cannot block indefinitely. Collect its verdict
+                    // within the remaining budget before trusting the output.
+                    if let Some(rx) = stdin_result.as_ref() {
+                        let remaining = command_deadline
+                            .checked_duration_since(Instant::now())
+                            .filter(|d| !d.is_zero())
+                            .ok_or_else(|| ServiceError::manager("manager command timed out"))?;
+                        if !matches!(rx.recv_timeout(remaining), Ok(Ok(()))) {
+                            let _ = child.kill();
+                            let _ = child.wait();
+                            return Err(ServiceError::manager(format!(
+                                "manager stdin failed for {program}"
+                            )));
+                        }
+                    }
                     let remaining = command_deadline
                         .checked_duration_since(Instant::now())
                         .filter(|d| !d.is_zero())
@@ -1149,6 +1195,12 @@ pub fn atomic_write_definition(
     }
     drop(file);
     if allow_overwrite {
+        // `std::fs::rename` is `MoveFileEx(MOVEFILE_REPLACE_EXISTING)` on
+        // Windows, so it already replaces an existing destination. A former
+        // `AlreadyExists` arm that removed the destination and re-renamed was
+        // therefore unreachable, and had it ever run it would have opened a
+        // data-loss window: the destination is already gone and the promotion
+        // can still fail, leaving nothing at the path.
         match std::fs::rename(&tmp, path) {
             Ok(()) => {
                 guard.disarm = true;
@@ -1156,17 +1208,6 @@ pub fn atomic_write_definition(
                 if let Ok(dir) = std::fs::File::open(parent) {
                     let _ = dir.sync_all();
                 }
-                Ok(())
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                // Windows: rename fails when dest exists. Remove the owned
-                // dest (already authorized by ownership) then rename.
-                std::fs::remove_file(path).map_err(|e2| {
-                    ServiceError::manager(format!("removing owned definition: {e2}"))
-                })?;
-                std::fs::rename(&tmp, path)
-                    .map_err(|e2| ServiceError::manager(format!("promoting definition: {e2}")))?;
-                guard.disarm = true;
                 Ok(())
             }
             Err(e) => Err(ServiceError::manager(format!("promoting definition: {e}"))),
@@ -2836,25 +2877,18 @@ impl<E: CommandExecutor> ServiceManager for CronManager<E> {
         })
     }
 
-    fn install(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
+    fn install(&mut self, _spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
         let current = self.list_crontab()?;
         // Reuse pure merge (fail-closed on Foreign/Unknown, idempotent).
+        //
+        // This is also the ownership gate. `cron_merge` classifies the same
+        // crontab with the same marker and desired block, so it already rejects
+        // `Foreign` and `Unknown` before returning. A separate classification
+        // gate here was unreachable, and it would have misattributed the
+        // failure: `cron_merge` reports `Foreign` against the synthetic
+        // `cron:{marker}` id that owns the block, while a second check could
+        // only report it against `spec.id()`.
         let (merged, changed) = cron_merge(&current, &self.marker, &self.desired_block)?;
-        // Gate on neutral ownership as well: Absent creation or Owned refresh.
-        let block_state = cron_classify(&current, &self.marker, &self.desired_block);
-        match block_state {
-            CronOwnership::Absent | CronOwnership::Owned => {}
-            CronOwnership::Foreign | CronOwnership::Unknown => {
-                return Err(ServiceError::denied(
-                    spec.id(),
-                    if block_state == CronOwnership::Foreign {
-                        Ownership::Foreign
-                    } else {
-                        Ownership::Unknown
-                    },
-                ));
-            }
-        }
         if !changed {
             return Ok(TransitionResult {
                 operation: ServiceOperation::Install,
