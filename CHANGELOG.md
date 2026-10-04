@@ -1,20 +1,21 @@
 # Changelog
 
-## 0.1.2 — 2026-09-28, completed 2026-10-02
+## 0.1.2 — 2026-09-28, completed 2026-10-04
 
-The 0.1.2 source version was published to crates.io in two steps. On 2026-09-28
-(M009) `eggup-core 0.1.2` and `eggup-archive 0.1.2` were published. On 2026-10-02
-(Eggpack Manifest Interoperability M004) the remaining crates of the same
-0.1.2 source version were published, completing the workspace version on the
-registry.
+The 0.1.2 source version was published to crates.io in three steps. On 2026-09-28
+(Verified Update Core M009) `eggup-core 0.1.2` and `eggup-archive 0.1.2` were
+published. On 2026-10-02 (Eggpack Manifest Interoperability M004) the
+producer-schema-dependent half of the same 0.1.2 source version was published:
+`eggup-acquisition 0.1.2`, `eggup-eggfetch 0.1.2`, and `eggup-eggpack 0.1.2`.
+On 2026-10-04 (Acquisition Transport M009) `eggup-curl 0.1.2` was published.
 
 **Complete crates.io 0.1.2 publication set:** `eggup-core`, `eggup-archive`,
-`eggup-acquisition`, `eggup-eggfetch`, `eggup-eggpack`.
+`eggup-acquisition`, `eggup-eggfetch`, `eggup-eggpack`, `eggup-curl`.
 
-`eggup-curl`, `eggup-service`, and `eggup-transport-footprint` share the 0.1.2
-source version and are still **not** published; they remain at their last
-published versions or unpublished. `eggup-transport-footprint` is
-`publish = false` by design and has no edge in the published adapter graph.
+`eggup-service` and `eggup-transport-footprint` share the 0.1.2 source version
+and are still **not** published. `eggup-transport-footprint` is
+`publish = false` by design and has no edge in the published adapter graph;
+`eggup-service` remains outside every publication authorization to date.
 
 Integrity remains SHA-256 checksum evidence only; no authenticity or signature
 claims are made by any of these crates.
@@ -64,6 +65,36 @@ claims are made by any of these crates.
   adapter still selects no release, verifies no authenticity, and authorizes
   no filesystem destination. Published 2026-10-02.
 
+> **Published-content caveat for `eggup-acquisition 0.1.2`.** That version was
+> published from `02a1d32` on 2026-10-02 and therefore does **not** contain the
+> two workspace bug-audit fixes that landed afterwards in `0b8cb98` (2026-10-04):
+> the owned `.part` file leak when permission hardening fails, and the
+> `ComposedTransport` fallback receiving the caller's full budget instead of the
+> remaining one. The second one is reachable today by any consumer that composes
+> two transports from the registry, so those consumers should either pin a
+> later `eggup-acquisition` or set a total deadline that tolerates the doubled
+> composed window until the fix is republished. `eggup-curl 0.1.2` keeps a
+> caret-compatible `eggup-acquisition` requirement, so it inherits an
+> `eggup-acquisition 0.1.3` automatically once one is published.
+
+- `eggup-curl 0.1.2` (first crates.io publication): the lightweight
+  external-`curl` acquisition adapter, promoted as a package only. It fetches
+  exact caller-selected URLs by invoking a caller-supplied `curl` executable
+  with no shell, no internal `sudo`, and no release/version/mirror policy, so a
+  curl-only binary carries no embedded HTTP/TLS stack. Carries the Acquisition
+  M005-M008 qualified behavior: explicit connect/total ceilings plus an
+  independent parent wall deadline serialized truthfully at sub-second
+  precision, exact 404 classified as `FetchOutcome::NotFound`, bounded streaming
+  into Eggup-owned staging, cancellation/timeout child kill and reap,
+  race-safe no-clobber promotion, credential-bearing diagnostic redaction, and
+  explicit redirect/protocol/proxy policy. Package metadata is behavior-neutral
+  and the existing `eggup-acquisition` requirement stays caret-compatible. The
+  adapter selects no release, verifies no authenticity, and authorizes no
+  destination. No Windows live-loopback curl result is claimed: hosted Windows
+  runners refused the historical spawned-curl loopback case, so the Windows lane
+  carries the portable adapter, process, and error-path fixtures only. Published
+  2026-10-04.
+
 ## Unreleased
 
 - Eggpack Interop M002 (published in `eggup-eggpack 0.1.2` on 2026-10-02; see the 0.1.2 section above): `eggup-eggpack` gains the archive
@@ -84,7 +115,7 @@ claims are made by any of these crates.
   `0.1.2` version; Eggsact's own Git-to-registry consumer migration is still
   separately authorized in `eggstack/eggsact` and is not claimed here.
 
-- Acquisition M008 (unpublished corrective): `eggup-curl` deadline
+- Acquisition M008 (published in `eggup-curl 0.1.2` on 2026-10-04; see the 0.1.2 section above): `eggup-curl` deadline
   arguments now serialize at microsecond precision with a `.` decimal
   separator, so sub-second connect/total ceilings (`100 ms -> "0.1"`,
   `250 ms -> "0.25"`, `1.5 s -> "1.5"`, `2 s -> "2"`) are passed to curl
@@ -95,7 +126,7 @@ claims are made by any of these crates.
   tolerance (`POLL_INTERVAL + 5 ms`); the previous one-second
   truthfulness allowance is removed. No public `FetchLimits` API or
   default values changed; no fallback, release, service, or core policy
-  changed. No publication or consumer migration performed.
+  changed. No consumer migration performed.
 
 - Service M007 (unpublished corrective): bounded service errors and manager
   output excerpts now truncate at UTF-8 character boundaries within their
@@ -103,21 +134,25 @@ claims are made by any of these crates.
   bounded remediation hint. No lifecycle behavior or consumer migration
   changed; no publication performed.
 
-- Acquisition M007 (unpublished corrective): diagnostics now truncate only at
+- Acquisition M007: the `eggup-acquisition` half shipped in `eggup-acquisition
+  0.1.2` on 2026-10-02; the `eggup-curl` half shipped in `eggup-curl 0.1.2` on
+  2026-10-04 (see the 0.1.2 section above). Diagnostics truncate only at
   UTF-8 boundaries; `FetchLimits::max_artifact_bytes` is a mandatory positive
   finite `u64` (migration: `Some(n)` → `n`, remove `None`); curl streams body
   bytes into Eggup's retained exclusive file handle and captures bounded HTTP
   status separately. No fallback, release, service, or core policy changed.
-  No publication or consumer migration performed.
+  No consumer migration performed.
 
-- Acquisition M005 (unpublished): new `eggup-curl` external-curl adapter plus
+- Acquisition M005 (published: `eggup-curl` 0.1.2 on 2026-10-04 and
+  `eggup-acquisition` 0.1.2 on 2026-10-02; see the 0.1.2 section above): the
+  `eggup-curl` external-curl adapter plus
   `AcquisitionError::Unavailable` and `eggup-acquisition::ComposedTransport`
   with `CompositionPolicy::{UnavailableOnly (default), UnavailableOrTransport}`.
   Curl-only binaries avoid an embedded HTTP/TLS stack; Eggfetch-only binaries
   avoid curl; dual binaries compose both for the same exact URL. Exact 404
   remains terminal `NotFound`; default fallback occurs only on unavailability.
-  No `eggup-core` change; no Gregg modification or dependency. No publication
-  or consumer migration performed.
+  No `eggup-core` change; no Gregg modification or dependency. No consumer
+  migration performed.
 
 - Service M006 (unpublished): product-neutral `UpdateRuntimeDisposition`
   (`ManagedRunning`, `ManagedStopped`, `DirectRunning`, `Stopped`,

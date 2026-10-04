@@ -1,2 +1,6 @@
 /target/
 
+# macOS Finder metadata. Ignored so the tree can stay clean for the
+# no---allow-dirty publication step in the release plans.
+.DS_Store
+

@@ -2,12 +2,20 @@
 
 ## Unreleased
 
-This crate has never been published. There is no migration requirement for
-downstream consumers, and no crates.io version of `eggup-curl` exists.
+Nothing is pending beyond the published `0.1.2` release below.
 
-Fixes from the workspace bug audit; no API change.
+## 0.1.2 — 2026-10-04
 
-- **Security: an `https` request could follow a redirect down to `http`.**
+First crates.io publication of `eggup-curl`
+(`plans/closure/acquisition-transport/009-status.md`). This is a package
+promotion only: the transport semantics qualified under Acquisition M005-M008
+are unchanged, and the crate was not re-architected for publication.
+
+Integrity remains SHA-256 checksum evidence only; no authenticity or signature
+claims. The adapter selects no release, authorizes no install destination, and
+claims no Windows live-loopback evidence.
+
+- **Fixed: an `https` request could follow a redirect down to `http`.**
   `CurlConfig::allowed_protocols` was forwarded as both `--proto` and
   `--proto-redir`, and the default list contains `http`. A `302 Location:
   http://…` was therefore followed in cleartext with no error and no
@@ -24,17 +32,35 @@ Fixes from the workspace bug audit; no API change.
   held for every exit 28, so a total-deadline timeout was reported as a connect
   timeout. Coincident ceilings now report the weaker, always-true `total` phase.
 
-- Acquisition M005 (unpublished): new `eggup-curl` external-curl adapter plus
-  `AcquisitionError::Unavailable` and `eggup-acquisition::ComposedTransport`
-  with `CompositionPolicy::{UnavailableOnly (default), UnavailableOrTransport}`.
+- Acquisition M005 (published in this version): the `eggup-curl` external-curl
+  adapter plus `AcquisitionError::Unavailable` and
+  `eggup-acquisition::ComposedTransport` with
+  `CompositionPolicy::{UnavailableOnly (default), UnavailableOrTransport}`.
   Curl-only binaries avoid an embedded HTTP/TLS stack; Eggfetch-only binaries
   avoid curl; dual binaries compose both for the same exact URL. Exact 404
   remains terminal `NotFound`; default fallback occurs only on unavailability.
-  No `eggup-core` change; no Gregg modification or dependency. No publication
-  or consumer migration performed.
+  Transport fallback is never release/source fallback. No `eggup-core` change;
+  no Gregg modification or dependency; no consumer migration performed.
 
-## 0.1.2
+- Acquisition M007 (published in this version): diagnostics truncate only at
+  UTF-8 boundaries; `FetchLimits::max_artifact_bytes` is a mandatory positive
+  finite `u64` (migration: `Some(n)` → `n`, remove `None`); curl streams body
+  bytes into Eggup's retained exclusive file handle and captures bounded HTTP
+  status separately, so the temp pathname is never handed back to curl for
+  reopening. No fallback, release, service, or core policy changed.
 
-Source version only — not published. The crate shares the workspace `0.1.2`
-source version and has no crates.io release. See the `Unreleased` section above
-for what the crate contains.
+- Acquisition M008 (published in this version): deadline arguments serialize at
+  microsecond precision with a `.` decimal separator, so sub-second
+  connect/total ceilings (`100 ms -> "0.1"`, `250 ms -> "0.25"`, `1.5 s -> "1.5"`,
+  `2 s -> "2"`) are passed to curl truthfully instead of being widened to whole
+  seconds. Truncation to whole microseconds never widens the input, and
+  sub-microsecond positive durations are rejected at validation rather than
+  silently extended. Connect-phase timeout attribution uses only the parent
+  scheduling tolerance (`POLL_INTERVAL + 5 ms`); the previous one-second
+  truthfulness allowance is removed. No public `FetchLimits` API or default
+  values changed.
+
+- Platform note: Windows hosted runners refused the historical spawned-curl
+  loopback case, so the Windows lane carries the portable adapter, process, and
+  error-path fixtures only. No Windows live HTTP/curl result is claimed. Live
+  local HTTP/curl evidence is carried by the Linux and macOS lanes.
