@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M006 closed; M007 conditionally closed; M008 closed via Archive M001b hosted run 36222536670; M009 eggup-curl 0.1.2 publication ready
+Status: M001-M006 closed; M007 conditionally closed; M008 closed via Archive M001b hosted run 36222536670; M009 eggup-curl 0.1.2 published and closed; M010 eggup-acquisition 0.1.3 publication ready
 
 Long-term references:
 
@@ -112,7 +112,10 @@ M007 boundary safety hardening [CONDITIONALLY CLOSED]
                  M008 sub-second deadline truthfulness [CLOSED via run 36222536670]
                       |
                       v
-                 M009 eggup-curl 0.1.2 publication [READY]
+                 M009 eggup-curl 0.1.2 publication [CLOSED; published from b485228]
+                      |
+                      v
+                 M010 eggup-acquisition 0.1.3 publication [READY]
 ```
 
 ## 7. Milestones
@@ -199,11 +202,56 @@ Class: package promotion / downstream unblock.
 
 Plan: `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md`.
 
-Status: ready.
+Status: closed; see `plans/closure/acquisition-transport/009-status.md`.
+
+M009 published `eggup-curl 0.1.2` on 2026-10-04 from release-prep commit
+`b485228` (hosted run `37223895075` green on all four lanes), checksum
+`79df200f…b465`, with a registry-only external fixture passing 6/6 and a
+lockfile showing one registry source per package and no git or path entry. No
+`src/` byte changed. No tag was created or moved: `v0.1.1` and `v0.1.2` are
+immutable, and the existing GitHub Release `0.1.2` notes were extended rather
+than replaced. The M007 Windows hosted live-loopback limitation is retained and
+is not upgraded. The publication also delivered the two `0b8cb98` curl fixes
+(https redirect downgrade, coincident-ceiling timeout phase), because the crate
+was published after that commit.
 
 M009 publishes the already-qualified lightweight external-curl adapter without changing its transport semantics. The immediate downstream trigger is cargo-cleanme Phase 10 self-update, which should consume the registry package instead of copying Gregg's local updater. Publication must prove a registry-only external graph against published `eggup-acquisition`, rerun current Stable/MSRV/macOS/Windows qualification, and retain M007's explicit Windows hosted live-loopback limitation.
 
 M009 does not authorize a Gregg migration, add release-selection policy, or publish `eggup-service` / `eggup-transport-footprint`.
+
+### M010 — eggup-acquisition 0.1.3 publication
+
+Class: package promotion / correctness delivery.
+
+Plan: `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md`.
+
+Status: ready.
+
+Published `eggup-acquisition 0.1.2` came from `02a1d32` on 2026-10-02 and does
+not contain the two acquisition fixes that landed afterwards in `0b8cb98`: the
+owned `.part` file leaks when permission hardening fails, and
+`ComposedTransport` hands the secondary adapter the caller's full `FetchLimits`
+instead of the remaining budget, so one composed fetch can run for roughly twice
+the caller's documented `total_timeout`. The second is reachable today by any
+registry consumer composing two transports. It is pre-existing, is not
+introduced by M009, and is recorded in the root `CHANGELOG.md`, the Release
+`0.1.2` notes, and the M009 closure record.
+
+M010 republishes the seam as `0.1.3` carrying both fixes, and nothing else. No
+`src/` change, no new transport feature, no other crate published.
+
+`eggup-curl 0.1.2` and `eggup-eggfetch 0.1.2` both require `eggup-acquisition
+^0.1.0`, so they inherit the fix automatically on the next resolve — the caret
+was deliberately kept for exactly this reason. `eggup-eggpack 0.1.2` pins
+`=0.1.2` and therefore does **not** inherit it; that exact pin is intentional
+from M004, so delivering the fix to adapter consumers is a separate adapter
+republication rather than a pin relaxation. M010 records that as its named
+follow-on and as a stop condition.
+
+The workspace `version.workspace` bump to `0.1.3` is unavoidable and forces
+`eggup-eggpack`'s three `=0.1.2` requirements to be re-pinned so the workspace
+resolves; M010 states that bookkeeping explicitly rather than leaving it
+implicit.
 
 ## 8. Cross-cutting requirements
 
@@ -219,7 +267,7 @@ Eggfetch version/feature choice may materially affect binary size. Measure rathe
 
 ## 11. Completion definition
 
-The subsystem's mechanism path is complete through M008 when current-head hosted Stable/MSRV/macOS/Windows qualification is green, the corrected native Eggfetch and lightweight curl paths satisfy the common bounded acquisition contract and truthful deadline ceilings, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. M009 is a separate package-promotion gate that makes the already-qualified curl path registry-consumable; it must not reopen transport semantics.
+The subsystem's mechanism path is complete through M008 when current-head hosted Stable/MSRV/macOS/Windows qualification is green, the corrected native Eggfetch and lightweight curl paths satisfy the common bounded acquisition contract and truthful deadline ceilings, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. M009 is a separate package-promotion gate that makes the already-qualified curl path registry-consumable; it must not reopen transport semantics. M009 closed on 2026-10-04. M010 is a correctness-delivery publication for the two `0b8cb98` acquisition fixes and is the current next milestone.
 
 ## 12. Milestone status
 
@@ -233,4 +281,5 @@ The subsystem's mechanism path is complete through M008 when current-head hosted
 | M006 | closed | `plans/implementation/acquisition-transport/006-m005-windows-portability-and-cross-closure-qualification-corrective.md` | `plans/closure/acquisition-transport/006-status.md` | — |
 | M007 | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` | `plans/closure/acquisition-transport/007-status.md` | Windows hosted runner blocks spawned curl loopback requests; no Windows live-HTTP claim |
 | M008 | closed | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md` | `plans/closure/acquisition-transport/008-status.md` | — |
-| M009 | ready | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md` | — | Current package/publish simulation + registry-only external graph; downstream trigger cargo-cleanme Phase 10 M010C |
+| M009 | closed | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md` | `plans/closure/acquisition-transport/009-status.md` | `eggup-curl 0.1.2` published from `b485228`, run `37223895075` green on all lanes; registry-only fixture 6/6; M007 Windows live-loopback limitation retained |
+| M010 | ready | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md` | — | Publish the two `0b8cb98` acquisition fixes; `eggup-eggpack =0.1.2` pin needs a separate adapter republication |

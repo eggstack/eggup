@@ -1,6 +1,6 @@
 # M009 — eggup-curl 0.1.2 Publication
 
-Status: ready
+Status: closed; see `plans/closure/acquisition-transport/009-status.md`
 
 Repository baseline: `6a3e1e931b4976deebb0da5ca28f6462e899671e`
 
