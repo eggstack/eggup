@@ -266,8 +266,19 @@ under time pressure, and it is the one that protects the layered design.
 failure in an unlisted crate went unobserved on Windows is closed.
 
 The targeted steps stay, ahead of the full run, because they name the failure
-instead of reporting a pile of results. The selection reflects where
-Windows-specific behavior actually lives:
+instead of reporting a pile of results. The closing run passes
+`--no-fail-fast`: this is the only Windows test coverage, so one failing target
+must not hide the state of every other one.
+
+The widening has already paid for itself. Turning on
+`cargo test --workspace` exposed
+`bound_source_stages_open_object_after_root_rename` failing on Windows — renaming
+a directory that contains an open handle is refused there — a portability gap
+that had been invisible for the crate's whole life and that Linux and macOS
+cannot see. Treat the Windows lane as an active finding source rather than a
+formality, and fix portability gaps instead of narrowing the step.
+
+The selection reflects where Windows-specific behavior actually lives:
 
 - `eggup-acquisition`, `eggup-archive`, `eggup-curl` — filesystem and process
   behavior that differs from POSIX. `eggup-archive` in particular has

@@ -328,9 +328,19 @@ mod tests {
             ArtifactSet::single(member).unwrap(),
         )
         .unwrap();
-        // The recorded advisory path is stale from here on; staging must still
-        // resolve the owned object, never the renamed-away name.
+        // Make the recorded advisory path stale from here on, while keeping the
+        // bound handle open. Staging must then resolve the owned object through
+        // the handle and never through the name.
+        //
+        // Unix renames the whole *directory*, the stronger case: the recorded
+        // prefix is stale too. Windows refuses to rename a directory that still
+        // contains an open handle, so there the file itself is renamed, which
+        // leaves the recorded path stale all the same. Both are possible only
+        // because `File::open` requests `FILE_SHARE_DELETE` on Windows.
+        #[cfg(unix)]
         fs::rename(&subdir, inputs.path().join("renamed-dir")).expect("rename");
+        #[cfg(windows)]
+        fs::rename(&source, subdir.join("renamed-member")).expect("rename");
         let mut bound = BoundSources::new();
         bound.insert(MemberId::new("main").unwrap(), handle);
         let prepared = plan.prepare_with_bound_sources(bound).unwrap();

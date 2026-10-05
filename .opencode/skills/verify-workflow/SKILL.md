@@ -59,9 +59,18 @@ whole workspace:
 7. `cargo test --workspace --all-targets --locked`
 
 Step 7 exists because the per-crate steps cannot catch a regression in an
-untargeted crate. If a new Core milestone adds platform-dependent filesystem or
-running-image behaviour, add its fixture here — a local macOS pass says nothing
-about Windows.
+untargeted crate. It passes `--no-fail-fast` deliberately: this lane is the only
+Windows test coverage, so one failing target must not hide the state of the rest.
+If a new Core milestone adds platform-dependent filesystem or running-image
+behaviour, add its fixture here — a local macOS pass says nothing about Windows.
+
+**This lane has already paid for itself twice.** Turning on
+`cargo test --workspace` exposed `bound_source_stages_open_object_after_root_rename`
+failing on Windows (renaming a directory that contains an open handle is refused
+there), a portability gap that had been invisible for the crate's whole life. The
+Core M010 fixtures caught a missing Windows identity check in the same period.
+Both were compile-clean on Linux and macOS. Assume more exist until the lane has
+been green for a while, and fix them rather than narrowing the step.
 
 ## Known coverage gaps — check these before claiming evidence
 
