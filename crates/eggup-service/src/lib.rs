@@ -439,8 +439,7 @@ impl TestDoubleManager {
         self.registrations.insert(
             id.as_str().to_string(),
             TestRegistration {
-                spec: ServiceSpec::new(id, PathBuf::from("/invalid"), vec![], None)
-                    .expect("test spec"),
+                spec: ServiceSpec::new(id, absolute("/invalid"), vec![], None).expect("test spec"),
                 state: LifecycleState::Unknown,
                 malformed: true,
             },
@@ -3090,6 +3089,20 @@ pub fn candidate_managers(facts: &HostFacts) -> Vec<CandidateManager> {
     Vec::new()
 }
 
+/// Builds an absolute path for the host platform.
+///
+/// `ServiceSpec` requires an absolute executable on every platform, so a
+/// hardcoded POSIX path is simply not absolute on Windows and is refused there.
+/// Prefixing a drive keeps one fixture valid on both, and on Unix it is the
+/// identity function. Not test-gated: the public `TestDoubleManager` uses it.
+pub(crate) fn absolute(path: &str) -> PathBuf {
+    if cfg!(windows) {
+        PathBuf::from(format!(r"C:\{}", path.trim_start_matches('/')))
+    } else {
+        PathBuf::from(path)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3196,7 +3209,7 @@ mod tests {
         let mut m = TestDoubleManager::new();
         let id = ServiceId::new("svc").unwrap();
         m.put_malformed(id.clone());
-        let want = ServiceSpec::new(id, PathBuf::from("/invalid"), vec![], None).unwrap();
+        let want = ServiceSpec::new(id, absolute("/invalid"), vec![], None).unwrap();
         assert_eq!(m.inspect(&want).unwrap().ownership, Ownership::Unknown);
         assert!(m.stop(&want, Duration::from_secs(1)).is_err());
         assert!(m.restart(&want, Duration::from_secs(1)).is_err());
@@ -3689,9 +3702,9 @@ mod unix_tests {
     fn systemd_config_identity_requires_one_exact_argv_match() {
         let with_config = ServiceSpec::new(
             ServiceId::new("my-daemon.service").unwrap(),
-            PathBuf::from("/opt/app/bin"),
+            absolute("/opt/app/bin"),
             vec!["--config".into(), "/etc/app.toml".into()],
-            Some(PathBuf::from("/etc/app.toml")),
+            Some(absolute("/etc/app.toml")),
         )
         .unwrap();
         let exact = "LoadState=loaded\nActiveState=inactive\nExecStart={ path=/opt/app/bin ; argv[]=/opt/app/bin --config /etc/app.toml ; ignore_errors=no }\n";
@@ -3920,7 +3933,7 @@ mod unix_tests {
             "com.example.daemon".to_string(),
             LaunchdDomain::UserAgent,
             "gui/501".to_string(),
-            PathBuf::from("/tmp/com.example.daemon.plist"),
+            absolute("/tmp/com.example.daemon.plist"),
             plist("/opt/app/bin", &[]),
             false,
             Duration::from_secs(5),
@@ -3930,7 +3943,7 @@ mod unix_tests {
             "com.example.daemon".to_string(),
             LaunchdDomain::SystemDaemon,
             "system".to_string(),
-            PathBuf::from("/Library/LaunchDaemons/com.example.daemon.plist"),
+            absolute("/Library/LaunchDaemons/com.example.daemon.plist"),
             plist("/opt/app/bin", &[]),
             false,
             Duration::from_secs(5),
@@ -3942,7 +3955,7 @@ mod unix_tests {
             "com.example.daemon".to_string(),
             LaunchdDomain::UserAgent,
             "system".to_string(),
-            PathBuf::from("/tmp/x.plist"),
+            absolute("/tmp/x.plist"),
             plist("/opt/app/bin", &[]),
             false,
             Duration::from_secs(5),
@@ -4078,16 +4091,16 @@ mod unix_tests {
     fn launchd_config_identity_reconciles_exact_missing_and_ambiguous_argv() {
         let service = ServiceSpec::new(
             ServiceId::new("com.example.daemon").unwrap(),
-            PathBuf::from("/opt/app/bin"),
+            absolute("/opt/app/bin"),
             vec!["--settings".into(), "/etc/app.toml".into()],
-            Some(PathBuf::from("/etc/app.toml")),
+            Some(absolute("/etc/app.toml")),
         )
         .unwrap();
         let observed = |args: &[&str]| {
             reconcile_config_identity(
                 RegistrationSnapshot {
                     present: true,
-                    executable: Some(PathBuf::from("/opt/app/bin")),
+                    executable: Some(absolute("/opt/app/bin")),
                     args: args.iter().map(|arg| (*arg).to_string()).collect(),
                     config: None,
                     malformed: false,
@@ -4435,7 +4448,7 @@ mod unix_tests {
         let install = SystemdInstall::new(
             "my-daemon.service".to_string(),
             SystemdScope::User,
-            PathBuf::from("/tmp/my-daemon.service"),
+            absolute("/tmp/my-daemon.service"),
             b"[Unit]\n".to_vec(),
             false,
             false,

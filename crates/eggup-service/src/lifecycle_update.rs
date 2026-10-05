@@ -818,7 +818,7 @@ mod tests {
             if self.drift_to_foreign_after_stop {
                 let foreign = ServiceSpec::new(
                     spec.id().clone(),
-                    PathBuf::from("/different/service-executable"),
+                    crate::absolute("/different/service-executable"),
                     spec.args().to_vec(),
                     spec.config().map(Path::to_path_buf),
                 )?;
@@ -1115,7 +1115,7 @@ mod tests {
                 1 => {
                     let foreign = ServiceSpec::new(
                         service.id().clone(),
-                        PathBuf::from("/foreign"),
+                        crate::absolute("/foreign"),
                         service.args().to_vec(),
                         None,
                     )

@@ -1328,8 +1328,8 @@ mod tests {
         DirectObservation {
             state,
             exact_ownership_proven: proven,
-            executable: Some(PathBuf::from("/opt/app/service.bin")),
-            config: Some(PathBuf::from("/etc/app/config.toml")),
+            executable: Some(crate::absolute("/opt/app/service.bin")),
+            config: Some(crate::absolute("/etc/app/config.toml")),
         }
     }
 
@@ -1354,8 +1354,8 @@ mod tests {
 
     #[test]
     fn unix_reference_matrix() {
-        let cfg = PathBuf::from("/etc/app/config.toml");
-        let other = PathBuf::from("/etc/other/config.toml");
+        let cfg = crate::absolute("/etc/app/config.toml");
+        let other = crate::absolute("/etc/other/config.toml");
         // Owned + active -> ManagedRunning.
         assert_eq!(
             plan_unix(&unix_input(
@@ -1663,7 +1663,7 @@ mod tests {
             }
             self.obs.state = DirectState::Stopped;
             if self.drift_after_stop {
-                self.obs.executable = Some(PathBuf::from("/different/service.bin"));
+                self.obs.executable = Some(crate::absolute("/different/service.bin"));
                 self.obs.exact_ownership_proven = false;
             }
             Ok(TransitionResult {
@@ -1997,7 +1997,7 @@ mod tests {
         // Foreign registration: same id, different executable.
         let foreign_spec = ServiceSpec::new(
             ServiceId::new("disposition-test").unwrap(),
-            PathBuf::from("/foreign/service.bin"),
+            crate::absolute("/foreign/service.bin"),
             vec!["--worker".into()],
             None,
         )
@@ -2040,7 +2040,7 @@ mod tests {
         // Manager is Foreign and untouched; direct is Running.
         let foreign = ServiceSpec::new(
             spec.id().clone(),
-            PathBuf::from("/foreign/service.bin"),
+            crate::absolute("/foreign/service.bin"),
             spec.args().to_vec(),
             None,
         )
@@ -2085,7 +2085,7 @@ mod tests {
         // orchestration observes (simulated by replacing the registration).
         let foreign = ServiceSpec::new(
             spec.id().clone(),
-            PathBuf::from("/different/service-executable"),
+            crate::absolute("/different/service-executable"),
             spec.args().to_vec(),
             None,
         )
@@ -2126,8 +2126,8 @@ mod tests {
             obs: DirectObservation {
                 state: DirectState::Running,
                 exact_ownership_proven: false,
-                executable: Some(PathBuf::from("/different/service.bin")),
-                config: Some(PathBuf::from("/etc/app/config.toml")),
+                executable: Some(crate::absolute("/different/service.bin")),
+                config: Some(crate::absolute("/etc/app/config.toml")),
             },
             events,
             fail_stop: false,
