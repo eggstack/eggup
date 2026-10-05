@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; simple, eggsearch, CodeGG M005, and Egress M006 are closed; Gregg M004 remains intentionally unwritten
+Status: active; simple, eggsearch, CodeGG M005, and Egress M006 are closed; Gregg M004 and EggPool M007 remain unwritten pending substrate corrections
 
 Long-term references:
 
@@ -103,7 +103,9 @@ core M005 corrective + M006 qualification + transport M002
                                        |
                                        v
                                  M004 Gregg
-                            [writable; plan intentionally unwritten]
+                [BLOCKED on Core M010/M011 + Service M009
+                 and registry-correct Acquisition M010;
+                 plan intentionally unwritten]
 
 qualified core M006 + acquisition M004
                     |
@@ -114,7 +116,7 @@ qualified core M006 + acquisition M004
 
 M006 Egress was unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and its adoption plan is registered at `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`. Verified Core M009 closed the publication gate on 2026-09-28 (`eggup-core 0.1.2` + `eggup-archive 0.1.2` registry-visible; `plans/closure/verified-update-core/009-status.md`), and Egress Delivery M003 landed the adoption on 2026-09-29 with hosted Linux/macOS/Windows updater evidence — M006 is closed (see `plans/closure/consumer-adoption/006-status.md` M003-landed addendum). No git/path dependency entered Egress's publishable release state.
 
-M007 EggPool selective adoption is independent/evidence-driven after core maturity.
+M007 EggPool selective adoption remains evidence-driven. Current review shows its standalone-Rust branch can adopt the generic current-executable transaction only after Core M010/M011 close; uv/pipx/pip provenance and package-manager rollback remain EggPool-owned.
 ```
 
 ## 7. Milestones
@@ -150,7 +152,7 @@ Do not execute the Gregg migration yet. Gregg was a read-only reference/test ora
 - acquisition M005: external curl adapter + explicit curl/Eggfetch transport composition;
 - service M006: managed/direct/stopped/foreign-preserved daemon update disposition and revalidation semantics.
 
-Both upstream feature milestones are closed, and acquisition M006 has restored green hosted qualification with reconciled M005/M006 closure evidence. Gregg M004 prerequisites are therefore satisfied and the milestone is writable, but its plan remains intentionally unwritten pending a separate authoring decision. Author M004 only if migration can delete duplicated generic machinery without regressing transport footprint, Cargo fallback policy, exact executable/config lifecycle behavior, or CLI/release policy. Gregg-owned release/version/target/Cargo-fallback semantics remain downstream policy.
+Those earlier upstream feature milestones are closed, but the 2026-10-05 parity review against current Gregg `1aac89f1` found two remaining Core substrate gaps: current-executable transaction authority/Windows running-image rollback (Core M010) and proof-authorized stale-lock recovery (Core M011). Service M009 must also make the already-qualified M006 service substrate registry-consumable, and Acquisition M010 must publish the composed-transport deadline fix before a Gregg curl/Eggfetch composition is frozen. Gregg M004 therefore returns to **blocked / intentionally unwritten** until those Eggup prerequisites close. Gregg-owned release/version/target/Cargo-fallback semantics remain downstream policy.
 
 ### M005 — CodeGG managed-runfile bundle adoption
 
@@ -178,6 +180,8 @@ Replace duplicated generic tar.gz/zip extraction and pair rollback with the qual
 
 Adopt only low-level primitives that reduce ownership without weakening provenance/package-manager logic.
 
+The 2026-10-05 review of EggPool `fe3c308d` confirms that only the `StandaloneRust` local executable transaction is a clean Eggup target. The `UvTool`, `Pipx`, `PipEnvironment`, source-checkout, release catalog, PEP-440-like ordering, DB/config compatibility and package-manager rollback paths remain EggPool-owned. M007 stays unwritten until Core M010/M011 close and a versioned Core package containing those corrections is qualified.
+
 ## 8. Cross-cutting requirements
 
 Every adoption records pre/post dependency tree, binary size where relevant, removed duplicated lines/modules, behavior differences, fixture coverage, and rollback path.
@@ -201,7 +205,7 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
-| M004 Gregg | writable; plan intentionally unwritten | — | — | prerequisites satisfied (acquisition M005+M006 + service M006 closed, hosted matrix green); no migration authorized yet |
+| M004 Gregg | blocked; plan intentionally unwritten | — | — | Core M010 + M011; Service M009 publication; Acquisition M010 registry correctness/publication; later versioned Core handoff |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
 | M006 Egress | closed 2026-09-29 | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` (+ M003-landed addendum) | — (Egress Delivery M003 landed) |
-| M007 EggPool | deferred/evidence-driven | — | — | core maturity |
+| M007 EggPool | blocked/evidence-driven; plan intentionally unwritten | — | — | Core M010 + M011 and later versioned Core package; package-manager/provenance paths explicitly excluded |
