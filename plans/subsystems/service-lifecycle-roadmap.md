@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: complete; M001-M008 closed
+Status: active; M001-M008 closed; M009 eggup-service 0.1.2 publication ready
 
 Long-term references:
 
@@ -114,6 +114,11 @@ M006 daemon disposition + revalidation [closed; evidence reconciled via acquisit
                                 |
                                 v
                       M008 deadline-test determinism [CLOSED via run 36332823865]
+                                |
+                                v
+                      M009 eggup-service 0.1.2 publication [READY]
+                                |
+                                `--> Acquisition M010 workspace 0.1.3 bump may proceed
 ```
 
 ## 7. Milestones
@@ -185,6 +190,16 @@ Status: closed; see `plans/closure/service-lifecycle/008-status.md`.
 
 Replaced the scheduler-sensitive 80 ms/sleep-based unit proof with deterministic injected-`Instant` arithmetic while preserving the existing absolute-deadline runtime contract. No production tolerance, deadline extension, retry, API, or dependency change. Closed with fresh green Stable/MSRV/macOS/Windows hosted run `36332823865`, which supersedes failed run `36261671380`.
 
+### M009 — eggup-service 0.1.2 publication
+
+Plan: `plans/implementation/service-lifecycle/009-eggup-service-0.1.2-publication.md`.
+
+Status: ready.
+
+Publish the already-qualified M001-M008 service substrate without runtime/source change. This is a release-order prerequisite for Acquisition M010 because that milestone moves the shared workspace version to 0.1.3.
+
+M009 must preserve the existing `v0.1.2` tag as the historical core/archive publication source; service 0.1.2 is a later package publication from its own recorded commit and is documented additively.
+
 ## 8. Cross-cutting requirements
 
 No destructive action on Foreign/Unknown. Permission errors return remediation rather than escalating. Service definition rendering must reject unsafe control characters/path ambiguity.
@@ -199,7 +214,7 @@ System-level versus user-level service registration differs across consumers. Us
 
 ## 11. Completion definition
 
-Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap. M008 closed the deadline-arithmetic determinism gap with a fresh green hosted matrix; no further service-lifecycle milestone is registered.
+Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap. M008 closed the deadline-arithmetic determinism gap with a fresh green hosted matrix. M009 is now registered to publish the already-qualified 0.1.2 service package before the workspace advances to 0.1.3.
 
 ## 12. Milestone status
 
@@ -213,3 +228,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M006 | closed; hosted evidence reconciled via acquisition M006 | `plans/implementation/service-lifecycle/006-daemon-update-disposition-and-reference-qualification.md` | `plans/closure/service-lifecycle/006-status.md` | — |
 | M007 | closed | `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md` | `plans/closure/service-lifecycle/007-status.md` | — |
 | M008 | closed | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md` | `plans/closure/service-lifecycle/008-status.md` | — |
+| M009 | ready | `plans/implementation/service-lifecycle/009-eggup-service-0.1.2-publication.md` | — | —; should close before Acquisition M010 workspace version bump |
