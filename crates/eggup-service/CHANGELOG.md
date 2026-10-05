@@ -1,12 +1,15 @@
 # Changelog
 
-`eggup-service` **is** on crates.io at `0.1.0` and `0.1.1` (part of the lockstep
-`0.1.1` patch). Its `0.1.2` — the `Unreleased` section below — has not yet been
-published. Service M009 now authorizes a future manual `0.1.2` publication; until
-that milestone closes, this section still describes code no downstream consumer
-can resolve from crates.io.
+`eggup-service` is on crates.io at `0.1.0`, `0.1.1` (the lockstep `0.1.1` patch),
+and `0.1.2`. The `0.1.2` release below was published manually from a later source
+commit than the shared `v0.1.2` tag, which denotes the `eggup-core`/
+`eggup-archive` publication; the tag was not moved.
 
-## Unreleased
+## 0.1.2 — 2026-10-05
+
+This release publishes the already-qualified M001-M008 service substrate. No
+service runtime behavior changed for the publication: the working tree carried
+these entries, and they are released as-is.
 
 - **Fixed: a panicking service transition was reported as a post-install check
   failure.** In the commit-restore path, `transition_to` ran inside the
@@ -45,7 +48,14 @@ can resolve from crates.io.
   rejects `Foreign`/`Unknown`, so the second check was unreachable — and would
   have misattributed a `Foreign` failure to `spec.id()` instead of the synthetic
   `cron:{marker}` id that owns the block.
-- This release has not been published; there is no migration requirement for
-  downstream consumers of the published `0.1.1`.
-- Make service diagnostic byte bounds UTF-8 safe while preserving existing
-  256/512-byte ceilings and lifecycle behavior.
+- Service M007: make service diagnostic byte bounds UTF-8 safe while preserving
+  existing 256/512-byte ceilings and lifecycle behavior.
+
+The published dependency requirement is unchanged (`eggup-core ^0.1.0`), so
+consumers of `0.1.1` need no migration and pick up the corrected behavior by
+upgrading within the `0.1.x` range. No public API was added, removed, or
+changed by this release.
+
+## Unreleased
+
+Nothing yet.

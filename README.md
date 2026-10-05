@@ -126,10 +126,11 @@ user-facing guidance and never overrides them.
 ## Publication state
 
 `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
-`eggup-eggpack`, and `eggup-curl` are published at `0.1.2`. `eggup-service` is
-published but lags at `0.1.1`, so its `0.1.2` has never been published.
-`eggup-transport-footprint` is `publish = false` by design. CI never publishes;
-releases are manual and milestone-gated.
+`eggup-eggpack`, `eggup-curl`, and `eggup-service` are all published at `0.1.2`.
+`eggup-service` was published later from a different source commit than the shared
+`v0.1.2` tag, which denotes the `eggup-core`/`eggup-archive` publication; the tag
+was not moved. `eggup-transport-footprint` is `publish = false` by design. CI never
+publishes; releases are manual and milestone-gated.
 
 Note that published releases trail the working tree — see
 [docs/releases.md](docs/releases.md) for the limitations you inherit at `0.1.2`.

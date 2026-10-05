@@ -2,23 +2,23 @@
 
 ## 0.1.2 — 2026-09-28, completed 2026-10-04
 
-The 0.1.2 source version was published to crates.io in three steps. On 2026-09-28
+The 0.1.2 source version was published to crates.io in four steps. On 2026-09-28
 (Verified Update Core M009) `eggup-core 0.1.2` and `eggup-archive 0.1.2` were
 published. On 2026-10-02 (Eggpack Manifest Interoperability M004) the
 producer-schema-dependent half of the same 0.1.2 source version was published:
 `eggup-acquisition 0.1.2`, `eggup-eggfetch 0.1.2`, and `eggup-eggpack 0.1.2`.
-On 2026-10-04 (Acquisition Transport M009) `eggup-curl 0.1.2` was published.
+On 2026-10-04 (Acquisition Transport M009) `eggup-curl 0.1.2` was published. On
+2026-10-05 (Service Lifecycle M009) `eggup-service 0.1.2` was published.
 
 **Complete crates.io 0.1.2 publication set:** `eggup-core`, `eggup-archive`,
-`eggup-acquisition`, `eggup-eggfetch`, `eggup-eggpack`, `eggup-curl`.
+`eggup-acquisition`, `eggup-eggfetch`, `eggup-eggpack`, `eggup-curl`,
+`eggup-service`.
 
-`eggup-service` and `eggup-transport-footprint` share the 0.1.2 source version,
-but neither has a `0.1.2` release. `eggup-service` **is** on crates.io at
-`0.1.0` and `0.1.1` (it was part of the lockstep `0.1.1` patch), so it is a
-published crate that lags the workspace rather than an unpublished one; its
-`0.1.2` has never been published and no publication milestone authorizes it.
-`eggup-transport-footprint` is `publish = false` by design and has no edge in
-the published adapter graph.
+`eggup-service` was the last crate still lagging the workspace. Its `0.1.2` was
+published **later, from a different source commit** than the shared `v0.1.2` tag:
+the tag still denotes the `eggup-core`/`eggup-archive` publication source and was
+not moved or recreated. `eggup-transport-footprint` is `publish = false` by design
+and has no edge in the published adapter graph.
 
 Integrity remains SHA-256 checksum evidence only; no authenticity or signature
 claims are made by any of these crates.
@@ -97,6 +97,21 @@ claims are made by any of these crates.
   runners refused the historical spawned-curl loopback case, so the Windows lane
   carries the portable adapter, process, and error-path fixtures only. Published
   2026-10-04.
+
+- `eggup-service 0.1.2` (first publication of this version): the
+  manager-neutral service lifecycle crate, promoted as a package only. It carries
+  the already-qualified M001-M008 substrate — systemd/launchd/cron/Windows SCM
+  adapters, transaction/lifecycle composition with `KeepInstalled | RollBack`,
+  the M006 managed-running/managed-stopped/direct-running/stopped/foreign-preserved
+  disposition and revalidation semantics, UTF-8-safe bounded diagnostics, and
+  deterministic deadline proof — plus the post-closure bug-audit fixes: a
+  panicking service transition is now recorded under the phase that actually
+  executes instead of as a post-install check failure, an unobservable target
+  before a destructive `stop` is `Unknown` and fails closed, and the
+  `SystemExecutor::run` stdin write is bounded by the caller's deadline. No
+  service runtime behavior changed for the publication. The
+  `eggup-core = ^0.1.0` requirement is unchanged and resolves from the registry.
+  No migration is required for consumers of `0.1.1`. Published 2026-10-05.
 
 ## Unreleased
 

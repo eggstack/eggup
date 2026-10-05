@@ -19,19 +19,17 @@ All crates share the source version `0.1.2`. Only the registry differs.
 | `eggup-curl` | `0.1.2` | first publication was `0.1.2` |
 | `eggup-archive` | `0.1.2` | first publication was `0.1.2` |
 | `eggup-eggpack` | `0.1.2` | first publication was `0.1.2` |
-| `eggup-service` | `0.1.0`, `0.1.1` | **lags** — its `0.1.2` has never been published |
+| `eggup-service` | `0.1.0`, `0.1.1`, `0.1.2` | published last, from a different source commit than the `v0.1.2` tag |
 | `eggup-transport-footprint` | — | `publish = false`; not on the registry at all |
 
-Two consequences worth planning around:
+One consequence worth planning around:
 
-- **`eggup-service` is published but behind.** A dependency on `"0.1.1"` resolves
-  today; a dependency on `"0.1.2"` does not. If you take a caret requirement you
-  will silently get `0.1.1`, which predates the fixes in its `Unreleased`
-  section. Read
-  [`crates/eggup-service/CHANGELOG.md`](../crates/eggup-service/CHANGELOG.md)
-  before assuming you have current behaviour.
 - **`eggup-transport-footprint` cannot be depended on from crates.io.** It exists
   to measure footprint inside this workspace via a path dependency.
+
+`eggup-service` was published last (2026-10-05, Service Lifecycle M009). The
+shared `v0.1.2` tag still denotes the `eggup-core`/`eggup-archive` publication
+source; it was not moved to point at the service publication.
 
 ## Pinning: the exact-pin cascade
 
