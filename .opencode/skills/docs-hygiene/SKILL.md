@@ -26,16 +26,27 @@ Deep dive: [`architecture/tooling-governance.md`](../../../architecture/tooling-
 | Published versions | crates.io | any claim of "unpublished" |
 | Closure milestone status | `plans/closure/<subsystem>/NNN-status.md` `Status:` line | registry/roadmap status cells |
 | Per-crate release notes | `crates/*/CHANGELOG.md` | the root `CHANGELOG.md` as a *substitute* (it aggregates; it does not replace) |
+| Consumer-facing how-to | `docs/quickstart.md`, `docs/crates.md`, `docs/releases.md` — **non-normative**, precedence stated in `docs/README.md` | `crates/eggup-core/docs/`, `architecture/` |
+
+A snippet in `docs/quickstart.md` must be a verbatim copy of a checked-in
+example under `crates/*/examples/`, so the gate's `cargo test --all-targets`
+compiles **and runs** it. A snippet with no compiled example behind it is an
+unverifiable claim — see `architecture/tooling-governance.md` §7.4.
 
 ## The chain to update when a fact changes
 
 ```text
 code / script / workflow
-  -> the owning doc (README, deep dive, plans/)
+  -> the owning doc (crate README/CHANGELOG, deep dive, plans/)
+  -> root README.md + docs/  (consumer-facing; only if the change is user-visible)
   -> AGENTS.md  (thin index; link to the section, never restate the rule)
   -> .opencode/skills/  (summary only; source of truth stays plans/ + architecture/)
   -> plans/registry.md + roadmap status, if open/closed work changed
 ```
+
+`docs/` is downstream of everything else. It is the last thing to update and
+the first thing to suspect when a consumer-facing claim is wrong, because a
+consumer reads it without the rest of the tree.
 
 **`AGENTS.md` is an index, not a second copy.** Each rule in it should name the
 `architecture/` section that owns the detail. That is what keeps it short enough

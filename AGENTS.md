@@ -57,6 +57,7 @@ Start at [`architecture/overview.md`](architecture/overview.md) (birds-eye view,
 - `eggup-eggpack` → `architecture/eggpack-adapter.md`
 - `eggup-transport-footprint` → `architecture/transport-footprint.md`
 - workspace, CI, plans/process, release, agent surface → `architecture/tooling-governance.md`
+- consumer-facing how-to (`docs/`) → `architecture/tooling-governance.md` §7.4. `docs/` is **non-normative** and must never be the place a rule is introduced — it points at the contracts, it does not restate them.
 
 ## Skills (on-demand, via the `skill` tool)
 

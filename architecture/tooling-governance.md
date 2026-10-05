@@ -527,6 +527,41 @@ instances, recorded at the end of this file. The maintenance rules:
 - Residual drift is **recorded** in the table at the end of this file, and rows
   are removed as they are fixed, so the table stays a live list.
 
+### 7.4 The user-facing layer: `docs/`
+
+`docs/` is adoption guidance for consumers of the published crates. It is the
+newest layer in the tree and the one most likely to become a drift sink, because
+it restates facts that are owned elsewhere.
+
+| Document | Owns |
+|---|---|
+| `docs/README.md` | The index, and the rule that this directory is non-normative |
+| `docs/quickstart.md` | The verified walkthrough and the five runnable examples |
+| `docs/crates.md` | Which crate to depend on, and each crate's declared boundary |
+| `docs/releases.md` | Published state, the exact-pin cascade, and known limitations of published versions |
+
+The ownership rule is one-directional: `docs/` may point at
+`crates/eggup-core/docs/` and `architecture/`, never the reverse. Nothing
+normative may be introduced here. Concretely:
+
+- **API names and signatures** are owned by the source. Every snippet in
+  `docs/quickstart.md` is a verbatim copy of a checked-in example under
+  `crates/eggup-core/examples/`, and the gate's
+  `cargo test --workspace --all-targets --all-features --locked` **builds and
+  runs** those examples (verified: it compiles each `examples/*.rs` and executes
+  the resulting binaries). A snippet that is not backed by a compiled example
+  does not belong in `docs/`.
+- **Contract semantics** are owned by `crates/eggup-core/docs/`. `docs/`
+  summarises and links; it does not restate the ownership, integrity, or receipt
+  rules in a form that could contradict them.
+- **Registry state** is owned by crates.io. `docs/releases.md` is explicitly
+  labelled a snapshot.
+
+Because a consumer reads `docs/` without the rest of the tree, the failure mode
+to watch is a confident, well-written, wrong claim. `docs/README.md` states the
+precedence order explicitly so a future agent knows which side of a conflict to
+change.
+
 ## 8. Release process
 
 **CI never publishes.** No job in `.github/workflows/ci.yml` contains a
@@ -613,11 +648,21 @@ Ordered by how expensive a miss is.
     `.opencode/skills/` file. Record anything left unresolved in the
     **Known doc/code drift** table at the end of this document. See the
     `docs-hygiene` skill.
+14. **Does `docs/` still tell the truth?** If the change altered a public API, a
+    crate boundary, a dependency edge, or a published version, check whether
+    `docs/quickstart.md`, `docs/crates.md`, or `docs/releases.md` now repeats it
+    (§7.4). A snippet in `docs/` must still correspond to a compiled example
+    under `crates/eggup-core/examples/` — the gate runs those on every pass, so
+    a snippet that no longer compiles is caught mechanically, but a *deleted*
+    example leaves the snippet as a claim with nothing behind it.
 
 ## 10. Cross-references
 
 - [overview.md](overview.md) — birds-eye view, module map, cross-cutting
   invariants, and the deep-dive index.
+- [`../docs/`](../docs/README.md) — user-facing adoption guidance
+  (quickstart, crate choice, releases). Non-normative; points at the contracts
+  rather than restating them (§7.4).
 - [core-transaction.md](core-transaction.md) — the crate whose sole `sha2`
   dependency makes the boundary in §2.4 checkable.
 - [acquisition.md](acquisition.md) — the zero-dependency seam both adapters and
@@ -703,3 +748,4 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | `plans/registry.md:116-203` | The `Dependency-ready implementation work` and `Planned / blocked work` tables duplicate 16 `(subsystem, milestone)` rows, and `Eggpack M004` appears twice inside the first table. 40 of its 44 rows are closed records, so the table is largely a second copy of closure history | `plans/003-planning-process.md` §13 says the registry is the active control surface and plan detail does not belong there. Deduplicating changes what the control surface claims is active, so it wants an explicit decision and its own hygiene milestone rather than a docs pass |
 | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | Still asserts `git log 39ff626..HEAD -- crates/` **is empty**; it now returns 4 commits | Deliberate. The record is an immutable 2026-10-01 snapshot, and rewriting it would edit historical evidence. The `registry.md` line that made the same claim *as a live status statement* is corrected; the closure record is not |
 | `plans/archive/` | Holds only its own `README.md`; no superseded material has ever been moved there, though `plans/README.md` describes it as retained-for-traceability | A policy directory with no content is not wrong. Pruning it would remove a documented mechanism; populating it is a separate authoring decision |
+| `docs/releases.md` published-state table | Recorded from this document's §8 table and cross-checked against the crate manifests; it was **not** re-verified against crates.io, which needs network access | Every claim in it is internally consistent and manifest-consistent, and the document labels itself a snapshot rather than an authority. Re-check it against crates.io whenever a network-capable session touches releases, since registry state is the one fact here that changes without a commit |
