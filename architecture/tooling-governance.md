@@ -195,8 +195,9 @@ would not be caught, and its public-facing documentation surface is the
 `architecture/transport-footprint.md` deep dive plus rustdoc on the binaries
 rather than crate-level docs. This is a reasonable trade for a
 non-published, binary-only fixture crate, but it means the "every crate has a
-README and CHANGELOG" rule that AGENTS.md states does not hold uniformly, and
-`crates/eggup-transport-footprint` is the reason.
+README and CHANGELOG" rule holds for the 7 library crates only —
+`crates/eggup-transport-footprint` is the reason, and `AGENTS.md` says so
+rather than stating the rule as absolute.
 
 ## 4. The local gate
 
@@ -469,29 +470,58 @@ reviewable without reading 62 plans.
 `distribution-bootstrap` appears in the registry as `archived/transferred` with
 "no further Eggup producer work" — the roadmap-level expression of ADR-0004.
 
-## 7. Skills vs. source of truth
+## 7. The agent-facing surface: `AGENTS.md` and skills
 
-`.opencode/skills/` contains exactly two skills, both `SKILL.md` with YAML
-frontmatter:
+This section is what `AGENTS.md` indexes into. The rule is simple: **`AGENTS.md`
+is an index, not a second copy.** It names the owning section of this document
+(or of a deep dive) and states only the few facts an agent needs before its
+first tool call. Rules live here; `AGENTS.md` points at them.
 
-- `planning-workflow` — "Eggup plan-to-closure workflow — normative docs,
-  16-section implementation plans, closure evidence, registry updates"
-- `verify-workflow` — "Run Eggup verification gate locally and interpret CI
-  lanes — command order, focused runs, MSRV and platform evidence"
+### 7.1 `AGENTS.md`
 
-There is no `.skills/` directory. The skills are summaries: both restate the
-command list and the process order that already exist in
-`scripts/check-local.sh` and `plans/`. They add no new policy. That ordering is
-deliberate — `plans/` plus `architecture/` remain the source of truth, so a
-skill that drifts is corrected by rewriting the skill, not by treating it as
-authoritative.
+Root-level, consumed by every coding agent that opens the workspace. It covers
+four things and nothing else: the workspace layout and its dependency rules,
+the verification gate order, where to look per crate, the cross-cutting
+invariants that are not obvious from filenames, and the planning-governance
+entry points. It deliberately does not restate command lists, enum tables, or
+process templates — those drift, and a stale copy in the most-read file is worse
+than no copy.
 
-The consequence is that a skill *can* drift, and one currently has. The
-`verify-workflow` skill describes the `windows-check` job as "`cargo check` on
-`windows-latest` (compile-only)". The actual job runs seven steps including
-four `cargo test` invocations (§5). `AGENTS.md` repeats the same
-understatement, listing CI's Windows addition as "cargo check on Windows". Both
-understate the Windows lane; the workflow file is authoritative.
+### 7.2 `.opencode/skills/`
+
+Four `SKILL.md` files with YAML frontmatter, loaded on demand via the `skill`
+tool. Each is a **summary** of a normative source; none adds new policy. A
+drifting skill is corrected by rewriting the skill, never by deferring to it.
+
+| Skill | Summarizes | Source of truth |
+|---|---|---|
+| `planning-workflow` | Plan → implement → closure → registry; the 16-section template; closure requirements; naming; the severity gate | `plans/003-planning-process.md`, `plans/implementation/README.md`, `plans/closure/README.md` |
+| `verify-workflow` | Local gate order, focused runs, the four CI lanes, and the known coverage gaps | `scripts/check-local.sh`, `.github/workflows/ci.yml`, §4–§5 |
+| `docs-hygiene` | Which doc owns which fact, the doc-change chain, and the drift classes this repo keeps hitting | this file, `plans/registry.md`, `crates/*/README.md` |
+| `release-workflow` | Manual publication as a milestone, dependency ordering, the exact-pin cascade, post-publish bookkeeping | §8, `plans/registry.md`, the four publication closures |
+
+There is no `.skills/` directory. `AGENTS.md` says so explicitly, because an
+agent that guesses the path will look for something that is not there.
+
+### 7.3 How the surface stays honest
+
+Drift is not hypothetical here — the audit behind this section found real
+instances, recorded at the end of this file. The maintenance rules:
+
+- A doc that describes a **gate** must have its direction confirmed against the
+  source. A prior revision of `core-transaction.md` claimed the core accepted a
+  member whose integrity was `NotRequired`; the code rejects it.
+- A doc that lists **enum variants** is checked against the `enum` block whenever
+  one changes. `core-transaction.md` had drifted to a whole earlier generation
+  of `eggup-core`'s failure enums.
+- A doc that claims a **CI lane** is read from the workflow file, not from
+  another doc. `verify-workflow` and `AGENTS.md` both once understated the
+  Windows lane as compile-only when it runs four `cargo test` invocations.
+- A doc that claims a **publication status** is checked against crates.io.
+  `eggup-service` was described as "unpublished" in three places while being on
+  crates.io at `0.1.0`/`0.1.1`.
+- Residual drift is **recorded** in the table at the end of this file, and rows
+  are removed as they are fixed, so the table stays a live list.
 
 ## 8. Release process
 
@@ -502,26 +532,28 @@ Releases are manual, and this is recorded as a deliberate design decision in the
 registry: the M009 core/archive publication row states "manual only, no release
 CI added."
 
-| Crate | Version | Publish status | Note |
+| Crate | Workspace version | On crates.io | Note |
 |---|---|---|---|
-| `eggup-core` | 0.1.2 | published | Sole dep `sha2`; transaction mechanics |
-| `eggup-archive` | 0.1.2 | published | Bounded extraction |
-| `eggup-acquisition` | 0.1.2 | published | Zero-dependency seam |
-| `eggup-eggfetch` | 0.1.2 | published | Native HTTP adapter |
-| `eggup-curl` | 0.1.2 | published | External-curl adapter |
-| `eggup-eggpack` | 0.1.2 | published | Only crate touching producer types |
-| `eggup-service` | 0.1.2 | **unpublished** | Manager-neutral lifecycle; no `publish = false` key, it is simply not published |
-| `eggup-transport-footprint` | 0.1.2 | `publish = false` | Binary-only fixture crate, non-publishable by design |
+| `eggup-core` | 0.1.2 | 0.1.0, 0.1.1, **0.1.2** | Sole dep `sha2`; transaction mechanics |
+| `eggup-archive` | 0.1.2 | **0.1.2** | Bounded extraction |
+| `eggup-acquisition` | 0.1.2 | 0.1.0, 0.1.1, **0.1.2** | Zero-dependency seam; `0.1.3` is M010 |
+| `eggup-eggfetch` | 0.1.2 | 0.1.0, 0.1.1, **0.1.2** | Native HTTP adapter |
+| `eggup-curl` | 0.1.2 | **0.1.2** | External-curl adapter; first publication was 0.1.2 |
+| `eggup-eggpack` | 0.1.2 | **0.1.2** | Only crate touching producer types; pins `=0.1.2` |
+| `eggup-service` | 0.1.2 | 0.1.0, **0.1.1** | **Published but lagging** — see below |
+| `eggup-transport-footprint` | 0.1.2 | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
-All 8 crates share the workspace version `0.1.2`; only the publish status
-differs. Publication is a milestone, not a side effect: the registry records
-dedicated publication milestones (M009 for `eggup-curl`, M009 for the
-core/archive pair, M010 for `eggup-acquisition 0.1.3` marked `ready`), and
-`plans/003-planning-process.md` §16 requires package dry-run as part of
-boundary qualification. The registry also records a downstream consequence
-worth noting: `eggup-eggpack` pins `=0.1.2`, so it needs a separate
-republication to inherit any `eggup-acquisition` fix — an exact-pin
-requirement turning a single-crate fix into a multi-crate release event.
+All 8 crates share the workspace version `0.1.2`; only the registry state
+differs. Six crates are published at `0.1.2`.
+
+**`eggup-service` is not an unpublished crate.** It is on crates.io at `0.1.0`
+and `0.1.1` (it was part of the lockstep `0.1.1` patch, listed in
+`plans/registry.md`), but its current `0.1.2` has never been published and no
+publication milestone authorizes it. Its manifest carries no `publish = false`
+key — it is simply outside every publication authorization to date. Describing
+it as "unpublished" is wrong in the sense that matters: a downstream consumer
+can and does resolve `eggup-service 0.1.1` today, and that published code
+predates the `Unreleased` fixes in its changelog.
 
 `CHANGELOG.md` discipline follows the same separation: every published crate
 keeps an `Unreleased` section (7 of 8 crates have a CHANGELOG; the fixture
@@ -568,7 +600,15 @@ Ordered by how expensive a miss is.
 12. **If publishing** — confirm it is a tracked publication milestone, that
     `cargo package`/dry-run was qualified, that downstream exact pins
     (`eggup-eggpack` → `=0.1.2`) are accounted for, and that CI still does not
-    publish.
+    publish. See the `release-workflow` skill.
+13. **Did the prose move with the code?** If the change touched an enum, a
+    variant, a CI lane, a dependency edge, a command, or a publication status,
+    the owning doc must have been updated in the same pass: `README.md`, the
+    matching `architecture/*.md` deep dive, `plans/registry.md` and the roadmap
+    if open/closed work moved, then `AGENTS.md` and the affected
+    `.opencode/skills/` file. Record anything left unresolved in the
+    **Known doc/code drift** table at the end of this document. See the
+    `docs-hygiene` skill.
 
 ## 10. Cross-references
 
@@ -600,16 +640,42 @@ Ordered by how expensive a miss is.
   plan template.
 - [closure/README.md](../plans/closure/README.md) — the required closure
   structure and the per-platform reporting rule.
+- [AGENTS.md](../AGENTS.md) — the thin index into this document; it owns no
+  rules of its own (§7.1).
+- `.opencode/skills/` — `planning-workflow`, `verify-workflow`, `docs-hygiene`,
+  `release-workflow`; on-demand summaries of `plans/`, the scripts, and §8
+  (§7.2).
 
 ## Known doc/code drift
 
-Recorded rather than corrected, since the scripts and workflows are the
-behavior and the prose is owned elsewhere.
+A live list. Rows are **removed as they are fixed**; a table that only grows
+becomes a historical log and stops being read. Correct a row here, or record the
+residual in this table rather than leaving it silent.
 
-| Location | Drift |
+### Resolved
+
+Corrected in the doc-hygiene pass recorded in the workspace history:
+
+| Was | Resolution |
 |---|---|
-| `verify-workflow` skill, CI lanes table | Describes `windows-check` as `cargo check` only, "compile-only". The job runs four `cargo test` steps covering acquisition, archive, curl, eggpack, and selected `eggup-service` tests |
-| `AGENTS.md`, CI section | Lists CI's Windows addition as "cargo check on Windows", likewise understating the targeted test run |
-| `AGENTS.md`, planning governance | States "keep crate `README.md` + `CHANGELOG.md` current" as a general rule; `eggup-transport-footprint` has neither, and legitimately cannot carry `missing_docs` since it has no library root |
-| `verify-workflow` skill | Says CI's `windows-check` "adds `cargo check` on `windows-latest`". It does not mention that the job, like `msrv`, omits `--all-features`, which is the concrete gap in §5.3 |
-| `crates/eggup-transport-footprint/Cargo.toml:16,24,29` | Pins `"0.1.0"` for `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` while `[workspace.package] version` is `0.1.2`. Resolves correctly via the caret requirement and the path dependencies, but the literals are stale |
+| `verify-workflow` + `AGENTS.md` described `windows-check` as `cargo check` / "compile-only" | Both now describe the four `cargo test` invocations plus the closing workspace check (§5, §7) |
+| `AGENTS.md` and `registry.md` called `eggup-service` "unpublished" | It is on crates.io at `0.1.0`/`0.1.1`; its `0.1.2` was never published. Corrected in `AGENTS.md`, [overview.md](overview.md), §8, and the registry |
+| `AGENTS.md` gave `eggup-eggpack` a partial dependency list, omitting `sha2` | `sha2` added; the list now matches `crates/eggup-eggpack/Cargo.toml` |
+| `AGENTS.md` stated "keep crate `README.md` + `CHANGELOG.md` current" as absolute | Now scoped to library crates, with `eggup-transport-footprint` named as the exception (§3.4) |
+| `core-transaction.md` listed a previous generation of `FailureCategory`, `FailurePhase`, `IntegrityRequirement`, `IntegrityStatus`, and `PermissionsIntent` | All five rows regenerated from source; the two `FailureCategory::Destination` references replaced with real variants |
+| `core-transaction.md` described an "empty validator set" gate escaped by `NotRequired` members | Inverted. `validate` requires **every** member to be `IntegrityStatus::Verified`; `NotRequired` always fails (§3) |
+| `core-transaction.md` mis-described `verify_file`, `AbsentOnlyVerifier`, `ExistingAsOwnedVerifier`, and identifier validation | All corrected against source |
+| `core-transaction.md` had a row split by a stray `\|\|` | Row split back into two |
+| `archive-extraction.md` counted 13 `ExtractionErrorKind` variants | 14 |
+| `registry.md` asserted `git log 39ff626..HEAD -- crates/` was empty | It returns 3 commits; the claim and the surrounding summary were rewritten |
+| `plans/subsystems/README.md` listed 6 subsystems; 7 exist | `archive-extraction-roadmap.md` added |
+| `registry.md` "Recently closed foundation" understated 3 workstreams and omitted 3 | Rewritten to match the closure directories |
+| `registry.md` "Planned / blocked work" declared 4 columns; 4 rows carried 5 | Cells merged; two rows that duplicated rows in the same table removed |
+| `planning-closure-hygiene-corrective/010` plan still read `Status: ready for handoff` | Set to closed, matching its closure record and C011/C012 |
+
+### Open — code-level, needs a milestone, not a doc edit
+
+| Location | Drift | Why it is not fixed here |
+|---|---|---|
+| `crates/eggup-transport-footprint/Cargo.toml:16,24,29` | Pins `"0.1.0"` for `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` while `[workspace.package] version` is `0.1.2` | Resolves correctly via the caret requirement plus path dependencies, so the build is correct. Changing the literals is a `Cargo.lock` + publication-affecting change that belongs in a plan, not a docs pass. The pin style also differs per crate for no stated reason (§2.4), so it should be settled in one milestone rather than per-crate |
+| `plans/implementation/**` | 14 of 62 plans ship fewer than 16 sections and 17 omit a `Repository baseline:` line; `Primary class:` is frequently outside the template enum | Historical records. The template is `plans/implementation/README.md`; conforming old plans is not worth rewriting evidence. New plans should follow the template exactly |

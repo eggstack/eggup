@@ -1,5 +1,10 @@
 # Changelog
 
+`eggup-service` **is** on crates.io at `0.1.0` and `0.1.1` (part of the lockstep
+`0.1.1` patch). Its `0.1.2` — the `Unreleased` section below — has never been
+published and no publication milestone authorizes it, so that section describes
+code no downstream consumer can resolve yet.
+
 ## Unreleased
 
 - **Fixed: a panicking service transition was reported as a post-install check
@@ -39,6 +44,7 @@
   rejects `Foreign`/`Unknown`, so the second check was unreachable — and would
   have misattributed a `Foreign` failure to `spec.id()` instead of the synthetic
   `cron:{marker}` id that owns the block.
-- This release has not been published; there is no migration requirement for downstream consumers.
+- This release has not been published; there is no migration requirement for
+  downstream consumers of the published `0.1.1`.
 - Make service diagnostic byte bounds UTF-8 safe while preserving existing
   256/512-byte ceilings and lifecycle behavior.

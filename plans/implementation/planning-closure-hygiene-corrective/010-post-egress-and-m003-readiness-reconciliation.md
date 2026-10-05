@@ -1,6 +1,6 @@
 # Planning / Closure Hygiene Corrective C010 — Post-Egress and M003 Readiness Reconciliation
 
-Status: ready for handoff
+Status: closed; see `plans/closure/planning-closure-hygiene-corrective/010-status.md`
 
 Repository baseline: `3fd4c433126d144d73bf7dcbb5c6e3de0be99717`
 

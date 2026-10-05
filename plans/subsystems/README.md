@@ -32,7 +32,8 @@ Roadmaps MUST preserve completed history and MUST link active milestones to impl
 - `verified-update-core-roadmap.md`
 - `acquisition-transport-roadmap.md`
 - `service-lifecycle-roadmap.md`
-- `distribution-bootstrap-roadmap.md`
+- `archive-extraction-roadmap.md`
+- `distribution-bootstrap-roadmap.md` (archived/transferred)
 - `consumer-adoption-roadmap.md`
 - `eggpack-manifest-interoperability-roadmap.md`
 

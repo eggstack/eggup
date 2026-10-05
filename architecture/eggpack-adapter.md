@@ -231,7 +231,7 @@ Checked against the source, not inferred:
 
 | Check | Result |
 |---|---|
-| `eggpack_manifest` imports in production code | Exactly one `use` statement, `lib.rs:5`: `{ArtifactForm, ReleaseForm…}` → `{ArtifactForm, ReleaseManifest, MAX_DOCUMENT_BYTES}` |
+| `eggpack_manifest` imports in production code | Exactly one `use` statement, `lib.rs:5`: `use eggpack_manifest::{ArtifactForm, ReleaseManifest, MAX_DOCUMENT_BYTES};` |
 | `ReleaseManifest` in a public signature | Exactly one: `project(manifest: &ReleaseManifest, …)`, `lib.rs:327` |
 | `ReleaseManifest` constructed internally | `lib.rs:417` inside `project_json`, never re-exported |
 | Producer types in `ManifestProjection`'s definition | None — every field is `String`, `u64`, `[u8; 32]`, or an Eggup `ProductId`/`ReleaseId`/`MemberId` |

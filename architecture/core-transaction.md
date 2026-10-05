@@ -70,13 +70,13 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 
 | Export | Role | Ref |
 | --- | --- | --- |
-| `ProductId` | Validated product identity, `1..=64` chars, no `/` `\` or control chars | `domain.rs:11`, `domain.rs:15` |
+| `ProductId` | Validated product identity; rejects empty and control-character input only | `domain.rs:11`, `domain.rs:15` |
 | `ReleaseId` | Validated release identity, same character rules | `domain.rs:33`, `domain.rs:37` |
 | `MemberId` | Validated per-artifact identity inside a set | `domain.rs:55`, `domain.rs:59` |
 | `FileKind` | Source file classification; only `Regular` today, `#[non_exhaustive]` | `domain.rs:87` |
-| `PermissionsIntent` | `Private` / `Executable` / `Preserve` staged-file mode intent | `domain.rs:99` |
+| `PermissionsIntent` | `Preserve` / `Executable` staged-file mode intent, `#[non_exhaustive]` | `domain.rs:99` |
 | `Ownership` | `Absent` / `Owned` / `Foreign` / `Unknown` | `domain.rs:112` |
-| `IntegrityRequirement` | `Sha256(Digest)` (only variant today), `NotRequired` marker used by absence of a member requirement | `domain.rs:130` |
+| `IntegrityRequirement` | `None` / `Sha256([u8; 32])`; only `Sha256` members are commit-capable, `#[non_exhaustive]` | `domain.rs:130` |
 | `OwnershipVerifier` | Caller-implemented ownership proof trait | `domain.rs:147` |
 | `AbsentPolicy` | `AllowCreate` / `DenyCreate` for `Ownership::Absent` destinations | `domain.rs:158` |
 | `CommitOwnership<'a>` | Verifier + absent policy pair passed to `commit` | `domain.rs:168`, `domain.rs:177` |
@@ -86,8 +86,8 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 | `InstallPlan` | Product + release + root + set; entry point | `domain.rs:447` |
 | `Result<T>` | `core::Result<T> = Result<T, Error>` | `error.rs:5` |
 | `Error` | The only non-receipt failure channel | `error.rs:9` |
-| `AbsentOnlyVerifier` | Verifier that only ever returns `Absent`; cannot authorize replacement | `domain.rs:194` |
-| `ExistingAsOwnedVerifier` | Verifier that returns `Owned` for any existing path (for fixtures) | `domain.rs:213` |
+| `AbsentOnlyVerifier` | `Absent` when missing, `Foreign` when anything exists, `Unknown` on other errors; never authorizes replacement | `domain.rs:194`, `domain.rs:196` |
+| `ExistingAsOwnedVerifier` | `Owned` only for an existing **regular file**; directories/links/FIFOs are `Foreign` (test/example helper) | `domain.rs:213`, `domain.rs:215` |
 | `ExactDigestVerifier` | Verifier that proves `Owned` by exact prior content digest | `domain.rs:232` |
 
 ### Integrity (`integrity.rs`)
@@ -96,10 +96,10 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 | --- | --- | --- |
 | `hash_file` | Streaming SHA-256 of a local file | `integrity.rs:65` |
 | `parse_sha256_sidecar` | Strict `<64 hex> [ filename]` sidecar parser | `integrity.rs:83` |
-| `verify_file` | Digest + `FileKind` check over local bytes | `integrity.rs:117` |
+| `verify_file` | Optional sidecar-filename binding plus hash/compare; returns the observed `[u8; 32]` | `integrity.rs:117` |
 | `Sha256Manifest` | Digest + optional declared filename | `integrity.rs:13` |
-| `IntegrityStatus` | `Verified` / `Failed` | `integrity.rs:32` |
-| `IntegrityResult` | Status + observed digest | `integrity.rs:41` |
+| `IntegrityStatus` | `Verified` / `NotRequired` — no failure variant; a mismatch is an `Err` | `integrity.rs:32` |
+| `IntegrityResult` | Member + computed digest + status | `integrity.rs:41` |
 | `VerifiedTransaction` | Prepared state with member integrity resolved | `integrity.rs:164` |
 
 ### Staging (`stage.rs`)
@@ -135,8 +135,8 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 | `TransactionDisposition` | `Committed` / `RolledBack` / `RecoveryRequired` | `transaction.rs:19` |
 | `CleanupDisposition` | `Cleaned` / `RetainedForRecovery` | `transaction.rs:34` |
 | `PostCommitFailurePolicy` | `KeepInstalled` / `RollBack` | `transaction.rs:43` |
-| `FailurePhase` | `Ownership`, `StageRevalidation`, `Backup`, `Commit`, `Rollback`, `Finalize`, `PostCommit` | `transaction.rs:55` |
-| `FailureCategory` | `Ownership`, `Lock`, `Destination`, `Stage`, `Backup`, `Commit`, `Rollback`, `Finalize`, `PostCommitCheck` | `transaction.rs:93` |
+| `FailurePhase` | `Lock`, `Ownership`, `StageRevalidation`, `Backup`, `Commit`, `PostCommit`, `Rollback`, `Finalize` | `transaction.rs:55` |
+| `FailureCategory` | `LockContention`, `OwnershipConflict`, `Verification`, `Filesystem`, `InvalidInput`, `Injected`, `PostCommitCheck` | `transaction.rs:93` |
 | `FailureReport` | Phase + category + optional member + bounded (≤512 B) core-authored detail | `transaction.rs:127` |
 | `TransactionReceipt` | The terminal artifact: disposition, rollback facts, cleanup, recovery path, up to three reports | `transaction.rs:210` |
 
@@ -221,10 +221,13 @@ must still handle it.
 
 ### `ValidatedTransaction` — `candidate.rs:406`
 
-- **Proves**: (a) at least one validator was supplied and ran, unless every member is
-  `NotRequired` (`candidate.rs:413-420`); (b) every validator returned `Ok`. Because
-  the crate ships no default validators, "validate succeeded" is a claim about the
-  caller's validators plus the `NotRequired` gate, nothing more.
+- **Proves**: (a) **every** member carries `IntegrityStatus::Verified` — a member
+  that is `NotRequired` (declared `IntegrityRequirement::None`) always fails here
+  (`candidate.rs:413-420`); (b) the validator returned `Ok`. Because the crate ships
+  no default validators, "validate succeeded" is a claim about the caller's
+  validators plus the all-verified integrity gate, nothing more. Note there is **no**
+  check on how many validators ran: an empty `AllValidators` passes once every
+  member is verified.
 - **Durable**: same stage, same digests.
 - **Can still fail**: any ownership, revalidation, backup, commit, rollback, or
   finalization failure. The staged bytes can still change after `validate` returns;
@@ -365,8 +368,8 @@ A receipt combines three orthogonal status axes plus up to three reports:
 6. A leftover `BoundSources` entry for a non-member fails closed
    (`stage.rs:56-59`).
 
-Nothing here reads a live destination. The `NotRequired`/ownership questions are all
-deferred to commit.
+Nothing here reads a live destination. Ownership questions are deferred to commit;
+integrity is resolved by `verify` and then gated by `validate`.
 
 ### verify — `integrity.rs:171`
 
@@ -377,11 +380,12 @@ because no live mutation and no backup exist yet. The observed digests are retai
 
 ### validate — `candidate.rs:412`
 
-1. If not all members are `NotRequired` and the validator set is empty, return
-   `Err(VerificationFailed)`. This is the gate that stops a caller from getting an
-   unvalidated commit by passing an empty `AllValidators`.
+1. If any member's recorded integrity is missing or is not `IntegrityStatus::Verified`,
+   return `Err(VerificationFailed)`. This is the gate that keeps a member declared
+   `IntegrityRequirement::None` (`IntegrityStatus::NotRequired`) out of candidate
+   execution and commit entirely — there is no escape hatch for an unverified member.
 2. Otherwise run the validator. Any error propagates unchanged, so validators keep full
-   control of their error variants.
+   control of their error variants. The number of validators is not itself gated.
 
 ### commit — `candidate.rs:449` → `transaction.rs:322`
 
@@ -492,11 +496,11 @@ rollback_verified == true`.
 
 | # | Invariant | Enforced at | On violation |
 | --- | --- | --- | --- |
-| 1 | Unverified bytes never execute | `candidate.rs:413-420` (non-`NotRequired` set requires a non-empty validator set) | `Err(VerificationFailed)`; no candidate is spawned |
+| 1 | Unverified bytes never execute | `candidate.rs:413-420` (every member must be `IntegrityStatus::Verified`; `NotRequired` is rejected) | `Err(VerificationFailed)`; no candidate is spawned |
 | 2 | No live mutation before every member is backed up | `transaction.rs:555-609` must complete for all members before `transaction.rs:407` starts | `Err`/`Receipt` from backup; rollback restores untouched state |
 | 3 | `Owned` is never inferred; ownership is caller-proven and checked twice | `classify_all` (`transaction.rs:612`) and `revalidate_ownership_locked` (`transaction.rs:627`) | Flap, `Foreign`, `Unknown`, or `Absent`+`DenyCreate` → `RolledBack` receipt, zero mutation |
 | 4 | Staged bytes are re-verified under the lock | `revalidate_staged_under_lock` (`transaction.rs:659`) re-hashes against the digest recorded at verify time | `RolledBack` receipt, `StageRevalidation`, zero live mutation |
-| 5 | Destinations are never symlinks or hard links, and live parents are never created | `revalidate_destination` (`transaction.rs:746-789`, canonicalizes the root and the nearest existing ancestor), `require_ready_parent` (`transaction.rs:791-830`) | `RolledBack` receipt, `Destination`; **no** directory is created |
+| 5 | Destinations are never symlinks or hard links, and live parents are never created | `revalidate_destination` (`transaction.rs:746-789`, canonicalizes the root and the nearest existing ancestor), `require_ready_parent` (`transaction.rs:791-830`) | `RolledBack` receipt, `Filesystem`/`OwnershipConflict`; **no** directory is created |
 | 6 | Destinations stay inside the installation root | `normalize_relative_path` + `InstallPlan::new` (`domain.rs:545`, `domain.rs:594`); re-checked per member during backup and per member in `restore_entries` | `Err(InvalidInput)` at plan time; `rollback_verified == false` → `RecoveryRequired` |
 | 7 | Transaction-owned state is owner-private on Unix | `0700` on the stage dir (`stage.rs:237`), stage subdirs (`stage.rs:80`), and the backup root (`transaction.rs:735`); `0600` on staged files (`stage.rs:300`) and the lock record (`lock.rs:84`) | Permissions are best-effort `set_permissions` calls whose errors are discarded with `let _ =`; a failure is not surfaced |
 | 7a | The backup set is not widened | The backup is a `rename` of the live file (`transaction.rs:586`), so a backed-up file keeps its **original** mode inside the `0700` backup root. Core does not re-narrow it, and the intermediate backup subdirectories are not chmod'd (`transaction.rs:579`) | No error path; the `0700` root is the only containment |
@@ -548,12 +552,13 @@ This is the central review artifact. Two rules govern the whole table:
 | Stage member copy fails, or injected `StageCreate`/`StageCopy` | `Err(Io)` / `Err(Injected)` | Stage is removed; safe to retry | `stage.rs:52-55`, `stage.rs:318` |
 | `BoundSources` entry for a non-member | `Err(InvalidInput)` | Producer/consumer key mismatch; fix the map | `stage.rs:56-59` |
 | Staged digest mismatch or non-regular staged file at verify | `Err(VerificationFailed)` | Re-resolve artifacts; no receipt exists yet | `integrity.rs:179`, `integrity.rs:191` |
-| `NotRequired` set validated with an empty validator set | `Err(VerificationFailed)` | Supply a validator; the gate will not be bypassed | `candidate.rs:413-420` |
+| Any member lacking `IntegrityStatus::Verified` (including a `NotRequired` member) reaches `validate` | `Err(VerificationFailed)` | Declare `IntegrityRequirement::Sha256` and verify; the gate will not be bypassed | `candidate.rs:413-420` |
 | Validator returns an error, or `run_bounded` times out / truncates output | `Err(<validator's variant>)`, typically `CandidateExecution` | Handle validator error variants | `candidate.rs:421`, `candidate.rs:320` |
 | `run_bounded` spawn/poll failure | `Err(Io)` | Environment problem; nothing was committed | `candidate.rs:141`, `candidate.rs:182` |
 | Lock record already present (including stale or malformed) | `Err(UpdateInProgress { lock })` | Inspect with `MutationLock::inspect`; a stale lock needs manual operator removal | `lock.rs:70-72` |
 | Lock token exceeds 4096 bytes, or lock write fails | `Err(InvalidInput)` / `Err(Io)` (lock file removed on write failure) | Shorten identifiers | `lock.rs:63`, `lock.rs:77-80` |
-| Injected `LockCreation` (test seam) | `Err(Injected)` | Proves the pre-lock path performs zero mutation | `transaction.rs:329` || Destination resolution fails during preflight | `Err(UnknownMember)` | Unreachable for plan-built members; treat as a core bug if seen | `transaction.rs:334` |
+| Injected `LockCreation` (test seam) | `Err(Injected)` | Proves the pre-lock path performs zero mutation | `transaction.rs:329` |
+| Destination resolution fails during preflight | `Err(UnknownMember)` | Unreachable for plan-built members; treat as a core bug if seen | `transaction.rs:334` |
 | Ownership `Foreign` or `Unknown` | **Receipt** `RolledBack`, `rollback_performed=false`, `rollback_verified=true`, `Cleaned`, `failure` phase `Ownership` | Treat as refused; do not retry without new ownership evidence | `transaction.rs:342-346` |
 | Ownership `Absent` with `DenyCreate` | **Receipt** `RolledBack`, same shape | Authorize creation explicitly or do not retry | `transaction.rs:642-648` |
 | Ownership answer differs between preflight and under-lock (flap) | **Receipt** `RolledBack`, zero mutation | Make the verifier deterministic; investigate the writer | `transaction.rs:637-641` |

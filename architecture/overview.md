@@ -19,6 +19,7 @@ wins.
 | Do a real review of one component | The linked deep dive under [deep-dive index](#deep-dive-index-review-entry-points) |
 | Understand the data flow end to end | [Composition paths](#composition-paths) |
 | Understand why the design is shaped this way | [`plans/000`–`003`](../plans/000-long-term-specification.md) + [`plans/adrs/`](../plans/adrs/README.md) |
+| Know what an agent must do before landing a change | [AGENTS.md](../AGENTS.md) — a thin index; the rules themselves live in [tooling-governance.md](tooling-governance.md) |
 
 ## The one-paragraph model
 
@@ -40,7 +41,9 @@ manager, and producer concerns.
 ## Dependency graph
 
 Derived from the `crates/*/Cargo.toml` manifests. Arrows point from dependent to
-dependency (compile-time direction). All seven published crates are `0.1.2`.
+dependency (compile-time direction). All 8 crates carry the workspace version
+`0.1.2`; six of them are published at `0.1.2` on crates.io. `eggup-service` is
+published but lags at `0.1.1`, and `eggup-transport-footprint` is `publish = false`.
 
 ```text
                          eggup-transport-footprint   (publish = false, 3 bins)
@@ -94,7 +97,7 @@ carries `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]`.
 | `eggup-archive` | Bounded local archive extraction | 3512 / 51 | Explicit tar.gz/zip member allowlists, finite compressed/decompressed budgets, regular-file-only extraction, private root, no-clobber files, streamed SHA-256/size evidence, `ExtractedArchive` → `PersistedExtraction` → `BoundExtraction` handoff, `DirectoryGuard` cleanup | [archive-extraction.md](archive-extraction.md) |
 | `eggup-eggpack` | Optional Eggpack ReleaseManifest v1 adapter (leaf) | 849 / 63 | `project` / `project_json`, `bind_requests` (tightened byte caps), `default_destinations`, `materialize_artifact_set[_with_destinations]`, direct/bundle installable vs archive extraction-required, `core_plan_for_archive*`, `bind_archive_members`, `install_ids` | [eggpack-adapter.md](eggpack-adapter.md) |
 | `eggup-transport-footprint` | Non-published footprint fixtures | 45 / 0 | Three `required-features` binaries — `curl_only`, `eggfetch_only`, `dual` — that pin which transport stacks a consumer links; measures the cost of the transport choice | [transport-footprint.md](transport-footprint.md) |
-| tooling + governance | Workspace, verification, planning | — | `scripts/check-local.sh` (fmt/clippy/test/doc/tree), CI (stable, MSRV 1.89, macOS, Windows), workspace lints, `plans/` ADRs + subsystem roadmaps + closure records + registry | [tooling-governance.md](tooling-governance.md) |
+| tooling + governance | Workspace, verification, planning | — | `scripts/check-local.sh` (fmt/clippy/test/doc/tree), CI (stable, MSRV 1.89, macOS, Windows), workspace lints, `plans/` ADRs + subsystem roadmaps + closure records + registry, and the agent-facing surface (`AGENTS.md` + `.opencode/skills/`) | [tooling-governance.md](tooling-governance.md) |
 
 ### Source layout inside the larger crates
 
@@ -214,7 +217,7 @@ checks:
 | [archive-extraction.md](archive-extraction.md) | `eggup-archive` | Bounded allowlisted tar.gz/zip extraction, budgets, extraction→binding handoff |
 | [eggpack-adapter.md](eggpack-adapter.md) | `eggup-eggpack` | Manifest projection, request binding, materialization, archive handoff, conformance tests |
 | [transport-footprint.md](transport-footprint.md) | `eggup-transport-footprint` | Which transport stack a consumer links, and what that costs |
-| [tooling-governance.md](tooling-governance.md) | workspace | Lints, the local verification gate, CI matrix, planning and closure process |
+| [tooling-governance.md](tooling-governance.md) | workspace | Lints, the local verification gate, CI matrix, planning and closure process, release process, and the agent-facing surface (`AGENTS.md` + `.opencode/skills/`) |
 
 Contract-level detail that belongs to no single crate:
 
@@ -235,5 +238,8 @@ Contract-level detail that belongs to no single crate:
 
 Publication state: `eggup-core`, `eggup-archive`, `eggup-acquisition`,
 `eggup-eggfetch`, `eggup-eggpack`, and `eggup-curl` are published at `0.1.2`.
-`eggup-service` is unpublished. `eggup-transport-footprint` is `publish = false`
-by design. CI never publishes; releases are manual.
+`eggup-service` **is** on crates.io but only at `0.1.0`/`0.1.1`, so its `0.1.2`
+has never been published and no milestone authorizes it.
+`eggup-transport-footprint` is `publish = false` by design and has no registry
+version. CI never publishes; releases are manual — see
+[tooling-governance.md](tooling-governance.md) §8.

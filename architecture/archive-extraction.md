@@ -76,7 +76,7 @@ Every exported item in the crate, with its role. All line references are
 | `ArchiveMember::output_name` | Single-component filename inside the private root | 122 |
 | `ArchivePlan` | Archive path + format + allowlist + limits; opaque after construction (no getters) | 129 |
 | `ArchivePlan::new` | Rejects empty/oversized allowlists, duplicate sources, case-insensitive duplicate outputs, over-budget declared sizes | 139 |
-| `ExtractionErrorKind` | 13 stable failure categories (no OS error text) | 182 |
+| `ExtractionErrorKind` | 14 stable failure categories (no OS error text) | 182 |
 | `ExtractionError` | Failure carrier: `kind` plus optional `residue_path` | 215 |
 | `ExtractionError::kind` | Stable category accessor | 251 |
 | `ExtractionError::residue_path` | Private-root residue location; see §9 for its two meanings | 259 |
