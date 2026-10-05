@@ -3111,7 +3111,9 @@ mod tests {
     fn spec(id: &str, exe: &str, args: &[&str]) -> ServiceSpec {
         ServiceSpec::new(
             ServiceId::new(id).unwrap(),
-            PathBuf::from(exe),
+            // Callers pass POSIX-looking strings; `absolute` makes them valid on
+            // Windows too, where a bare "/opt/app/bin" is not absolute.
+            absolute(exe),
             args.iter().map(|s| s.to_string()).collect(),
             None,
         )
@@ -3318,7 +3320,9 @@ mod unix_tests {
     fn spec(id: &str, exe: &str, args: &[&str]) -> ServiceSpec {
         ServiceSpec::new(
             ServiceId::new(id).unwrap(),
-            PathBuf::from(exe),
+            // Callers pass POSIX-looking strings; `absolute` makes them valid on
+            // Windows too, where a bare "/opt/app/bin" is not absolute.
+            absolute(exe),
             args.iter().map(|s| s.to_string()).collect(),
             None,
         )
