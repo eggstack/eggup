@@ -1,6 +1,6 @@
 # M010 — eggup-acquisition 0.1.3 publication (workspace 0.1.3 source version)
 
-Status: ready
+Status: blocked on Service M009 release-order dependency
 
 Repository baseline: `b485228d1edebe27e2dd691310c7c68f60d97d8d`
 
@@ -16,6 +16,7 @@ Hard dependencies:
 - `0b8cb98` landed the two acquisition defect fixes this milestone publishes.
 - `eggup-acquisition 0.1.2` is published from `02a1d32`; `0.1.3` is absent and
   `eggup-acquisition` is already owned, so no name or ownership gate applies.
+- **Release-order dependency:** Service M009 must publish `eggup-service 0.1.2` before this plan moves the shared workspace version to 0.1.3. This is packaging/version ordering, not a transport-runtime dependency.
 
 Downstream trigger: every registry consumer of the acquisition seam that
 composes two transports is currently reachable for the doubled-total-deadline
@@ -33,9 +34,7 @@ bounded acquisition, staging, promotion, or redaction semantics.
 
 ## 2. Why this milestone is ready
 
-Both fixes are implemented, in the local tree, and covered by the current
-workspace gate. Nothing needs to be written; this milestone decides the version
-bump, the pin consequences, and the publication order.
+Both fixes are implemented, in the local tree, and covered by the current workspace gate. Nothing in `eggup-acquisition/src` needs to be written; this milestone decides the version bump, pin consequences, and publication order. Independently planned Core work may land first, but the acquisition source bytes being published must remain the qualified post-`0b8cb98` implementation or receive a separate corrective.
 
 ## 3. Current implementation evidence
 
@@ -170,10 +169,9 @@ the correct trade.
 - Historical `0.1.2` text is corrected in place with the reason stated. Nothing
   is erased to conceal a defect.
 
-### 6.4 No source change
+### 6.4 No acquisition source change
 
-Zero edits to any `crates/*/src/` file. If the gate reveals a needed source
-change, stop under §14 and open a corrective.
+Zero edits to `crates/eggup-acquisition/src/` under this milestone. Independent Core/service plans may change their own source before M010 executes; that does not widen this publication scope, but the exact current workspace must be requalified before publication. If `eggup-acquisition/src/` needs any change, stop under §14 and open a corrective.
 
 ## 7. Ordered work packages
 
@@ -298,7 +296,7 @@ only, and no Windows live-HTTP result is claimed.
   the published version.
 - Current Stable/MSRV/macOS/Windows qualification is green on the publication
   commit.
-- No `crates/*/src/` file changed; only manifests, `Cargo.lock`, and docs.
+- No `crates/eggup-acquisition/src/` file changed under M010; unrelated source changes in the publication tree must be separately planned/closed and covered by exact-current-head qualification.
 - Only `eggup-acquisition` was published; no other crate's `0.1.2` was
   republished or yanked.
 - The `eggup-eggpack 0.1.2` pin caveat is stated truthfully in the changelog,
@@ -309,7 +307,7 @@ only, and no Windows live-HTTP result is claimed.
 
 Stop and open a separate corrective if:
 
-- the version bump forces any `src/` change, or any change to a public API
+- the version bump forces any `eggup-acquisition/src/` change, or any change to a public API
   shape, `FetchLimits` field type, default, or validation message;
 - `eggup-acquisition`'s packaged manifest is no longer dependency-free;
 - publishing would require widening any bounded acquisition, staging, promotion,
@@ -345,6 +343,5 @@ exact pin, which needs an adapter republication to pick up `0.1.3`; that is the
 next candidate milestone and should be authored only as a deliberate decision,
 not folded into a transport milestone.
 
-Publishing `eggup-service` remains unauthorized. Gregg M004 remains
-intentionally unwritten. Phase 12 authenticity still requires an ADR, and Phase
+Service M009 is separately authorized and must close before this workspace version bump. Gregg M004 remains intentionally unwritten and blocked on the new Core substrate correctives plus these publication gates. Phase 12 authenticity still requires an ADR, and Phase
 13 remains future API stabilization.
