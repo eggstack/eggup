@@ -25,7 +25,7 @@ The only new surface is the plan constructor and the type that binds the image.
 The central claim — **no write authority above the executable's own directory**
 — is enforced by construction rather than by convention.
 `InstallPlan::for_current_executable` plans `StagePlacement::InsideInstallationRoot`
-(`domain.rs:455`), so `create_stage_directory` puts the private stage inside
+(`domain.rs:455`, variant at `domain.rs:465`), so `create_stage_directory` puts the private stage inside
 that directory and `create_backup_directory` already puts the backup set there.
 `self_update_needs_no_authority_above_the_executable_directory` seals the parent
 to `0500` first, *proves* the seal is effective by probing a write into it, and

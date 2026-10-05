@@ -325,7 +325,7 @@ mechanism: no advisory flock, no PID liveness probe, no heartbeat, no expiry. Th
 is a bounded text token `pid=… nonce=… product=… release=…` capped at 4096 bytes
 (`lock.rs:11`, `lock.rs:220`).
 
-`MutationLock::inspect` (`lock.rs:321`) is read-only and returns `LockStatus::Available`,
+`MutationLock::inspect` (`lock.rs:322`) is read-only and returns `LockStatus::Available`,
 `Held`, or `Malformed`. It is unchanged and still never removes anything.
 
 `MutationLock::acquire` is likewise unchanged: it never recovers, so a crashed updater's
@@ -333,7 +333,7 @@ record still blocks until something else resolves it. What changed is that "some
 can now be the caller, deliberately — see
 [`Proof-authorized stale-lock recovery`](#proof-authorized-stale-lock-recovery).
 
-`Drop` (`lock.rs:423`) removes the record only if it is still a regular file whose bytes
+`Drop` (`lock.rs:432`) removes the record only if it is still a regular file whose bytes
 equal this process's token, so a lock that was replaced or rewritten by someone else is
 left alone.
 
@@ -358,24 +358,24 @@ executable, or service fact, because none of those is universal proof — a pid 
 An unrecognised record format stays observable and byte-identifiable but reports no parsed
 field, so a caller that needs fields cannot prove staleness from it.
 
-Claiming is race-safe without unsafe code (`claim` at `lock.rs:403`):
+Claiming is race-safe without unsafe code (`claim` at `lock.rs:404`):
 
-1. create-new; on `AlreadyExists`, observe within bounds (`observe`, `lock.rs:302`);
+1. create-new; on `AlreadyExists`, observe within bounds (`observe`, `lock.rs:303`);
 2. ask the caller's verifier about that one observation;
 3. on `ProvenStale` only, re-read the record's exact bytes and file kind immediately
    before displacing it — a changed record is never deleted;
 4. `rename` the pathname into a unique Eggup-owned claim path **in the same directory**
-   (`claim_path`, `lock.rs:447`), so the move is a same-filesystem rename;
+   (`claim_path`, `lock.rs:481`), so the move is a same-filesystem rename;
 5. re-read the *claimed object* and require it to still equal the authorized observation;
 6. create-new the real lock, and only then delete the claimed record.
 
 A record that is malformed, oversized, symlinked, non-regular, non-UTF-8, or unreadable
 never reaches step 4. If the claimed object turns out not to be the authorized one, the
-displacement is undone when the lock path is still free (`restore_claim`, `lock.rs:494`);
+displacement is undone when the lock path is still free (`restore_claim`, `lock.rs:535`);
 otherwise the displaced record stays where it is and `Error::RecoveryRequired` reports its
 real retained path. A writer that creates the lock after the claim simply wins: its record
 is never removed, and this caller's displaced record is cleaned up or reported
-(`remove_claim`, `lock.rs:516`).
+(`remove_claim`, `lock.rs:566`).
 
 There is no unbounded retry loop, and a crash after a record reaches a claim path is never
 treated as permission to delete it later.
@@ -581,7 +581,7 @@ rollback_verified == true`.
 | 6 | Destinations stay inside the installation root | `normalize_relative_path` + `InstallPlan::new` (`domain.rs:545`, `domain.rs:604`); re-checked per member during backup and per member in `restore_entries` | `Err(InvalidInput)` at plan time; `rollback_verified == false` → `RecoveryRequired` |
 | 7 | Transaction-owned state is owner-private on Unix | `0700` on the stage dir (`stage.rs:237`), stage subdirs (`stage.rs:80`), and the backup root (`transaction.rs:735`); `0600` on staged files (`stage.rs:300`) and the lock record (`lock.rs:84`) | Permissions are best-effort `set_permissions` calls whose errors are discarded with `let _ =`; a failure is not surfaced |
 | 7a | The backup set is not widened | The backup is a `rename` of the live file (`transaction.rs:586`), so a backed-up file keeps its **original** mode inside the `0700` backup root. Core does not re-narrow it, and the intermediate backup subdirectories are not chmod'd (`transaction.rs:579`) | No error path; the `0700` root is the only containment |
-| 8 | Core never removes a lock it does not own, and never inspects destructively | `lock.rs:423` (`Drop` compares token bytes), `lock.rs:321` (`inspect` is read-only) | A foreign lock is left in place; a stale lock blocks all later commits with `Err(UpdateInProgress)` |
+| 8 | Core never removes a lock it does not own, and never inspects destructively | `lock.rs:432` (`Drop` compares token bytes), `lock.rs:322` (`inspect` is read-only) | A foreign lock is left in place; a stale lock blocks all later commits with `Err(UpdateInProgress)` |
 | 9 | Rollback is verified, not assumed | Two-pass `restore_entries` + second containment pass (`transaction.rs:902-913`) | `RecoveryRequired` receipt, real `recovery_path`, lock preserved |
 | 10 | Crashes are never claimed to be recovered | Nothing — no journal, no replay | Process death leaves stage, backup, and possibly the lock on disk; recovery is operator work via the receipt and the backup |
 
@@ -652,7 +652,7 @@ This is the central review artifact. Two rules govern the whole table:
 | Restore cannot restore a member, or a post-rollback re-check finds an inconsistency | **Receipt** `RecoveryRequired`, `rollback_performed=true`, real `recovery_path`, **lock preserved** | Operator intervention; core will not retry or clean up | `transaction.rs:986-998` |
 | Restore verified but backup removal fails | **Receipt** `RolledBack`, `rollback_verified=true`, `RetainedForRecovery` | Old generation is live; backup remains as evidence | `transaction.rs:969-983` |
 | Process death, power loss, or kill at any point | No receipt; stage/backup/lock may remain | Out of scope by design. Use receipts and backups; there is no crash journal | `crates/eggup-core/docs/transaction.md:44-45` |
-| Stale lock from a dead process | `Err(UpdateInProgress)` forever | Manual removal only; `inspect` will not delete it | `lock.rs:70`, `lock.rs:321` |
+| Stale lock from a dead process | `Err(UpdateInProgress)` forever | Manual removal only; `inspect` will not delete it | `lock.rs:70`, `lock.rs:322` |
 
 ### Reading a receipt safely
 
@@ -676,8 +676,8 @@ What concurrent callers observe:
 | Scenario | Observable |
 | --- | --- |
 | Two Eggup commits, same root, no stale lock | First commits; second gets `Err(UpdateInProgress { lock })` at `transaction.rs:335`, before any mutation |
-| Stale lock from a crashed process | Every later commit gets `Err(UpdateInProgress)` indefinitely. `MutationLock::inspect` (`lock.rs:321`) reports `Malformed`/`Held` but never removes it |
-| Lock record replaced by a third party mid-transaction | `Drop` (`lock.rs:423`) refuses to remove it because the token bytes differ; the foreign file survives |
+| Stale lock from a crashed process | Every later commit gets `Err(UpdateInProgress)` indefinitely. `MutationLock::inspect` (`lock.rs:322`) reports `Malformed`/`Held` but never removes it |
+| Lock record replaced by a third party mid-transaction | `Drop` (`lock.rs:432`) refuses to remove it because the token bytes differ; the foreign file survives |
 | Two Eggup commits, different roots | Fully independent; stage and backup names embed pid, an atomic counter, and a timestamp (`stage.rs:223-231`, `transaction.rs:12`) |
 | Two transactions in one process, same root | Serialized the same way; the in-process atomic nonce prevents lock-token collision |
 

@@ -1738,4 +1738,111 @@ mod tests {
     fn _unused() {
         let _m: HashMap<MemberId, [u8; 32]> = HashMap::new();
     }
+
+    /// A competing writer that takes the lock *after* our claim wins, and its
+    /// record is never removed.
+    ///
+    /// The window between the claim and the create-new retry is microseconds
+    /// wide, so this uses the `cfg(test)` hook in `lock` to inject the competing
+    /// write deterministically. This is the branch the whole claim protocol
+    /// exists to survive; without the hook it could only be reached by a real
+    /// multi-process race, which would prove nothing about ordering.
+    #[test]
+    fn competing_writer_after_the_claim_is_preserved() {
+        use crate::lock::POST_CLAIM_HOOK;
+
+        let root = InstallationRoot::new().expect("root");
+        let lock_path = root.path().join(".eggup-mutation.lock");
+        fs::write(&lock_path, "pid=1 nonce=1 product=a release=b\n").expect("plant");
+        let competing = "pid=2 nonce=2 product=a release=b\n".to_string();
+
+        struct Proven;
+        impl std::fmt::Debug for Proven {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("Proven")
+            }
+        }
+        impl crate::lock::StaleLockVerifier for Proven {
+            fn classify(
+                &self,
+                _observed: &crate::lock::LockObservation,
+            ) -> crate::lock::StaleLockDecision {
+                crate::lock::StaleLockDecision::ProvenStale
+            }
+        }
+
+        let hook_ran = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let hook_ran_in_hook = hook_ran.clone();
+        *POST_CLAIM_HOOK.lock().expect("hook slot") = Some(Box::new(move || {
+            fs::write(&lock_path, &competing).expect("competing writer");
+            hook_ran_in_hook.store(true, std::sync::atomic::Ordering::SeqCst);
+        }));
+
+        let error = MutationLock::acquire_with_recovery(
+            root.path(),
+            &ProductId::new("a").unwrap(),
+            &ReleaseId::new("b").unwrap(),
+            &Proven,
+        )
+        .expect_err("the competing writer owns the domain");
+
+        assert!(
+            matches!(error, Error::UpdateInProgress { .. }),
+            "expected typed contention, got {error:?}"
+        );
+        assert!(
+            hook_ran.load(std::sync::atomic::Ordering::SeqCst),
+            "the injected competing writer must actually have run, otherwise this \
+             test is asserting the pre-claim rejection path and proves nothing \
+             about the post-claim branch"
+        );
+        assert_eq!(
+            fs::read_to_string(root.path().join(".eggup-mutation.lock")).expect("read"),
+            "pid=2 nonce=2 product=a release=b\n",
+            "the winning writer's record must survive byte-identical"
+        );
+        let leftovers: Vec<_> = fs::read_dir(root.path())
+            .expect("read dir")
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with(".eggup-stale-claim-"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "our own displaced record must be cleaned up: {leftovers:?}"
+        );
+    }
+
+    /// The restore path must never clobber a lock a competing writer took.
+    ///
+    /// POSIX `rename` atomically replaces its destination, so restoring by
+    /// rename would be a TOCTOU. `restore_claim` re-materializes the record with
+    /// `create_new` instead, which cannot replace anything.
+    #[test]
+    fn restore_never_clobbers_a_lock_taken_in_the_meantime() {
+        let root = InstallationRoot::new().expect("root");
+        let lock_path = root.path().join(".eggup-mutation.lock");
+        let claim = root.path().join(".eggup-stale-claim-test");
+        fs::write(&claim, "pid=1 nonce=1 product=a release=b\n").expect("write claim");
+
+        // Someone else owns the lock path.
+        let winner = "pid=9 nonce=9 product=other release=z\n";
+        fs::write(&lock_path, winner).expect("write winner");
+
+        let error =
+            crate::lock::restore_claim(&claim, &lock_path, "pid=1 nonce=1 product=a release=b\n");
+        assert!(
+            matches!(error, Error::RecoveryRequired { .. }),
+            "a re-taken lock path must retain the claim, got {error:?}"
+        );
+        assert_eq!(
+            fs::read_to_string(&lock_path).expect("read"),
+            winner,
+            "the competing writer's record must be untouched"
+        );
+        assert!(
+            claim.exists(),
+            "the displaced record is retained and reported, not deleted"
+        );
+    }
 }

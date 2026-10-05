@@ -344,45 +344,49 @@ fn record_replaced_after_observation_is_never_deleted() {
     );
 }
 
-/// A writer that creates the lock after the claim wins; its record is preserved
-/// and never removed.
+/// A record replaced between observation and the claim is never displaced.
+///
+/// This is the *pre-claim* window: the competing write lands while the verifier
+/// is still deciding, so the claim's pre-rename re-read catches it and no claim
+/// file is ever created. The genuinely post-claim window — after the rename,
+/// before the create-new retry — has no public injection point and is covered
+/// deterministically by the in-crate `competing_writer_after_the_claim_is_preserved`
+/// unit test instead.
 #[test]
-fn a_second_writer_after_the_claim_is_preserved() {
+fn record_replaced_during_verification_is_never_claimed() {
     let root = Root::new();
     root.plant("pid=1 nonce=1 product=a release=b\n");
 
-    struct ClaimThenLose {
+    struct ReplaceOnClassify {
         root: PathBuf,
     }
-    impl std::fmt::Debug for ClaimThenLose {
+    impl std::fmt::Debug for ReplaceOnClassify {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.write_str("ClaimThenLose")
+            f.write_str("ReplaceOnClassify")
         }
     }
-    impl StaleLockVerifier for ClaimThenLose {
+    impl StaleLockVerifier for ReplaceOnClassify {
         fn classify(&self, _observed: &LockObservation) -> StaleLockDecision {
-            // Simulate a competing writer winning the domain between our
-            // observation and our create-new.
             fs::write(&self.root, "pid=2 nonce=2 product=a release=b\n").expect("competing writer");
             StaleLockDecision::ProvenStale
         }
     }
 
-    let verifier = ClaimThenLose {
+    let verifier = ReplaceOnClassify {
         root: root.lock_path(),
     };
     let error = MutationLock::acquire_with_recovery(root.path(), &product(), &release(), &verifier)
-        .expect_err("the competing writer owns the domain");
+        .expect_err("a record that changed before the claim must not be displaced");
 
     assert!(matches!(error, Error::UpdateInProgress { .. }), "{error:?}");
     assert_eq!(
         fs::read_to_string(root.lock_path()).expect("read"),
         "pid=2 nonce=2 product=a release=b\n",
-        "the winning writer's record is never removed"
+        "the replacement record survives untouched"
     );
     assert!(
         root.claims().is_empty(),
-        "our own displaced record is cleaned up: {:?}",
+        "nothing was displaced, so nothing is retained: {:?}",
         root.claims()
     );
 }

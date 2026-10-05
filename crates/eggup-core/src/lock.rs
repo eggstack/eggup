@@ -259,6 +259,7 @@ impl MutationLock {
             });
         }
         let claim = Self::claim(root, &observed)?;
+        fire_post_claim_hook();
         // Ownership of the installation domain is only established by a fresh
         // create-new. If another writer won the race, its record is left alone.
         match Self::create_new(root, product, release) {
@@ -416,7 +417,7 @@ impl MutationLock {
             Ok(claimed) if claimed == observed.record() => Ok(claim),
             // The displaced object is not the authorized one, so the claim is not
             // authorized either: undo it if that is safe, otherwise retain it.
-            Ok(_) => Err(restore_claim(&claim, &path)),
+            Ok(claimed) => Err(restore_claim(&claim, &path, &claimed)),
             // The record is displaced but unverified. Reporting only the
             // underlying error would leave real Eggup-owned bytes behind with
             // no indication of where they are.
@@ -447,6 +448,31 @@ impl Drop for MutationLock {
         }
     }
 }
+
+/// Test-only seam fired in the window between the claim and the create-new retry.
+///
+/// A competing writer that wins that window is the case the whole claim
+/// protocol exists to survive, but the window is microseconds wide. Without a
+/// deterministic seam the only way to exercise the branch is a real
+/// multi-process race, which would prove nothing about ordering. It is
+/// `cfg(test)` so no production binary carries it.
+#[cfg(test)]
+pub(crate) static POST_CLAIM_HOOK: std::sync::Mutex<Option<Box<dyn Fn() + Send>>> =
+    std::sync::Mutex::new(None);
+
+#[cfg(test)]
+fn fire_post_claim_hook() {
+    // `take` so the hook fires exactly once even if recovery retries.
+    let hook = POST_CLAIM_HOOK.lock().ok().and_then(|mut slot| slot.take());
+    if let Some(hook) = hook {
+        hook();
+    }
+}
+
+/// The call site stays ungated so production builds do not carry a branch on a
+/// test-only symbol.
+#[cfg(not(test))]
+fn fire_post_claim_hook() {}
 
 fn lock_path(root: &Path) -> PathBuf {
     root.join(".eggup-mutation.lock")
@@ -494,28 +520,44 @@ fn read_record(path: &Path) -> Result<String> {
     }
 }
 
-/// Undoes a displacement whose object turned out not to be the authorized one.
+/// Puts a displaced record back only if the lock pathname is still free.
 ///
-/// Restoring is only safe while the lock pathname is still free. If another
-/// writer has already claimed it, the displaced record stays where it is and its
-/// real path is reported as retained evidence.
-fn restore_claim(claim: &Path, lock: &Path) -> Error {
-    if fs::symlink_metadata(lock).is_ok() {
-        return Error::RecoveryRequired {
+/// The restore deliberately does **not** `rename` the claim back. POSIX `rename`
+/// atomically *replaces* an existing destination, so a writer that took the lock
+/// between a freeness check and a rename would have its record unlinked
+/// underneath it while it still believes it holds the domain. `create_new` can
+/// never replace anything, so re-materializing the record through it makes the
+/// restore safe on every platform.
+///
+/// On success the lock path holds the displaced record again and the caller
+/// reports contention; the displaced writer owns the domain, which is the
+/// correct outcome for a record Core was never authorized to displace.
+pub(crate) fn restore_claim(claim: &Path, lock: &Path, record: &str) -> Error {
+    match OpenOptions::new().write(true).create_new(true).open(lock) {
+        Ok(mut file) => {
+            if let Err(source) = file.write_all(record.as_bytes()) {
+                // The lock path now holds a partial record. That is fail-closed:
+                // `acquire` still refuses it, and the full bytes remain at the
+                // claim, which is what the error names.
+                return Error::RecoveryRequired {
+                    evidence: claim.to_path_buf(),
+                    detail: format!(
+                        "a displaced lock record was re-created at {} but could not be written: {source}",
+                        lock.display()
+                    ),
+                };
+            }
+            // The claim is now a duplicate of a record that owns the lock path,
+            // so removing it cannot lose the only copy.
+            let _ = fs::remove_file(claim);
+            Error::UpdateInProgress {
+                lock: lock.to_path_buf(),
+            }
+        }
+        Err(_) => Error::RecoveryRequired {
             evidence: claim.to_path_buf(),
-            detail: "the displaced lock record was not the authorized one and the lock path was re-taken; retained evidence requires inspection".to_string(),
-        };
-    }
-    match fs::rename(claim, lock) {
-        Ok(()) => Error::UpdateInProgress {
-            lock: lock.to_path_buf(),
-        },
-        Err(source) => Error::RecoveryRequired {
-            evidence: claim.to_path_buf(),
-            detail: format!(
-                "the displaced lock record could not be restored to {}: {source}",
-                lock.display()
-            ),
+            detail: "the displaced lock record was not the authorized one and the lock path was re-taken; retained evidence requires inspection"
+                .to_string(),
         },
     }
 }

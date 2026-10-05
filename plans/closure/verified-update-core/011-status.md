@@ -55,12 +55,12 @@ and its record is never removed.
 | §6.3 bounded typed observation | `LockObservation` with accessors; `MAX_LOCK_BYTES` = 4096 enforced in `inspect`, `read_record`, `create_new`, and record parsing | passed |
 | §6.3 verifier sees the exact record, not a pathname | `caller_supplied_proof_sees_the_exact_record`: exactly one observation, `record()` equal to the planted bytes, all four fields parsed, `format_known()` true | passed |
 | §6.4 create-new first | `acquire_with_recovery` returns immediately on a successful create-new, so the common path never reaches the claim machinery | passed |
-| §6.4 claim-and-verify before deletion | `claim` (`lock.rs:403`) re-reads, renames, then re-reads the claimed object; the record is deleted by `remove_claim` only after `create_new` has returned `Some` | passed |
-| §6.4 same-filesystem claim path | `claim_path` (`lock.rs:447`) joins the same installation root as the lock | passed |
+| §6.4 claim-and-verify before deletion | `claim` (`lock.rs:404`) re-reads, renames, then re-reads the claimed object; the record is deleted by `remove_claim` only after `create_new` has returned `Some` | passed |
+| §6.4 same-filesystem claim path | `claim_path` (`lock.rs:481`) joins the same installation root as the lock | passed |
 | §6.4 object changed → no destructive delete | `record_replaced_after_observation_is_never_deleted`: the verifier swaps the record after observation; result is `UpdateInProgress`, the replacement survives byte-identical, and **no claim file is left behind** | passed |
-| §6.4 second writer after claim wins | `a_second_writer_after_the_claim_is_preserved`: the competing writer's record is preserved byte-identical and our own claim is cleaned up | passed |
-| §6.4 restore when safe | `restore_claim` (`lock.rs:494`) renames back only while the lock path is free; otherwise it retains the evidence and reports it | implemented; contract-tested |
-| §6.4 claim cleanup failure reports the real retained path | `remove_claim` (`lock.rs:516`) returns `Error::RecoveryRequired { evidence: <real path> }`; `retained_evidence_error_names_the_real_path` asserts the path is real and named in the message | passed (contract), see residual risk |
+| §6.4 second writer after claim wins | `competing_writer_after_the_claim_is_preserved` (in-crate, using the `cfg(test)` post-claim hook so the window is hit deterministically): the competing writer's record survives byte-identical and our own claim is cleaned up | passed |
+| §6.4 restore when safe | `restore_claim` (`lock.rs:535`) re-materializes the record with `create_new`, which cannot replace an existing path; when the path was re-taken it retains the evidence and reports it. `restore_never_clobbers_a_lock_taken_in_the_meantime` | passed |
+| §6.4 claim cleanup failure reports the real retained path | `remove_claim` (`lock.rs:566`) returns `Error::RecoveryRequired { evidence: <real path> }`; `retained_evidence_error_names_the_real_path` asserts the path is real and named in the message | passed (contract), see residual risk |
 | §6.4 bounded loop, then contention | one observation, one create-new retry after an observation that found nothing; no unbounded retry | passed |
 | §6.4 return `Err` only for genuine setup failures | contention, unknown, malformed, and changed-record all map to typed `Err` variants carrying real paths, never a synthetic success | passed |
 | §4.2 malformed / oversized / symlink / non-regular / unreadable never displaced | `unsafe_records_never_reach_destructive_recovery`: non-UTF-8, 8 KiB record, a directory in the lock's place, and a symlink (Unix) each retain the record and create no claim | passed |
@@ -95,6 +95,20 @@ this code just renamed in a directory this code must be able to write to
 essentially always succeeds, so this is a correctness statement rather than an
 expected path.
 
+**The restore does not use `rename`.** POSIX `rename` atomically *replaces* its
+destination, so restoring the displaced record by renaming the claim back over
+the lock path would unlink a competing writer's record underneath it. A freeness
+check before that rename is a TOCTOU. `restore_claim` therefore re-materializes
+the record with `create_new`, which by definition cannot replace anything.
+
+**The post-claim window needs a test seam, not a race.** The branch between the
+claim rename and the create-new retry is microseconds wide; exercising it with a
+real multi-process race would prove nothing about ordering. A `cfg(test)` hook
+fires there so the competing write is injected deterministically. It compiles
+away from production builds, and `hook_ran` is asserted so the test cannot
+silently degrade into asserting the *pre-claim* rejection path — which is
+exactly the bug an earlier draft of that test had.
+
 **`Unknown` is the default a careful caller should return.** The example's
 cautious verifier deliberately returns `Unknown` for a supervised-but-invisible
 pid with no out-of-band statement, and the fixture
@@ -118,13 +132,22 @@ by upgrading.
 `unknown_record_format_is_observed_without_inventing_fields`,
 `unsafe_records_never_reach_destructive_recovery`,
 `record_replaced_after_observation_is_never_deleted`,
-`a_second_writer_after_the_claim_is_preserved`,
+`record_replaced_during_verification_is_never_claimed`,
 `retained_evidence_error_names_the_real_path`,
 `owner_drop_never_deletes_a_replacement_record`,
 `inspect_remains_read_only_and_backward_compatible`,
 `observation_of_an_absent_record_is_none`,
 `bounded_non_ascii_record_diagnostics_stay_panic_free`,
 `commit_recovers_only_with_caller_proof`.
+
+Two further tests live in `src/lib.rs` because they need `pub(crate)` access:
+
+- `competing_writer_after_the_claim_is_preserved` — the genuinely post-claim
+  window, via the `cfg(test)` hook. Asserts the hook actually ran, so the test
+  cannot pass vacuously by falling back to the pre-claim rejection path.
+  Verified by mutation: removing the `remove_claim` call makes it fail.
+- `restore_never_clobbers_a_lock_taken_in_the_meantime` — the restore cannot
+  clobber a lock a competing writer took.
 
 `commit_recovers_only_with_caller_proof` is the end-to-end proof of the opt-in:
 the same fixture, with an identical planted record, fails with
@@ -177,17 +200,26 @@ platform and a macOS pass is not evidence for Windows.
 
 ## Residual risk
 
-1. **`remove_claim` failure and `restore_claim`'s unsafe branch have no
-   deterministic public trigger.** Both are covered by a contract test on
-   `Error::RecoveryRequired` rather than by provoking the race. Disclosed rather
-   than papered over: a truly exhaustive proof would need an injected filesystem
-   fault, which is new machinery this milestone does not have.
+1. **`remove_claim` failure still has no deterministic trigger.** The unsafe
+   *branch* of `restore_claim` is now covered
+   (`restore_never_clobbers_a_lock_taken_in_the_meantime`), but a filesystem
+   fault mid-`write_all` is not: that path is exercised only by reading the code.
+   A truly exhaustive proof would need an injected filesystem fault, which is new
+   machinery this milestone does not have.
+3. **`MutationLock::drop` has a pre-existing check-then-remove window.** The
+   contents comparison and `remove_file` are separate syscalls, so a recovering
+   writer that swaps in a fresh record between them can have it deleted. This is
+   **unchanged by these milestones** and not a regression, but it is the same
+   class of defect as the `rename` issue found above and is recorded here rather
+   than silently left unmentioned. `owner_drop_never_deletes_a_replacement_record`
+   cannot catch it, because there is no interleaving hook. Fixing it properly
+   needs atomic compare-and-delete, which std does not offer portably.
 2. **The race tests are logically ordered, not genuinely concurrent.** They
    prove the implementation handles a changed record and a competing writer
    *when those events occur at the specified point*. They do not demonstrate
    robustness under real multi-process contention. The `windows-check` job runs
    the same fixtures, which improves platform coverage but does not change this.
-3. **No crash-recovery sweep exists, by design.** A process killed between the
+4. **No crash-recovery sweep exists, by design.** A process killed between the
    claim rename and `create_new` leaves a `.eggup-stale-claim-*` file behind and
    the lock path free — so the *next* acquisition succeeds normally, and the
    orphaned claim is inert garbage the operator must remove by hand. The plan
