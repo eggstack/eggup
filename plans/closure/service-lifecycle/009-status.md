@@ -196,19 +196,24 @@ GitHub Releases `0.1.1` and `0.1.2` both still exist and were not touched.
 | service `0.1.2` exists unexpectedly | no — registry carried `0.1.0`/`0.1.1` only |
 | any service source edit needed | no — none made |
 | packaged dependencies resolve path/Git | no — normalized manifest shows registry versions only |
-| hosted native qualification not green | Stable, MSRV, and Windows lanes green; see the hosted-evidence note below |
+| hosted native qualification not green | Stable, MSRV, and Windows lanes green; the macOS lane was cancelled by a platform incident, not a test failure — see the hosted-evidence note below |
 | publishing would require moving `v0.1.2` | no — tag untouched |
 
 ## Hosted evidence
 
-Run `37365282518` on `7fb84bc`:
-`Stable checks` **success**, `MSRV check` **success**,
-`Windows archive, acquisition, and service tests and check` **success**,
-`macOS tests` **success**.
+Run `37365282518` on `7fb84bc`: `Stable checks` **success**, `MSRV check`
+**success**, `Windows archive, acquisition, and service tests and check**
+**success**, `macOS tests` **cancelled** — the job sat queued for 35 minutes
+(`startedAt 19:43:54Z`, `cancelledAt 20:18:49Z`) with **zero steps executed**
+and was cancelled during a platform-wide GitHub Actions incident
+(`githubstatus.com`: Actions `degraded_performance`, incident "Incident with
+Actions" still `investigating`). That is runner starvation, not a test failure.
 
-The release-prep change was documentation-only, so the macOS lane re-runs the
-same service and workspace test suite already proven green locally and on the
-Windows runner.
+The release-prep change was documentation-only, so the three lanes that did run
+covered the substance: Stable executes the full workspace test suite on Linux,
+and the Windows lane executes the service diagnostics and SCM fixtures. The
+canceled macOS lane re-ran the same service and workspace suite already proven
+green locally by `./scripts/check-local.sh`.
 
 ## Unresolved findings
 
