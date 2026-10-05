@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+Nothing in this section has been published. `0.1.2` remains the published
+baseline on crates.io, and no publication milestone authorizes these entries.
+No consumer migration is required: no API changed, and the stricter
+`validate_output_name` can only reject output names that were never safe on
+Windows.
+
 Fixes from the workspace bug audit; no API change, no new feature. Integrity
 remains SHA-256 checksum evidence only.
 

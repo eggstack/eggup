@@ -42,7 +42,7 @@ gaps are in [`architecture/tooling-governance.md`](architecture/tooling-governan
 
 Focused runs: `cargo test -p eggup-core`, `cargo test -p eggup-core <name>`, `cargo clippy -p <crate> --all-targets --locked -- -D warnings`.
 
-CI (`.github/workflows/ci.yml`) adds what the script lacks: `stable` (fmt/clippy/test/doc on Linux), `msrv` (compile-only `cargo check` on 1.89.0), `macos` (full `cargo test`), and `windows-check` — which **runs tests**, not just a check: `cargo test` for `eggup-acquisition`/`eggup-archive`/`eggup-curl`, `eggup-eggpack` with `--all-features`, three named `eggup-service` diagnostic-safety tests, `windows_scm::tests`, then a workspace `cargo check`. Neither `msrv` nor `windows-check` passes `--all-features`, so the feature-gated footprint binaries are built only by `stable` and `macos`. CI never publishes; releases are manual.
+CI (`.github/workflows/ci.yml`) adds what the script lacks: `stable` (fmt/clippy/test/doc on Linux), `msrv` (compile-only `cargo check` on 1.89.0), `macos` (full `cargo test`), and `windows-check` — which **runs tests**, not just a check: six `cargo test` steps at `ci.yml:48-53` (one combined run for `eggup-acquisition`/`eggup-archive`/`eggup-curl`, `eggup-eggpack` with `--all-features`, three named `eggup-service` diagnostic-safety tests, and `windows_scm::tests`), then a workspace `cargo check`. Neither `msrv` nor `windows-check` passes `--all-features`, so the feature-gated footprint binaries are built only by `stable` and `macos`. CI never publishes; releases are manual.
 
 ## Where to look
 
@@ -89,7 +89,7 @@ Process detail: [`architecture/tooling-governance.md`](architecture/tooling-gove
 - `plans/000–003` (spec, terminology, roadmap, process) are normative — do not edit in ordinary work. Accepted ADRs in `plans/adrs/` are superseded, never rewritten.
 - Work flow: subsystem roadmap → bounded `implementation/<subsystem>/NNN-*.md` plan (16-section template in `implementation/README.md`, needs SHA baseline + non-goals + failure semantics + verification commands) → implement → `closure/<subsystem>/NNN-status.md` (requirement→evidence matrix, exact commands, per-platform results) → update `plans/registry.md` + roadmap status table.
 - "medium-or-higher" is the de facto blocking-severity gate: any such issue still open forces a new corrective before the milestone closes.
-- Public API changes need rustdoc; keep library-crate `README.md` + `CHANGELOG.md` (`Unreleased`, with a no-publication/no-migration disclaimer) current.
+- Public API changes need rustdoc; keep library-crate `README.md` + `CHANGELOG.md` (`Unreleased`, with a no-publication/no-migration disclaimer) current. The root `CHANGELOG.md` aggregates but does not replace the per-crate ones — an unpublished fix (notably a security fix in an already-published crate) must appear in both.
 
 ## Releasing
 

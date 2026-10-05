@@ -12,10 +12,13 @@ On 2026-10-04 (Acquisition Transport M009) `eggup-curl 0.1.2` was published.
 **Complete crates.io 0.1.2 publication set:** `eggup-core`, `eggup-archive`,
 `eggup-acquisition`, `eggup-eggfetch`, `eggup-eggpack`, `eggup-curl`.
 
-`eggup-service` and `eggup-transport-footprint` share the 0.1.2 source version
-and are still **not** published. `eggup-transport-footprint` is
-`publish = false` by design and has no edge in the published adapter graph;
-`eggup-service` remains outside every publication authorization to date.
+`eggup-service` and `eggup-transport-footprint` share the 0.1.2 source version,
+but neither has a `0.1.2` release. `eggup-service` **is** on crates.io at
+`0.1.0` and `0.1.1` (it was part of the lockstep `0.1.1` patch), so it is a
+published crate that lags the workspace rather than an unpublished one; its
+`0.1.2` has never been published and no publication milestone authorizes it.
+`eggup-transport-footprint` is `publish = false` by design and has no edge in
+the published adapter graph.
 
 Integrity remains SHA-256 checksum evidence only; no authenticity or signature
 claims are made by any of these crates.
@@ -96,6 +99,48 @@ claims are made by any of these crates.
   2026-10-04.
 
 ## Unreleased
+
+The workspace-wide bug-audit fixes below are recorded here as well as in the
+per-crate changelogs, because they are **not** on the registry. Every crate
+still carries its published baseline: `0.1.2` for the six published crates,
+`0.1.1` for `eggup-service`. No publication milestone authorizes these entries,
+and the two acquisition fixes below are the specific payload of the open
+Acquisition M010 milestone (`eggup-acquisition 0.1.3`).
+
+- Eggpack Interop audit fix — **security, in a published crate**
+  (`eggup-eggpack`, unpublished here): archive members were bound
+  positionally, with no identity cross-check. A `BoundExtraction` from a
+  different `ArchivePlan`, or reused after member reordering, could commit each
+  member's bytes under another member's declared identity — digest-invisible
+  when two declared members share identical content. Bound members are now
+  cross-checked against the declared member they would bind to and a mismatch
+  fails closed with `AdapterError::MapMismatch`. No API change. Consumers
+  resolving `eggup-eggpack 0.1.2` from crates.io do **not** have this fix until
+  a new version is published. See `crates/eggup-eggpack/CHANGELOG.md`.
+
+- Core audit fixes (unpublished): bound-source staging dropped the executable
+  bit for every `PermissionsIntent::Preserve` member; a fully successful
+  rollback could be reported as `RecoveryRequired` with
+  `rollback_verified: false`; `Error::Injected` was added, which is **breaking**
+  for an exhaustive `match` on the non-`non_exhaustive` `Error` enum. See
+  `crates/eggup-core/CHANGELOG.md`.
+
+- Archive audit fixes (unpublished): Windows device-name validation accepted
+  `COM0`/`LPT0` and the reserved console names `CONIN$`, `CONOUT$`, `CLOCK$`;
+  `residue_path()` could report a non-empty root as cleaned. See
+  `crates/eggup-archive/CHANGELOG.md`.
+
+- Eggfetch audit fixes (unpublished): `block_on` could panic via `.expect()`
+  when a tokio runtime failed to build, and `TooLarge` could report
+  `limit: 0`. Both now surface as typed errors. See
+  `crates/eggup-eggfetch/CHANGELOG.md`.
+
+- Acquisition audit fixes (unpublished; **these two are M010's publication
+  payload**): public `FetchLimits` values are validated at every transport
+  boundary, and post-link temp cleanup failure can no longer report ordinary
+  failure after a complete destination exists. They are implemented and green
+  but not yet on the registry, so a consumer resolving `eggup-acquisition
+  0.1.2` does not have them.
 
 - Eggpack Interop M002 (published in `eggup-eggpack 0.1.2` on 2026-10-02; see the 0.1.2 section above): `eggup-eggpack` gains the archive
   extraction handoff (`archive_format_for_name`, `validate_acquired_archive`,

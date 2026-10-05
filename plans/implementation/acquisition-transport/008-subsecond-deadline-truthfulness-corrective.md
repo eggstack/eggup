@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 008 — Sub-Second Deadline Truthfulness Corrective
 
-Status: implemented; hosted closure qualification pending fresh full matrix
+Status: closed — hosted closure qualification complete via run `36222536670`; see `plans/closure/acquisition-transport/008-status.md`
 
 Repository baseline: `ea51fe12a7c9120028b727eb5e40411e9b10f8e2`
 

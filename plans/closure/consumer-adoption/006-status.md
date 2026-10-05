@@ -1,6 +1,6 @@
 # Consumer Adoption M006 — Execution Status
 
-Disposition: **closed** (consumer implementation landed in Egress; see M003-landed addendum below)
+Status: closed (consumer implementation landed in Egress; see M003-landed addendum below)
 
 Source plan: `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`
 

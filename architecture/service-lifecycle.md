@@ -64,11 +64,13 @@ eggup-service   ->  windows-args (=0.2.0)
   **Windows-target dependency**, so the Linux/macOS build never links it.
 - `windows-args` is cross-platform and is used for the SCM command-line parser,
   so the ownership tests in `windows_scm.rs` run on every host.
-- **The crate is unpublished.** It appears in no publication authorization;
-  `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
+- **The crate is published but lags the workspace.** It is on crates.io at
+  `0.1.0` and `0.1.1`; its `0.1.2` has never been published and no publication
+  milestone authorizes it, so the `Unreleased` section below is not on the
+  registry. `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
   `eggup-eggpack`, and `eggup-curl` are the published `0.1.2` set.
-  `eggup-service` and `eggup-transport-footprint` are outside every publication
-  authorization to date ([registry.md](../plans/registry.md)).
+  `eggup-transport-footprint` is `publish = false`
+  ([registry.md](../plans/registry.md)).
 - Dependency order position: 5th deepest in
   [overview.md's dependency graph](overview.md#dependency-graph). It is a leaf
   consumer of `eggup-core` and depends on nothing else in the workspace.

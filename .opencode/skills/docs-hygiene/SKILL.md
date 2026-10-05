@@ -24,6 +24,8 @@ Deep dive: [`architecture/tooling-governance.md`](../../../architecture/tooling-
 | Process, naming, templates | `plans/003-planning-process.md` + `plans/*/README.md` | skills |
 | Open work and blockers | `plans/registry.md` | roadmaps, skills |
 | Published versions | crates.io | any claim of "unpublished" |
+| Closure milestone status | `plans/closure/<subsystem>/NNN-status.md` `Status:` line | registry/roadmap status cells |
+| Per-crate release notes | `crates/*/CHANGELOG.md` | the root `CHANGELOG.md` as a *substitute* (it aggregates; it does not replace) |
 
 ## The chain to update when a fact changes
 
@@ -43,9 +45,10 @@ to stay correct.
 
 Each has occurred at least once — check for them explicitly:
 
-1. **CI lane understatement.** Windows runs four `cargo test` invocations, not
-   just `cargo check`. MSRV is compile-only. Never call `windows-check`
-   "compile-only".
+1. **CI lane understatement.** Windows runs six `cargo test` steps
+   (`ci.yml:48-53`), not just `cargo check`. MSRV is compile-only. Never call
+   `windows-check` "compile-only" — and count the steps, not the bullets: the
+   three named `eggup-service` tests are three steps, not one.
 2. **Publication status.** "Unpublished" is wrong for `eggup-service` — it is on
    crates.io at `0.1.0`/`0.1.1` while its `0.1.2` was never published. Check
    crates.io rather than inferring from a `publish = false` key or a plan.
@@ -62,9 +65,28 @@ Each has occurred at least once — check for them explicitly:
    roadmap. When adding a subsystem, add it to the index.
 7. **Falsified git claim.** A registry line asserted
    `git log A..HEAD -- crates/` was empty when it returned commits. Re-run the
-   command before repeating a state claim that depends on it.
+   command before repeating a state claim that depends on it — and re-run it
+   *again* after landing commits, because a docs-only commit that touches a
+   `crates/**/CHANGELOG.md` also appears in `-- crates/`.
 8. **Broken markdown tables.** Copy-pasting a row between tables of different
    arity silently drops cells. Check column counts.
+9. **Counting steps, not bullets.** A CI lane that runs three separately-named
+   tests is three steps, not one. `windows-check` is six `cargo test` steps
+   (`ci.yml:48-53`): one combined three-crate run, one eggpack run, three named
+   `eggup-service` tests, and `windows_scm::tests`. Count the `- run:` lines.
+10. **A quoted phrase that was never written.** A governance section attributed
+    a quoted comment to a skill file that did not contain it. When a doc quotes
+    another doc, `grep` the quoted string — a paraphrase presented as a
+    quotation is indistinguishable from drift once it is copied forward.
+11. **A closure record's `Status:` is not the registry's status.** M001c's
+    closure still reads `blocked` because its deferred half shipped *as M001d*.
+    The record is honest; the registry's "closed" framing was not. Keep the
+    original status line and append a dated addendum rather than rewriting
+    historical evidence.
+12. **A universal lint claim that has a binary-only exception.**
+    "`deny(missing_docs)`" is a crate-root attribute, not a workspace lint, so a
+    crate with no `lib.rs` has no `missing_docs` enforcement at all. State the
+    exception where the rule is stated.
 
 ## Reporting
 

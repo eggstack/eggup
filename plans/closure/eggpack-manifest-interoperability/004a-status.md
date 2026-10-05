@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability M004a — Closure Record
 
-Disposition: **closed** (readiness preflight complete 2026-10-01; M004 proper remains **blocked** on the proven prerequisites below — no publication occurred and none is authorized by this closure)
+Status: closed (readiness preflight complete 2026-10-01; at the time of writing, M004 proper remained **blocked** on the proven prerequisites below — no publication occurred and none is authorized by this closure; M004 has since closed, see `plans/closure/eggpack-manifest-interoperability/004-status.md`)
 
 Source plan: `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md`
 

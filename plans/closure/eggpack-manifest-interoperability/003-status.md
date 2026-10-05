@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability M003 — Closure Record
 
-Disposition: **closed** (real-consumer adoption landed and qualified 2026-10-01)
+Status: closed (real-consumer adoption landed and qualified 2026-10-01)
 
 Source plan: `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`
 

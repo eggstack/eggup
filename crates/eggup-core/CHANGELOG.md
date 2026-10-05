@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+Nothing in this section has been published. `0.1.2` remains the published
+baseline on crates.io, and no publication milestone authorizes these entries.
+The `Error::Injected` variant added below is a **breaking** change for pre-1.0
+consumers: an exhaustive `match` on the non-`#[non_exhaustive]` `Error` enum
+needs a new arm. No other consumer migration is required.
+
 Fixes from the workspace bug audit. No new features; dependency surface remains
 `sha2` only. Integrity evidence is still SHA-256 checksum only — no authenticity
 or signature claims.

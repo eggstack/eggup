@@ -84,17 +84,21 @@ Two consequences worth knowing before reviewing anything:
 
 ## Module map
 
-`LOC` is source lines; `tests` is the count of `#[test]` functions. Every crate
-carries `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]`.
+`LOC` is source lines; `tests` is the count of `#[test]` functions. All 7
+library crates carry `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]` on
+their crate root; `eggup-transport-footprint` is the exception — it is
+binary-only with no `lib.rs`, so it relies on the workspace lint table for
+`unsafe_code` and has no `missing_docs` enforcement
+([tooling-governance.md](tooling-governance.md) §3.4).
 
 | Module (crate) | Role | LOC / tests | Key capabilities | Deep dive |
 |---|---|---|---|---|
 | `eggup-core` | Policy-neutral local mechanics | 4748 / 50 | `InstallPlan` → `Prepared` → `Verified` → `Validated` → `Receipt`; SHA-256 integrity, bounded candidate execution, caller-proven `Absent \| Owned \| Foreign \| Unknown`, `MutationLock`, locked ownership + staged-digest revalidation, commit/rollback, `commit_with_post_commit` | [core-transaction.md](core-transaction.md) |
-| `eggup-acquisition` | Transport-neutral seam, fixtures, composition | 2182 / 38 | `AcquisitionRequest`, `FetchLimits` + `effective()` = `min(request, adapter)`, `CancelFlag`, `Success \| NotFound` vs hard failure (`Transport`/`Timeout`/`TooLarge`/`Cancelled`/`Io`/`Unavailable`), `AcquisitionTransport`, `FixtureTransport`, `ComposedTransport` + `CompositionPolicy`, exclusive 0600 temp + no-clobber promotion, URL redaction | [acquisition.md](acquisition.md) |
+| `eggup-acquisition` | Transport-neutral seam, fixtures, composition | 2182 / 38 | `AcquisitionRequest`, `FetchLimits` + `effective()` = `min(request, adapter)`, `CancelFlag`, `Success \| NotFound` vs hard failure (`InvalidInput`/`Transport`/`Timeout`/`TooLarge`/`Cancelled`/`Io`/`Unavailable`), `AcquisitionTransport`, `FixtureTransport`, `ComposedTransport` + `CompositionPolicy`, exclusive 0600 temp + no-clobber promotion, URL redaction | [acquisition.md](acquisition.md) |
 | `eggup-eggfetch` | Native HTTP adapter | 1231 / 25 | `EggfetchConfig::strict()` single policy point (timeout ceilings, redirect bound, explicit `ProxyDecision`, HTTP/1 + Rustls), status classification, streaming artifacts, sync-over-async bridge, category-only redacted errors | [eggfetch-adapter.md](eggfetch-adapter.md) |
 | `eggup-curl` | External curl adapter | 1672 / 24 | `CurlConfig::strict()` single policy point (explicit executable, opt-in PATH discovery, connect/total ceilings, redirect/protocol/proxy explicit, `--disable` against curlrc), direct-process execution with kill/reap, same-request HTTP status capture, private temp + no-clobber promotion | [curl-adapter.md](curl-adapter.md) |
 | `eggup-service` | Manager-neutral lifecycle | 10101 / 104 | `ServiceSpec` / `Ownership` / `LifecycleSnapshot`, `ServiceManager` + `TestDoubleManager`, `SystemExecutor` (allowlisted paths, cleared env, bounded I/O), `atomic_write_definition`, systemd / launchd / cron / Windows SCM adapters, `commit_with_lifecycle`, `UpdateRuntimeDisposition` + `plan_unix`/`plan_windows` + `DirectRuntimeControl` + `commit_with_disposition` | [service-lifecycle.md](service-lifecycle.md) |
-| `eggup-archive` | Bounded local archive extraction | 3512 / 51 | Explicit tar.gz/zip member allowlists, finite compressed/decompressed budgets, regular-file-only extraction, private root, no-clobber files, streamed SHA-256/size evidence, `ExtractedArchive` → `PersistedExtraction` → `BoundExtraction` handoff, `DirectoryGuard` cleanup | [archive-extraction.md](archive-extraction.md) |
+| `eggup-archive` | Bounded local archive extraction | 3512 / 51 | Explicit tar.gz/zip member allowlists, finite compressed/decompressed budgets, regular-file-only extraction, private root, no-clobber files, streamed SHA-256/size evidence, `ExtractedArchive` → `PersistedExtraction` → `BoundExtraction` handoff, internal `DirectoryGuard` cleanup | [archive-extraction.md](archive-extraction.md) |
 | `eggup-eggpack` | Optional Eggpack ReleaseManifest v1 adapter (leaf) | 849 / 63 | `project` / `project_json`, `bind_requests` (tightened byte caps), `default_destinations`, `materialize_artifact_set[_with_destinations]`, direct/bundle installable vs archive extraction-required, `core_plan_for_archive*`, `bind_archive_members`, `install_ids` | [eggpack-adapter.md](eggpack-adapter.md) |
 | `eggup-transport-footprint` | Non-published footprint fixtures | 45 / 0 | Three `required-features` binaries — `curl_only`, `eggfetch_only`, `dual` — that pin which transport stacks a consumer links; measures the cost of the transport choice | [transport-footprint.md](transport-footprint.md) |
 | tooling + governance | Workspace, verification, planning | — | `scripts/check-local.sh` (fmt/clippy/test/doc/tree), CI (stable, MSRV 1.89, macOS, Windows), workspace lints, `plans/` ADRs + subsystem roadmaps + closure records + registry, and the agent-facing surface (`AGENTS.md` + `.opencode/skills/`) | [tooling-governance.md](tooling-governance.md) |

@@ -39,8 +39,9 @@ only** — nothing in the script or CI fails when a boundary is crossed.
 | `macos` | macos-latest | full `cargo test`; the only macOS evidence |
 | `windows-check` | windows-latest | **runs tests**, then a workspace `cargo check` — see below |
 
-`windows-check` is *not* compile-only. It runs four `cargo test` invocations
-covering the platform-sensitive subset, then `cargo check --workspace --all-targets --locked`:
+`windows-check` is *not* compile-only. It runs six `cargo test` steps
+(`ci.yml:48-53`) covering the platform-sensitive subset, then
+`cargo check --workspace --all-targets --locked` (`ci.yml:54`):
 
 1. `cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl --locked`
 2. `cargo test -p eggup-eggpack --all-targets --all-features --locked`

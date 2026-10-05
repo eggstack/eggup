@@ -145,5 +145,21 @@ Archive M001/M001a/M001b, Acquisition M008, and all other closed milestones are 
 - Archive M001c: ready → blocked (Section 14 stop; implementation `09c953f`; continued by M001d).
 - Archive M001d: — → ready (new handle-backed handoff plan).
 - Consumer Adoption M006 Egress: blocked on M001c → blocked on M001d.
-- Eggpack Interoperability M002: blocked on M001c → blocked on M001d.
+- Eggpack Interoperability M002 archive handoff: blocked on M001c → blocked on M001d.
 - Planning/closure hygiene C005: ready (reconciles this updated graph; see its closure).
+
+## Status addendum (docs reconciliation)
+
+The `Status:` line above still reads `blocked`, and it was correct when written:
+M001c's own path-handoff half was not implemented, and the stop was discharged
+by a different milestone. `plans/closure/archive-extraction/001d-status.md:170`
+records that M001d closed the M001c write-authority handoff stop, and the M001d
+closure itself is `Status: closed`. The work M001c deferred is therefore
+complete, but it was completed *as M001d*, not as M001c.
+
+Read the status as: **M001c is a historical predecessor whose deferred handoff
+half shipped under M001d.** The original `blocked` finding is retained above as
+the evidence that was true at the time; this addendum is the only place that
+records the later transition, and it does not restate or soften the stop
+itself. The registry and the archive-extraction roadmap use the
+"historical predecessor; stop resolved by M001d" wording for the same reason.

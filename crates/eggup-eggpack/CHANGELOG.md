@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+Nothing in this section has been published. `0.1.2` remains the published
+baseline on crates.io, and no publication milestone authorizes these entries.
+No consumer migration is required — no public API changed, and correct
+declaration-order pairing is unaffected. Note that a published crate
+(`0.1.2`) carries the positional-binding defect fixed below, so a consumer
+resolving `eggup-eggpack 0.1.2` from crates.io does not have this fix until a
+new version is published.
+
 - **Security: archive members were bound positionally, with no identity
   cross-check.** `bind_archive_members` paired bound members to declared members
   by declaration order and checked only that the counts matched. A

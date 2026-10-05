@@ -50,7 +50,7 @@ eggup-acquisition ──▶ eggup-eggfetch        (transport adapters, no core d
         └──────────▶ eggup-curl
 
 eggup-core (sha2 only)
-   ├──▶ eggup-service      (manager-neutral lifecycle, unpublished)
+   ├──▶ eggup-service      (manager-neutral lifecycle; published, lagging)
    ├──▶ eggup-archive      (dev-dependency only, for qualification tests)
    └──▶ eggup-eggpack      (published leaf adapter; producer types live there)
 ```

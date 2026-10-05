@@ -242,7 +242,7 @@ M004's production change is the mechanical promotion M004a identified: remove `p
 
 `v0.1.1` and `v0.1.2` are immutable and are not moved. `git diff v0.1.2..HEAD -- crates/eggup-acquisition crates/eggup-eggfetch` is empty, so the two lower crates publish exactly the tagged content; `eggup-eggpack` has changed since that tag by M003a and is therefore not reproducible from it. Per the plan, the three crates are recorded by appending to the existing GitHub Release `0.1.2` notes, and each crates.io version carries its own exact publication commit in `.cargo_vcs_info.json`.
 
-Eggpack owes M004 nothing further; do not wait on it. `eggup-curl`, `eggup-service`, and `eggup-transport-footprint` stay unpublished, and Eggsact's Git→registry migration stays separately authorized in `eggstack/eggsact`.
+Eggpack owes M004 nothing further; do not wait on it. At the time of M004, `eggup-curl`, `eggup-service`, and `eggup-transport-footprint` were all unpublished; since then `eggup-curl 0.1.2` has been published (Acquisition M009, 2026-10-04), and `eggup-service` is published at `0.1.0`/`0.1.1` with its `0.1.2` still unauthorized, while `eggup-transport-footprint` remains `publish = false`. Eggsact's Git→registry migration stays separately authorized in `eggstack/eggsact`.
 
 ## 8. Cross-cutting requirements
 

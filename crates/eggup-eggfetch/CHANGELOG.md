@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+Nothing in this section has been published. `0.1.2` remains the published
+baseline on crates.io, and no publication milestone authorizes these entries.
+No consumer migration is required: no public API changed, and the
+previously-panicking `block_on` path now returns
+`AcquisitionError::Unavailable`, which is the error variant composition
+already had to handle.
+
 Fixes from the workspace bug audit; no API change. Composition and
 dual-transport behavior live in `eggup-acquisition` (`ComposedTransport`,
 `CompositionPolicy`) and `eggup-curl`; see those changelogs.

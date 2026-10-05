@@ -244,4 +244,4 @@ above are not reproducible, and a silent `Cargo.lock` update could change them.
 - [`tooling-governance.md`](tooling-governance.md) — the local gate and the CI
   matrix summarized in the coverage table above.
 - [`../plans/registry.md`](../plans/registry.md) — records the `publish = false`
-  decision and the published/unpublished status of every crate.
+  decision and the registry state of every crate.
