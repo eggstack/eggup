@@ -107,6 +107,13 @@ is no `cargo publish` step and no registry credential in
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml). Releases are manual,
 and published tags are never moved; release notes are extended instead.
 
+The published evidence for each milestone is a hosted CI run. Those run IDs,
+the tags, and the release records were checked against the GitHub API on
+**2026-10-05**: every run cited in `plans/` resolves and its head SHA matches
+the commit the closure record names, including the runs deliberately cited as
+failures. `v0.1.2` is an annotated tag pointing at `e8e07eb5`, the M009
+publication source, and GitHub releases `0.1.1` and `0.1.2` both exist.
+
 The full process, including dependency ordering and the evidence a publication
 milestone must record, is in
 [`architecture/tooling-governance.md`](../architecture/tooling-governance.md) §8.
