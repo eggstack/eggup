@@ -151,10 +151,26 @@ clean; it is the demonstration that caller evidence, not Core policy, decides.
 
 ## Hosted evidence
 
-Run `37367758362` on `95f7567` — see the "Verification status" section appended
-below once the run completes. The load-bearing item is the `windows-check` job:
-`self-replace::self_delete_at` and the mapped-image rename are the only
-substantively new Windows behaviour, and no macOS result can speak to them.
+Run `37370557872` on `689771f`, `windows-check` job, native Windows:
+
+| Fixture | Windows result |
+|---|---|
+| `self_update_child_replaces_its_own_running_image` | **passed** — the child-process harness replaces its own running image |
+| `keep_installed_leaves_the_new_generation_live` | **passed** — `self_replace::self_delete_at` scheduled deletion of the mapped old image and the new generation stayed live |
+| `rollback_restores_a_byte_identical_old_generation` | **passed** — renaming a running `.exe` aside and restoring it works |
+| `image_rewritten_in_place_is_detected_by_content_identity` | **passed** — the cross-platform SHA-256 binding catches an in-place rewrite |
+| `destination_replaced_after_binding_fails_closed` | **passed** — this was the failure that motivated the content binding |
+| `foreign_current_executable_is_never_replaced`, `wrong_candidate_digest_fails_before_mutation`, `ordinary_plans_keep_sibling_stage_placement` | **passed** |
+| `self_update_needs_no_authority_above_the_executable_directory`, `symlink_invocation_...`, `hard_linked_...` | not run — Unix-only by construction |
+
+This is exactly the evidence the plan required and that no macOS result could
+supply: the mapped-image rename, the deferred deletion, and the rollback of a
+running Windows executable are all confirmed natively.
+
+The same run also failed on `tests::bound_source_stages_open_object_after_root_rename`
+in the core lib (43 passed, 1 failed) — a pre-existing Windows portability gap in
+a fixture that had never run on Windows, exposed for the first time by turning
+this lane into a full `cargo test --workspace`. Fixed in `1c86ef0`.
 
 ## Residual risk
 
@@ -170,12 +186,11 @@ substantively new Windows behaviour, and no macOS result can speak to them.
    count while changing every byte, so only the content digest can catch it.
    This is the concrete payoff of the plan's requirement for native Windows
    execution — no amount of macOS-local evidence would have found it.
-2. **The Windows finalization path still has no green hosted run.** It is fixed
-   and the fixture is in place, but re-verification on the Windows lane has not
-   completed because of the GitHub Actions incident. If `self_delete_at` cannot
-   write its helper into the backup directory, finalization returns
-   `Error::RecoveryRequired` and a `RetainedForRecovery` receipt — a truthful
-   failure, not a silent one.
+2. **Resolved by the hosted Windows lane.** `self_delete_at` does write its
+   helper successfully and `keep_installed_leaves_the_new_generation_live` is
+   green natively, so this residual is retired. What remains is only whether the
+   workspace-wide Windows run is fully green, which is a CI matter rather than a
+   design one.
 3. **Windows has no hard-link refusal.** `nlink` is a Unix-only check. A
    hard-linked Windows image would be bound and replaced. A real difference from
    Unix behaviour, recorded rather than glossed.
