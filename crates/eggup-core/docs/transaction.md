@@ -32,8 +32,11 @@ receipt distinguishes `Committed`, `RolledBack`, and `RecoveryRequired`,
 reports whether restoration was verified, and always carries the triggering
 `FailureReport` (phase, member, category, bounded detail). Rollback failure
 additionally carries `rollback_failure` while preserving the original cause.
-`CleanupDisposition::{Cleaned, RetainedForRecovery}` describes temporary
-evidence only. `commit_with_post_commit` is the ADR-0002 boundary: after all
+`CleanupDisposition::{Cleaned, RetainedForRecovery, DeferredToProcessExit}`
+describes temporary evidence only. `DeferredToProcessExit` is reported only by a
+current-executable self-update kept installed on Windows: the previous generation
+is still mapped by this process, so its deletion is scheduled rather than
+performed, and nothing is stranded for an operator. `commit_with_post_commit` is the ADR-0002 boundary: after all
 members are live, its one caller check runs while the mutation lock and backup
 remain held. Success finalizes normally. On failure, `KeepInstalled` finalizes
 the backup and records `post_commit_failure` while retaining `Committed`;
@@ -48,8 +51,27 @@ implementation does not claim crash-safe journaling or literal filesystem-wide
 atomicity.
 
 Existing symlink, non-regular, hard-linked, or escaped destinations fail closed
-before backup. Lock records are bounded (4 KiB), owner-private (0600), and
-malformed, oversized, or ambiguous records are never auto-removed.
-`MutationLock::inspect` reports `Available | Held | Malformed` without
-deleting anything; stale removal requires manual operator action with
-deployment-specific process evidence.
+before backup.
+
+A program may replace the executable it is currently running through this same
+transaction model. `InstallPlan::for_current_executable` binds the canonical
+live image and plans `StagePlacement::InsideInstallationRoot`, so the private
+stage and the backup set stay inside the executable's own directory and no write
+authority above it is ever required. An invocation symlink is followed to its
+real target and never overwritten; a destination whose exact identity cannot be
+proven is refused. That identity is re-proved under the mutation lock and again
+immediately before the first live rename. The old generation is renamed aside
+rather than deleted, so it stays rollback-addressable until the caller's policy
+resolves.
+
+Lock records are bounded (4 KiB), owner-private (0600), and malformed, oversized,
+symlinked, non-regular, non-UTF-8, or otherwise ambiguous records are never
+auto-removed. `MutationLock::inspect` reports `Available | Held | Malformed`
+without deleting anything, and `MutationLock::acquire` never recovers a record.
+Stale recovery is opt-in per commit through `acquire_with_recovery` and a
+caller-supplied `StaleLockVerifier`: Core exposes a bounded `LockObservation` of
+one exact record and displaces it only on `StaleLockDecision::ProvenStale`,
+binding the authorization to that observation's exact bytes. Core decides no
+staleness from PID liveness, record age, executable name, or service state. A
+record replaced between observation and claim is never deleted, and a writer that
+creates the lock after the claim always wins.

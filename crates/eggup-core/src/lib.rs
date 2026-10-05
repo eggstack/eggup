@@ -15,6 +15,7 @@
 #![doc = "validator, ownership verifier, and receipt interpretation."]
 
 mod candidate;
+mod current_exe;
 mod domain;
 mod error;
 mod integrity;
@@ -26,17 +27,19 @@ pub use candidate::{
     run_bounded, AllValidators, CandidateValidator, CommandOutput, CommandSpec,
     CrossMemberAgreementValidator, ExactIdentityValidator, ValidatedTransaction,
 };
+pub use current_exe::CurrentExecutable;
 pub use domain::{
     AbsentOnlyVerifier, AbsentPolicy, ArtifactMember, ArtifactSet, BoundSources, CommitOwnership,
     ExactDigestVerifier, ExistingAsOwnedVerifier, FileKind, InstallPlan, IntegrityRequirement,
     MemberId, Ownership, OwnershipVerifier, PermissionsIntent, ProductId, ReleaseId,
+    StagePlacement,
 };
 pub use error::{Error, Result};
 pub use integrity::{
     hash_file, parse_sha256_sidecar, verify_file, IntegrityResult, IntegrityStatus, Sha256Manifest,
     VerifiedTransaction,
 };
-pub use lock::{LockStatus, MutationLock};
+pub use lock::{LockObservation, LockStatus, MutationLock, StaleLockDecision, StaleLockVerifier};
 pub use stage::PreparedTransaction;
 pub use transaction::{
     CleanupDisposition, FailureCategory, FailurePhase, FailureReport, PostCommitFailurePolicy,
@@ -999,6 +1002,72 @@ mod tests {
         assert!(install.path().join(".eggup-mutation.lock").exists());
         let recovery = receipt.recovery_path().unwrap();
         assert!(recovery.exists());
+        let _ = fs::remove_dir_all(recovery);
+        let _ = fs::remove_file(install.path().join(".eggup-mutation.lock"));
+    }
+
+    /// A self-update whose rollback cannot be completed reports
+    /// `RecoveryRequired` and retains the real old-image path, rather than
+    /// claiming a rollback it did not perform.
+    #[test]
+    fn self_update_rollback_failure_retains_the_real_old_image() {
+        use super::{hash_file, CurrentExecutable, IntegrityRequirement, StagePlacement};
+
+        let inputs = InstallationRoot::new().expect("inputs");
+        let install = InstallationRoot::new().expect("install");
+        let installed = install.path().join("app");
+        fs::write(&installed, b"old-generation").expect("install old");
+        let candidate = inputs
+            .write_file("candidate", b"new-generation")
+            .expect("candidate");
+
+        let current = CurrentExecutable::bind(&installed).expect("bind current executable");
+        let digest = hash_file(&candidate).expect("hash candidate");
+        let plan = InstallPlan::for_current_executable(
+            ProductId::new("app").unwrap(),
+            ReleaseId::new("r1").unwrap(),
+            &candidate,
+            &current,
+            IntegrityRequirement::Sha256(digest),
+        )
+        .expect("plan");
+        assert_eq!(
+            plan.stage_placement(),
+            StagePlacement::InsideInstallationRoot
+        );
+
+        let prepared = plan.prepare().expect("prepare");
+        let receipt = prepared
+            .verify_integrity()
+            .expect("verify")
+            .validate(&AllValidators::new())
+            .expect("validate")
+            .commit_with_post_commit_fault(
+                CommitOwnership::new(&FixedVerifier(Ownership::Owned), AbsentPolicy::DenyCreate),
+                PostCommitFailurePolicy::RollBack,
+                CommitFault::PostCommitRollback,
+            )
+            .expect("receipt");
+
+        assert_eq!(
+            receipt.disposition(),
+            TransactionDisposition::RecoveryRequired,
+            "an incomplete rollback is never reported as RolledBack"
+        );
+        assert!(!receipt.rollback_verified());
+        assert!(receipt.rollback_failure().is_some());
+        let recovery = receipt
+            .recovery_path()
+            .expect("the real retained path must be reported");
+        assert!(
+            recovery.exists(),
+            "reported recovery path must really exist"
+        );
+        assert!(
+            recovery.starts_with(fs::canonicalize(install.path()).expect("canonical install root")),
+            "recovery evidence stays inside the executable's own directory: {}",
+            recovery.display()
+        );
         let _ = fs::remove_dir_all(recovery);
         let _ = fs::remove_file(install.path().join(".eggup-mutation.lock"));
     }

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::domain::{AbsentPolicy, CommitOwnership, MemberId, Ownership};
+use crate::domain::{AbsentPolicy, CommitOwnership, InstallPlan, MemberId, Ownership};
 use crate::error::{Error, Result};
 use crate::integrity::hash_file;
 use crate::lock::MutationLock;
@@ -36,6 +36,15 @@ pub enum CleanupDisposition {
     Cleaned,
     /// Evidence was retained for an operator because cleanup was unsafe or failed.
     RetainedForRecovery,
+    /// Cleanup was safely arranged but cannot complete until this process exits.
+    ///
+    /// This is the truthful terminal state for a Windows self-update kept
+    /// installed: the new generation is live and the previous generation is
+    /// still mapped by this very process, so it cannot be unlinked yet. The old
+    /// image is owned and scheduled for deletion rather than abandoned, and no
+    /// operator action is required. It is never reported for an ordinary
+    /// multi-member transaction, where no artifact is still mapped.
+    DeferredToProcessExit,
 }
 
 /// Caller policy for a failed post-commit check.
@@ -103,6 +112,8 @@ pub enum FailureCategory {
     InvalidInput,
     /// The failure was injected by the test fault harness.
     Injected,
+    /// Transaction-owned evidence was retained and manual recovery is required.
+    RetainedEvidence,
     /// A caller-supplied post-commit check failed or panicked.
     PostCommitCheck,
 }
@@ -117,6 +128,7 @@ impl FailureCategory {
             Self::Filesystem => "filesystem",
             Self::InvalidInput => "invalid-input",
             Self::Injected => "injected",
+            Self::RetainedEvidence => "retained-evidence",
             Self::PostCommitCheck => "post-commit-check",
         }
     }
@@ -195,6 +207,10 @@ pub(crate) fn report_for_error(
         Error::VerificationFailed(m) => (FailureCategory::Verification, m.clone()),
         Error::CandidateExecution(m) => (FailureCategory::Verification, m.clone()),
         Error::Injected(m) => (FailureCategory::Injected, m.clone()),
+        Error::RecoveryRequired { evidence, detail } => (
+            FailureCategory::RetainedEvidence,
+            format!("{} at {}", detail, evidence.display()),
+        ),
         Error::InvalidInput(m) => (FailureCategory::InvalidInput, m.clone()),
         Error::UnknownMember(m) => (FailureCategory::InvalidInput, format!("unknown member {m}")),
         Error::Io { operation, source } => (
@@ -325,6 +341,7 @@ impl PreparedTransaction {
         verified_digests: &HashMap<MemberId, [u8; 32]>,
         fault: Option<CommitFault>,
         post_commit: Option<PostCommitCheck<'_>>,
+        stale_recovery: Option<&dyn crate::lock::StaleLockVerifier>,
     ) -> Result<TransactionReceipt> {
         if fault == Some(CommitFault::LockCreation) {
             return Err(Error::injected("injected lock creation failure"));
@@ -332,11 +349,22 @@ impl PreparedTransaction {
         // Preflight ownership classification before taking the lock so a
         // change between preflight and locked revalidation is detectable.
         let preflight = classify_all(&self, &ownership)?;
-        let mut lock = MutationLock::acquire(
-            self.plan.installation_root(),
-            self.plan.product(),
-            self.plan.release(),
-        )?;
+        let mut lock = match stale_recovery {
+            // Recovery is opt-in and never the default: a caller that supplies
+            // no proof keeps the fail-closed acquire that never displaces a
+            // record.
+            None => MutationLock::acquire(
+                self.plan.installation_root(),
+                self.plan.product(),
+                self.plan.release(),
+            ),
+            Some(verifier) => MutationLock::acquire_with_recovery(
+                self.plan.installation_root(),
+                self.plan.product(),
+                self.plan.release(),
+                verifier,
+            ),
+        }?;
         // Locked ownership revalidation: must match preflight and authorize
         // the intended mutation.
         if let Err(error) = revalidate_ownership_locked(&self, &ownership, &preflight) {
@@ -521,35 +549,56 @@ impl PreparedTransaction {
                 post_commit_failure,
             });
         }
-        if let Err(source) = fs::remove_dir_all(&backup_root) {
-            lock.preserve();
-            let error = Error::io("removing backup set after commit", source);
-            let report = report_for_error(FailurePhase::Finalize, None, &error);
-            return Ok(TransactionReceipt {
+        // Finalization is the only phase that discards the previous generation,
+        // so it is the only place a running image may be scheduled for removal.
+        // Reaching here means `KeepInstalled` already resolved and no rollback
+        // remains possible, which is exactly the precondition the platform
+        // helper requires.
+        match finalize_backup_set(&self.plan, &backup_root, &entries) {
+            Ok(FinalizeOutcome::Cleaned) => Ok(TransactionReceipt {
                 product: self.plan.product().clone(),
                 release: self.plan.release().clone(),
                 disposition: TransactionDisposition::Committed,
                 rollback_performed: false,
                 rollback_verified: false,
-                cleanup: CleanupDisposition::RetainedForRecovery,
-                recovery_path: Some(backup_root),
-                failure: Some(report),
+                cleanup: CleanupDisposition::Cleaned,
+                recovery_path: None,
+                failure: None,
                 rollback_failure: None,
                 post_commit_failure,
-            });
+            }),
+            Ok(FinalizeOutcome::Deferred) => Ok(TransactionReceipt {
+                product: self.plan.product().clone(),
+                release: self.plan.release().clone(),
+                disposition: TransactionDisposition::Committed,
+                rollback_performed: false,
+                rollback_verified: false,
+                cleanup: CleanupDisposition::DeferredToProcessExit,
+                // Nothing is retained for an operator: the old image is owned
+                // and scheduled for deletion when this process exits.
+                recovery_path: None,
+                failure: None,
+                rollback_failure: None,
+                post_commit_failure,
+            }),
+            Err(source) => {
+                lock.preserve();
+                let error = Error::io("removing backup set after commit", source);
+                let report = report_for_error(FailurePhase::Finalize, None, &error);
+                Ok(TransactionReceipt {
+                    product: self.plan.product().clone(),
+                    release: self.plan.release().clone(),
+                    disposition: TransactionDisposition::Committed,
+                    rollback_performed: false,
+                    rollback_verified: false,
+                    cleanup: CleanupDisposition::RetainedForRecovery,
+                    recovery_path: Some(backup_root),
+                    failure: Some(report),
+                    rollback_failure: None,
+                    post_commit_failure,
+                })
+            }
         }
-        Ok(TransactionReceipt {
-            product: self.plan.product().clone(),
-            release: self.plan.release().clone(),
-            disposition: TransactionDisposition::Committed,
-            rollback_performed: false,
-            rollback_verified: false,
-            cleanup: CleanupDisposition::Cleaned,
-            recovery_path: None,
-            failure: None,
-            rollback_failure: None,
-            post_commit_failure,
-        })
     }
 
     fn backup_members(
@@ -571,6 +620,12 @@ impl PreparedTransaction {
                 .destination(member.id())
                 .map_err(|e| (Some(member.id().clone()), e))?;
             revalidate_destination(&destination, self.plan.installation_root())
+                .map_err(|e| (Some(member.id().clone()), e))?;
+            // Last identity proof before the first live rename: the running
+            // image is moved aside here, and that rename is the point of no
+            // return for the previous generation.
+            self.plan
+                .revalidate_current_executable()
                 .map_err(|e| (Some(member.id().clone()), e))?;
             let backup = match fs::symlink_metadata(&destination) {
                 Ok(_) => {
@@ -624,6 +679,60 @@ fn classify_all(
     Ok(out)
 }
 
+/// How the previous generation could be discarded after a successful commit.
+#[cfg_attr(not(windows), allow(dead_code))]
+enum FinalizeOutcome {
+    /// Everything transaction-owned is gone.
+    Cleaned,
+    /// The old image is owned and scheduled for deletion after this process exits.
+    Deferred,
+}
+
+/// Discards the previous generation after the caller's policy has resolved.
+///
+/// For an ordinary transaction this is a plain recursive removal. For a
+/// self-update the previous generation is the image this very process is still
+/// executing: on Unix it can be unlinked immediately, but on Windows a mapped
+/// image cannot be deleted until the process exits. The old image has already
+/// been renamed to a transaction-owned path by the time this runs, so the
+/// platform helper can address it exactly — and it is only ever called here,
+/// after `KeepInstalled` has resolved and rollback is no longer possible.
+fn finalize_backup_set(
+    plan: &InstallPlan,
+    backup_root: &Path,
+    entries: &[BackupEntry],
+) -> std::io::Result<FinalizeOutcome> {
+    // Only a self-update plan can hold a still-mapped generation, and only its
+    // single member has a backup of the running image.
+    let running_image = plan
+        .current_executable()
+        .and_then(|_| entries.iter().find_map(|entry| entry.backup.clone()));
+    #[cfg(windows)]
+    if let Some(backup) = running_image {
+        // The image was renamed aside rather than deleted, which is what kept
+        // it rollback-addressable until this point. Scheduling its removal is
+        // irreversible, so it happens only once the policy decision is final.
+        self_replace::self_delete_at(&backup).map_err(|source| {
+            std::io::Error::other(format!(
+                "scheduling removal of the replaced running image: {source}"
+            ))
+        })?;
+        // The scheduled image still occupies its slot, so only an
+        // empty-parent removal is available until the process exits.
+        return match fs::remove_dir(backup_root) {
+            Ok(()) => Ok(FinalizeOutcome::Deferred),
+            Err(source) if source.kind() == std::io::ErrorKind::DirectoryNotEmpty => {
+                Ok(FinalizeOutcome::Deferred)
+            }
+            Err(source) => Err(source),
+        };
+    }
+    #[cfg(not(windows))]
+    let _ = running_image;
+    fs::remove_dir_all(backup_root)?;
+    Ok(FinalizeOutcome::Cleaned)
+}
+
 fn revalidate_ownership_locked(
     txn: &PreparedTransaction,
     ownership: &CommitOwnership<'_>,
@@ -653,6 +762,9 @@ fn revalidate_ownership_locked(
         require_ready_parent(&destination, txn.plan.installation_root())?;
         revalidate_destination(&destination, txn.plan.installation_root())?;
     }
+    // The bound current-executable object is re-proven under the same lock, so
+    // a swapped image between preflight and mutation is detected here too.
+    txn.plan.revalidate_current_executable()?;
     Ok(())
 }
 

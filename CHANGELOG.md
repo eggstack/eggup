@@ -116,11 +116,34 @@ claims are made by any of these crates.
 ## Unreleased
 
 The workspace-wide bug-audit fixes below are recorded here as well as in the
-per-crate changelogs, because they are **not** on the registry. Every crate
-still carries its published baseline: `0.1.2` for the six published crates,
-`0.1.1` for `eggup-service`. No publication milestone authorizes these entries,
-and the two acquisition fixes below are the specific payload of the open
-Acquisition M010 milestone (`eggup-acquisition 0.1.3`).
+per-crate changelogs, because they are **not** on the registry. Published
+baselines are `0.1.2` for all seven published crates. No publication milestone
+authorizes these entries yet, and the two acquisition fixes below are the
+specific payload of the open Acquisition M010 milestone
+(`eggup-acquisition 0.1.3`).
+
+- `eggup-core` gains current-executable transaction parity (Verified Update Core
+  M010): `CurrentExecutable` and `InstallPlan::for_current_executable` let a
+  program replace the executable it is running through the ordinary one-member
+  transaction model, with `StagePlacement::InsideInstallationRoot` so no write
+  authority above the executable's own directory is ever required. Exact image
+  identity is canonicalized and re-proved under the lock immediately before the
+  first live rename. New `CleanupDisposition::DeferredToProcessExit` reports
+  truthfully that a kept-installed Windows self-update still holds a mapped old
+  generation whose deletion is scheduled for process exit. `self-replace` is
+  added as a **Windows-only** dependency; the Unix/macOS graph is unchanged
+  (`sha2` only). The new `Error::RecoveryRequired` variant is breaking for an
+  exhaustive `match` on `Error`.
+
+- `eggup-core` gains proof-authorized stale-lock recovery (Verified Update Core
+  M011): `LockObservation`, `StaleLockDecision`, `StaleLockVerifier`, and
+  `MutationLock::acquire_with_recovery`. Core exposes a bounded observation of
+  one exact record and displaces it only when the caller's verifier returns
+  `ProvenStale`; PID liveness, age, and service state remain consumer policy.
+  Claiming re-reads, renames into a same-directory Eggup-owned claim path, and
+  re-verifies the claimed object before anything is created, so a replaced
+  record is never deleted and a competing writer always wins. The default
+  `MutationLock::acquire` remains fail-closed and never recovers.
 
 - Eggpack Interop audit fix — **security, in a published crate**
   (`eggup-eggpack`, unpublished here): archive members were bound

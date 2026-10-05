@@ -3,14 +3,82 @@
 ## Unreleased
 
 Nothing in this section has been published. `0.1.2` remains the published
-baseline on crates.io, and no publication milestone authorizes these entries.
-The `Error::Injected` variant added below is a **breaking** change for pre-1.0
+baseline on crates.io, and no publication milestone authorizes these entries yet.
+Two `Error` variants are added below — `Error::Injected` and
+`Error::RecoveryRequired` — which is a **breaking** change for pre-1.0
 consumers: an exhaustive `match` on the non-`#[non_exhaustive]` `Error` enum
-needs a new arm. No other consumer migration is required.
+needs a new arm for each. `CleanupDisposition` and `FailureCategory` are
+`#[non_exhaustive]`, so adding to those is additive.
 
-Fixes from the workspace bug audit. No new features; dependency surface remains
-`sha2` only. Integrity evidence is still SHA-256 checksum only — no authenticity
-or signature claims.
+Integrity evidence is still SHA-256 checksum only — no authenticity or
+signature claims. Self-update selects no release and infers no version.
+
+### Current-executable transaction parity
+
+- **Added: `CurrentExecutable` and `InstallPlan::for_current_executable`.** A
+  program can now replace the executable it is currently running through the
+  ordinary one-member transaction model, rather than needing a bespoke updater.
+  This is not a second state machine: preparation, integrity verification,
+  candidate validation, locked ownership revalidation, staged-digest
+  revalidation, commit, rollback, and the receipt are the existing ones.
+  `CurrentExecutable::resolve` / `bind` canonicalize the running image, so an
+  invocation through a symlink updates the real target and never overwrites the
+  link object. A destination whose exact identity cannot be proven — a symlink, a
+  directory, or a hard-linked image — is refused rather than replaced.
+- **Added: `StagePlacement`.** A self-update plans
+  `StagePlacement::InsideInstallationRoot`, so the private stage and the backup
+  set both live inside the executable's own directory. A self-updater therefore
+  needs write authority where its executable lives and never in that directory's
+  parent. Ordinary plans keep `StagePlacement::SiblingOfInstallationRoot` and
+  are unchanged; `InstallPlan::stage_placement` exposes which one applies.
+- **Added: `CleanupDisposition::DeferredToProcessExit`.** After a `KeepInstalled`
+  self-update on Windows, the previous generation is still mapped by this very
+  process and cannot be unlinked. It has already been renamed to a
+  transaction-owned path, so it stays rollback-addressable until the caller's
+  policy resolves; only then is its deletion scheduled for process exit. The
+  receipt reports this distinctly rather than calling it either cleaned or
+  stranded, and never reports it for an ordinary multi-member transaction.
+- **Added (breaking, pre-1.0): `Error::RecoveryRequired`.** Carries the real
+  retained evidence path when a transaction-owned artifact cannot be resolved
+  automatically, plus `FailureCategory::RetainedEvidence`.
+- The bound executable identity is re-proved under the mutation lock and again
+  immediately before the first live rename, so an image swapped in between
+  fails closed before anything is moved.
+- Dependency impact: `eggup-core` gains exactly one dependency,
+  `self-replace`, under `[target.'cfg(windows)'.dependencies]`. The Unix and
+  macOS dependency graphs are unchanged (`sha2` only). The helper is called only
+  after `KeepInstalled` has resolved and rollback is no longer possible; a
+  direct `self_replace()` of the running image is never used, because that would
+  hide the old generation before Eggup's own `RollBack` decision.
+
+### Proof-authorized stale-lock recovery
+
+- **Added: `LockObservation`, `StaleLockDecision`, `StaleLockVerifier`, and
+  `MutationLock::acquire_with_recovery`.** Stale-lock recovery is now possible,
+  but Core never decides staleness: it exposes a bounded, typed observation of
+  one exact record and performs the mutation only when the caller's verifier
+  returns `ProvenStale`. `Active` and `Unknown` retain the record and return
+  contention. PID liveness, record age, executable name, and service state stay
+  consumer policy; Core consults none of them.
+- **Unchanged: `MutationLock::acquire` remains fail-closed** and never recovers a
+  record, and `MutationLock::inspect` remains read-only and unchanged.
+  Recovery is opt-in through `ValidatedTransaction::commit_with_stale_lock_recovery`
+  or `commit_with_post_commit_and_stale_lock_recovery`; existing commit methods
+  keep their exact signatures and semantics.
+- Claiming is race-safe without unsafe code: the record is re-read, renamed into
+  a unique Eggup-owned same-directory claim path, and the claimed object is
+  re-read and required to still equal the authorized observation before
+  anything is created. A record that changed in between is never deleted. If
+  another writer creates the lock after the claim, that writer wins and its
+  record is never removed.
+- Malformed, oversized, symlinked, non-regular, non-UTF-8, and unreadable
+  records never reach destructive recovery. An unrecognised record format stays
+  observable and byte-identifiable but reports no parsed fields, so a caller
+  needing fields cannot prove staleness from it.
+- No process-enumeration dependency enters Core, and a crash after moving a
+  record to a claim path is never treated as permission to delete it later.
+
+### Workspace bug audit fixes
 
 - **Fixed (breaking, pre-1.0): bound-source staging dropped the executable bit.**
   `stage_bound_source` creates a fresh owner-private staged file and hardcodes

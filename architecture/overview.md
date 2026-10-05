@@ -93,7 +93,7 @@ binary-only with no `lib.rs`, so it relies on the workspace lint table for
 
 | Module (crate) | Role | LOC / tests | Key capabilities | Deep dive |
 |---|---|---|---|---|
-| `eggup-core` | Policy-neutral local mechanics | 4748 / 50 | `InstallPlan` → `Prepared` → `Verified` → `Validated` → `Receipt`; SHA-256 integrity, bounded candidate execution, caller-proven `Absent \| Owned \| Foreign \| Unknown`, `MutationLock`, locked ownership + staged-digest revalidation, commit/rollback, `commit_with_post_commit` | [core-transaction.md](core-transaction.md) |
+| `eggup-core` | Policy-neutral local mechanics | 5650 / 54 | `InstallPlan` → `Prepared` → `Verified` → `Validated` → `Receipt`; SHA-256 integrity, bounded candidate execution, caller-proven `Absent \| Owned \| Foreign \| Unknown`, `MutationLock` + opt-in `StaleLockVerifier` recovery, locked ownership + staged-digest revalidation, commit/rollback, `commit_with_post_commit`, `InstallPlan::for_current_executable` self-update | [core-transaction.md](core-transaction.md) |
 | `eggup-acquisition` | Transport-neutral seam, fixtures, composition | 2182 / 38 | `AcquisitionRequest`, `FetchLimits` + `effective()` = `min(request, adapter)`, `CancelFlag`, `Success \| NotFound` vs hard failure (`InvalidInput`/`Transport`/`Timeout`/`TooLarge`/`Cancelled`/`Io`/`Unavailable`), `AcquisitionTransport`, `FixtureTransport`, `ComposedTransport` + `CompositionPolicy`, exclusive 0600 temp + no-clobber promotion, URL redaction | [acquisition.md](acquisition.md) |
 | `eggup-eggfetch` | Native HTTP adapter | 1231 / 25 | `EggfetchConfig::strict()` single policy point (timeout ceilings, redirect bound, explicit `ProxyDecision`, HTTP/1 + Rustls), status classification, streaming artifacts, sync-over-async bridge, category-only redacted errors | [eggfetch-adapter.md](eggfetch-adapter.md) |
 | `eggup-curl` | External curl adapter | 1672 / 24 | `CurlConfig::strict()` single policy point (explicit executable, opt-in PATH discovery, connect/total ceilings, redirect/protocol/proxy explicit, `--disable` against curlrc), direct-process execution with kill/reap, same-request HTTP status capture, private temp + no-clobber promotion | [curl-adapter.md](curl-adapter.md) |
@@ -106,8 +106,10 @@ binary-only with no `lib.rs`, so it relies on the workspace lint table for
 ### Source layout inside the larger crates
 
 - `eggup-core` — `lib.rs` (state machine, facade) + `domain.rs`, `candidate.rs`,
-  `transaction.rs`, `stage.rs`, `integrity.rs`, `lock.rs`, `error.rs`,
-  `test_support.rs`; five runnable `examples/`.
+  `transaction.rs`, `stage.rs`, `current_exe.rs`, `integrity.rs`, `lock.rs`,
+  `error.rs`, `test_support.rs`; six runnable `examples/` plus two integration
+  test files (`current_executable.rs`, `stale_lock_recovery.rs`) that drive real
+  running-image replacement and real lock races.
 - `eggup-service` — `lib.rs` (neutral model + Unix mechanics),
   `disposition.rs` (M006 runtime-authority barrier), `lifecycle_update.rs`
   (definition writing + `commit_with_lifecycle`), `windows_scm.rs` (native SCM).
@@ -159,7 +161,7 @@ invariant, not just the function.
 | SHA-256 is **integrity evidence only**; no authenticity or signature claim | Keeps the core usable without a trust root it cannot verify | workspace-wide; stated in every crate's crate docs |
 | `Owned` is **never inferred** — it is caller-proven via `OwnershipVerifier` | Prevents clobbering a foreign install | `eggup-core` `commit`; `eggup-service` `require_owned` |
 | Foreign / Unknown / flapping ownership **fails closed with a receipt**, not an `Err` | Callers get structured recovery evidence; only lock contention and setup failures are `Err` | `eggup-core` commit/rollback |
-| Core never creates live destination parents, never deletes stale locks | Avoids unrequested mutation of live install locations | `eggup-core`; `MutationLock::inspect` is read-only |
+| Core never creates live destination parents, and never *decides* that a lock is stale | Avoids unrequested mutation of live install locations | `eggup-core`; `MutationLock::inspect` is read-only and `acquire` never recovers. Recovery is opt-in per commit through a caller-supplied `StaleLockVerifier`, and displaces only the exact observed record |
 | Staging is owner-private: `0700` dirs, `0600` files | Other local users cannot read or race the transaction | `eggup-core` stage; `eggup-acquisition` temp helpers |
 | No-clobber promotion everywhere bytes land | A partial write never becomes the live artifact | `eggup-acquisition`; `eggup-archive`; `eggup-service` |
 | Timeouts are **ceilings**, resolved `min(request, adapter)` | No layer can invent a longer budget than another set | `FetchLimits::effective`, `EggfetchConfig`, `CurlConfig` |

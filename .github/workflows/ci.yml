@@ -51,4 +51,9 @@ jobs:
       - run: cargo test -p eggup-service --lib service_errors_output_and_permission_remediation_stay_utf8_bounded --locked
       - run: cargo test -p eggup-service --lib lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free --locked
       - run: cargo test -p eggup-service --lib windows_scm::tests --locked
-      - run: cargo check --workspace --all-targets --locked
+      # Core self-update and stale-lock fixtures exercise real running-image and
+      # filesystem-race behaviour, so they run natively here rather than only
+      # being compiled.
+      - run: cargo test -p eggup-core --test current_executable --locked
+      - run: cargo test -p eggup-core --test stale_lock_recovery --locked
+      - run: cargo test --workspace --all-targets --locked

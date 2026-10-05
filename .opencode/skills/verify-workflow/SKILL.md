@@ -37,11 +37,11 @@ only** — nothing in the script or CI fails when a boundary is crossed.
 | `stable` | ubuntu | fmt + clippy + full `cargo test` + `cargo doc`; the only lane running clippy, fmt, and doc |
 | `msrv` | ubuntu, pinned `1.89.0` | `cargo check --workspace --all-targets --locked` — compile-only, no clippy, no tests |
 | `macos` | macos-latest | full `cargo test`; the only macOS evidence |
-| `windows-check` | windows-latest | **runs tests**, then a workspace `cargo check` — see below |
+| `windows-check` | windows-latest | **runs tests**, ending in a full `cargo test --workspace --all-targets` — see below |
 
-`windows-check` is *not* compile-only. It runs six `cargo test` steps
-(`ci.yml:48-53`) covering the platform-sensitive subset, then
-`cargo check --workspace --all-targets --locked` (`ci.yml:54`):
+`windows-check` is *not* compile-only, and it is no longer a curated subset. It
+runs the platform-sensitive steps, then the two Core fixture files, then the
+whole workspace:
 
 1. `cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl --locked`
 2. `cargo test -p eggup-eggpack --all-targets --all-features --locked`
@@ -50,9 +50,18 @@ only** — nothing in the script or CI fails when a boundary is crossed.
    `service_errors_output_and_permission_remediation_stay_utf8_bounded`,
    `lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free`)
 4. `cargo test -p eggup-service --lib windows_scm::tests --locked`
+5. `cargo test -p eggup-core --test current_executable --locked` — replaces a
+   real running Windows image from a child process, both `KeepInstalled` and
+   `RollBack`. A Windows claim about self-update is **only** evidenced here.
+6. `cargo test -p eggup-core --test stale_lock_recovery --locked` — exercises
+   the claim/race fixtures natively; `rename` semantics differ per platform, so
+   compile-only evidence is not sufficient for M011.
+7. `cargo test --workspace --all-targets --locked`
 
-A full `cargo test --workspace` is deliberately *not* run on Windows; crates with
-no Windows-specific behavior are covered by the closing workspace `cargo check`.
+Step 7 exists because the per-crate steps cannot catch a regression in an
+untargeted crate. If a new Core milestone adds platform-dependent filesystem or
+running-image behaviour, add its fixture here — a local macOS pass says nothing
+about Windows.
 
 ## Known coverage gaps — check these before claiming evidence
 
@@ -63,8 +72,9 @@ no Windows-specific behavior are covered by the closing workspace `cargo check`.
   build non-default features.
 - clippy and fmt run on Linux only — a `#[cfg(windows)]` or `#[cfg(target_os = "macos")]`
   clippy violation is caught by no lane.
-- Windows test coverage is the curated subset above; a Windows failure in an
-  untargeted crate's tests would not be observed.
+- `macos` is the only lane that runs `cargo test` with `--all-features`, and
+  `windows-check` omits it; a feature-gated Windows-only path would not be
+  observed.
 
 ## Reporting
 

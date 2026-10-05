@@ -3,6 +3,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::path::{Component, Path, PathBuf};
 
+use crate::current_exe::CurrentExecutable;
 use crate::error::{Error, Result};
 use crate::stage::{PreparedTransaction, Stage};
 
@@ -80,6 +81,9 @@ fn validate_identifier(kind: &str, value: String) -> Result<String> {
     }
     Ok(value)
 }
+
+/// The stable member identity used by [`InstallPlan::for_current_executable`].
+const CURRENT_EXECUTABLE_MEMBER: &str = "executable";
 
 /// The file kind expected for an artifact member.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -442,6 +446,25 @@ impl BoundSources {
     }
 }
 
+/// Where transaction-owned staging state is created for a plan.
+///
+/// The distinction is an authority boundary, not a convenience: staging
+/// placement decides which directory a caller must be able to write in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum StagePlacement {
+    /// A private, unpredictable directory beside the installation root.
+    ///
+    /// Requires write authority in the installation root's **parent**.
+    SiblingOfInstallationRoot,
+    /// A private, unpredictable directory inside the installation root itself.
+    ///
+    /// Requires write authority in the installation root only. This is what
+    /// [`InstallPlan::for_current_executable`] uses so that replacing the
+    /// running executable never needs authority above its own directory.
+    InsideInstallationRoot,
+}
+
 /// An explicit installation root and a coherent artifact set ready for private preparation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstallPlan {
@@ -449,6 +472,8 @@ pub struct InstallPlan {
     release: ReleaseId,
     installation_root: PathBuf,
     artifacts: ArtifactSet,
+    placement: StagePlacement,
+    current_executable: Option<CurrentExecutable>,
 }
 
 impl InstallPlan {
@@ -459,7 +484,24 @@ impl InstallPlan {
         installation_root: impl Into<PathBuf>,
         artifacts: ArtifactSet,
     ) -> Result<Self> {
-        let installation_root = installation_root.into();
+        Self::build(
+            product,
+            release,
+            installation_root.into(),
+            artifacts,
+            StagePlacement::SiblingOfInstallationRoot,
+            None,
+        )
+    }
+
+    fn build(
+        product: ProductId,
+        release: ReleaseId,
+        installation_root: PathBuf,
+        artifacts: ArtifactSet,
+        placement: StagePlacement,
+        current_executable: Option<CurrentExecutable>,
+    ) -> Result<Self> {
         validate_installation_root(&installation_root)?;
         let canonical_root = fs::canonicalize(&installation_root)
             .map_err(|source| Error::io("canonicalizing installation root", source))?;
@@ -478,7 +520,70 @@ impl InstallPlan {
             release,
             installation_root,
             artifacts,
+            placement,
+            current_executable,
         })
+    }
+
+    /// Builds a one-member plan that replaces the executable currently running.
+    ///
+    /// This is an ordinary [`InstallPlan`], not a second transaction model: it
+    /// advances through exactly the same prepared/verified/validated/receipt
+    /// path as any other one-member plan, and its terminal contract is the same
+    /// [`crate::TransactionReceipt`]. The only differences are authority and
+    /// identity:
+    ///
+    /// - The installation root is the executable's own directory, and staging is
+    ///   [`StagePlacement::InsideInstallationRoot`], so the transaction needs
+    ///   write authority in that directory and nowhere above it.
+    /// - The single destination is the canonical live image, so an invocation
+    ///   symlink is followed to its real target instead of being overwritten.
+    /// - The bound executable identity is re-proved immediately before mutation.
+    ///
+    /// The candidate must be a local path outside the executable's directory,
+    /// exactly as for any other member. Nothing here selects a release, infers a
+    /// version, or reads product identity from the executable: `product`,
+    /// `release`, and `integrity` are all caller-supplied.
+    pub fn for_current_executable(
+        product: ProductId,
+        release: ReleaseId,
+        candidate: impl Into<PathBuf>,
+        current: &CurrentExecutable,
+        integrity: IntegrityRequirement,
+    ) -> Result<Self> {
+        let member = ArtifactMember::new(
+            MemberId::new(CURRENT_EXECUTABLE_MEMBER)?,
+            candidate,
+            current.destination_name(),
+        )?
+        .with_permissions(PermissionsIntent::Executable)
+        .with_integrity(integrity);
+        let artifacts = ArtifactSet::single(member)?;
+        Self::build(
+            product,
+            release,
+            current.installation_root().to_path_buf(),
+            artifacts,
+            StagePlacement::InsideInstallationRoot,
+            Some(current.clone()),
+        )
+    }
+
+    /// Returns where this plan creates its private staging state.
+    pub fn stage_placement(&self) -> StagePlacement {
+        self.placement
+    }
+
+    /// Returns the bound current executable when this plan replaces one.
+    pub fn current_executable(&self) -> Option<&CurrentExecutable> {
+        self.current_executable.as_ref()
+    }
+
+    pub(crate) fn revalidate_current_executable(&self) -> Result<()> {
+        match &self.current_executable {
+            Some(current) => current.revalidate(),
+            None => Ok(()),
+        }
     }
 
     /// Returns the consumer-owned product identity.

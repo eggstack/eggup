@@ -35,9 +35,9 @@ Two further self-imposed constraints are worth stating because they are easy to 
 in review:
 
 - Core never creates a live destination parent. `require_ready_parent`
-  (`transaction.rs:791`) only *checks* that the parent exists, is a real directory, and
+  (`transaction.rs:903`) only *checks* that the parent exists, is a real directory, and
   is not a symlink. Directory creation happens exclusively inside the stage
-  (`stage.rs:72-82`) and the backup root (`transaction.rs:718`).
+  (`stage.rs:76-86`) and the backup root (`transaction.rs:830`).
 - Core never makes a timeout, retry, or crash-durability promise of its own. The only
   timeout is the caller-supplied one in `CommandSpec::timeout`
   (`candidate.rs:64`, default 5s at `candidate.rs:14`).
@@ -72,23 +72,23 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 | --- | --- | --- |
 | `ProductId` | Validated product identity; rejects empty and control-character input only | `domain.rs:11`, `domain.rs:15` |
 | `ReleaseId` | Validated release identity, same character rules | `domain.rs:33`, `domain.rs:37` |
-| `MemberId` | Validated per-artifact identity inside a set | `domain.rs:55`, `domain.rs:59` |
-| `FileKind` | Source file classification; only `Regular` today, `#[non_exhaustive]` | `domain.rs:87` |
-| `PermissionsIntent` | `Preserve` / `Executable` staged-file mode intent, `#[non_exhaustive]` | `domain.rs:99` |
-| `Ownership` | `Absent` / `Owned` / `Foreign` / `Unknown` | `domain.rs:112` |
-| `IntegrityRequirement` | `None` / `Sha256([u8; 32])`; only `Sha256` members are commit-capable, `#[non_exhaustive]` | `domain.rs:130` |
-| `OwnershipVerifier` | Caller-implemented ownership proof trait | `domain.rs:147` |
-| `AbsentPolicy` | `AllowCreate` / `DenyCreate` for `Ownership::Absent` destinations | `domain.rs:158` |
-| `CommitOwnership<'a>` | Verifier + absent policy pair passed to `commit` | `domain.rs:168`, `domain.rs:177` |
-| `ArtifactMember` | One `(id, source, relative destination)` triple plus mode/digest intent | `domain.rs:281` |
-| `ArtifactSet` | Ordered, duplicate-free member collection; the mutation unit | `domain.rs:357` |
-| `BoundSources` | Pre-opened `MemberId -> File` map for the object-bound prepare path | `domain.rs:418` |
-| `InstallPlan` | Product + release + root + set; entry point | `domain.rs:447` |
+| `MemberId` | Validated per-artifact identity inside a set | `domain.rs:56`, `domain.rs:60` |
+| `FileKind` | Source file classification; only `Regular` today, `#[non_exhaustive]` | `domain.rs:91` |
+| `PermissionsIntent` | `Preserve` / `Executable` staged-file mode intent, `#[non_exhaustive]` | `domain.rs:103` |
+| `Ownership` | `Absent` / `Owned` / `Foreign` / `Unknown` | `domain.rs:116` |
+| `IntegrityRequirement` | `None` / `Sha256([u8; 32])`; only `Sha256` members are commit-capable, `#[non_exhaustive]` | `domain.rs:134` |
+| `OwnershipVerifier` | Caller-implemented ownership proof trait | `domain.rs:151` |
+| `AbsentPolicy` | `AllowCreate` / `DenyCreate` for `Ownership::Absent` destinations | `domain.rs:162` |
+| `CommitOwnership<'a>` | Verifier + absent policy pair passed to `commit` | `domain.rs:172`, `domain.rs:177` |
+| `ArtifactMember` | One `(id, source, relative destination)` triple plus mode/digest intent | `domain.rs:285` |
+| `ArtifactSet` | Ordered, duplicate-free member collection; the mutation unit | `domain.rs:361` |
+| `BoundSources` | Pre-opened `MemberId -> File` map for the object-bound prepare path | `domain.rs:422` |
+| `InstallPlan` | Product + release + root + set; entry point | `domain.rs:470` |
 | `Result<T>` | `core::Result<T> = Result<T, Error>` | `error.rs:5` |
 | `Error` | The only non-receipt failure channel | `error.rs:9` |
-| `AbsentOnlyVerifier` | `Absent` when missing, `Foreign` when anything exists, `Unknown` on other errors; never authorizes replacement | `domain.rs:194`, `domain.rs:196` |
-| `ExistingAsOwnedVerifier` | `Owned` only for an existing **regular file**; directories/links/FIFOs are `Foreign` (test/example helper) | `domain.rs:213`, `domain.rs:215` |
-| `ExactDigestVerifier` | Verifier that proves `Owned` by exact prior content digest | `domain.rs:232` |
+| `AbsentOnlyVerifier` | `Absent` when missing, `Foreign` when anything exists, `Unknown` on other errors; never authorizes replacement | `domain.rs:198`, `domain.rs:196` |
+| `ExistingAsOwnedVerifier` | `Owned` only for an existing **regular file**; directories/links/FIFOs are `Foreign` (test/example helper) | `domain.rs:217`, `domain.rs:215` |
+| `ExactDigestVerifier` | Verifier that proves `Owned` by exact prior content digest | `domain.rs:236` |
 
 ### Integrity (`integrity.rs`)
 
@@ -106,7 +106,7 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 
 | Export | Role | Ref |
 | --- | --- | --- |
-| `PreparedTransaction` | Stage-backed plan; exposes `staged_path` for external inspection | `stage.rs:147` |
+| `PreparedTransaction` | Stage-backed plan; exposes `staged_path` for external inspection | `stage.rs:148` |
 
 ### Candidate execution (`candidate.rs`)
 
@@ -125,7 +125,7 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 
 | Export | Role | Ref |
 | --- | --- | --- |
-| `MutationLock` | Create-new lock record owning one installation domain | `lock.rs:44`, `lock.rs:53` |
+| `MutationLock` | Create-new lock record owning one installation domain | `lock.rs:193`, `lock.rs:205` |
 | `LockStatus` | `Available` / `Held` / `Malformed`, from the read-only inspector | `lock.rs:15` |
 
 ### Transaction and receipts (`transaction.rs`)
@@ -134,11 +134,11 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 | --- | --- | --- |
 | `TransactionDisposition` | `Committed` / `RolledBack` / `RecoveryRequired` | `transaction.rs:19` |
 | `CleanupDisposition` | `Cleaned` / `RetainedForRecovery` | `transaction.rs:34` |
-| `PostCommitFailurePolicy` | `KeepInstalled` / `RollBack` | `transaction.rs:43` |
-| `FailurePhase` | `Lock`, `Ownership`, `StageRevalidation`, `Backup`, `Commit`, `PostCommit`, `Rollback`, `Finalize` | `transaction.rs:55` |
-| `FailureCategory` | `LockContention`, `OwnershipConflict`, `Verification`, `Filesystem`, `InvalidInput`, `Injected`, `PostCommitCheck` | `transaction.rs:93` |
-| `FailureReport` | Phase + category + optional member + bounded (≤512 B) core-authored detail | `transaction.rs:127` |
-| `TransactionReceipt` | The terminal artifact: disposition, rollback facts, cleanup, recovery path, up to three reports | `transaction.rs:210` |
+| `PostCommitFailurePolicy` | `KeepInstalled` / `RollBack` | `transaction.rs:52` |
+| `FailurePhase` | `Lock`, `Ownership`, `StageRevalidation`, `Backup`, `Commit`, `PostCommit`, `Rollback`, `Finalize` | `transaction.rs:64` |
+| `FailureCategory` | `LockContention`, `OwnershipConflict`, `Verification`, `Filesystem`, `InvalidInput`, `Injected`, `PostCommitCheck` | `transaction.rs:102` |
+| `FailureReport` | Phase + category + optional member + bounded (≤512 B) core-authored detail | `transaction.rs:139` |
+| `TransactionReceipt` | The terminal artifact: disposition, rollback facts, cleanup, recovery path, up to three reports | `transaction.rs:226` |
 
 `TransactionReceipt` accessors are all read-only: `disposition` (`transaction.rs:235`),
 `rollback_performed` (`transaction.rs:240`), `rollback_verified` (`transaction.rs:252`),
@@ -157,7 +157,7 @@ must still handle it.
 ```text
                           prepare()                      verify_integrity()
   InstallPlan  ──────────────────────────▶ PreparedTransaction ─────────────────────▶ VerifiedTransaction
-  domain.rs:447                              stage.rs:147                           integrity.rs:164
+  domain.rs:470                              stage.rs:148                           integrity.rs:164
                                                 │                                       │
                                                 │                              validate(&dyn CandidateValidator)
                                                 ▼                                       ▼
@@ -172,40 +172,42 @@ must still handle it.
                                                 TransactionReceipt
                                              Committed | RolledBack | RecoveryRequired
 
-  internal commit phases (transaction.rs:322 commit_inner), all under MutationLock:
+  internal commit phases (transaction.rs:338 commit_inner), all under MutationLock:
     preflight classify (ownership, first call)  ──▶ under-lock revalidate
       (ownership 2nd call + staged digests)     ──▶ backup (per member)
       ──▶ commit loop (per member rename)       ──▶ [optional post-commit check]
       ──▶ finish: finalize or rollback          ──▶ receipt
 ```
 
-### `InstallPlan` — `domain.rs:447`
+### `InstallPlan` — `domain.rs:470`
 
 - **Proves**: nothing about the files. It is a validated declaration: identifier
   character rules, relative destination normalization, duplicate normalized-destination
   rejection, source `FileKind::Regular` and not-a-symlink, destination containment
-  inside the root (`domain.rs:456`, `domain.rs:545`, `domain.rs:557`,
-  `domain.rs:594`).
+  inside the root (`domain.rs:456`, `domain.rs:545`, `domain.rs:567`,
+  `domain.rs:604`).
 - **Durable**: nothing. No filesystem mutation has occurred.
 - **Can still fail**: everything downstream.
 - **Advances via**: `prepare()` (`domain.rs:515`) or `prepare_with_bound_sources()`
-  (`domain.rs:532`).
+  (`domain.rs:617`).
 
-### `PreparedTransaction` — `stage.rs:147`
+### `PreparedTransaction` — `stage.rs:148`
 
 - **Proves**: that every member was copied from a proven source into an
   owner-private stage owned by this process. `DestinationConflict` from a foreign
-  file in the stage fails closed (`stage.rs:196-208` on `Drop`, and the create-new
-  directory at `stage.rs:232`). No destination has been read, written, or even stat'ed
+  file in the stage fails closed (`stage.rs:192-209` on `Drop`, and the create-new
+  directory at `stage.rs:249`). No destination has been read, written, or even stat'ed
   for existence beyond what the plan already validated.
-- **Durable**: a private stage directory in the **parent** of the installation root
-  (`stage.rs:214-231`), named `.eggup-stage-{root}-{pid}-{seq}-{nanos}`, one
-  subdirectory per member destination, each file narrowed to `0600`/`0700` on Unix
-  (`stage.rs:294-305`).
+- **Durable**: a private stage directory named `.eggup-stage-{root}-{pid}-{seq}-{nanos}`,
+  one subdirectory per member destination, each file narrowed to `0600`/`0700` on Unix
+  (`stage.rs:299-325`). *Where* it is created is a per-plan authority decision, not a
+  constant — see [`StagePlacement`](#stageplacement-and-current-executable-authority)
+  below. Ordinary plans stage in the **parent** of the installation root
+  (`StagePlacement::SiblingOfInstallationRoot`).
 - **Can still fail**: copy, digest mismatch, candidate execution, ownership,
   contention, and every commit-phase failure.
 - **Advances via**: `PreparedTransaction::verify_integrity` (`integrity.rs:171`),
-  which consumes `self`; or `commit_inner` (`transaction.rs:322`) only as an internal
+  which consumes `self`; or `commit_inner` (`transaction.rs:338`) only as an internal
   fast path exercised through the test-only fault seams.
 
 ### `VerifiedTransaction` — `integrity.rs:164`
@@ -215,7 +217,7 @@ must still handle it.
   `verified_digests` (`integrity.rs:241`).
 - **Durable**: same as `PreparedTransaction`, plus the digest evidence.
 - **Can still fail**: the *same* member can fail again later — `revalidate_staged_under_lock`
-  (`transaction.rs:659`) re-reads and re-hashes each staged file under the lock, so
+  (`transaction.rs:771`) re-reads and re-hashes each staged file under the lock, so
   staged-byte mutation between verify and commit is caught before any live mutation.
 - **Advances via**: `ValidatedTransaction::validate` (`candidate.rs:412`).
 
@@ -235,7 +237,7 @@ must still handle it.
 - **Advances via**: `commit` (`candidate.rs:449`) or `commit_with_post_commit`
   (`candidate.rs:465`).
 
-### `TransactionReceipt` — `transaction.rs:210`
+### `TransactionReceipt` — `transaction.rs:226`
 
 - **Proves**: the terminal disposition plus what happened to the live generation,
   the backup, the lock, and the failure. There is no further mutation; receipts are
@@ -249,10 +251,10 @@ must still handle it.
 
 ### `ArtifactSet` and `Member`
 
-An `ArtifactSet` (`domain.rs:357`) is an ordered, duplicate-keyed collection of
-`ArtifactMember` (`domain.rs:281`). Each member carries an id, an absolute or relative
+An `ArtifactSet` (`domain.rs:361`) is an ordered, duplicate-keyed collection of
+`ArtifactMember` (`domain.rs:285`). Each member carries an id, an absolute or relative
 **source** path, and a **relative destination**. `InstallPlan::new` normalizes every
-destination through `normalize_relative_path` (`domain.rs:594`) and rejects duplicates
+destination through `normalize_relative_path` (`domain.rs:604`) and rejects duplicates
 *after* normalization, so `bin/app` and `./bin/app` cannot both be members.
 
 The set is the mutation unit. Multi-member commit is all-or-nothing: `backup_members`
@@ -263,7 +265,7 @@ property rather than a per-file outcome.
 
 ### Digest and size evidence
 
-`IntegrityRequirement` has one variant today, `Sha256(Digest)` (`domain.rs:130`).
+`IntegrityRequirement` has one variant today, `Sha256(Digest)` (`domain.rs:134`).
 `verify_file` (`integrity.rs:117`) hashes local bytes and checks `FileKind::Regular`; it
 returns `IntegrityResult` with status and observed digest. `parse_sha256_sidecar`
 (`integrity.rs:83`) is a strict two-token parser, not a general `sha256sum` dialect
@@ -283,12 +285,12 @@ artifact-integrity claim.
 
 ### `OwnershipVerifier`
 
-`OwnershipVerifier` (`domain.rs:147`) is a single-method trait,
+`OwnershipVerifier` (`domain.rs:151`) is a single-method trait,
 `verify(&MemberId, &Path) -> Ownership`. Core never infers `Owned`: it is whatever the
 caller returns. The shipped verifiers are deliberately unequal in power —
-`ExistingAsOwnedVerifier` (`domain.rs:213`) is a fixture-grade trust-everything
-verifier, `ExactDigestVerifier` (`domain.rs:232`) proves ownership by prior content, and
-`AbsentOnlyVerifier` (`domain.rs:194`) can never authorize replacement.
+`ExistingAsOwnedVerifier` (`domain.rs:217`) is a fixture-grade trust-everything
+verifier, `ExactDigestVerifier` (`domain.rs:236`) proves ownership by prior content, and
+`AbsentOnlyVerifier` (`domain.rs:198`) can never authorize replacement.
 
 The trait doc (`domain.rs:139-142`) requires a deterministic answer for fixed filesystem
 state. That is load-bearing: `classify_all` (`transaction.rs:612`) and
@@ -317,19 +319,94 @@ shows the intended shape.
 
 ### `MutationLock` and `LockStatus`
 
-`MutationLock::acquire` (`lock.rs:53`) creates `<installation_root>/.eggup-mutation.lock`
-with `create_new` (`lock.rs:66-69`). That single syscall is the entire mutual-exclusion
+`MutationLock::acquire` (`lock.rs:205`) creates `<installation_root>/.eggup-mutation.lock`
+with `create_new` (`lock.rs:377-380`). That single syscall is the entire mutual-exclusion
 mechanism: no advisory flock, no PID liveness probe, no heartbeat, no expiry. The record
 is a bounded text token `pid=… nonce=… product=… release=…` capped at 4096 bytes
-(`lock.rs:11`, `lock.rs:63`).
+(`lock.rs:11`, `lock.rs:220`).
 
-`MutationLock::inspect` (`lock.rs:100`) is read-only and returns `LockStatus::Available`,
-`Held`, or `Malformed`. It never removes anything, and neither does anything else in the
-crate: a stale lock blocks forever until an operator removes it, by design.
+`MutationLock::inspect` (`lock.rs:321`) is read-only and returns `LockStatus::Available`,
+`Held`, or `Malformed`. It is unchanged and still never removes anything.
 
-`Drop` (`lock.rs:141`) removes the record only if it is still a regular file whose bytes
+`MutationLock::acquire` is likewise unchanged: it never recovers, so a crashed updater's
+record still blocks until something else resolves it. What changed is that "something else"
+can now be the caller, deliberately — see
+[`Proof-authorized stale-lock recovery`](#proof-authorized-stale-lock-recovery).
+
+`Drop` (`lock.rs:423`) removes the record only if it is still a regular file whose bytes
 equal this process's token, so a lock that was replaced or rewritten by someone else is
 left alone.
+
+### Proof-authorized stale-lock recovery
+
+Recovery exists, but it is **not** something Core decides. The default acquire still never
+displaces a record; a caller must opt in per commit by supplying a `StaleLockVerifier`.
+
+The split is between **authorization** and **mechanism**:
+
+- **Authorization** is `StaleLockDecision` (`lock.rs:156`), returned by the caller's
+  `StaleLockVerifier::classify` (`lock.rs:175`) for one `LockObservation`
+  (`lock.rs:44`). Only `ProvenStale` authorizes anything; `Active` and `Unknown` retain the
+  record and return contention.
+- **Mechanism** is Core's `MutationLock::acquire_with_recovery` (`lock.rs:234`), which
+  decides *how* a proven-stale record is displaced safely.
+
+`LockObservation` carries only what Core can prove: the path, the exact bounded record
+bytes, and whatever the known format yields (`pid`, `nonce`, `product`, `release`, all
+`Option`, plus `format_known`). Core deliberately supplies **no** process-liveness, age,
+executable, or service fact, because none of those is universal proof — a pid is reused.
+An unrecognised record format stays observable and byte-identifiable but reports no parsed
+field, so a caller that needs fields cannot prove staleness from it.
+
+Claiming is race-safe without unsafe code (`claim` at `lock.rs:403`):
+
+1. create-new; on `AlreadyExists`, observe within bounds (`observe`, `lock.rs:302`);
+2. ask the caller's verifier about that one observation;
+3. on `ProvenStale` only, re-read the record's exact bytes and file kind immediately
+   before displacing it — a changed record is never deleted;
+4. `rename` the pathname into a unique Eggup-owned claim path **in the same directory**
+   (`claim_path`, `lock.rs:447`), so the move is a same-filesystem rename;
+5. re-read the *claimed object* and require it to still equal the authorized observation;
+6. create-new the real lock, and only then delete the claimed record.
+
+A record that is malformed, oversized, symlinked, non-regular, non-UTF-8, or unreadable
+never reaches step 4. If the claimed object turns out not to be the authorized one, the
+displacement is undone when the lock path is still free (`restore_claim`, `lock.rs:494`);
+otherwise the displaced record stays where it is and `Error::RecoveryRequired` reports its
+real retained path. A writer that creates the lock after the claim simply wins: its record
+is never removed, and this caller's displaced record is cleaned up or reported
+(`remove_claim`, `lock.rs:516`).
+
+There is no unbounded retry loop, and a crash after a record reaches a claim path is never
+treated as permission to delete it later.
+
+### `StagePlacement` and current-executable authority
+
+`StagePlacement` (`domain.rs:455`) is an authority boundary expressed in the type. For an
+ordinary plan, staging in the installation root's *parent* is fine and is what
+`SiblingOfInstallationRoot` means. For a self-update it is not: a program replacing its own
+executable should need write permission only in the directory that executable already
+lives in.
+
+`InstallPlan::for_current_executable` (`domain.rs:547`) therefore plans
+`InsideInstallationRoot`, so the private stage and the backup set both stay inside that one
+directory. `CurrentExecutable` (`current_exe.rs:13`) canonicalizes the running image, so an
+invocation through a symlink updates the real target and never overwrites the link object,
+and refuses any destination whose identity it cannot prove (symlink, directory, or
+hard-linked image). That identity — device and inode on Unix — is re-proved under the
+mutation lock and again immediately before the first live rename, so an image swapped in
+between fails closed before anything is moved.
+
+This is the ordinary one-member transaction, not a second state machine: preparation,
+verification, validation, commit, rollback, and the receipt are the same ones.
+
+The one genuinely platform-specific consequence is finalization. On Unix the previous
+generation can be unlinked immediately. On Windows it is still mapped by this very process,
+so after `KeepInstalled` resolves — the only point at which rollback is no longer possible
+— `finalize_backup_set` (`transaction.rs:700`) schedules its removal and the receipt reports
+`CleanupDisposition::DeferredToProcessExit` rather than claiming it was cleaned. The
+Windows-only `self-replace` dependency exists solely for that call; the Unix and macOS
+dependency graphs are unchanged.
 
 ### Receipts and the receipt status variants
 
@@ -346,17 +423,17 @@ A receipt combines three orthogonal status axes plus up to three reports:
 | | `rollback_verified` | Whether every member was re-checked after restoration, including a second containment pass. |
 
 `recovery_path` (`transaction.rs:268`) is always the actual backup root returned by
-`create_backup_directory` (`transaction.rs:718`), never a constructed string; the test
+`create_backup_directory` (`transaction.rs:830`), never a constructed string; the test
 `cleanup_failure_reports_real_backup_root` (`lib.rs:1510`) pins this.
 
 ## 6. Control flow, step by step
 
 ### prepare — `stage.rs:20` / `stage.rs:24`
 
-1. `create_stage_directory` (`stage.rs:212`) requires a parent of the installation root
+1. `create_stage_directory` (`stage.rs:213`) requires a parent of the installation root
    and creates `.eggup-stage-{root}-{pid}-{seq}-{nanos}` there with `create_dir`
-   (`stage.rs:232`), then chmods `0700` on Unix. Up to 32 name collisions are retried.
-2. For each member, `copy_members` (`stage.rs:63`) creates the member's subdirectory
+   (`stage.rs:249`), then chmods `0700` on Unix. Up to 32 name collisions are retried.
+2. For each member, `copy_members` (`stage.rs:64`) creates the member's subdirectory
    under the stage and chmods it `0700`. This is the only place directories are created.
 3. The source is either an already-open `BoundSources` handle (`stage_bound_source`,
    `stage.rs:120`) or a pathname copy (`stage.rs:96`).
@@ -387,7 +464,7 @@ because no live mutation and no backup exist yet. The observed digests are retai
 2. Otherwise run the validator. Any error propagates unchanged, so validators keep full
    control of their error variants. The number of validators is not itself gated.
 
-### commit — `candidate.rs:449` → `transaction.rs:322`
+### commit — `candidate.rs:449` → `transaction.rs:338`
 
 `commit_inner` runs strictly in this order:
 
@@ -395,7 +472,7 @@ because no live mutation and no backup exist yet. The observed digests are retai
    failure return `Err` here, before any mutation.
 2. **Preflight classification** — `classify_all` (`transaction.rs:612`) calls the
    verifier once per member and checks parent readiness (`require_ready_parent`,
-   `transaction.rs:791`: parent must exist, be a real directory, and not be a symlink).
+   `transaction.rs:903`: parent must exist, be a real directory, and not be a symlink).
    Failure here produces a `RolledBack` receipt with `rollback_performed == false`.
 3. **Under-lock revalidation** — `revalidate_ownership_locked` (`transaction.rs:627`)
    calls the verifier a **second** time and compares with the preflight answer, then
@@ -403,12 +480,12 @@ because no live mutation and no backup exist yet. The observed digests are retai
    on a non-regular or hard-linked (`nlink > 1`) destination. Any difference, or a
    `Foreign`/`Unknown` answer, or `Absent` under `DenyCreate`, yields a `RolledBack`
    receipt with no mutation performed.
-4. **Staged revalidation** — `revalidate_staged_under_lock` (`transaction.rs:659`)
+4. **Staged revalidation** — `revalidate_staged_under_lock` (`transaction.rs:771`)
    re-resolves each staged path, requires a regular non-hard-linked file, requires a
    recorded verified digest, and **re-hashes the bytes**, comparing against that
    recorded digest. This is what catches a staged file replaced between `validate`
    and commit.
-5. **Backup** — `create_backup_directory` (`transaction.rs:718`) creates
+5. **Backup** — `create_backup_directory` (`transaction.rs:830`) creates
    `.eggup-backup-{root}-{pid}-{nonce}-{nanos}` **inside the installation root** and
    chmods the backup root `0700` on Unix (`transaction.rs:735`), retrying up to 32 name
    collisions. `backup_members` (`transaction.rs:555`) then, per member, re-runs
@@ -499,12 +576,12 @@ rollback_verified == true`.
 | 1 | Unverified bytes never execute | `candidate.rs:413-420` (every member must be `IntegrityStatus::Verified`; `NotRequired` is rejected) | `Err(VerificationFailed)`; no candidate is spawned |
 | 2 | No live mutation before every member is backed up | `transaction.rs:555-609` must complete for all members before `transaction.rs:407` starts | `Err`/`Receipt` from backup; rollback restores untouched state |
 | 3 | `Owned` is never inferred; ownership is caller-proven and checked twice | `classify_all` (`transaction.rs:612`) and `revalidate_ownership_locked` (`transaction.rs:627`) | Flap, `Foreign`, `Unknown`, or `Absent`+`DenyCreate` → `RolledBack` receipt, zero mutation |
-| 4 | Staged bytes are re-verified under the lock | `revalidate_staged_under_lock` (`transaction.rs:659`) re-hashes against the digest recorded at verify time | `RolledBack` receipt, `StageRevalidation`, zero live mutation |
-| 5 | Destinations are never symlinks or hard links, and live parents are never created | `revalidate_destination` (`transaction.rs:746-789`, canonicalizes the root and the nearest existing ancestor), `require_ready_parent` (`transaction.rs:791-830`) | `RolledBack` receipt, `Filesystem`/`OwnershipConflict`; **no** directory is created |
-| 6 | Destinations stay inside the installation root | `normalize_relative_path` + `InstallPlan::new` (`domain.rs:545`, `domain.rs:594`); re-checked per member during backup and per member in `restore_entries` | `Err(InvalidInput)` at plan time; `rollback_verified == false` → `RecoveryRequired` |
+| 4 | Staged bytes are re-verified under the lock | `revalidate_staged_under_lock` (`transaction.rs:771`) re-hashes against the digest recorded at verify time | `RolledBack` receipt, `StageRevalidation`, zero live mutation |
+| 5 | Destinations are never symlinks or hard links, and live parents are never created | `revalidate_destination` (`transaction.rs:746-789`, canonicalizes the root and the nearest existing ancestor), `require_ready_parent` (`transaction.rs:903-830`) | `RolledBack` receipt, `Filesystem`/`OwnershipConflict`; **no** directory is created |
+| 6 | Destinations stay inside the installation root | `normalize_relative_path` + `InstallPlan::new` (`domain.rs:545`, `domain.rs:604`); re-checked per member during backup and per member in `restore_entries` | `Err(InvalidInput)` at plan time; `rollback_verified == false` → `RecoveryRequired` |
 | 7 | Transaction-owned state is owner-private on Unix | `0700` on the stage dir (`stage.rs:237`), stage subdirs (`stage.rs:80`), and the backup root (`transaction.rs:735`); `0600` on staged files (`stage.rs:300`) and the lock record (`lock.rs:84`) | Permissions are best-effort `set_permissions` calls whose errors are discarded with `let _ =`; a failure is not surfaced |
 | 7a | The backup set is not widened | The backup is a `rename` of the live file (`transaction.rs:586`), so a backed-up file keeps its **original** mode inside the `0700` backup root. Core does not re-narrow it, and the intermediate backup subdirectories are not chmod'd (`transaction.rs:579`) | No error path; the `0700` root is the only containment |
-| 8 | Core never removes a lock it does not own, and never inspects destructively | `lock.rs:141` (`Drop` compares token bytes), `lock.rs:100` (`inspect` is read-only) | A foreign lock is left in place; a stale lock blocks all later commits with `Err(UpdateInProgress)` |
+| 8 | Core never removes a lock it does not own, and never inspects destructively | `lock.rs:423` (`Drop` compares token bytes), `lock.rs:321` (`inspect` is read-only) | A foreign lock is left in place; a stale lock blocks all later commits with `Err(UpdateInProgress)` |
 | 9 | Rollback is verified, not assumed | Two-pass `restore_entries` + second containment pass (`transaction.rs:902-913`) | `RecoveryRequired` receipt, real `recovery_path`, lock preserved |
 | 10 | Crashes are never claimed to be recovered | Nothing — no journal, no replay | Process death leaves stage, backup, and possibly the lock on disk; recovery is operator work via the receipt and the backup |
 
@@ -521,7 +598,7 @@ Invariants 7 and part of 5 are **Unix-only in implementation**:
   Windows hardening claim, and `crates/eggup-core/docs/domain.md:11` states the
   permission behavior without this qualification.
 - The `0600`/`0700` mode is also applied **after** the object is created — the stage
-  directory at `stage.rs:232-238`, the backup root at `transaction.rs:730-736`, the
+  directory at `stage.rs:249-238`, the backup root at `transaction.rs:730-736`, the
   lock record after the token is written at `lock.rs:77-85`. There is therefore a brief
   window in which the object carries umask-derived permissions rather than the private
   mode. For the stage this window opens before any staged bytes are copied, which limits
@@ -547,7 +624,7 @@ This is the central review artifact. Two rules govern the whole table:
 
 | Condition | Outcome | Caller obligation | Ref |
 | --- | --- | --- | --- |
-| Invalid identifier, escaping or duplicate normalized destination, bad installation root, non-regular/symlinked source | `Err(InvalidInput)` | Fix the declaration; nothing was touched | `domain.rs:456`, `domain.rs:545`, `domain.rs:557` |
+| Invalid identifier, escaping or duplicate normalized destination, bad installation root, non-regular/symlinked source | `Err(InvalidInput)` | Fix the declaration; nothing was touched | `domain.rs:456`, `domain.rs:545`, `domain.rs:567` |
 | Stage directory cannot be created or 32 names collide | `Err(Io)` / `Err(InvalidInput)` | Ensure the **parent** of the install root is writable | `stage.rs:242`, `stage.rs:245` |
 | Stage member copy fails, or injected `StageCreate`/`StageCopy` | `Err(Io)` / `Err(Injected)` | Stage is removed; safe to retry | `stage.rs:52-55`, `stage.rs:318` |
 | `BoundSources` entry for a non-member | `Err(InvalidInput)` | Producer/consumer key mismatch; fix the map | `stage.rs:56-59` |
@@ -556,15 +633,15 @@ This is the central review artifact. Two rules govern the whole table:
 | Validator returns an error, or `run_bounded` times out / truncates output | `Err(<validator's variant>)`, typically `CandidateExecution` | Handle validator error variants | `candidate.rs:421`, `candidate.rs:320` |
 | `run_bounded` spawn/poll failure | `Err(Io)` | Environment problem; nothing was committed | `candidate.rs:141`, `candidate.rs:182` |
 | Lock record already present (including stale or malformed) | `Err(UpdateInProgress { lock })` | Inspect with `MutationLock::inspect`; a stale lock needs manual operator removal | `lock.rs:70-72` |
-| Lock token exceeds 4096 bytes, or lock write fails | `Err(InvalidInput)` / `Err(Io)` (lock file removed on write failure) | Shorten identifiers | `lock.rs:63`, `lock.rs:77-80` |
+| Lock token exceeds 4096 bytes, or lock write fails | `Err(InvalidInput)` / `Err(Io)` (lock file removed on write failure) | Shorten identifiers | `lock.rs:220`, `lock.rs:77-80` |
 | Injected `LockCreation` (test seam) | `Err(Injected)` | Proves the pre-lock path performs zero mutation | `transaction.rs:329` |
 | Destination resolution fails during preflight | `Err(UnknownMember)` | Unreachable for plan-built members; treat as a core bug if seen | `transaction.rs:334` |
 | Ownership `Foreign` or `Unknown` | **Receipt** `RolledBack`, `rollback_performed=false`, `rollback_verified=true`, `Cleaned`, `failure` phase `Ownership` | Treat as refused; do not retry without new ownership evidence | `transaction.rs:342-346` |
 | Ownership `Absent` with `DenyCreate` | **Receipt** `RolledBack`, same shape | Authorize creation explicitly or do not retry | `transaction.rs:642-648` |
 | Ownership answer differs between preflight and under-lock (flap) | **Receipt** `RolledBack`, zero mutation | Make the verifier deterministic; investigate the writer | `transaction.rs:637-641` |
-| Missing or symlinked live parent | **Receipt** `RolledBack`, zero mutation; **no directory created** | Create the parent yourself, then retry | `transaction.rs:791-815` |
+| Missing or symlinked live parent | **Receipt** `RolledBack`, zero mutation; **no directory created** | Create the parent yourself, then retry | `transaction.rs:903-815` |
 | Destination is a symlink or hard link (`nlink > 1`) at preflight or at backup | **Receipt** `RolledBack`, zero live mutation | Resolve the link; core will not follow or clobber it | `transaction.rs:746-786` |
-| Staged member missing, non-regular, hard-linked, lacks a verified digest, or digest changed under the lock | **Receipt** `RolledBack`, `StageRevalidation`, zero live mutation | Re-prepare; the stage was tampered with | `transaction.rs:349-352`, `transaction.rs:659` |
+| Staged member missing, non-regular, hard-linked, lacks a verified digest, or digest changed under the lock | **Receipt** `RolledBack`, `StageRevalidation`, zero live mutation | Re-prepare; the stage was tampered with | `transaction.rs:349-352`, `transaction.rs:771` |
 | Backup directory creation fails | **Receipt** `RolledBack`, phase `Backup`, `rollback_performed=false` | Fix install-root writability | `transaction.rs:353-359` |
 | Per-member backup rename fails (injected `CommitFault::Backup` or real I/O) | **Receipt** `RolledBack` if restore verified, else `RecoveryRequired` | Read `rollback_failure` and `recovery_path` | `transaction.rs:361-368`, `transaction.rs:563` |
 | Any commit-loop error: destination resolution, `require_ready_parent`, staged resolution, or `fs::rename` | **Receipt** `RolledBack` (all old members restored, members that were absent removed) or `RecoveryRequired` | Never assume partial success; branch on disposition | `transaction.rs:369-444` |
@@ -575,7 +652,7 @@ This is the central review artifact. Two rules govern the whole table:
 | Restore cannot restore a member, or a post-rollback re-check finds an inconsistency | **Receipt** `RecoveryRequired`, `rollback_performed=true`, real `recovery_path`, **lock preserved** | Operator intervention; core will not retry or clean up | `transaction.rs:986-998` |
 | Restore verified but backup removal fails | **Receipt** `RolledBack`, `rollback_verified=true`, `RetainedForRecovery` | Old generation is live; backup remains as evidence | `transaction.rs:969-983` |
 | Process death, power loss, or kill at any point | No receipt; stage/backup/lock may remain | Out of scope by design. Use receipts and backups; there is no crash journal | `crates/eggup-core/docs/transaction.md:44-45` |
-| Stale lock from a dead process | `Err(UpdateInProgress)` forever | Manual removal only; `inspect` will not delete it | `lock.rs:70`, `lock.rs:100` |
+| Stale lock from a dead process | `Err(UpdateInProgress)` forever | Manual removal only; `inspect` will not delete it | `lock.rs:70`, `lock.rs:321` |
 
 ### Reading a receipt safely
 
@@ -599,8 +676,8 @@ What concurrent callers observe:
 | Scenario | Observable |
 | --- | --- |
 | Two Eggup commits, same root, no stale lock | First commits; second gets `Err(UpdateInProgress { lock })` at `transaction.rs:335`, before any mutation |
-| Stale lock from a crashed process | Every later commit gets `Err(UpdateInProgress)` indefinitely. `MutationLock::inspect` (`lock.rs:100`) reports `Malformed`/`Held` but never removes it |
-| Lock record replaced by a third party mid-transaction | `Drop` (`lock.rs:141`) refuses to remove it because the token bytes differ; the foreign file survives |
+| Stale lock from a crashed process | Every later commit gets `Err(UpdateInProgress)` indefinitely. `MutationLock::inspect` (`lock.rs:321`) reports `Malformed`/`Held` but never removes it |
+| Lock record replaced by a third party mid-transaction | `Drop` (`lock.rs:423`) refuses to remove it because the token bytes differ; the foreign file survives |
 | Two Eggup commits, different roots | Fully independent; stage and backup names embed pid, an atomic counter, and a timestamp (`stage.rs:223-231`, `transaction.rs:12`) |
 | Two transactions in one process, same root | Serialized the same way; the in-process atomic nonce prevents lock-token collision |
 

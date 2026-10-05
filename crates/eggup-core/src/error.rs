@@ -32,6 +32,17 @@ pub enum Error {
     VerificationFailed(String),
     /// Candidate execution could not produce an accepted bounded result.
     CandidateExecution(String),
+    /// A partial recovery left Eggup-owned evidence that could not be resolved
+    /// automatically.
+    ///
+    /// `evidence` always names real retained bytes on disk. This is never
+    /// reported as a successful acquisition or a completed transaction.
+    RecoveryRequired {
+        /// Real, retained Eggup-owned evidence an operator must inspect.
+        evidence: std::path::PathBuf,
+        /// Bounded human-readable detail.
+        detail: String,
+    },
     /// A failure deliberately produced by the built-in test fault harness.
     ///
     /// This variant exists so fault injection is identified structurally,
@@ -83,6 +94,11 @@ impl fmt::Display for Error {
             Self::Injected(message) => {
                 write!(formatter, "injected failure: {message}")
             }
+            Self::RecoveryRequired { evidence, detail } => write!(
+                formatter,
+                "recovery evidence retained at {}: {detail}",
+                evidence.display()
+            ),
         }
     }
 }
@@ -98,6 +114,7 @@ impl std::error::Error for Error {
             | Self::VerificationFailed(_)
             | Self::CandidateExecution(_)
             | Self::Injected(_) => None,
+            Self::RecoveryRequired { .. } => None,
         }
     }
 }

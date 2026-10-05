@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M009 closed; M010/M011 ready substrate correctives; 0.1.2 core/archive pair published to crates.io
+Status: active; M001-M011 closed; 0.1.2 core/archive pair published to crates.io; M010/M011 substrate correctives implemented in the working tree and awaiting an `eggup-core 0.1.3` publication milestone
 
 Long-term references:
 
@@ -172,9 +172,9 @@ M008 core/archive consumer package qualification [CLOSED via M008a]
                     v
 M009 core/archive 0.1.2 publication [CLOSED 2026-09-28]
         |
-        +--> M010 current-executable transaction parity [READY]
+        +--> M010 current-executable transaction parity [CLOSED]
         |
-        `--> M011 proof-authorized stale-lock recovery [READY]
+        `--> M011 proof-authorized stale-lock recovery [CLOSED]
 
 M010 + M011 closures
         |
@@ -458,5 +458,5 @@ is qualified.
 | M008 | closed with clean package evidence (M008a); publication gate satisfied by M009 | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md` | `plans/closure/verified-update-core/008-status.md` (M008a addendum) | — |
 | M008a | closed | `plans/implementation/verified-update-core/008a-clean-package-evidence-corrective.md` | `plans/closure/verified-update-core/008a-status.md` | — (was: hard dependency on M002a green head; satisfied by run `36477024102`) |
 | M009 | closed | `plans/implementation/verified-update-core/009-core-archive-0.1.2-publication.md` | `plans/closure/verified-update-core/009-status.md` | — (pair published 2026-09-28; Consumer M006 gate satisfied) |
-| M010 | ready | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md` | — | —; current Gregg/EggPool reference evidence is sufficient |
-| M011 | ready | `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md` | — | —; independent of M010, but serialize Core edits during implementation |
+| M010 | closed | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md` | `plans/closure/verified-update-core/010-status.md` | — (`CurrentExecutable` + `InstallPlan::for_current_executable`; `StagePlacement::InsideInstallationRoot`; Windows-native fixtures in CI) |
+| M011 | closed | `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md` | `plans/closure/verified-update-core/011-status.md` | — (`LockObservation` + `StaleLockVerifier`; default `acquire` still fail-closed; claim/race fixtures run natively on Windows in CI) |

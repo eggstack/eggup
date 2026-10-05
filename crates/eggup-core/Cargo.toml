@@ -23,3 +23,11 @@ workspace = true
 
 [dependencies]
 sha2 = "0.10"
+
+# Windows-only. A running image cannot be unlinked while it is mapped, so the
+# previous generation of a kept-installed self-update is scheduled for deletion
+# after this process exits. It is never called before the caller's post-commit
+# policy has resolved, and it is never reachable on any other target, so the
+# Unix/macOS dependency graph is unchanged.
+[target.'cfg(windows)'.dependencies]
+self-replace = "1.5"

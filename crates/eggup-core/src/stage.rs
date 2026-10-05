@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(unix)]
 use crate::domain::PermissionsIntent;
-use crate::domain::{ArtifactMember, BoundSources, InstallPlan};
+use crate::domain::{ArtifactMember, BoundSources, InstallPlan, StagePlacement};
 use crate::error::{Error, Result};
 
 static NEXT_STAGE_ID: AtomicU64 = AtomicU64::new(0);
@@ -47,7 +47,8 @@ impl Stage {
         failure: Option<FailureAt>,
     ) -> Result<PreparedTransaction> {
         check_failure(failure, FailureAt::Create)?;
-        let (path, parent) = create_stage_directory(plan.installation_root())?;
+        let (path, parent) =
+            create_stage_directory(plan.installation_root(), plan.stage_placement())?;
         let stage = Self { path, parent };
         if let Err(error) = stage.copy_members(&plan, &mut bound, failure) {
             drop(stage);
@@ -209,16 +210,33 @@ impl Drop for Stage {
     }
 }
 
-fn create_stage_directory(installation_root: &Path) -> Result<(PathBuf, PathBuf)> {
+fn create_stage_directory(
+    installation_root: &Path,
+    placement: StagePlacement,
+) -> Result<(PathBuf, PathBuf)> {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let parent = installation_root
-        .parent()
-        .ok_or_else(|| Error::invalid("installation root has no stage parent"))?
-        .to_path_buf();
-    let root_name = installation_root
-        .file_name()
-        .ok_or_else(|| Error::invalid("installation root has no name"))?
-        .to_string_lossy();
+    // `InsideInstallationRoot` deliberately keeps the stage beside the
+    // destinations it will be renamed onto. Same-directory placement is what
+    // makes the commit a same-filesystem rename and what keeps the whole
+    // transaction inside the caller's own directory: a self-updater needs write
+    // authority where its executable lives, never in that directory's parent.
+    let (parent, root_name) = match placement {
+        StagePlacement::SiblingOfInstallationRoot => {
+            let parent = installation_root
+                .parent()
+                .ok_or_else(|| Error::invalid("installation root has no stage parent"))?
+                .to_path_buf();
+            let root_name = installation_root
+                .file_name()
+                .ok_or_else(|| Error::invalid("installation root has no name"))?
+                .to_string_lossy()
+                .into_owned();
+            (parent, root_name)
+        }
+        StagePlacement::InsideInstallationRoot => {
+            (installation_root.to_path_buf(), String::from("self"))
+        }
+    };
     for _ in 0..32 {
         let sequence = NEXT_STAGE_ID.fetch_add(1, Ordering::Relaxed);
         let nanos = SystemTime::now()

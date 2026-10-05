@@ -256,13 +256,18 @@ under time pressure, and it is the one that protects the layered design.
 | `stable` | `ubuntu-latest` | stable + `rustfmt`, `clippy` | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --all-features --locked`; `cargo doc --workspace --no-deps --locked` | Linux is the reference platform. The only lane that runs clippy, fmt, and doc |
 | `msrv` | `ubuntu-latest` | `1.89.0` (`ci.yml:29`) | `cargo check --workspace --all-targets --locked` | The code type-checks at the declared `rust-version` floor. Clippy and tests are not run here, so this is a compile check only |
 | `macos` | `macos-latest` | stable | `cargo test --workspace --all-targets --all-features --locked` | The full test suite passes on a non-Linux Unix — the only evidence for macOS behavior |
-| `windows-check` | `windows-latest` | stable | `cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl --locked`; `cargo test -p eggup-eggpack --all-targets --all-features --locked`; three `cargo test -p eggup-service --lib <name> --locked` steps; `cargo test -p eggup-service --lib windows_scm::tests --locked` — six `cargo test` steps at `ci.yml:48-53`; then `cargo check --workspace --all-targets --locked` (`ci.yml:54`) | Windows compiles the whole workspace and *runs* the platform-sensitive subset |
+| `windows-check` | `windows-latest` | stable | `cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl --locked`; `cargo test -p eggup-eggpack --all-targets --all-features --locked`; three `cargo test -p eggup-service --lib <name> --locked` steps; `cargo test -p eggup-service --lib windows_scm::tests --locked`; `cargo test -p eggup-core --test current_executable --locked`; `cargo test -p eggup-core --test stale_lock_recovery --locked`; then `cargo test --workspace --all-targets --locked` (`ci.yml:48-60`) | Windows compiles the whole workspace and *runs* it. The targeted steps run first so a platform-specific failure is named before the broad run buries it |
 
-### 5.1 Why `windows-check` is targeted rather than a full workspace test run
+### 5.1 Why `windows-check` leads with targeted steps
 
-A plain `cargo test --workspace --all-features` on `windows-latest` is not run.
-The job instead names specific crates and specific tests. The selection reflects
-where Windows-specific behavior actually lives:
+`cargo test --workspace --all-features` is still not run — the job omits
+`--all-features` on purpose (§5.3). But it **does** now finish with a plain
+`cargo test --workspace --all-targets --locked`, so the earlier gap where a
+failure in an unlisted crate went unobserved on Windows is closed.
+
+The targeted steps stay, ahead of the full run, because they name the failure
+instead of reporting a pile of results. The selection reflects where
+Windows-specific behavior actually lives:
 
 - `eggup-acquisition`, `eggup-archive`, `eggup-curl` — filesystem and process
   behavior that differs from POSIX. `eggup-archive` in particular has
@@ -305,7 +310,7 @@ platform lane that a whole-workspace run would not guarantee.
 | No `cargo check` with `--all-features` on the Windows lane | `ci.yml:54` is the same command. The feature-gated footprint binaries are not built on Windows either |
 | Clippy and fmt run on Linux only | A `#[cfg(windows)]` or `#[cfg(target_os = "macos")]` clippy violation is not caught by any lane — the Windows and macOS jobs run `test`/`check`, never `clippy` |
 | `cargo doc` on Linux only | `deny(missing_docs)` is not re-verified per platform, which is acceptable since rustdoc is platform-independent |
-| No full Windows workspace test run | Windows test coverage is a curated subset (§5.1); a Windows failure in an untargeted crate's tests would not be observed |
+| No `cargo test` with `--all-features` on the Windows lane | The closing run is `cargo test --workspace --all-targets --locked`. Combined with the targeted steps, every crate's tests now execute on Windows — but only under default features, so the footprint binaries and any other feature-gated path remain unbuilt there |
 
 ### 5.3 Coverage gaps — the `--all-features` asymmetry, concretely
 
@@ -341,11 +346,12 @@ consequences:
   link both adapters together — the code most likely to break on a toolchain
   floor, because it is the only place two independent adapter dependency
   graphs meet.
-- **`windows-check` job**: the closing `cargo check --workspace --all-targets
+- **`windows-check` job**: the closing `cargo test --workspace --all-targets
   --locked` has the same gap. Combined with the fact that the Windows lane does
   not run `--all-features` on anything, **no Windows lane ever compiles the
-  footprint binaries.** Windows coverage exists for the archives, the seam, the
-  curl adapter, the eggpack adapter, and selected service tests — the footprint
+  footprint binaries.** Windows coverage exists for every crate under default
+  features — the archives, the seam, the curl adapter, the eggpack adapter, the
+  Core self-update and lock-race fixtures, and selected service tests — the footprint
   fixtures are Linux/macOS-only in practice, with no job recording that fact.
 - Only `stable` and `macos` use `--all-features` and therefore actually compile
   these three binaries.

@@ -450,7 +450,7 @@ impl ValidatedTransaction {
         let digests = self.verified.verified_digests();
         self.verified
             .prepared
-            .commit_inner(ownership, &digests, None, None)
+            .commit_inner(ownership, &digests, None, None, None)
     }
 
     /// Commits the complete artifact set, runs one caller check while the
@@ -476,7 +476,52 @@ impl ValidatedTransaction {
         let check = Box::new(move || check().map_err(|error| bounded_display(&error)));
         self.verified
             .prepared
-            .commit_inner(ownership, &digests, None, Some((policy, check)))
+            .commit_inner(ownership, &digests, None, Some((policy, check)), None)
+    }
+
+    /// Commits with caller-authorized stale-lock recovery.
+    ///
+    /// Identical to [`commit`](Self::commit) except that a pre-existing lock
+    /// record may be displaced — but only when `recovery` returns
+    /// [`StaleLockDecision::ProvenStale`](crate::lock::StaleLockDecision::ProvenStale)
+    /// for the exact record Core observed. Every other verdict, and every record
+    /// Core cannot prove safe, keeps the fail-closed contention result.
+    ///
+    /// Core never decides staleness from PID liveness, record age, executable
+    /// name, or service state; that evidence belongs to the caller.
+    pub fn commit_with_stale_lock_recovery(
+        self,
+        ownership: CommitOwnership<'_>,
+        recovery: &dyn crate::lock::StaleLockVerifier,
+    ) -> Result<TransactionReceipt> {
+        let digests = self.verified.verified_digests();
+        self.verified
+            .prepared
+            .commit_inner(ownership, &digests, None, None, Some(recovery))
+    }
+
+    /// Commits with a caller post-commit check and caller-authorized stale-lock
+    /// recovery, combining both opt-in policies.
+    pub fn commit_with_post_commit_and_stale_lock_recovery<F, E>(
+        self,
+        ownership: CommitOwnership<'_>,
+        policy: PostCommitFailurePolicy,
+        recovery: &dyn crate::lock::StaleLockVerifier,
+        check: F,
+    ) -> Result<TransactionReceipt>
+    where
+        F: FnOnce() -> std::result::Result<(), E>,
+        E: std::fmt::Display,
+    {
+        let digests = self.verified.verified_digests();
+        let check = Box::new(move || check().map_err(|error| bounded_display(&error)));
+        self.verified.prepared.commit_inner(
+            ownership,
+            &digests,
+            None,
+            Some((policy, check)),
+            Some(recovery),
+        )
     }
 
     /// Test-only commit with injected faults. The ownership and staged
@@ -490,7 +535,7 @@ impl ValidatedTransaction {
         let digests = self.verified.verified_digests();
         self.verified
             .prepared
-            .commit_inner(ownership, &digests, Some(fault), None)
+            .commit_inner(ownership, &digests, Some(fault), None, None)
     }
 
     #[cfg(test)]
@@ -509,6 +554,7 @@ impl ValidatedTransaction {
                 policy,
                 Box::new(|| Err("injected post-commit failure".to_string())),
             )),
+            None,
         )
     }
 }

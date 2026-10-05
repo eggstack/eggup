@@ -13,7 +13,7 @@ and the [`docs-hygiene`](.opencode/skills/docs-hygiene/SKILL.md) skill.
 Full dependency rules and per-crate boundary rationale:
 [`architecture/tooling-governance.md`](architecture/tooling-governance.md) §2.
 
-- `crates/eggup-core` — policy-neutral local mechanics: `InstallPlan → Prepared → Verified → Validated → Receipt`. Sole dep: `sha2`. Never add transport, service-manager, or Eggpack deps here.
+- `crates/eggup-core` — policy-neutral local mechanics: `InstallPlan → Prepared → Verified → Validated → Receipt`. Deps: `sha2`, plus `self-replace` **Windows-only** (deferred deletion of a replaced running image; non-Windows graphs stay `sha2` only). Never add transport, service-manager, or Eggpack deps here.
 - `crates/eggup-acquisition` — transport-neutral seam (`AcquisitionTransport`, `FixtureTransport`, `ComposedTransport`, `FetchLimits`). Zero dependencies — not even `sha2`. No eggup deps.
 - `crates/eggup-eggfetch` — native HTTP adapter (`eggfetch-core` + `tokio` + `futures-util`); depends only on `eggup-acquisition`. Must not know `eggup-curl` exists.
 - `crates/eggup-curl` — external-curl adapter, no embedded HTTP/TLS stack; depends only on `eggup-acquisition`. Must not know `eggup-eggfetch` exists. Transport composition lives in the seam, never in an adapter.
@@ -42,7 +42,7 @@ gaps are in [`architecture/tooling-governance.md`](architecture/tooling-governan
 
 Focused runs: `cargo test -p eggup-core`, `cargo test -p eggup-core <name>`, `cargo clippy -p <crate> --all-targets --locked -- -D warnings`.
 
-CI (`.github/workflows/ci.yml`) adds what the script lacks: `stable` (fmt/clippy/test/doc on Linux), `msrv` (compile-only `cargo check` on 1.89.0), `macos` (full `cargo test`), and `windows-check` — which **runs tests**, not just a check: six `cargo test` steps at `ci.yml:48-53` (one combined run for `eggup-acquisition`/`eggup-archive`/`eggup-curl`, `eggup-eggpack` with `--all-features`, three named `eggup-service` diagnostic-safety tests, and `windows_scm::tests`), then a workspace `cargo check`. Neither `msrv` nor `windows-check` passes `--all-features`, so the feature-gated footprint binaries are built only by `stable` and `macos`. CI never publishes; releases are manual.
+CI (`.github/workflows/ci.yml`) adds what the script lacks: `stable` (fmt/clippy/test/doc on Linux), `msrv` (compile-only `cargo check` on 1.89.0), `macos` (full `cargo test`), and `windows-check` — which **runs tests**, not just a check: the acquisition/archive/curl, `eggup-eggpack`, and named `eggup-service` diagnostic-safety runs, then `cargo test -p eggup-core --test current_executable` and `--test stale_lock_recovery` (Core M010/M011 self-replacement and lock-race fixtures must execute natively, not merely compile), then a full `cargo test --workspace --all-targets`. Neither `msrv` nor `windows-check` passes `--all-features`, so the feature-gated footprint binaries are built only by `stable` and `macos`. CI never publishes; releases are manual.
 
 ## Where to look
 
@@ -80,7 +80,8 @@ and [`architecture/tooling-governance.md`](architecture/tooling-governance.md).
 - Authoritative contracts: `crates/eggup-core/docs/{domain,verification,transaction}.md` + `architecture/*.md`. SHA-256 is integrity evidence only — no authenticity/signature claims, no invented timeouts, no crash-journaling claims.
 - Ownership `Absent | Owned | Foreign | Unknown` is caller-proven via `OwnershipVerifier`; `Owned` is never inferred. `commit` revalidates ownership + staged digests under lock; `Foreign`/`Unknown`/flap fails closed with a receipt (`RolledBack`/`RecoveryRequired`), not `Err` — only lock contention/setup failures return `Err`.
 - `validate` requires **every** member to carry `IntegrityStatus::Verified`. A member declared `IntegrityRequirement::None` (`NotRequired`) always fails — there is no escape hatch.
-- Core never creates live destination parents, never deletes stale locks (`MutationLock::inspect` is read-only), stages to owner-private sibling dirs (`0700`/`0600` on Unix).
+- Core never creates live destination parents and never *decides* that a lock is stale. `MutationLock::acquire` never recovers; recovery is opt-in per commit via a caller-supplied `StaleLockVerifier` and displaces only the exact observed record. Staging is owner-private (`0700`/`0600` on Unix); its placement is an authority decision — ordinary plans stage beside the install root, `InstallPlan::for_current_executable` stages **inside** it so a self-update never needs write authority above the executable's directory.
+- A program can replace the executable it is running through the same transaction model (`InstallPlan::for_current_executable`). The old generation is renamed aside, not deleted, so `RollBack` stays possible; on Windows a kept-installed update reports `CleanupDisposition::DeferredToProcessExit` because the old image is still mapped.
 - `eggup-eggpack` archives stop at extraction-required evidence; URL/install-root/ownership/permission/authenticity policy stays caller-owned.
 
 ## Planning governance
