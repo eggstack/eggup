@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M009 closed; 0.1.2 core/archive pair published to crates.io
+Status: active; M001-M009 closed; M010/M011 ready substrate correctives; 0.1.2 core/archive pair published to crates.io
 
 Long-term references:
 
@@ -171,6 +171,14 @@ M008 core/archive consumer package qualification [CLOSED via M008a]
                     |
                     v
 M009 core/archive 0.1.2 publication [CLOSED 2026-09-28]
+        |
+        +--> M010 current-executable transaction parity [READY]
+        |
+        `--> M011 proof-authorized stale-lock recovery [READY]
+
+M010 + M011 closures
+        |
+        `--> future core package/publication qualification [NAMED FOLLOW-ON; plan intentionally unwritten]
 ```
 
 - M001 -> M002: hard.
@@ -186,7 +194,7 @@ M009 core/archive 0.1.2 publication [CLOSED 2026-09-28]
 - M009 -> Consumer M006 / Egress Delivery M003: hard Eggup-side gate
   satisfied; consumer implementation is Egress-owned and now executable.
 - Acquisition consumers may continue using the qualified immediate-commit path.
-- Service Lifecycle M005 is closed; no downstream service-aware consumer migration is currently scheduled.
+- Service Lifecycle M005/M006 are closed. Current Gregg/EggPool migration research exposed two remaining Core substrate gaps: current-executable parity (M010) and caller-authorized stale-lock recovery (M011). Both are additive correctives against already-normative requirements.
 
 ## 7. Milestones
 
@@ -342,6 +350,42 @@ Exit conditions:
 - no other Eggup crate is published;
 - Egress publication gate is reconciled to ready after closure.
 
+### M010 — Current-executable transaction parity corrective
+
+Class: invariant/capability corrective.
+
+Plan: `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md`.
+
+Objective: make ADR-0002's one-member transaction model true for an executable that is currently running, without requiring write authority above the executable directory and with native Windows running-image rollback/finalization semantics.
+
+Reference evidence: Gregg `1aac89f1` and EggPool `fe3c308d`.
+
+Exit conditions:
+
+- current-executable binding reuses the normal validated transaction/receipt model;
+- executable-local staging requires no broader write authority than the executable directory;
+- exact target/symlink identity is revalidated immediately before mutation;
+- Windows native evidence proves running-image replacement;
+- old-image rollback evidence remains addressable until `KeepInstalled | RollBack` resolves;
+- ordinary bundle/multi-member behavior does not change.
+
+### M011 — Proof-authorized stale-lock recovery
+
+Class: invariant/capability corrective.
+
+Plan: `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md`.
+
+Objective: implement the specification's stale-lock recovery requirement without teaching Core consumer process policy.
+
+Exit conditions:
+
+- ordinary `MutationLock::acquire` remains fail-closed;
+- an opt-in caller verifier can authorize recovery only for one exact observed lock;
+- malformed/unknown records remain non-destructible;
+- stale claiming is race-safe against pathname replacement and concurrent new writers;
+- partial recovery preserves real evidence;
+- EggPool's stronger stale-lock behavior is representable without importing its provenance/package-manager policy.
+
 ## 8. Cross-cutting requirements
 
 ### Storage and migration
@@ -391,12 +435,14 @@ Every safety-sensitive public type documents what it proves and what it does not
 
 ## 11. Completion definition
 
-The runtime roadmap is functionally closed through M009. The already-qualified
-0.1.2 core/archive pair is published (`eggup-core 0.1.2` then
+The original runtime roadmap closed through M009, but current Gregg/EggPool parity
+research reopened two already-normative Core obligations as M010/M011. The
+already-qualified 0.1.2 core/archive pair remains published (`eggup-core 0.1.2` then
 `eggup-archive 0.1.2`, 2026-09-28, from release-prep commit `e8e07eb`,
 tagged `v0.1.2` with GitHub Release `0.1.2`); publication stayed manual and
-irreversible-step aware throughout. No further core publication work is
-required for the Egress M006 dependency cutover.
+irreversible-step aware throughout. No prior publication is reopened. A future Core package/publication milestone is
+intentionally unwritten until M010/M011 close and the resulting public/API surface
+is qualified.
 
 ## 12. Milestone status
 
@@ -412,3 +458,5 @@ required for the Egress M006 dependency cutover.
 | M008 | closed with clean package evidence (M008a); publication gate satisfied by M009 | `plans/implementation/verified-update-core/008-core-archive-consumer-package-qualification.md` | `plans/closure/verified-update-core/008-status.md` (M008a addendum) | — |
 | M008a | closed | `plans/implementation/verified-update-core/008a-clean-package-evidence-corrective.md` | `plans/closure/verified-update-core/008a-status.md` | — (was: hard dependency on M002a green head; satisfied by run `36477024102`) |
 | M009 | closed | `plans/implementation/verified-update-core/009-core-archive-0.1.2-publication.md` | `plans/closure/verified-update-core/009-status.md` | — (pair published 2026-09-28; Consumer M006 gate satisfied) |
+| M010 | ready | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md` | — | —; current Gregg/EggPool reference evidence is sufficient |
+| M011 | ready | `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md` | — | —; independent of M010, but serialize Core edits during implementation |
