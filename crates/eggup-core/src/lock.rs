@@ -414,8 +414,16 @@ impl MutationLock {
             .map_err(|source| Error::io("claiming the authorized stale lock record", source))?;
         match read_record(&claim) {
             Ok(claimed) if claimed == observed.record() => Ok(claim),
+            // The displaced object is not the authorized one, so the claim is not
+            // authorized either: undo it if that is safe, otherwise retain it.
             Ok(_) => Err(restore_claim(&claim, &path)),
-            Err(error) => Err(error),
+            // The record is displaced but unverified. Reporting only the
+            // underlying error would leave real Eggup-owned bytes behind with
+            // no indication of where they are.
+            Err(error) => Err(Error::RecoveryRequired {
+                evidence: claim,
+                detail: format!("the claimed stale lock record could not be verified: {error}"),
+            }),
         }
     }
 }
