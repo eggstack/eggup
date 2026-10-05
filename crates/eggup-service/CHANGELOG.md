@@ -1,9 +1,10 @@
 # Changelog
 
 `eggup-service` **is** on crates.io at `0.1.0` and `0.1.1` (part of the lockstep
-`0.1.1` patch). Its `0.1.2` — the `Unreleased` section below — has never been
-published and no publication milestone authorizes it, so that section describes
-code no downstream consumer can resolve yet.
+`0.1.1` patch). Its `0.1.2` — the `Unreleased` section below — has not yet been
+published. Service M009 now authorizes a future manual `0.1.2` publication; until
+that milestone closes, this section still describes code no downstream consumer
+can resolve from crates.io.
 
 ## Unreleased
 
