@@ -81,7 +81,8 @@ elevation.
 - **Dependencies:** `eggup-core`, `windows-args` (plus `windows-service` on
   Windows only).
 - **Status:** **published but lagging** — crates.io carries `0.1.0` and `0.1.1`;
-  the `0.1.2` working tree has never been published. Pin deliberately, and read
+  the `0.1.2` working tree is still unpublished. Service M009 now authorizes a
+  future manual `0.1.2` publication; until that closes, pin deliberately and read
   [`crates/eggup-service/CHANGELOG.md`](../crates/eggup-service/CHANGELOG.md)
   for what is and is not on the registry.
 
