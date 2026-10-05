@@ -136,11 +136,15 @@ Acquisition M010 milestone (`eggup-acquisition 0.1.3`).
   `crates/eggup-eggfetch/CHANGELOG.md`.
 
 - Acquisition audit fixes (unpublished; **these two are M010's publication
-  payload**): public `FetchLimits` values are validated at every transport
-  boundary, and post-link temp cleanup failure can no longer report ordinary
-  failure after a complete destination exists. They are implemented and green
-  but not yet on the registry, so a consumer resolving `eggup-acquisition
-  0.1.2` does not have them.
+  payload**, confirmed by diffing the published `0.1.2` source against the
+  working tree): a fallback adapter restarted the caller's total time budget, so
+  one composed fetch could run for roughly twice the documented `total_timeout`
+  — the fallback now receives only the remaining budget; and a part file was
+  left on disk when securing it to `0600` failed, which now drops the handle
+  and removes the candidate. Note that `FetchLimits` validation at every
+  transport boundary, the retirement of `Option` from `max_artifact_bytes`, and
+  UTF-8-safe bounded diagnostics all shipped in the published `0.1.2` — a
+  consumer resolving `eggup-acquisition 0.1.2` already has those.
 
 - Eggpack Interop M002 (published in `eggup-eggpack 0.1.2` on 2026-10-02; see the 0.1.2 section above): `eggup-eggpack` gains the archive
   extraction handoff (`archive_format_for_name`, `validate_acquired_archive`,

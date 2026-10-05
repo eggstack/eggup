@@ -2,13 +2,12 @@
 
 ## Unreleased
 
-Acquisition M007 (unpublished corrective): diagnostics now truncate only at
-  UTF-8 character boundaries. `FetchLimits::max_artifact_bytes` is a mandatory
-  positive finite `u64` (migration for direct field writers: `Some(n)` → `n`,
-  and every `None` case must choose a positive bound). Composition, fallback,
-  release, service, and core policy are unchanged.
+Nothing in this section has been published. `0.1.2` remains the published
+baseline on crates.io, and no publication milestone authorizes these entries.
+M010 (`eggup-acquisition 0.1.3`) is the milestone that will publish them.
 
-Additional fixes from the workspace bug audit:
+The two `0b8cb98` bug-audit fixes, both verified absent from the published
+`0.1.2` source:
 
 - **Fixed: a fallback adapter restarted the caller's total time budget.**
   `ComposedTransport` passed the caller's original `FetchLimits` to the secondary
@@ -18,6 +17,18 @@ Additional fixes from the workspace bug audit:
   clamped alongside it to preserve `connect_timeout <= total_timeout`. When the
   budget is already exhausted the fallback is not attempted at all and the
   result is a `Timeout`, rather than starting a doomed attempt.
+- **Fixed: a part file was left on disk when securing it failed.** If reading the
+  part's permissions or applying the `0600` mode failed, the candidate file was
+  abandoned in the private temp directory instead of being removed. Both
+  failure paths now drop the handle and remove the candidate before returning.
+  The `0600` hardening itself is unchanged — this only fixes the cleanup on
+  the error path.
+
+`FetchLimits::validate` is **not** part of this section: it is already enforced
+at every transport boundary in the published `0.1.2`, as is the retirement of
+`Option` from `max_artifact_bytes` (see the `0.1.2` section below). An earlier
+revision of this file filed both under `Unreleased` as an "M007 unpublished
+corrective", which was misleading for anyone reading the published crate.
 
 ## 0.1.2 — 2026-10-02
 
@@ -28,6 +39,9 @@ artifact cap. No Eggup or producer dependency; the crate has zero `[dependencies
 - Finite artifact bound: `FetchLimits::max_artifact_bytes` is a plain `u64`
   and `None` is no longer representable. `validate()` requires a strictly
   positive value, so every fetch is finitely bounded.
+- UTF-8-safe bounded diagnostics (Acquisition M007): truncation
+  (`truncate_utf8_bytes`, URL redaction) lands only on `char` boundaries within
+  the existing 512-byte bound, so a truncated diagnostic is always valid UTF-8.
 - Adapter-only constructors, exclusive owner-private (`0600` on Unix) temp
   siblings, race-safe no-clobber promotion, and owned-temp-only cleanup.
 

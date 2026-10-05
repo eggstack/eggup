@@ -1,9 +1,11 @@
 # Releases, pinning, and upgrading
 
 Eggup is published to crates.io. **crates.io is the source of truth** for what
-exists; the table below is a convenience snapshot recorded in
-[`architecture/tooling-governance.md`](../architecture/tooling-governance.md) §8
-and verified against the workspace manifests, not against the registry.
+exists. The table below was queried from the crates.io API on **2026-10-05**
+and matches the workspace manifests; re-check it when a release milestone
+closes, since registry state is the one fact here that changes without a
+commit. See also
+[`architecture/tooling-governance.md`](../architecture/tooling-governance.md) §8.
 
 ## Published state
 
@@ -59,15 +61,24 @@ items. Each is tracked upstream in
   cross-check, so a `BoundExtraction` from a different plan — or reused after
   member reordering — could commit bytes under another member's declared
   identity. That substitution is digest-invisible when two declared members
-  share identical content. The fix is implemented and green but not released;
-  see the `Unreleased` section of
+  share identical content. Verified against the published source: `0.1.2`'s
+  `bind_archive_members` pairs members with `members.iter().zip(...)` and checks
+  only the count, while the working tree additionally compares each bound
+  member's `source_path`/`output_name` against the declared member and fails
+  closed with `AdapterError::MapMismatch`. The fix is implemented and green but
+  not released; see the `Unreleased` section of
   [`crates/eggup-eggpack/CHANGELOG.md`](../crates/eggup-eggpack/CHANGELOG.md).
-- **Published `eggup-acquisition 0.1.2` does not validate every `FetchLimits`
-  value at the transport boundary.** A composed transport can therefore run
-  roughly twice the documented `total_timeout`. This is the specific payload of
-  the open Acquisition M010 milestone (`eggup-acquisition 0.1.3`);
-  `eggup-curl 0.1.2` and `eggup-eggfetch 0.1.2` inherit the fix automatically
-  once it lands.
+- **A composed fetch in `eggup-acquisition 0.1.2` can overrun the caller's
+  deadline.** `ComposedTransport` handed the caller's *original* `FetchLimits` to
+  a fallback adapter, so one composed fetch could run for roughly twice the
+  documented `total_timeout`. The fix (`remaining_limits`, which subtracts
+  elapsed time and clamps `connect_timeout` to the remainder) is implemented and
+  green but not published; it is the payload of the open Acquisition M010
+  milestone (`eggup-acquisition 0.1.3`). `eggup-curl 0.1.2` and
+  `eggup-eggfetch 0.1.2` inherit it automatically once it lands.
+  Note that `FetchLimits::validate` *is* already enforced at every transport
+  boundary in the published `0.1.2` — the gap is the fallback budget, not
+  validation.
 - **Published `eggup-core 0.1.2` predates the `Error::Injected` addition.** That
   variant is only in the unpublished working tree, so a downstream exhaustive
   `match` on `Error` compiles against the published version without needing the
