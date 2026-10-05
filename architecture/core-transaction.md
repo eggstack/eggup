@@ -393,9 +393,20 @@ lives in.
 directory. `CurrentExecutable` (`current_exe.rs:13`) canonicalizes the running image, so an
 invocation through a symlink updates the real target and never overwrites the link object,
 and refuses any destination whose identity it cannot prove (symlink, directory, or
-hard-linked image). That identity — device and inode on Unix — is re-proved under the
-mutation lock and again immediately before the first live rename, so an image swapped in
-between fails closed before anything is moved.
+hard-linked image).
+
+Identity is two-layered, and the first layer is the one that matters. The bound
+identity is the image's **SHA-256 on every platform**, plus device and inode on
+Unix. The content digest is load-bearing rather than belt-and-braces: a file
+identity on Windows requires handle-based FFI, which this crate forbids, so a
+path-and-inode-only model would leave that platform with *no* proof at all and a
+swapped image would commit. `image_rewritten_in_place_is_detected_by_content_identity`
+pins that layer specifically: rewriting the image in place preserves the path,
+inode, and link count while changing every byte, so only the digest catches it.
+
+Either layer is re-proved under the mutation lock and again immediately before the
+first live rename, so an image swapped in between fails closed before anything is
+moved.
 
 This is the ordinary one-member transaction, not a second state machine: preparation,
 verification, validation, commit, rollback, and the receipt are the same ones.

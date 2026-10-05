@@ -465,6 +465,81 @@ fn destination_replaced_after_binding_fails_closed() {
     );
 }
 
+/// The content identity is proved independently of the Unix inode check.
+///
+/// Rewriting the image **in place** keeps the path, the inode, and the link
+/// count identical while changing every byte. On Unix the device/inode check
+/// would happily accept that, so this fixture specifically exercises the
+/// SHA-256 binding that is the *only* identity proof available on Windows.
+/// Before that binding existed, this fixture committed over the tampered image.
+#[test]
+fn image_rewritten_in_place_is_detected_by_content_identity() {
+    let deployment = Deployment::new();
+    let installed = deployment.install_self();
+    let candidate = deployment.candidate("in-place");
+    let current = CurrentExecutable::bind(&installed).expect("bind");
+    let digest = hash_file(&candidate).expect("hash");
+
+    let plan = InstallPlan::for_current_executable(
+        ProductId::new("eggup").expect("product"),
+        ReleaseId::new("r1").expect("release"),
+        &candidate,
+        &current,
+        IntegrityRequirement::Sha256(digest),
+    )
+    .expect("plan");
+
+    // Overwrite in place: same path, same inode, same link count, new bytes.
+    {
+        use std::io::Write;
+        let mut handle = fs::OpenOptions::new()
+            .write(true)
+            .open(&installed)
+            .expect("open for in-place rewrite");
+        handle
+            .write_all(b"tampered in place")
+            .expect("rewrite in place");
+        handle.sync_all().expect("sync");
+    }
+
+    // Snapshot the exact post-tamper bytes: the rewrite is shorter than the
+    // image, so a short in-place write leaves the original tail in place.
+    let tampered = fs::read(&installed).expect("read tampered");
+    assert!(
+        tampered.starts_with(b"tampered in place"),
+        "the in-place rewrite must have landed"
+    );
+
+    let receipt = plan
+        .prepare()
+        .expect("prepare")
+        .verify_integrity()
+        .expect("verify")
+        .validate(&AllValidators::new())
+        .expect("validate")
+        .commit(CommitOwnership::new(
+            &ExistingAsOwnedVerifier,
+            AbsentPolicy::DenyCreate,
+        ))
+        .expect("an identity failure is a receipt, never an Err");
+
+    assert_eq!(
+        receipt.disposition(),
+        eggup_core::TransactionDisposition::RolledBack,
+        "an image whose bytes changed must fail closed"
+    );
+    assert!(
+        !receipt.rollback_performed(),
+        "identity is re-proved before the first live rename, so nothing should \
+         have been backed up or replaced at all"
+    );
+    assert_eq!(
+        fs::read(&installed).expect("read"),
+        tampered,
+        "the transaction must not have touched the tampered image"
+    );
+}
+
 /// Ownership the caller cannot prove fails closed before any live mutation,
 /// exactly as for an ordinary destination.
 #[test]
@@ -566,6 +641,11 @@ fn ordinary_plans_keep_sibling_stage_placement() {
 
 /// Names any transaction-owned state still sitting in `bin` after a completed
 /// self-update.
+///
+/// Unix-only: on Windows a kept-installed self-update intentionally leaves the
+/// old image in place until this process exits, so leftovers are the expected
+/// outcome there rather than a fault.
+#[cfg(unix)]
 fn leftover_transaction_state(bin: &Path) -> Vec<String> {
     let mut out = Vec::new();
     let Ok(entries) = fs::read_dir(bin) else {

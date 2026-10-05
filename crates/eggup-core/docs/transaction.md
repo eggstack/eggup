@@ -59,8 +59,11 @@ live image and plans `StagePlacement::InsideInstallationRoot`, so the private
 stage and the backup set stay inside the executable's own directory and no write
 authority above it is ever required. An invocation symlink is followed to its
 real target and never overwritten; a destination whose exact identity cannot be
-proven is refused. That identity is re-proved under the mutation lock and again
-immediately before the first live rename. The old generation is renamed aside
+proven is refused. Identity is the image's SHA-256 on **every** platform, plus
+device and inode on Unix; it is re-proved under the mutation lock and again
+immediately before the first live rename. The content digest is load-bearing,
+not belt-and-braces: Windows has no safe portable file identity, so without it
+that platform would have no proof at all. The old generation is renamed aside
 rather than deleted, so it stays rollback-addressable until the caller's policy
 resolves.
 

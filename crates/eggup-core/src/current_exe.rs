@@ -7,13 +7,21 @@ use crate::error::{Error, Result};
 ///
 /// Binding resolves symlinks, so an invocation through a link updates the real
 /// image and never overwrites the link object. It also proves that the target is
-/// a single-linked regular file beneath a real directory: a destination whose
-/// exact identity cannot be proven is refused rather than replaced.
+/// a regular file beneath a real directory and records an identity for it: on
+/// Unix that is device plus inode, and on **every** platform it is the SHA-256
+/// of the image's bytes.
+///
+/// The content digest is what makes the binding safe on Windows. A file
+/// identity there needs handle-based FFI, which this crate forbids, so a
+/// path-only recheck would silently accept an image swapped in between binding
+/// and commit. Content equality is the strongest identity provable with safe
+/// code on every platform, and a mismatch fails closed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CurrentExecutable {
     target: PathBuf,
     installation_root: PathBuf,
     destination_name: PathBuf,
+    digest: [u8; 32],
     #[cfg(unix)]
     device: u64,
     #[cfg(unix)]
@@ -91,10 +99,13 @@ impl CurrentExecutable {
             use std::os::unix::fs::MetadataExt;
             (metadata.dev(), metadata.ino())
         };
+        // Read once here so a later swap is detectable without any unsafe code.
+        let digest = crate::integrity::hash_file(&target)?;
         Ok(Self {
             target,
             installation_root,
             destination_name,
+            digest,
             #[cfg(unix)]
             device,
             #[cfg(unix)]
@@ -164,6 +175,17 @@ impl CurrentExecutable {
                 });
             }
         }
-        Ok(())
+        // Checked on every platform. Without this, the Windows build has *no*
+        // identity proof at all — device and inode do not exist there — and
+        // would commit over an image swapped in after binding.
+        match crate::integrity::hash_file(&self.target) {
+            Ok(digest) if digest == self.digest => Ok(()),
+            Ok(_) => Err(Error::DestinationConflict {
+                destination: self.target.clone(),
+            }),
+            // Already a typed crate error; propagate it unchanged so the
+            // diagnostic names the real filesystem failure.
+            Err(error) => Err(error),
+        }
     }
 }

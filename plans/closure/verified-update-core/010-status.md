@@ -50,7 +50,7 @@ handing the operator garbage nobody asked for.
 | §6.3 invocation symlink updates the real target and never overwrites the link | `CurrentExecutable::bind` canonicalizes; `symlink_invocation_updates_the_real_image_and_preserves_the_link` asserts the link is still a symlink, still points at the same real image, and that the *real image* changed | passed |
 | §6.3 hard-linked / non-regular destination refused | `bind` rejects `nlink() != 1` on Unix and rejects non-regular and symlinked targets; `hard_linked_current_executable_is_refused` | passed |
 | §6.3 parent path identity changed | a destination whose object changed fails identity revalidation; `destination_replaced_after_binding_fails_closed` replaces the file between binding and commit and asserts `RolledBack` with the impostor untouched | passed |
-| §6.3 exact identity revalidated immediately before mutation | `InstallPlan::revalidate_current_executable` is called under the lock in `revalidate_ownership_locked` and again inside `backup_members` immediately before the first live rename | passed |
+| §6.3 exact identity revalidated immediately before mutation | `InstallPlan::revalidate_current_executable` is called under the lock in `revalidate_ownership_locked` and again inside `backup_members` immediately before the first live rename. Identity = SHA-256 on every platform + `dev`/`ino` on Unix | passed, after the hosted Windows lane exposed a missing Windows check |
 | §6.3 no overbroad deletion | no `remove_dir_all` of an installation root anywhere in the new path; the stage is `Drop`-cleaned and the backup set is removed only after the policy resolves | passed |
 | §6.4 addressable old generation, rollback before publication | `backup_members` renames the live image to the backup root; `KeepInstalled` is resolved before finalization | passed |
 | §6.4 never delete-before-decision | `finalize_backup_set` runs only after the injected-`Finalize` branch, i.e. only after the caller's policy resolved | passed |
@@ -73,14 +73,13 @@ that plans `InsideInstallationRoot` and reads `stage_placement()` back can see
 which directories it is asking for write access to. This is the difference the
 corrective exists to close, so it is not hidden behind an implementation detail.
 
-**Identity is `dev`/`ino` on Unix, and there is no Unix identity claim for
-Windows.** `CurrentExecutable` stores device and inode under `#[cfg(unix)]` and
-compiles them out elsewhere; on Windows the binding re-proves the canonical path
-and regular-file kind. The architecture doc states this rather than implying
-cross-platform inode parity. Note that this also means the `nlink() != 1`
-hard-link refusal is Unix-only — Windows has no equivalent `nlink` check here,
-and the plan's "any platform where exact target identity cannot be proven fails
-closed" is satisfied by the canonical-path and regular-file checks only.
+**Identity is SHA-256 everywhere, plus `dev`/`ino` on Unix.** The content digest
+was added only after the hosted Windows lane caught the absence of *any*
+identity check there — see residual risk 1. The digest is what satisfies "any
+platform where exact target identity cannot be proven fails closed": without it
+Windows had only a path comparison, and a swapped image committed. The
+`nlink() != 1` hard-link refusal remains Unix-only, since Windows exposes no
+equivalent through safe std; that residual is disclosed, not papered over.
 
 **`self_replace()` itself is never called.** The helper can move and delete the
 current executable in one step, which would make the old generation
@@ -104,7 +103,7 @@ contract test on the error type rather than a contrived race.
 
 ## Test inventory
 
-`crates/eggup-core/tests/current_executable.rs` — 10 tests, all passing.
+`crates/eggup-core/tests/current_executable.rs` — 11 tests, all passing.
 
 The suite drives a child process that re-executes this very test binary from a
 private `bin/app`, because the only evidence that holds equally on Unix and
@@ -139,8 +138,8 @@ unaffected.
 Per-target results for the new surface:
 
 ```text
-eggup-core      (lib)                        51 passed; 0 failed
-current_executable (integration)              10 passed; 0 failed
+eggup-core      (lib)                        53 passed; 0 failed
+current_executable (integration)              11 passed; 0 failed
 ```
 
 `cargo tree` boundary review on macOS: `eggup-core v0.1.2 → sha2` only.
@@ -159,17 +158,27 @@ substantively new Windows behaviour, and no macOS result can speak to them.
 
 ## Residual risk
 
-1. **The Windows finalization path is not locally verified.** It is exercised for
-   the first time by the hosted Windows runner. If `self_delete_at` cannot write
-   its helper into the backup directory, finalization would return
+1. **A real cross-platform defect was found by the hosted Windows lane and
+   fixed.** `destination_replaced_after_binding_fails_closed` passed on macOS and
+   **failed on Windows** (run `37368735504`) with `Committed` where `RolledBack`
+   was required. Cause: `CurrentExecutable::revalidate` compared `dev`/`ino`,
+   which are `#[cfg(unix)]`, so the Windows build performed **no identity check
+   at all** and committed over a swapped image. Fixed by binding the image's
+   SHA-256 on every platform and comparing it during revalidation.
+   `image_rewritten_in_place_is_detected_by_content_identity` pins the new layer
+   specifically: it rewrites the image in place, preserving path, inode, and link
+   count while changing every byte, so only the content digest can catch it.
+   This is the concrete payoff of the plan's requirement for native Windows
+   execution — no amount of macOS-local evidence would have found it.
+2. **The Windows finalization path still has no green hosted run.** It is fixed
+   and the fixture is in place, but re-verification on the Windows lane has not
+   completed because of the GitHub Actions incident. If `self_delete_at` cannot
+   write its helper into the backup directory, finalization returns
    `Error::RecoveryRequired` and a `RetainedForRecovery` receipt — a truthful
-   failure, not a silent one, but still a gap between the plan's intent and
-   delivered behaviour.
-2. **Windows has no hard-link refusal.** `nlink` is a Unix-only check here. A
-   hard-linked Windows image would be bound and replaced, changing the other
-   name's contents. This is a narrow, pre-existing-shaped gap rather than a
-   regression, but it is a real difference from the Unix behaviour and is
-   recorded rather than glossed.
+   failure, not a silent one.
+3. **Windows has no hard-link refusal.** `nlink` is a Unix-only check. A
+   hard-linked Windows image would be bound and replaced. A real difference from
+   Unix behaviour, recorded rather than glossed.
 3. **`tests/current_executable.rs` skips the authority assertion on a privileged
    runner.** The skip is printed, not silent. On such a runner the central claim
    is covered only by the `StagePlacement` assertion, which checks the type
