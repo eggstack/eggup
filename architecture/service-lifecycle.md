@@ -65,9 +65,9 @@ eggup-service   ->  windows-args (=0.2.0)
 - `windows-args` is cross-platform and is used for the SCM command-line parser,
   so the ownership tests in `windows_scm.rs` run on every host.
 - **The crate is published but lags the workspace.** It is on crates.io at
-  `0.1.0` and `0.1.1`; its `0.1.2` has never been published and no publication
-  milestone authorizes it, so the `Unreleased` section below is not on the
-  registry. `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
+  `0.1.0` and `0.1.1`; its `0.1.2` has not yet been published. Service M009 now
+  authorizes a future manual `0.1.2` publication, but until that milestone closes
+  the `Unreleased` section below is still not on the registry. `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
   `eggup-eggpack`, and `eggup-curl` are the published `0.1.2` set.
   `eggup-transport-footprint` is `publish = false`
   ([registry.md](../plans/registry.md)).
