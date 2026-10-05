@@ -167,10 +167,16 @@ This is exactly the evidence the plan required and that no macOS result could
 supply: the mapped-image rename, the deferred deletion, and the rollback of a
 running Windows executable are all confirmed natively.
 
-The same run also failed on `tests::bound_source_stages_open_object_after_root_rename`
+That run also failed on `tests::bound_source_stages_open_object_after_root_rename`
 in the core lib (43 passed, 1 failed) — a pre-existing Windows portability gap in
 a fixture that had never run on Windows, exposed for the first time by turning
 this lane into a full `cargo test --workspace`. Fixed in `1c86ef0`.
+
+**Final qualification: run `37376971555` on `c53b55c`, all four lanes green** —
+`Stable checks`, `MSRV check`, `macOS tests`, and `windows-check`. The Windows
+lane reports **489 passing tests and 0 failing targets** across
+`cargo test --workspace --all-targets --locked --no-fail-fast`. M010's Windows
+obligations are met by executed evidence, not by compilation.
 
 ## Residual risk
 

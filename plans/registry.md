@@ -43,7 +43,7 @@ Eggup owns consumer-side acquisition, verification, candidate validation, local 
 
 | Workstream | Closed work | Evidence |
 |---|---|---|
-| Verified update core | M001-M009 closed; M010/M011 implemented and locally green, awaiting hosted Windows evidence | `plans/closure/verified-update-core/` |
+| Verified update core | M001-M011 closed; hosted run `37376971555` green on Stable/MSRV/macOS/Windows | `plans/closure/verified-update-core/` |
 | Acquisition transport | M001-M006 closed; M007 conditionally closed; M008 closed; M009 published `eggup-curl 0.1.2` and closed 2026-10-04; **M010 is the one open milestone** | `plans/closure/acquisition-transport/` |
 | Service lifecycle | M001-M009 closed; `eggup-service 0.1.2` published 2026-10-05 | `plans/closure/service-lifecycle/` |
 | Archive extraction | M001 foundation historical; M001a superseded; M001b closed; M001c historical predecessor (stop resolved by M001d); M001d closed | `plans/closure/archive-extraction/` |
@@ -103,7 +103,7 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
-| Verified update core | M001-M011 closed (M010/M011 implemented and locally green) | `eggup-core 0.1.3` publication to carry M010/M011 + audit fixes |
+| Verified update core | M001-M011 closed and hosted-green (`37376971555`) | `eggup-core 0.1.3` publication to carry M010/M011 + audit fixes |
 | Acquisition transport | M001-M006 closed; M007 conditionally closed; M008 closed; M009 published `eggup-curl 0.1.2` and closed | M010 `eggup-acquisition 0.1.3` publication (**unblocked** — Service M009 closed 2026-10-05) |
 | Service lifecycle | M001-M009 closed; `eggup-service 0.1.2` published 2026-10-05 | — (service substrate now resolvable from the registry) |
 | Archive extraction | M001/M001a historical; M001b closed; M001c historical predecessor with stop resolved by M001d; M001d closed | — |
@@ -115,8 +115,8 @@ Eggsearch M003, Service M004, Verified Update Core M007, Service M005, Acquisiti
 
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Verified update core | M010 current-executable transaction parity corrective | closed (impl `95f7567`, identity fix after `37368735504`) | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md`; `plans/closure/verified-update-core/010-status.md` | 11 integration fixtures + 2 unit fixtures; hosted Windows lane caught a missing Windows identity check — fixed with a cross-platform SHA-256 binding; `self-replace` Windows-only dep; unpublished |
-| Verified update core | M011 proof-authorized stale-lock recovery | closed (impl `95f7567`; local gate green) | `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md`; `plans/closure/verified-update-core/011-status.md` | 14 fixtures + example verifier; default `acquire` still fail-closed; unpublished |
+| Verified update core | M010 current-executable transaction parity corrective | closed; hosted run `37376971555` green on all four lanes | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md`; `plans/closure/verified-update-core/010-status.md` | 11 integration fixtures + 2 unit fixtures; hosted Windows lane caught a missing Windows identity check — fixed with a cross-platform SHA-256 binding; `self-replace` Windows-only dep; unpublished |
+| Verified update core | M011 proof-authorized stale-lock recovery | closed; hosted run `37376971555` green on all four lanes | `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md`; `plans/closure/verified-update-core/011-status.md` | 14 fixtures + example verifier; default `acquire` still fail-closed; unpublished |
 | Service lifecycle | M009 eggup-service 0.1.2 publication | closed 2026-10-05 | `plans/implementation/service-lifecycle/009-eggup-service-0.1.2-publication.md`; `plans/closure/service-lifecycle/009-status.md` | published from `7fb84bc`; registry checksum matches locally built `.crate`; registry-only fixture 10/10; no `src/` change; `v0.1.2` unmoved |
 | Acquisition transport | M009 eggup-curl 0.1.2 publication | closed 2026-10-04 | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md`; `plans/closure/acquisition-transport/009-status.md` | published from `b485228`, hosted run `37223895075` green on all lanes; registry-only fixture 6/6 with registry-source lockfile; no `src/` change; `v0.1.1`/`v0.1.2` unmoved, release `0.1.2` notes extended; M007 Windows live-loopback limitation retained |
 | Acquisition transport | M010 eggup-acquisition 0.1.3 publication | ready (release order now satisfied) | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md` | Service M009 closed 2026-10-05; M009 curl publication closed; the two `0b8cb98` acquisition fixes are implemented and green, so this is publication-only. `eggup-eggpack 0.1.2` pins `=0.1.2` and needs a separate adapter republication to inherit the fix |

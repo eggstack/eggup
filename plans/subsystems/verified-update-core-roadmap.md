@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M011 closed; 0.1.2 core/archive pair published to crates.io; M010/M011 substrate correctives implemented in the working tree and awaiting an `eggup-core 0.1.3` publication milestone
+Status: active; M001-M011 closed and hosted-green (run `37376971555`); 0.1.2 core/archive pair published to crates.io; M010/M011 implemented but unpublished pending an `eggup-core 0.1.3` publication milestone
 
 Long-term references:
 

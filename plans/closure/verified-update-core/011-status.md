@@ -192,11 +192,11 @@ for another deployment's record:
 
 ## Hosted evidence
 
-Run `37367758362` on `95f7567` — see the "Verification status" section appended
-below once the run completes. `ci.yml` now runs
-`cargo test -p eggup-core --test stale_lock_recovery --locked` in the
-`windows-check` job, because `rename` and file-deletion semantics differ per
-platform and a macOS pass is not evidence for Windows.
+Run `37376971555` on `c53b55c`, all four lanes green. The `windows-check` lane
+executes `cargo test -p eggup-core --test stale_lock_recovery --locked` natively
+— `rename` and file-deletion semantics differ per platform, and a macOS pass is
+not evidence for Windows. The Windows lane reports **489 passing tests and 0
+failing targets** across the full workspace run.
 
 ## Residual risk
 

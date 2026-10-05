@@ -64,13 +64,19 @@ Windows test coverage, so one failing target must not hide the state of the rest
 If a new Core milestone adds platform-dependent filesystem or running-image
 behaviour, add its fixture here — a local macOS pass says nothing about Windows.
 
-**This lane has already paid for itself twice.** Turning on
+**This lane has already paid for itself, repeatedly.** Turning on
 `cargo test --workspace` exposed `bound_source_stages_open_object_after_root_rename`
 failing on Windows (renaming a directory that contains an open handle is refused
-there), a portability gap that had been invisible for the crate's whole life. The
-Core M010 fixtures caught a missing Windows identity check in the same period.
-Both were compile-clean on Linux and macOS. Assume more exist until the lane has
-been green for a while, and fix them rather than narrowing the step.
+there), a portability gap invisible for the crate's whole life, plus twelve
+`eggup-service` fixtures rejected for hardcoding POSIX paths that are not
+absolute on Windows. The Core M010 fixtures caught a missing Windows identity
+check in the same period. All were compile-clean on Linux and macOS, and the
+twelve were invisible until `--no-fail-fast` stopped the first failing target
+from hiding them.
+
+The lane reached all-green on run `37376971555`. Treat it as an active finding
+source: when a Windows failure appears, fix the portability gap rather than
+narrowing the step, and keep `--no-fail-fast`.
 
 ## Known coverage gaps — check these before claiming evidence
 
