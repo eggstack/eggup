@@ -5,12 +5,15 @@ Rust workspace (edition 2021, MSRV 1.89, `resolver = "2"`). `unsafe_code = "deny
 ## Workspace layout
 
 - `crates/eggup-core` — policy-neutral local mechanics: `InstallPlan → Prepared → Verified → Validated → Receipt`. Sole dep: `sha2`. Never add transport, service-manager, or Eggpack deps here.
-- `crates/eggup-acquisition` — transport-neutral seam (`AcquisitionTransport`, `FixtureTransport`, `FetchLimits`). No eggup deps.
-- `crates/eggup-eggfetch` — native HTTP adapter; depends only on `eggup-acquisition`.
-- `crates/eggup-service` — manager-neutral lifecycle; depends only on `eggup-core`.
+- `crates/eggup-acquisition` — transport-neutral seam (`AcquisitionTransport`, `FixtureTransport`, `ComposedTransport`, `FetchLimits`). Zero dependencies — not even `sha2`. No eggup deps.
+- `crates/eggup-eggfetch` — native HTTP adapter (`eggfetch-core` + `tokio` + `futures-util`); depends only on `eggup-acquisition`. Must not know `eggup-curl` exists.
+- `crates/eggup-curl` — external-curl adapter, no embedded HTTP/TLS stack; depends only on `eggup-acquisition`. Must not know `eggup-eggfetch` exists. Transport composition lives in the seam, never in an adapter.
+- `crates/eggup-service` — manager-neutral lifecycle; depends only on `eggup-core` (+ `windows-args`, + `windows-service` on Windows). Unpublished.
+- `crates/eggup-archive` — bounded allowlisted local tar.gz/zip extraction; deps `tar`, `zip`, `flate2`, `fs_at`, `sha2`, dev-dep `eggup-core`. No transport, authenticity, or live-installation policy.
 - `crates/eggup-eggpack` — optional leaf adapter for Eggpack ReleaseManifest v1; published to crates.io (`=0.1.2`), depends on `core` + `archive` + `acquisition` (each pinned `=0.1.2`, local paths) + `eggpack-manifest = "=0.1.0"` from the registry. Only crate allowed to touch producer types.
+- `crates/eggup-transport-footprint` — non-published (`publish = false`) footprint fixtures: `curl_only` / `eggfetch_only` / `dual` binaries behind `required-features`.
 
-New crates must join `Cargo.toml` members, inherit the 5 shared keys, and set `[lints] workspace = true`.
+New crates must join `Cargo.toml` members, inherit the 5 shared keys (`version`, `edition`, `rust-version`, `license`, `repository`), and set `[lints] workspace = true`. All published crates also carry `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]`.
 
 ## Verify (in this order)
 
@@ -30,13 +33,16 @@ CI (`.github/workflows/ci.yml`) adds what the script lacks: MSRV `cargo check` o
 
 ## Where to look
 
-Start at `architecture/overview.md`, then the deep dive for the crate at hand:
+Start at `architecture/overview.md` (birds-eye view, module map, cross-cutting invariants, deep-dive index), then the deep dive for the crate at hand:
 
 - `eggup-core` → `architecture/core-transaction.md` + contracts in `crates/eggup-core/docs/{domain,verification,transaction}.md`
 - `eggup-acquisition` → `architecture/acquisition.md`
 - `eggup-eggfetch` → `architecture/eggfetch-adapter.md`
+- `eggup-curl` → `architecture/curl-adapter.md`
 - `eggup-service` → `architecture/service-lifecycle.md`
+- `eggup-archive` → `architecture/archive-extraction.md`
 - `eggup-eggpack` → `architecture/eggpack-adapter.md`
+- `eggup-transport-footprint` → `architecture/transport-footprint.md`
 - workspace, CI, plans/process → `architecture/tooling-governance.md`
 
 On-demand skills (via the `skill` tool): `planning-workflow`, `verify-workflow`
