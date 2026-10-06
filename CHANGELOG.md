@@ -153,11 +153,27 @@ claims are made by any of these crates.
 > requirements and inherit `eggup-acquisition 0.1.3` automatically on the next
 > resolve.
 
-- `eggup-core`, `eggup-archive`, `eggup-eggfetch`, and `eggup-eggpack`: the
-  workspace source version is `0.1.3`, but **none of these are published yet**.
-  Their 0.1.3 publication milestones (Core M012/M013, Archive M004, Acquisition
-  M011, Eggpack M005) are tracked separately, and the unpublished Core/eggfetch
-  content below remains registry-invisible until those close.
+- `eggup-eggfetch 0.1.3` (Acquisition Transport M011): carries the three
+  workspace bug-audit fixes absent from the published `0.1.2`. A `Result` API
+  could panic because the tokio runtime was built with `.expect()`, so a
+  runtime-build failure (fd exhaustion, driver creation failure) aborted the
+  process from inside a fallible fetch; runtime-build and thread-teardown
+  failures now return `AcquisitionError::Unavailable`, which composition already
+  knows how to handle. The runtime is now built once per calling thread rather
+  than once per fetch: a `current_thread` runtime is `Send` but not `Sync`, so
+  caching one on the transport would have made `EggfetchTransport` `!Sync` and
+  broken callers sharing one transport across threads — a thread-local keeps
+  the auto-traits intact. And `TooLarge` could report `limit: 0`, contradicting
+  the documented meaning of that field; the mapper now takes a mandatory `u64`
+  and every call site passes the bound it actually enforces. No public API
+  change, so no consumer migration is required. `eggup-acquisition` is a caret
+  requirement, so this package resolves the `0.1.3` seam above.
+
+- `eggup-core`, `eggup-archive`, and `eggup-eggpack`: the workspace source
+  version is `0.1.3`, but **none of these are published yet**. Their 0.1.3
+  publication milestones (Core M012/M013, Archive M004, Eggpack M005) are
+  tracked separately, and the unpublished content below remains
+  registry-invisible until those close.
 
 ## Unreleased
 

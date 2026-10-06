@@ -1,9 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.1.3 — 2026-10-06
 
-Nothing in this section has been published. `0.1.2` remains the published
-baseline on crates.io, and no publication milestone authorizes these entries.
+Published to crates.io (`plans/closure/acquisition-transport/011-status.md`).
+No public API change, no transport-policy change, and no new runtime or API
+feature. Composition and dual-transport behavior live in `eggup-acquisition`
+(`ComposedTransport`, `CompositionPolicy`) and `eggup-curl`; see those
+changelogs. `EggfetchTransport` remains shareable across threads.
+
+`eggup-acquisition` is a caret requirement, so this package resolves the
+published `eggup-acquisition 0.1.3` and inherits its composed-budget fix with
+no change on the consumer side.
+
 No consumer migration is required: no public API changed, and the
 previously-panicking `block_on` path now returns
 `AcquisitionError::Unavailable`, which is the error variant composition
@@ -28,6 +36,11 @@ dual-transport behavior live in `eggup-acquisition` (`ComposedTransport`,
   `TooLarge { limit: 0 }` — a documented field meaning "the bound that was
   exceeded". The mapper now takes a mandatory `u64` and every call site passes
   the bound it actually enforces.
+
+## Unreleased
+
+Nothing in this section has been published. `0.1.3` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
 
 ## 0.1.2 — 2026-10-02
 
