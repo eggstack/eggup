@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M011 closed and hosted-green (run `37376971555`); 0.1.2 core/archive pair published to crates.io; M010/M011 implemented but unpublished pending an `eggup-core 0.1.3` publication milestone
+Status: active; M001-M011 closed and hosted-green (run `37376971555`); M012 0.1.x API-compatibility corrective ready; M013 eggup-core 0.1.3 publication blocked on M012 + Acquisition M010
 
 Long-term references:
 
@@ -178,7 +178,18 @@ M009 core/archive 0.1.2 publication [CLOSED 2026-09-28]
 
 M010 + M011 closures
         |
-        `--> future core package/publication qualification [NAMED FOLLOW-ON; plan intentionally unwritten]
+        v
+M012 0.1.x public-error compatibility corrective [READY]
+        |
+        +-------------------------+
+        |                         |
+        |                 Acquisition M010
+        |                 workspace 0.1.3 + acquisition publish
+        |                         |
+        +------------+------------+
+                     |
+                     v
+M013 eggup-core 0.1.3 publication [BLOCKED]
 ```
 
 - M001 -> M002: hard.
@@ -386,6 +397,34 @@ Exit conditions:
 - partial recovery preserves real evidence;
 - EggPool's stronger stale-lock behavior is representable without importing its provenance/package-manager policy.
 
+### M012 — 0.1.x public-error compatibility corrective
+
+Class: API compatibility / release corrective.
+
+Plan: `plans/implementation/verified-update-core/012-0.1x-public-error-compatibility-corrective.md`.
+
+Status: ready.
+
+Restore the published `eggup-core 0.1.2` `Error` variant set while retaining
+M010/M011 semantics. Keep fault injection structural but out of the packaged
+public error surface, and move stale-lock retained-evidence failures into a new
+recovery-specific non-exhaustive error/result used only by the still-unpublished
+M011 APIs. Prove compatibility with an unchanged exhaustive-match fixture and
+with published `eggup-service 0.1.2`.
+
+### M013 — eggup-core 0.1.3 publication and registry handoff
+
+Class: package promotion / downstream handoff.
+
+Plan: `plans/implementation/verified-update-core/013-eggup-core-0.1.3-publication.md`.
+
+Status: blocked on M012 and Acquisition M010.
+
+Publish the hosted-qualified M010/M011 substrate plus the M012 compatibility
+correction and earlier Core audit fixes. Registry-only direct and
+`eggup-service 0.1.2 -> eggup-core 0.1.3` proofs are mandatory. M013 closure
+is the versioned Core gate for authoring Gregg M004 and EggPool M007.
+
 ## 8. Cross-cutting requirements
 
 ### Storage and migration
@@ -435,14 +474,11 @@ Every safety-sensitive public type documents what it proves and what it does not
 
 ## 11. Completion definition
 
-The original runtime roadmap closed through M009, but current Gregg/EggPool parity
-research reopened two already-normative Core obligations as M010/M011. The
-already-qualified 0.1.2 core/archive pair remains published (`eggup-core 0.1.2` then
-`eggup-archive 0.1.2`, 2026-09-28, from release-prep commit `e8e07eb`,
-tagged `v0.1.2` with GitHub Release `0.1.2`); publication stayed manual and
-irreversible-step aware throughout. No prior publication is reopened. A future Core package/publication milestone is
-intentionally unwritten until M010/M011 close and the resulting public/API surface
-is qualified.
+M010/M011 are implemented and hosted-green, but their current unpublished public
+Error additions are not patch-compatible with the published 0.1.2 exhaustive enum.
+M012 is the compatibility gate; M013 is the explicit registry handoff. The
+already-qualified 0.1.2 core/archive pair remains published and no prior
+publication/tag is reopened.
 
 ## 12. Milestone status
 
@@ -460,3 +496,5 @@ is qualified.
 | M009 | closed | `plans/implementation/verified-update-core/009-core-archive-0.1.2-publication.md` | `plans/closure/verified-update-core/009-status.md` | — (pair published 2026-09-28; Consumer M006 gate satisfied) |
 | M010 | closed | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md` | `plans/closure/verified-update-core/010-status.md` | — (`CurrentExecutable` + `InstallPlan::for_current_executable`; `StagePlacement::InsideInstallationRoot`; Windows-native fixtures in CI) |
 | M011 | closed | `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md` | `plans/closure/verified-update-core/011-status.md` | — (`LockObservation` + `StaleLockVerifier`; default `acquire` still fail-closed; claim/race fixtures run natively on Windows in CI) |
+| M012 | ready | `plans/implementation/verified-update-core/012-0.1x-public-error-compatibility-corrective.md` | — | M010/M011 closed; preserve published 0.1.2 Error surface |
+| M013 | blocked | `plans/implementation/verified-update-core/013-eggup-core-0.1.3-publication.md` | — | M012 closure + Acquisition M010 closure + exact-head hosted qualification |
