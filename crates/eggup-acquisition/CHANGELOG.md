@@ -1,19 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.1.3 — 2026-10-06
 
-Nothing in this section has been published. `0.1.2` remains the published
-baseline on crates.io, and no publication milestone authorizes these entries.
-M010 (`eggup-acquisition 0.1.3`) is the milestone that will publish them.
+Published to crates.io from the workspace `0.1.3` source version
+(`plans/closure/acquisition-transport/010-status.md`). The crate has **zero
+`[dependencies]`**, before and after. No public API change; `FetchLimits` field
+types, defaults, and validation messages are untouched, so this is
+semver-compatible within `0.1.x` and no migration is required.
 
-The two `0b8cb98` bug-audit fixes, both verified absent from the published
-`0.1.2` source:
+These two bug-audit fixes were already implemented and green in the local tree
+(commit `0b8cb98`, 2026-10-04) but were **absent from the published `0.1.2`**,
+which was published from `02a1d32` on 2026-10-02.
 
 - **Fixed: a fallback adapter restarted the caller's total time budget.**
   `ComposedTransport` passed the caller's original `FetchLimits` to the secondary
   adapter, so one composed fetch could run for roughly twice the caller's
-  deadline. `FetchLimits::total_timeout` is documented as the *total* deadline,
-  so the fallback now receives only the remaining budget, with `connect_timeout`
+  deadline — the connect phase is part of the total wall-clock budget.
+  `FetchLimits::total_timeout` is documented as the *total* deadline, so the
+  fallback now receives only the remaining budget, with `connect_timeout`
   clamped alongside it to preserve `connect_timeout <= total_timeout`. When the
   budget is already exhausted the fallback is not attempted at all and the
   result is a `Timeout`, rather than starting a doomed attempt.
@@ -28,7 +32,19 @@ The two `0b8cb98` bug-audit fixes, both verified absent from the published
 at every transport boundary in the published `0.1.2`, as is the retirement of
 `Option` from `max_artifact_bytes` (see the `0.1.2` section below). An earlier
 revision of this file filed both under `Unreleased` as an "M007 unpublished
-corrective", which was misleading for anyone reading the published crate.
+corrective", which was misleading for anyone reading the published crate; that
+wording is corrected here rather than left standing.
+
+Transport fallback remains *not* release/source fallback: an exact `NotFound`
+stays terminal for the requested URL. Diagnostic redaction is unchanged, and no
+raw upstream, command-line, or credential material is ever embedded. The part
+file is still created exclusively, owner-private (`0600` on Unix), never
+symlink-followed, and promoted with race-safe no-clobber semantics.
+
+## Unreleased
+
+Nothing in this section has been published. `0.1.3` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
 
 ## 0.1.2 — 2026-10-02
 

@@ -79,6 +79,12 @@ claims are made by any of these crates.
 > composed window until the fix is republished. `eggup-curl 0.1.2` keeps a
 > caret-compatible `eggup-acquisition` requirement, so it inherits an
 > `eggup-acquisition 0.1.3` automatically once one is published.
+>
+> **Status update (2026-10-06):** `eggup-acquisition 0.1.3` is published, so
+> this caveat is **resolved for every `^0.1.0` consumer** (`eggup-curl`,
+> `eggup-eggfetch`) automatically on their next resolve. It **remains open for
+> `eggup-eggpack 0.1.2`**, which exact-pins `=0.1.2` and therefore still composes
+> against the defective seam until `eggup-eggpack 0.1.3` is published.
 
 - `eggup-curl 0.1.2` (first crates.io publication): the lightweight
   external-`curl` acquisition adapter, promoted as a package only. It fetches
@@ -113,14 +119,56 @@ claims are made by any of these crates.
   `eggup-core = ^0.1.0` requirement is unchanged and resolves from the registry.
   No migration is required for consumers of `0.1.1`. Published 2026-10-05.
 
+## 0.1.3 — 2026-10-06, in progress
+
+The 0.1.3 source version is being published to crates.io crate-by-crate, because
+`version.workspace = true` forces the local tree to claim `0.1.3` for all seven
+published crates while each crate is published only when its own milestone
+closes. Every entry below states which crate is actually on the registry; no
+crate is implied to be published by the mere presence of this section.
+
+Integrity remains SHA-256 checksum evidence only; no authenticity or signature
+claims are made by any of these crates.
+
+- `eggup-acquisition 0.1.3` (published 2026-10-06, Acquisition Transport M010):
+  carries the two workspace bug-audit fixes from `0b8cb98` that are absent from
+  the published `0.1.2` source. A `ComposedTransport` fallback previously
+  received the caller's full `FetchLimits` instead of the remaining budget, so
+  one composed fetch could run for roughly twice the documented total deadline;
+  it now receives only the remaining budget with `connect_timeout` clamped to
+  preserve `connect_timeout <= total_timeout`, and an already-exhausted budget
+  reports `Timeout` without attempting the secondary transport. Separately, a
+  part file could be left on disk when its permission hardening failed; both
+  failure paths now drop the handle and remove the candidate. No public API
+  change — `FetchLimits` field types, defaults, and validation are untouched,
+  so this is semver-compatible within `0.1.x` and requires no migration. The
+  crate keeps **zero** `[dependencies]`.
+
+> **The `eggup-eggpack 0.1.2` caveat is still open at this point.** The
+> published `eggup-eggpack 0.1.2` exact-pins `eggup-acquisition = "=0.1.2"`, so
+> it does **not** receive the seam fixes above: adapter consumers that compose
+> two transports must pin `eggup-acquisition 0.1.3` themselves, or tolerate the
+> doubled composed window, until `eggup-eggpack 0.1.3` is published.
+> `eggup-curl 0.1.2` and `eggup-eggfetch 0.1.2` keep caret-compatible
+> requirements and inherit `eggup-acquisition 0.1.3` automatically on the next
+> resolve.
+
+- `eggup-core`, `eggup-archive`, `eggup-eggfetch`, and `eggup-eggpack`: the
+  workspace source version is `0.1.3`, but **none of these are published yet**.
+  Their 0.1.3 publication milestones (Core M012/M013, Archive M004, Acquisition
+  M011, Eggpack M005) are tracked separately, and the unpublished Core/eggfetch
+  content below remains registry-invisible until those close.
+
 ## Unreleased
 
 The workspace-wide bug-audit fixes below are recorded here as well as in the
 per-crate changelogs, because they are **not** on the registry. Published
 baselines are `0.1.2` for all seven published crates. No publication milestone
-authorizes these entries yet, and the two acquisition fixes below are the
-specific payload of the open Acquisition M010 milestone
-(`eggup-acquisition 0.1.3`).
+authorizes these entries yet.
+
+The two `0b8cb98` acquisition fixes that previously lived in this section are no
+longer here: they were published as `eggup-acquisition 0.1.3` on 2026-10-06
+(Acquisition Transport M010) and are recorded in the `0.1.3` section above.
 
 - `eggup-core` gains current-executable transaction parity (Verified Update Core
   M010): `CurrentExecutable` and `InstallPlan::for_current_executable` let a

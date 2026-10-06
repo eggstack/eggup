@@ -995,15 +995,19 @@ fn adapter_pins_registry_eggpack_manifest_and_no_producer_crates() {
              the producer schema comes from the registry"
         );
     }
-    // The adapter's Eggup edges stay exact-pinned at the published 0.1.2 set so
-    // it cannot silently resolve a different published seam.
+    // The adapter's Eggup edges stay exact-pinned at the same published set as
+    // the adapter itself, so it cannot silently resolve a different published
+    // seam. Derived from this package's own version rather than hardcoded: the
+    // invariant is "pinned to *our* version", and a hardcoded literal would
+    // silently stop testing anything after the first workspace bump.
+    let own = format!("={}", env!("CARGO_PKG_VERSION"));
     for eggup_dep in [
-        "eggup-core = { version = \"=0.1.2\"",
-        "eggup-archive = { version = \"=0.1.2\"",
-        "eggup-acquisition = { version = \"=0.1.2\"",
+        format!("eggup-core = {{ version = \"{own}\""),
+        format!("eggup-archive = {{ version = \"{own}\""),
+        format!("eggup-acquisition = {{ version = \"{own}\""),
     ] {
         assert!(
-            cargo_toml.contains(eggup_dep),
+            cargo_toml.contains(&eggup_dep),
             "adapter must keep its exact {eggup_dep} pin"
         );
     }
