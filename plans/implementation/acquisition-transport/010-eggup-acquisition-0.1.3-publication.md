@@ -1,6 +1,6 @@
 # M010 — eggup-acquisition 0.1.3 publication (workspace 0.1.3 source version)
 
-Status: blocked on Service M009 release-order dependency
+Status: ready; Service M009 release-order dependency satisfied 2026-10-05
 
 Repository baseline: `b485228d1edebe27e2dd691310c7c68f60d97d8d`
 
@@ -16,7 +16,7 @@ Hard dependencies:
 - `0b8cb98` landed the two acquisition defect fixes this milestone publishes.
 - `eggup-acquisition 0.1.2` is published from `02a1d32`; `0.1.3` is absent and
   `eggup-acquisition` is already owned, so no name or ownership gate applies.
-- **Release-order dependency:** Service M009 must publish `eggup-service 0.1.2` before this plan moves the shared workspace version to 0.1.3. This is packaging/version ordering, not a transport-runtime dependency.
+- **Satisfied release-order dependency:** Service M009 published `eggup-service 0.1.2` on 2026-10-05. The workspace may now advance to 0.1.3 without skipping the qualified service 0.1.2 release.
 
 Downstream trigger: every registry consumer of the acquisition seam that
 composes two transports is currently reachable for the doubled-total-deadline
