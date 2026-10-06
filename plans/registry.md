@@ -201,11 +201,11 @@ CodeGG M005, Verified Update Core M007, and Service Lifecycle M005-M008 remain c
 | Service lifecycle | M005 prepared-transaction lifecycle integration | closed | `plans/closure/service-lifecycle/005-status.md` |
 | Service lifecycle | M006 daemon update disposition/reference qualification | closed | `plans/closure/service-lifecycle/006-status.md` |
 | Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
-| Consumer adoption | M004 Gregg | writable; plan intentionally unwritten | prerequisites satisfied (acquisition M005/M006 + service M006 closed, hosted matrix green); no migration authorized |
+| Consumer adoption | M004 Gregg | blocked; plan intentionally unwritten | Core M012/M013 + Acquisition M010; Service M009 and Core M010/M011 already closed |
 | Consumer adoption | M005 CodeGG | closed | `plans/closure/consumer-adoption/005-status.md`; producer release mapping remains application/Eggpack-owned |
 | Verified update core | M009 core/archive 0.1.2 publication | closed 2026-09-28 | `plans/closure/verified-update-core/009-status.md` (pair published, smoke 3/3, `v0.1.2` + Release `0.1.2`) |
 | Consumer adoption | M006 Egress | closed 2026-09-29; M003-landed addendum recorded | — |
-| Consumer adoption | M007 EggPool selective | deferred | broader core maturity |
+| Consumer adoption | M007 EggPool selective | blocked/evidence-driven; plan intentionally unwritten | Core M012/M013; only StandaloneRust transaction in scope |
 | Eggpack manifest interoperability | M002 archive extraction handoff | closed with hosted qualification (M002a) | M002a green run `36477024102` (Stable clippy/tests/docs + MSRV + macOS + Windows adapter runtime) |
 | Eggpack manifest interoperability | M004 package/API promotion | closed | M004a closed; Eggpack Release Manifest M003 published `eggpack-manifest 0.1.0`; M004 then published `acquisition`/`eggfetch`/`eggpack` 0.1.2 from `02a1d32` (see M004 closure) |
 | Authenticity/signatures | future | ADR required | trust standard not selected |
