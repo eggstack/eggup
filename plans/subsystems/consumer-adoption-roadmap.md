@@ -115,7 +115,7 @@ qualified core M006 + acquisition M004
 
 M006 Egress was unblocked by Archive Extraction M001d closure (`plans/closure/archive-extraction/001d-status.md`, hosted run `36335233644`) and its adoption plan is registered at `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md`. Verified Core M009 closed the publication gate on 2026-09-28 (`eggup-core 0.1.2` + `eggup-archive 0.1.2` registry-visible; `plans/closure/verified-update-core/009-status.md`), and Egress Delivery M003 landed the adoption on 2026-09-29 with hosted Linux/macOS/Windows updater evidence — M006 is closed (see `plans/closure/consumer-adoption/006-status.md` M003-landed addendum). No git/path dependency entered Egress's publishable release state.
 
-M007 EggPool selective adoption remains evidence-driven. Current review shows its standalone-Rust branch can adopt the generic current-executable transaction only after Core M010/M011 close; uv/pipx/pip provenance and package-manager rollback remain EggPool-owned.
+M007 EggPool selective adoption remains evidence-driven. Core M010/M011 are closed; its standalone-Rust branch becomes authorable only after Core M012 preserves the 0.1.x boundary and M013 publishes the versioned Core. uv/pipx/pip provenance and package-manager rollback remain EggPool-owned.
 ```
 
 ## 7. Milestones
