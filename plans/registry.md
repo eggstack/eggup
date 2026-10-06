@@ -4,7 +4,7 @@ Status: active
 
 Last implementation/closure baseline reviewed: `44d7fdf6d31d67a2e2c8b0f62aa4f00ec365daeb` (Core M010/M011 final hosted-qualified line; run `37376971555` green on Stable/MSRV/macOS/Windows; subsequent `44d7fdf6` is docs-only governance correction)
 
-Latest planning registration head: `64180880492e52eb6f8c06158001d3f31b272b91` (Core M012/M013, Acquisition M011, Archive M004, Eggpack M005 registered; Acquisition M010 unblocked; Gregg/EggPool gates reconciled).
+Latest planning registration head before this header refresh: `d6a4722c30494e2aee29c2d8ee58a0eb69f51c26` (Core M012/M013, Acquisition M011, Archive M004, Eggpack M005 registered; Acquisition M010 unblocked; Gregg/EggPool versioned-handoff gates reconciled).
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record; historical)
 
