@@ -334,10 +334,16 @@ enum FailureAt {
 }
 
 fn check_failure(configured: Option<FailureAt>, point: FailureAt) -> Result<()> {
+    // `configured` is only ever `Some` through the test-only
+    // `prepare_with_failure` entry point, so in a packaged build the injected
+    // branch does not exist at all rather than existing and being unreachable.
+    #[cfg(test)]
     if configured == Some(point) {
         return Err(Error::injected(format!(
             "injected preparation failure at {point:?}"
         )));
     }
+    #[cfg(not(test))]
+    let _ = (configured, point);
     Ok(())
 }

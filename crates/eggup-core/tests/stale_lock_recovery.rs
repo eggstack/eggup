@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use eggup_core::{
-    Error, LockObservation, LockStatus, MutationLock, ProductId, ReleaseId, StaleLockDecision,
-    StaleLockVerifier,
+    Error, LockObservation, LockStatus, MutationLock, ProductId, RecoveryError, ReleaseId,
+    StaleLockDecision, StaleLockVerifier,
 };
 
 static NEXT_ROOT: AtomicU64 = AtomicU64::new(0);
@@ -130,6 +130,8 @@ fn ordinary_acquire_never_recovers_an_existing_record() {
     for _ in 0..2 {
         let error = MutationLock::acquire(root.path(), &product(), &release())
             .expect_err("an existing record must never be recovered by default");
+        // The default entry point keeps the published `Error` result type; only
+        // the opt-in recovery APIs return `RecoveryError`.
         assert!(matches!(error, Error::UpdateInProgress { .. }), "{error:?}");
     }
     assert!(
@@ -154,7 +156,10 @@ fn only_proven_stale_displaces_the_record() {
             &Fixed(decision),
         )
         .expect_err("a non-stale verdict must keep the record");
-        assert!(matches!(error, Error::UpdateInProgress { .. }), "{error:?}");
+        assert!(
+            matches!(error, RecoveryError::Core(Error::UpdateInProgress { .. })),
+            "{error:?}"
+        );
         assert_eq!(
             fs::read_to_string(root.lock_path()).expect("read"),
             planted,
@@ -228,7 +233,10 @@ fn unknown_record_format_is_observed_without_inventing_fields() {
     let verifier = Recording::new(StaleLockDecision::Unknown);
     let error = MutationLock::acquire_with_recovery(root.path(), &product(), &release(), &verifier)
         .expect_err("an unproven record must not be displaced");
-    assert!(matches!(error, Error::UpdateInProgress { .. }));
+    assert!(matches!(
+        error,
+        RecoveryError::Core(Error::UpdateInProgress { .. })
+    ));
 
     let seen = verifier.seen.borrow();
     assert_eq!(seen.len(), 1);
@@ -332,7 +340,10 @@ fn record_replaced_after_observation_is_never_deleted() {
     let error = MutationLock::acquire_with_recovery(root.path(), &product(), &release(), &verifier)
         .expect_err("a changed record must not be claimed");
 
-    assert!(matches!(error, Error::UpdateInProgress { .. }), "{error:?}");
+    assert!(
+        matches!(error, RecoveryError::Core(Error::UpdateInProgress { .. })),
+        "{error:?}"
+    );
     assert_eq!(
         fs::read_to_string(root.lock_path()).expect("read"),
         "pid=2 nonce=2 product=a release=b\n",
@@ -378,7 +389,10 @@ fn record_replaced_during_verification_is_never_claimed() {
     let error = MutationLock::acquire_with_recovery(root.path(), &product(), &release(), &verifier)
         .expect_err("a record that changed before the claim must not be displaced");
 
-    assert!(matches!(error, Error::UpdateInProgress { .. }), "{error:?}");
+    assert!(
+        matches!(error, RecoveryError::Core(Error::UpdateInProgress { .. })),
+        "{error:?}"
+    );
     assert_eq!(
         fs::read_to_string(root.lock_path()).expect("read"),
         "pid=2 nonce=2 product=a release=b\n",
@@ -404,12 +418,12 @@ fn retained_evidence_error_names_the_real_path() {
     // A directory occupying the claim name is not how this happens in practice;
     // the point under test is the reporting contract, so exercise the typed
     // error directly through the same shape the claim path produces.
-    let error = Error::RecoveryRequired {
+    let error = RecoveryError::RecoveryRequired {
         evidence: root.path().join(".eggup-stale-claim-example"),
         detail: "claimed stale lock record could not be removed".to_string(),
     };
     match &error {
-        Error::RecoveryRequired { evidence, detail } => {
+        RecoveryError::RecoveryRequired { evidence, detail } => {
             assert!(detail.contains("could not be removed"));
             assert!(evidence.to_string_lossy().contains(".eggup-stale-claim-"));
         }

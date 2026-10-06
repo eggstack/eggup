@@ -78,3 +78,12 @@ binding the authorization to that observation's exact bytes. Core decides no
 staleness from PID liveness, record age, executable name, or service state. A
 record replaced between observation and claim is never deleted, and a writer that
 creates the lock after the claim always wins.
+
+Those opt-in recovery entry points return `RecoveryResult<T>`, whose error is the
+`#[non_exhaustive]` `RecoveryError`. An ordinary contention or I/O failure is
+`RecoveryError::Core(Error)` and chains to the inner `Error`; retained evidence is
+`RecoveryError::RecoveryRequired { evidence, detail }`, where `evidence` is a
+real filesystem path reachable through `RecoveryError::evidence()` without parsing
+`Display`. The default `MutationLock::acquire` and every published commit method
+keep returning `Result<T, Error>`, so the `Error` variant set shipped in `0.1.2`
+is unchanged.

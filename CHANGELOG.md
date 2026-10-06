@@ -180,8 +180,11 @@ longer here: they were published as `eggup-acquisition 0.1.3` on 2026-10-06
   truthfully that a kept-installed Windows self-update still holds a mapped old
   generation whose deletion is scheduled for process exit. `self-replace` is
   added as a **Windows-only** dependency; the Unix/macOS graph is unchanged
-  (`sha2` only). The new `Error::RecoveryRequired` variant is breaking for an
-  exhaustive `match` on `Error`.
+  (`sha2` only). `CleanupDisposition` is not `#[non_exhaustive]`, so this new
+  variant is a source-visible addition to that one enum; no `eggstack` consumer
+  references the type. Retained evidence is reported through a new
+  `RecoveryError` rather than a new `Error` variant, so an exhaustive `match` on
+  `Error` compiles unchanged (Verified Update Core M012).
 
 - `eggup-core` gains proof-authorized stale-lock recovery (Verified Update Core
   M011): `LockObservation`, `StaleLockDecision`, `StaleLockVerifier`, and
@@ -207,9 +210,10 @@ longer here: they were published as `eggup-acquisition 0.1.3` on 2026-10-06
 - Core audit fixes (unpublished): bound-source staging dropped the executable
   bit for every `PermissionsIntent::Preserve` member; a fully successful
   rollback could be reported as `RecoveryRequired` with
-  `rollback_verified: false`; `Error::Injected` was added, which is **breaking**
-  for an exhaustive `match` on the non-`non_exhaustive` `Error` enum. See
-  `crates/eggup-core/CHANGELOG.md`.
+  `rollback_verified: false`; injected fault failures are now classified
+  structurally rather than by substring, without adding a public `Error` variant,
+  so the published `Error` surface stays compatible (Verified Update Core M012).
+  See `crates/eggup-core/CHANGELOG.md`.
 
 - Archive audit fixes (unpublished): Windows device-name validation accepted
   `COM0`/`LPT0` and the reserved console names `CONIN$`, `CONOUT$`, `CLOCK$`;

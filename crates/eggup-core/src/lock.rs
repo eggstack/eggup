@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::domain::{ProductId, ReleaseId};
-use crate::error::{Error, Result};
+use crate::error::{Error, RecoveryError, RecoveryResult, Result};
 
 static NEXT_LOCK_NONCE: AtomicU64 = AtomicU64::new(0);
 
@@ -236,7 +236,7 @@ impl MutationLock {
         product: &ProductId,
         release: &ReleaseId,
         verifier: &dyn StaleLockVerifier,
-    ) -> Result<Self> {
+    ) -> RecoveryResult<Self> {
         if let Some(lock) = Self::create_new(root, product, release)? {
             return Ok(lock);
         }
@@ -249,14 +249,16 @@ impl MutationLock {
                     Some(lock) => Ok(lock),
                     None => Err(Error::UpdateInProgress {
                         lock: lock_path(root),
-                    }),
+                    }
+                    .into()),
                 };
             }
         };
         if verifier.classify(&observed) != StaleLockDecision::ProvenStale {
             return Err(Error::UpdateInProgress {
                 lock: observed.path().to_path_buf(),
-            });
+            }
+            .into());
         }
         let claim = Self::claim(root, &observed)?;
         fire_post_claim_hook();
@@ -279,7 +281,8 @@ impl MutationLock {
                 remove_claim(&claim)?;
                 Err(Error::UpdateInProgress {
                     lock: lock_path(root),
-                })
+                }
+                .into())
             }
             Err(error) => {
                 // We displaced the stale record but could not take the domain.
@@ -287,7 +290,7 @@ impl MutationLock {
                 // outcome; silently dropping the record would let the caller
                 // believe recovery succeeded.
                 match remove_claim(&claim) {
-                    Ok(()) => Err(error),
+                    Ok(()) => Err(error.into()),
                     Err(retained) => Err(retained),
                 }
             }
@@ -401,15 +404,15 @@ impl MutationLock {
     /// same-filesystem rename. The claimed object is re-read and must still equal
     /// the authorized observation; if it does not, the displacement is undone
     /// where that is safe, and otherwise reported with its real retained path.
-    fn claim(root: &Path, observed: &LockObservation) -> Result<PathBuf> {
+    fn claim(root: &Path, observed: &LockObservation) -> RecoveryResult<PathBuf> {
         let path = observed.path().to_path_buf();
         let claim = claim_path(root);
         // Re-read immediately before displacing: the verdict was given for a
         // specific observation, not for a pathname.
         match read_record(&path) {
             Ok(current) if current == observed.record() => {}
-            Ok(_) => return Err(Error::UpdateInProgress { lock: path }),
-            Err(error) => return Err(error),
+            Ok(_) => return Err(Error::UpdateInProgress { lock: path }.into()),
+            Err(error) => return Err(error.into()),
         }
         fs::rename(&path, &claim)
             .map_err(|source| Error::io("claiming the authorized stale lock record", source))?;
@@ -421,7 +424,7 @@ impl MutationLock {
             // The record is displaced but unverified. Reporting only the
             // underlying error would leave real Eggup-owned bytes behind with
             // no indication of where they are.
-            Err(error) => Err(Error::RecoveryRequired {
+            Err(error) => Err(RecoveryError::RecoveryRequired {
                 evidence: claim,
                 detail: format!("the claimed stale lock record could not be verified: {error}"),
             }),
@@ -532,14 +535,14 @@ fn read_record(path: &Path) -> Result<String> {
 /// On success the lock path holds the displaced record again and the caller
 /// reports contention; the displaced writer owns the domain, which is the
 /// correct outcome for a record Core was never authorized to displace.
-pub(crate) fn restore_claim(claim: &Path, lock: &Path, record: &str) -> Error {
+pub(crate) fn restore_claim(claim: &Path, lock: &Path, record: &str) -> RecoveryError {
     match OpenOptions::new().write(true).create_new(true).open(lock) {
         Ok(mut file) => {
             if let Err(source) = file.write_all(record.as_bytes()) {
                 // The lock path now holds a partial record. That is fail-closed:
                 // `acquire` still refuses it, and the full bytes remain at the
                 // claim, which is what the error names.
-                return Error::RecoveryRequired {
+                return RecoveryError::RecoveryRequired {
                     evidence: claim.to_path_buf(),
                     detail: format!(
                         "a displaced lock record was re-created at {} but could not be written: {source}",
@@ -550,11 +553,11 @@ pub(crate) fn restore_claim(claim: &Path, lock: &Path, record: &str) -> Error {
             // The claim is now a duplicate of a record that owns the lock path,
             // so removing it cannot lose the only copy.
             let _ = fs::remove_file(claim);
-            Error::UpdateInProgress {
+            RecoveryError::Core(Error::UpdateInProgress {
                 lock: lock.to_path_buf(),
-            }
+            })
         }
-        Err(_) => Error::RecoveryRequired {
+        Err(_) => RecoveryError::RecoveryRequired {
             evidence: claim.to_path_buf(),
             detail: "the displaced lock record was not the authorized one and the lock path was re-taken; retained evidence requires inspection"
                 .to_string(),
@@ -563,11 +566,11 @@ pub(crate) fn restore_claim(claim: &Path, lock: &Path, record: &str) -> Error {
 }
 
 /// Deletes a claim this transaction created and has already proven it owns.
-fn remove_claim(claim: &Path) -> Result<()> {
+fn remove_claim(claim: &Path) -> RecoveryResult<()> {
     match fs::remove_file(claim) {
         Ok(()) => Ok(()),
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(source) => Err(Error::RecoveryRequired {
+        Err(source) => Err(RecoveryError::RecoveryRequired {
             evidence: claim.to_path_buf(),
             detail: format!("a claimed stale lock record could not be removed: {source}"),
         }),

@@ -4,11 +4,35 @@
 
 Nothing in this section has been published. `0.1.2` remains the published
 baseline on crates.io, and no publication milestone authorizes these entries yet.
-Two `Error` variants are added below — `Error::Injected` and
-`Error::RecoveryRequired` — which is a **breaking** change for pre-1.0
-consumers: an exhaustive `match` on the non-`#[non_exhaustive]` `Error` enum
-needs a new arm for each. `CleanupDisposition` and `FailureCategory` are
-`#[non_exhaustive]`, so adding to those is additive.
+
+**Compatibility correction (Verified Update Core M012).** An earlier revision of
+this file claimed that adding variants here was additive because `Error`,
+`CleanupDisposition`, and `FailureCategory` were all `#[non_exhaustive]`. Only
+`FailureCategory` was. `Error` and `CleanupDisposition` are closed enums, so an
+added variant breaks an exhaustive downstream `match`. That claim was wrong and
+is corrected here rather than left standing.
+
+The state after M012:
+
+- `Error` keeps **exactly** the seven variants `0.1.2` published, so an
+  exhaustive `match` on `Error` compiles unchanged against both versions.
+  `Error::Injected` no longer exists in any packaged build; the fault harness
+  classifies injected failures structurally through a `#[cfg(test)]`-only
+  variant. `Error::RecoveryRequired` moved to a new `RecoveryError` type.
+- `FailureCategory` **is** `#[non_exhaustive]`, so
+  `FailureCategory::RetainedEvidence` is genuinely additive.
+- `CleanupDisposition` is **not** `#[non_exhaustive]`, so
+  `CleanupDisposition::DeferredToProcessExit` is a source-visible addition. It
+  is required by M010: a kept-installed Windows self-update cannot unlink the
+  previous generation while this very process still maps it, and no truthful
+  value exists in the two-variant 0.1.2 set (`Cleaned` would claim the old image
+  is gone; `RetainedForRecovery` would wrongly page an operator for a state that
+  needs no operator action). It was **not** marked `#[non_exhaustive]` to paper
+  over this: M012 deliberately avoids that attribute on already-published enums
+  because adding it breaks the same matches a new variant breaks, and future
+  extensibility belongs to an intentional 0.2/1.0 boundary. The affected
+  surface is a single accessor on `TransactionReceipt`; no `eggstack` consumer
+  references `CleanupDisposition` at all.
 
 Integrity evidence is still SHA-256 checksum only — no authenticity or
 signature claims. Self-update selects no release and infers no version.
@@ -38,9 +62,15 @@ signature claims. Self-update selects no release and infers no version.
   policy resolves; only then is its deletion scheduled for process exit. The
   receipt reports this distinctly rather than calling it either cleaned or
   stranded, and never reports it for an ordinary multi-member transaction.
-- **Added (breaking, pre-1.0): `Error::RecoveryRequired`.** Carries the real
-  retained evidence path when a transaction-owned artifact cannot be resolved
-  automatically, plus `FailureCategory::RetainedEvidence`.
+- **Added: retained-evidence reporting.** The real retained evidence path is
+  carried when a transaction-owned artifact cannot be resolved automatically,
+  plus `FailureCategory::RetainedEvidence`. This was originally added as
+  `Error::RecoveryRequired`, which would have been a **breaking** change for an
+  exhaustive `match` on the closed `Error` enum; M012 moved it to
+  `RecoveryError` instead, so the published `Error` variant set is preserved.
+  Receipt-level recovery semantics are unchanged: transaction rollback
+  uncertainty is still reported through `TransactionDisposition::RecoveryRequired`
+  and `CleanupDisposition::RetainedForRecovery`.
 - The bound executable identity is re-proved under the mutation lock and again
   immediately before the first live rename, so an image swapped in between
   fails closed before anything is moved.
@@ -101,10 +131,25 @@ signature claims. Self-update selects no release and infers no version.
 - **Changed: `FailureCategory::Injected` is now structural.** It was derived by
   checking whether an `InvalidInput` message contained the substring
   `"injected"`, so caller-supplied text could claim the test-harness category.
-  Fault injection now uses a dedicated `Error::Injected` variant. This adds a
-  variant to the public `Error` enum, which is not `#[non_exhaustive]` — an
-  exhaustive downstream match on `Error` needs a new arm. `Error::injected` is
-  `pub(crate)`; production code cannot construct the variant.
+  Fault injection now uses a dedicated internal marker that is compiled only for
+  this crate's own tests, converted straight into
+  `FailureCategory::Injected`. Message-substring classification is gone and
+  cannot come back. The packaged public `Error` enum is untouched, so there is no
+  downstream arm to add and no way for a production caller to claim the
+  test-harness category.
+
+- **Added: `RecoveryError` and `RecoveryResult<T>`.** A `#[non_exhaustive]` error
+  type separating ordinary core failures (`RecoveryError::Core`) from retained
+  evidence (`RecoveryError::RecoveryRequired { evidence, detail }`). It exposes
+  the real retained path through `evidence()` without parsing `Display`, carries
+  bounded detail through `detail()`, and chains as a `std::error::Error` whose
+  `source()` is the inner `Error`. `From<Error>` keeps propagation ergonomic.
+  Only the three still-unpublished M011 entry points
+  (`MutationLock::acquire_with_recovery`,
+  `ValidatedTransaction::commit_with_stale_lock_recovery`, and
+  `commit_with_post_commit_and_stale_lock_recovery`) return it; every published
+  signature, including `MutationLock::acquire` and all `commit` variants, keeps
+  `Result<T, Error>`.
 
 The `eggup-archive` and `eggup-service` crates consume this crate; see their
 changelogs for changes that cross the boundary.
