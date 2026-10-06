@@ -8,10 +8,19 @@ Source roadmap: `plans/subsystems/verified-update-core-roadmap.md#M010--current-
 
 Implementation commit: `95f756786708521c3315439df882106a53211cce`
 
-Publication status: **not published.** `eggup-core 0.1.2` remains the published
-baseline on crates.io; these additions require an `eggup-core 0.1.3`
-publication milestone that has not been authorized. `Error::RecoveryRequired`
-is breaking for an exhaustive `match` on `Error`.
+Publication status: **published as `eggup-core 0.1.3` on 2026-10-06** by Core M013,
+from `bd43683` (hosted run `37527706900` green on all four lanes). These additions
+first appeared on the registry in that version, not `0.1.2`.
+
+> **Correction (2026-10-06).** This line originally recorded the work as
+> unpublished and warned that `Error::RecoveryRequired` was breaking for an
+> exhaustive `match` on `Error`. M012 removed that variant from the public enum
+> before publication, so `Error` keeps exactly the seven variants `0.1.2`
+> published. `self-replace` shipped as a **Windows-only** dependency, so the
+> Unix/macOS graph stayed `sha2`-only as intended. `CleanupDisposition::
+> DeferredToProcessExit`, added here, did ship and is a source-visible addition to
+> a closed enum — see the compatibility section of
+> `plans/closure/verified-update-core/012-status.md`.
 
 ## Executive finding
 
@@ -204,3 +213,20 @@ obligations are met by executed evidence, not by compilation.
    runner.** The skip is printed, not silent. On such a runner the central claim
    is covered only by the `StagePlacement` assertion, which checks the type
    rather than the filesystem.
+
+---
+
+## M012 addendum (2026-10-06)
+
+This milestone first appeared on the registry in `eggup-core 0.1.3` (M013), not
+`0.1.2`. M012 subsequently removed the `Error::Injected` and
+`Error::RecoveryRequired` variants this milestone had added, so `Error` keeps
+exactly the seven variants `0.1.2` published and an exhaustive downstream `match`
+compiles unchanged across the upgrade. Injected faults stay structurally
+classified through a `#[cfg(test)]`-only marker.
+
+`CleanupDisposition::DeferredToProcessExit`, introduced by this milestone, was
+**kept**: it is required for a kept-installed Windows self-update to report its
+still-mapped old generation truthfully. `CleanupDisposition` is a closed enum, so
+this is a source-visible addition on one accessor; see the compatibility section
+of `plans/closure/verified-update-core/012-status.md`.

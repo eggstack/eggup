@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication blocked on workspace 0.1.3
+Status: active; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication closed 2026-10-06
 
 Long-term references:
 
@@ -240,4 +240,4 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M001d handle-backed source handoff | closed | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | `plans/closure/archive-extraction/001d-status.md` | — |
 | M002 Egress adoption | closed 2026-09-29 via Egress Delivery M003 | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` (+ M003-landed addendum) | — |
 | M003 Eggpack archive handoff | closed | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md` | `plans/closure/eggpack-manifest-interoperability/002-status.md` | — |
-| M004 eggup-archive 0.1.3 correctness publication | blocked | `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md` | — | Acquisition M010 workspace 0.1.3 bump |
+| M004 eggup-archive 0.1.3 correctness publication | closed 2026-10-06 | `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md` | `plans/closure/archive-extraction/004-status.md` | published from `bd43683` (run `37527706900` green); registry-only fixture 6/6 and fails the device-alias case against 0.1.2 |

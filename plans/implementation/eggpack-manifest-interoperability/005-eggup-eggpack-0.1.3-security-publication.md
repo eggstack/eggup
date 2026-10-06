@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 005 — eggup-eggpack 0.1.3 security/correctness publication
 
-Status: blocked on Acquisition M010, Core M013, and Archive M004
+Status: closed 2026-10-06; `eggup-eggpack 0.1.3` published from `bd43683` (run `37527706900` green on all four lanes)
 
 Repository baseline: `44d7fdf6d31d67a2e2c8b0f62aa4f00ec365daeb`
 

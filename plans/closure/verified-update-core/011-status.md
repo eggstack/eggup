@@ -8,9 +8,18 @@ Source roadmap: `plans/subsystems/verified-update-core-roadmap.md#M011--proof-au
 
 Implementation commit: `95f756786708521c3315439df882106a53211cce`
 
-Publication status: **not published.** `eggup-core 0.1.2` remains the published
-baseline on crates.io. `Error::RecoveryRequired` is breaking for an exhaustive
-`match` on `Error`.
+Publication status: **superseded by M012.** These APIs first appeared on the
+registry in `eggup-core 0.1.3` (M013), not 0.1.2.
+
+> **M012 addendum (2026-10-06).** This record originally flagged
+> `Error::RecoveryRequired` as a breaking addition to `Error`. M012 removed it
+> from the public enum before publication: retained evidence now lives in the new
+> `#[non_exhaustive] RecoveryError`, and `Error` keeps exactly the seven
+> variants `0.1.2` published. The two recovery entry points documented here
+> (`acquire_with_recovery`, `commit_with_stale_lock_recovery`) therefore return
+> `RecoveryResult<T>`. No behavior described below changed — the claim/recovery
+> protocol, the `ProvenStale`-only authorization rule, and the fail-closed
+> default are all unchanged. See `plans/closure/verified-update-core/012-status.md`.
 
 ## Executive finding
 

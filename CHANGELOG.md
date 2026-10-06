@@ -194,10 +194,19 @@ claims are made by any of these crates.
   resolves and runs against this Core. `self-replace` remains Windows-only, so
   the Unix/macOS graph is still `sha2` only.
 
-- `eggup-eggpack`: the workspace source version is `0.1.3`, but it is **not
-  published yet**. Its publication (Eggpack M005) depends on `eggup-core 0.1.3`
-  and `eggup-archive 0.1.3` above being on the registry, because it exact-pins
-  all three Eggup dependencies.
+- `eggup-eggpack 0.1.3` (Eggpack M005): closes a security defect present in
+  published `0.1.2`. `bind_archive_members` paired bound archive members to
+  declared members **positionally**, never cross-checking a bound member's
+  recorded `source_path`/`output_name` against the declaration it was about to
+  represent. A mismatched or reordered `BoundExtraction` could therefore bind
+  bytes under a different member identity whenever content digests happened to
+  match. Each bound member is now checked against its declared counterpart and
+  fails closed with `AdapterError::MapMismatch`. Identical-content members still
+  cannot substitute for one another. The exact Eggup dependency set moves to
+  `=0.1.3`, which also delivers the acquisition composed-budget fix to adapter
+  consumers for the first time. The adapter still selects no release, verifies no
+  authenticity, and authorizes no filesystem destination; caller-bound
+  destination APIs are unchanged.
 
 ## Unreleased
 

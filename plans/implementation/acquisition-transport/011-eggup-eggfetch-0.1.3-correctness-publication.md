@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 011 — eggup-eggfetch 0.1.3 correctness publication
 
-Status: active; Acquisition M010 closed (`eggup-acquisition 0.1.3` published 2026-10-06)
+Status: closed 2026-10-06; `eggup-eggfetch 0.1.3` published from `bd43683` (run `37527706900` green on all four lanes)
 
 Repository baseline: `44d7fdf6d31d67a2e2c8b0f62aa4f00ec365daeb`
 

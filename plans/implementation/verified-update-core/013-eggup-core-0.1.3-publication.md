@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 013 — eggup-core 0.1.3 publication and registry handoff
 
-Status: blocked on Core M012 and Acquisition M010
+Status: closed 2026-10-06; `eggup-core 0.1.3` published from `bd43683`, `v0.1.3` + release created
 
 Repository baseline: `44d7fdf6d31d67a2e2c8b0f62aa4f00ec365daeb`
 

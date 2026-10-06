@@ -1,9 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.1.3 — 2026-10-06
 
-Nothing in this section has been published. `0.1.2` remains the published
-baseline on crates.io, and no publication milestone authorizes these entries.
+Published to crates.io (`plans/closure/eggpack-manifest-interoperability/005-status.md`).
+No public API change and no new transport/TLS dependency. No consumer migration is
+required — no public signature changed, and correct declaration-order pairing is
+unaffected.
+
+This version exact-pins the 0.1.3 Eggup set, so a registry consumer now receives
+`eggup-acquisition 0.1.3` (and with it the composed-transport deadline fix) for
+the first time. A consumer resolving `eggup-eggpack 0.1.2` from crates.io never
+received that fix, because that version exact-pins `=0.1.2`.
+
 No consumer migration is required — no public API changed, and correct
 declaration-order pairing is unaffected. Note that a published crate
 (`0.1.2`) carries the positional-binding defect fixed below, so a consumer
@@ -22,6 +30,11 @@ new version is published.
   declared member it would be bound to, and a mismatch fails closed with
   `AdapterError::MapMismatch`. The correct declaration-order pairing is
   unaffected. No API change.
+
+## Unreleased
+
+Nothing in this section has been published. `0.1.3` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
 
 ## 0.1.2 — 2026-10-02
 

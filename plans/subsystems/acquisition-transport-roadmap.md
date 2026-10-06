@@ -262,7 +262,7 @@ Class: correctness publication.
 
 Plan: `plans/implementation/acquisition-transport/011-eggup-eggfetch-0.1.3-correctness-publication.md`.
 
-Status: blocked on M010.
+Status: closed 2026-10-06; `eggup-eggfetch 0.1.3` published.
 
 Publish the already-qualified Eggfetch audit fixes: runtime construction returns
 typed `Unavailable` instead of panicking, the current-thread runtime is cached
@@ -298,5 +298,5 @@ The subsystem's mechanism path is complete through M008 when current-head hosted
 | M007 | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` | `plans/closure/acquisition-transport/007-status.md` | Windows hosted runner blocks spawned curl loopback requests; no Windows live-HTTP claim |
 | M008 | closed | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md` | `plans/closure/acquisition-transport/008-status.md` | — |
 | M009 | closed | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md` | `plans/closure/acquisition-transport/009-status.md` | `eggup-curl 0.1.2` published from `b485228`, run `37223895075` green on all lanes; registry-only fixture 6/6; M007 Windows live-loopback limitation retained |
-| M010 | ready | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md` | — | Service M009 closed; publish two `0b8cb98` acquisition fixes |
-| M011 | blocked | `plans/implementation/acquisition-transport/011-eggup-eggfetch-0.1.3-correctness-publication.md` | — | M010 closure / registry-visible eggup-acquisition 0.1.3 |
+| M010 | closed | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md` | `plans/closure/acquisition-transport/010-status.md` | published from `bb8fe41` (run `37525705132` green); registry-only fixture 4/4 and fails 2/4 against the defective 0.1.2; curl/eggfetch float onto the fix |
+| M011 | closed | `plans/implementation/acquisition-transport/011-eggup-eggfetch-0.1.3-correctness-publication.md` | `plans/closure/acquisition-transport/011-status.md` | published from `bd43683` (run `37527706900` green); registry-only fixture 4/4 and aborts the process against 0.1.2 |

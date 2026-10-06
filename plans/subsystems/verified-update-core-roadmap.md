@@ -418,7 +418,7 @@ Class: package promotion / downstream handoff.
 
 Plan: `plans/implementation/verified-update-core/013-eggup-core-0.1.3-publication.md`.
 
-Status: blocked on M012 and Acquisition M010.
+Status: closed 2026-10-06; `eggup-core 0.1.3` published, `v0.1.3` and release created.
 
 Publish the hosted-qualified M010/M011 substrate plus the M012 compatibility
 correction and earlier Core audit fixes. Registry-only direct and
@@ -496,5 +496,5 @@ publication/tag is reopened.
 | M009 | closed | `plans/implementation/verified-update-core/009-core-archive-0.1.2-publication.md` | `plans/closure/verified-update-core/009-status.md` | — (pair published 2026-09-28; Consumer M006 gate satisfied) |
 | M010 | closed | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md` | `plans/closure/verified-update-core/010-status.md` | — (`CurrentExecutable` + `InstallPlan::for_current_executable`; `StagePlacement::InsideInstallationRoot`; Windows-native fixtures in CI) |
 | M011 | closed | `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md` | `plans/closure/verified-update-core/011-status.md` | — (`LockObservation` + `StaleLockVerifier`; default `acquire` still fail-closed; claim/race fixtures run natively on Windows in CI) |
-| M012 | ready | `plans/implementation/verified-update-core/012-0.1x-public-error-compatibility-corrective.md` | — | M010/M011 closed; preserve published 0.1.2 Error surface |
-| M013 | blocked | `plans/implementation/verified-update-core/013-eggup-core-0.1.3-publication.md` | — | M012 closure + Acquisition M010 closure + exact-head hosted qualification |
+| M012 | closed | `plans/implementation/verified-update-core/012-0.1x-public-error-compatibility-corrective.md` | `plans/closure/verified-update-core/012-status.md` | `Error` keeps the seven published 0.1.2 variants; retained evidence moved to `RecoveryError`; byte-identical exhaustive-match fixture fails against pre-M012 main |
+| M013 | closed | `plans/implementation/verified-update-core/013-eggup-core-0.1.3-publication.md` | `plans/closure/verified-update-core/013-status.md` | published from `bd43683` (run `37527706900` green); `v0.1.3` + release created; registry-only direct and `eggup-service 0.1.2 -> eggup-core 0.1.3` graphs green |
