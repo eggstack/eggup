@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001/M001a historical; M001b cleanup closed; M001c write half implemented with Section 14 handoff stop closed by M001d; M001d closed with green hosted qualification; M003 Eggpack handoff closed with hosted qualification (M002a); M002 Egress adoption closed 2026-09-29 via Egress Delivery M003
+Status: active; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication blocked on workspace 0.1.3
 
 Long-term references:
 
@@ -188,6 +188,16 @@ Status: closed; see `plans/closure/eggpack-manifest-interoperability/002-status.
 
 The existing Eggpack interoperability roadmap may retain its historical M002 numbering; this roadmap's M003 describes the archive subsystem side of that integration only.
 
+### M004 — eggup-archive 0.1.3 correctness publication
+
+Plan: `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md`.
+
+Status: blocked on Acquisition M010 establishing workspace 0.1.3.
+
+Publish the already-implemented Windows reserved-device validation,
+truthful-residue reporting, and hostile-entry regression coverage without API or
+extraction-policy change.
+
 ## 8. Cross-cutting requirements
 
 - Rust 1.89 baseline;
@@ -230,3 +240,4 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M001d handle-backed source handoff | closed | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md` | `plans/closure/archive-extraction/001d-status.md` | — |
 | M002 Egress adoption | closed 2026-09-29 via Egress Delivery M003 | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` (+ M003-landed addendum) | — |
 | M003 Eggpack archive handoff | closed | `plans/implementation/eggpack-manifest-interoperability/002-archive-extraction-handoff.md` | `plans/closure/eggpack-manifest-interoperability/002-status.md` | — |
+| M004 eggup-archive 0.1.3 correctness publication | blocked | `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md` | — | Acquisition M010 workspace 0.1.3 bump |
