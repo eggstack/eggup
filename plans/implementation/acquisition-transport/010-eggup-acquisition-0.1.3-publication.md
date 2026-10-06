@@ -1,6 +1,6 @@
 # M010 — eggup-acquisition 0.1.3 publication (workspace 0.1.3 source version)
 
-Status: ready; Service M009 release-order dependency satisfied 2026-10-05
+Status: closed 2026-10-06; `eggup-acquisition 0.1.3` published from `bb8fe41` (run `37525705132` green on all four lanes)
 
 Repository baseline: `b485228d1edebe27e2dd691310c7c68f60d97d8d`
 
