@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 005 — eggup-eggpack 0.1.3 security/correctness publication
 
-Status: blocked on Acquisition M010, Core M013, and Archive M002
+Status: blocked on Acquisition M010, Core M013, and Archive M004
 
 Repository baseline: `44d7fdf6d31d67a2e2c8b0f62aa4f00ec365daeb`
 
@@ -22,7 +22,7 @@ Before package/dry-run:
 
 - `eggup-acquisition 0.1.3` published by Acquisition M010;
 - `eggup-core 0.1.3` published by Core M013;
-- `eggup-archive 0.1.3` published by Archive M002;
+- `eggup-archive 0.1.3` published by Archive M004;
 - `eggpack-manifest 0.1.0` remains published/non-yanked.
 
 These exact versions are load-bearing because `eggup-eggpack` intentionally exact-pins its Eggup dependency set.
