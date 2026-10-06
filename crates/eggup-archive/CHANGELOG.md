@@ -1,9 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.1.3 — 2026-10-06
 
-Nothing in this section has been published. `0.1.2` remains the published
-baseline on crates.io, and no publication milestone authorizes these entries.
+Published to crates.io (`plans/closure/archive-extraction/004-status.md`).
+No public API change, no new extraction feature, and no new dependency. No
+consumer migration is required: the stricter `validate_output_name` can only
+reject output names that were never safe on Windows. Integrity remains SHA-256
+checksum evidence only; no authenticity or signature claims.
+
 No consumer migration is required: no API changed, and the stricter
 `validate_output_name` can only reject output names that were never safe on
 Windows.
@@ -31,6 +35,11 @@ remains SHA-256 checksum evidence only.
   assert each is rejected as `InvalidPath` with nothing escaping the parent
   directory and no partial extraction retained, including a hostile entry placed
   after a valid declared member. This is the crate's most important invariant.
+
+## Unreleased
+
+Nothing in this section has been published. `0.1.3` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
 
 ## 0.1.2 — 2026-09-28
 

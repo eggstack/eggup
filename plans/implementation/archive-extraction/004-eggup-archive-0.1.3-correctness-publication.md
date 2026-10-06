@@ -1,6 +1,6 @@
 # Archive Extraction Milestone 004 — eggup-archive 0.1.3 correctness publication
 
-Status: blocked on Acquisition M010 workspace 0.1.3 bump
+Status: active; Acquisition M010 closed and the workspace is at 0.1.3
 
 Repository baseline: `44d7fdf6d31d67a2e2c8b0f62aa4f00ec365daeb`
 

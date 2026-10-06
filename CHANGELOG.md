@@ -169,11 +169,35 @@ claims are made by any of these crates.
   change, so no consumer migration is required. `eggup-acquisition` is a caret
   requirement, so this package resolves the `0.1.3` seam above.
 
-- `eggup-core`, `eggup-archive`, and `eggup-eggpack`: the workspace source
-  version is `0.1.3`, but **none of these are published yet**. Their 0.1.3
-  publication milestones (Core M012/M013, Archive M004, Eggpack M005) are
-  tracked separately, and the unpublished content below remains
-  registry-invisible until those close.
+- `eggup-archive 0.1.3` (Archive Extraction M004): carries the workspace
+  bug-audit fixes absent from the published `0.1.2`. `validate_output_name`
+  rejected `COM1`..`COM9`/`LPT1`..`LPT9` but accepted `COM0`/`LPT0` and the
+  reserved console names `CONIN$`, `CONOUT$`, `CLOCK$`, all of which Windows
+  also maps to a device; all are now rejected as `InvalidPath`, while near
+  misses such as `com10` and `console` stay valid. `with_empty_residue`
+  recorded a residue path without verifying the private root was actually
+  empty, so a partially failed cleanup was reported under the original error
+  kind; the root is now verified and a root that still holds evidence is
+  promoted to `CleanupFailed`, making `residue_path()`'s documented "the
+  directory is empty" guarantee true. Hostile traversal names are now tested as
+  real tar and zip *entries* on the untrusted path rather than only as
+  caller-declared plan input. No API change, no new dependency.
+
+- `eggup-core 0.1.3` (Core M012/M013): current-executable transaction parity
+  (M010), proof-authorized stale-lock recovery (M011), the earlier Core audit
+  fixes, and the M012 public-error compatibility correction. M010/M011 were
+  never published, so this is their first appearance on the registry. The
+  `Error` enum keeps exactly the seven variants `0.1.2` published, proven by a
+  byte-identical external exhaustive-match fixture that compiles against both
+  versions and fails against the pre-M012 tree; retained evidence moved to a
+  new `#[non_exhaustive] RecoveryError`. The published `eggup-service 0.1.2`
+  resolves and runs against this Core. `self-replace` remains Windows-only, so
+  the Unix/macOS graph is still `sha2` only.
+
+- `eggup-eggpack`: the workspace source version is `0.1.3`, but it is **not
+  published yet**. Its publication (Eggpack M005) depends on `eggup-core 0.1.3`
+  and `eggup-archive 0.1.3` above being on the registry, because it exact-pins
+  all three Eggup dependencies.
 
 ## Unreleased
 

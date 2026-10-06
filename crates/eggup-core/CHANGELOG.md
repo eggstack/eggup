@@ -1,9 +1,32 @@
 # Changelog
 
+## 0.1.3 — 2026-10-06
+
+Published to crates.io (`plans/closure/verified-update-core/013-status.md`).
+Dependency surface remains `sha2` plus a **Windows-only** `self-replace`; the
+Unix/macOS package graph is unchanged. Integrity evidence is SHA-256 checksum
+only — no authenticity or signature claims. Self-update selects no release and
+infers no version.
+
+This version carries current-executable transaction parity (M010),
+proof-authorized stale-lock recovery (M011), the earlier Core audit fixes, and
+the M012 public-error compatibility correction. Because M010/M011 were never
+published, this is their first appearance on the registry.
+
+**Compatibility, stated precisely.** `Error` keeps exactly the seven variants
+`0.1.2` published, so an exhaustive `match` on it compiles unchanged against
+both versions — proven by an external fixture that is byte-identical between
+the two and fails against the pre-M012 tree. Retained evidence moved to a new
+`#[non_exhaustive] RecoveryError`. The one intentional source-visible addition
+is `CleanupDisposition::DeferredToProcessExit`, on a closed enum, required by
+M010 so a kept-installed Windows self-update does not report its still-mapped
+old generation as either cleaned or stranded. The compatibility section below
+explains why that addition is not removable.
+
 ## Unreleased
 
-Nothing in this section has been published. `0.1.2` remains the published
-baseline on crates.io, and no publication milestone authorizes these entries yet.
+Nothing in this section has been published. `0.1.3` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
 
 **Compatibility correction (Verified Update Core M012).** An earlier revision of
 this file claimed that adding variants here was additive because `Error`,
