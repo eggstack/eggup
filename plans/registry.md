@@ -2,9 +2,9 @@
 
 Status: active
 
-Last implementation/closure baseline reviewed: `db5b3121f17f92029a47c389e68a464bc4478b27` (Acquisition Transport M009 eggup-curl 0.1.2 published from `b485228` with hosted run `37223895075` green; runtime/package baseline is now the M009 publication at `b485228`, superseding the M004 publication at `02a1d32` whose closure remains `ea1f1c5`)
+Last implementation/closure baseline reviewed: `44d7fdf6d31d67a2e2c8b0f62aa4f00ec365daeb` (Core M010/M011 final hosted-qualified line; run `37376971555` green on Stable/MSRV/macOS/Windows; subsequent `44d7fdf6` is docs-only governance correction)
 
-Latest planning batch: post-M010/M011 hosted reconciliation plus the 0.1.3 release-train plans are registered. Core M010/M011 are closed with final hosted run `37376971555`; Service M009 is closed/published. New work is Core M012/M013, Acquisition M010/M011, Archive M004, and Eggpack Interop M005.
+Latest planning registration head: `64180880492e52eb6f8c06158001d3f31b272b91` (Core M012/M013, Acquisition M011, Archive M004, Eggpack M005 registered; Acquisition M010 unblocked; Gregg/EggPool gates reconciled).
 
 Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba56bc42f4531b` (M003 producer-gate execution/status record; historical)
 
