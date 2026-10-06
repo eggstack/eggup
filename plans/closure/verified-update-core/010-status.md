@@ -1,6 +1,6 @@
 # Verified Update Core M010 — Closure and Verification Record
 
-Status: closed (implementation and local verification)
+Status: closed; hosted-qualified on Stable/MSRV/macOS/Windows (`37376971555`)
 
 Source plan: `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md`
 
