@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M006 closed; M007 conditionally closed; M008 closed via Archive M001b hosted run 36222536670; M009 eggup-curl 0.1.2 published and closed; M010 eggup-acquisition 0.1.3 publication ready
+Status: M001-M006 closed; M007 conditionally closed; M008 closed; M009 eggup-curl 0.1.2 published/closed; M010 eggup-acquisition 0.1.3 ready; M011 eggup-eggfetch 0.1.3 blocked on M010
 
 Long-term references:
 
@@ -116,6 +116,9 @@ M007 boundary safety hardening [CONDITIONALLY CLOSED]
                       |
                       v
                  M010 eggup-acquisition 0.1.3 publication [READY]
+                      |
+                      v
+                 M011 eggup-eggfetch 0.1.3 publication [BLOCKED ON M010]
 ```
 
 ## 7. Milestones
@@ -253,6 +256,19 @@ The workspace `version.workspace` bump to `0.1.3` is unavoidable and forces
 resolves; M010 states that bookkeeping explicitly rather than leaving it
 implicit.
 
+### M011 — eggup-eggfetch 0.1.3 correctness publication
+
+Class: correctness publication.
+
+Plan: `plans/implementation/acquisition-transport/011-eggup-eggfetch-0.1.3-correctness-publication.md`.
+
+Status: blocked on M010.
+
+Publish the already-qualified Eggfetch audit fixes: runtime construction returns
+typed `Unavailable` instead of panicking, the current-thread runtime is cached
+per calling thread without changing sharing auto-traits, and `TooLarge`
+reports the actual enforced bound. No API or transport-policy change.
+
 ## 8. Cross-cutting requirements
 
 Transport adapters must preserve bounded body/output behavior, redaction, cancellation cleanup, and partial-file cleanup. Proxy behavior must be explicit rather than inherited accidentally. Transport fallback is never release/source fallback: `NotFound`, verification failure, cancellation, size-limit failure, and staging/promotion failure do not silently select another source.
@@ -267,7 +283,7 @@ Eggfetch version/feature choice may materially affect binary size. Measure rathe
 
 ## 11. Completion definition
 
-The subsystem's mechanism path is complete through M008 when current-head hosted Stable/MSRV/macOS/Windows qualification is green, the corrected native Eggfetch and lightweight curl paths satisfy the common bounded acquisition contract and truthful deadline ceilings, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. M009 is a separate package-promotion gate that makes the already-qualified curl path registry-consumable; it must not reopen transport semantics. M009 closed on 2026-10-04. M010 is a correctness-delivery publication for the two `0b8cb98` acquisition fixes and is the current next milestone.
+The subsystem's mechanism path is complete through M008 when current-head hosted Stable/MSRV/macOS/Windows qualification is green, the corrected native Eggfetch and lightweight curl paths satisfy the common bounded acquisition contract and truthful deadline ceilings, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. M009 is a separate package-promotion gate that makes the already-qualified curl path registry-consumable; it must not reopen transport semantics. M009 closed on 2026-10-04. M010 is the current correctness-delivery publication for the two `0b8cb98` acquisition fixes. M011 follows only to publish the already-qualified Eggfetch audit fixes against the registry-visible 0.1.3 seam.
 
 ## 12. Milestone status
 
@@ -282,4 +298,5 @@ The subsystem's mechanism path is complete through M008 when current-head hosted
 | M007 | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` | `plans/closure/acquisition-transport/007-status.md` | Windows hosted runner blocks spawned curl loopback requests; no Windows live-HTTP claim |
 | M008 | closed | `plans/implementation/acquisition-transport/008-subsecond-deadline-truthfulness-corrective.md` | `plans/closure/acquisition-transport/008-status.md` | — |
 | M009 | closed | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md` | `plans/closure/acquisition-transport/009-status.md` | `eggup-curl 0.1.2` published from `b485228`, run `37223895075` green on all lanes; registry-only fixture 6/6; M007 Windows live-loopback limitation retained |
-| M010 | ready | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md` | — | Publish the two `0b8cb98` acquisition fixes; `eggup-eggpack =0.1.2` pin needs a separate adapter republication |
+| M010 | ready | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md` | — | Service M009 closed; publish two `0b8cb98` acquisition fixes |
+| M011 | blocked | `plans/implementation/acquisition-transport/011-eggup-eggfetch-0.1.3-correctness-publication.md` | — | M010 closure / registry-visible eggup-acquisition 0.1.3 |
