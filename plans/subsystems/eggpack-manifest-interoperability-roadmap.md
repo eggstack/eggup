@@ -244,6 +244,16 @@ M004's production change is the mechanical promotion M004a identified: remove `p
 
 Eggpack owes M004 nothing further; do not wait on it. At the time of M004, `eggup-curl`, `eggup-service`, and `eggup-transport-footprint` were all unpublished; since then `eggup-curl 0.1.2` has been published (Acquisition M009, 2026-10-04), and `eggup-service` is published at `0.1.0`/`0.1.1` with its `0.1.2` still unauthorized, while `eggup-transport-footprint` remains `publish = false`. Eggsact's Git→registry migration stays separately authorized in `eggstack/eggsact`.
 
+### M005 — eggup-eggpack 0.1.3 security/correctness publication
+
+Status: blocked on Acquisition M010, Core M013, and Archive M004.
+
+Implementation plan: `plans/implementation/eggpack-manifest-interoperability/005-eggup-eggpack-0.1.3-security-publication.md`.
+
+Publish the existing member-identity cross-check that fixes the positional archive
+binding defect in registry 0.1.2, and move the adapter's exact Eggup dependency
+pins coherently to `=0.1.3`. No adapter policy/API change.
+
 ## 8. Cross-cutting requirements
 
 - Rust 1.89 baseline;
@@ -298,3 +308,4 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 | M003 Eggsact real-consumer manifest adoption | closed | plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md | plans/closure/eggpack-manifest-interoperability/003-status.md | — (closed via consumer `65c916b` + hosted CI `36902758482` and drift `36902758396`) |
 | M004a package/API promotion readiness preflight | closed | `plans/implementation/eggpack-manifest-interoperability/004a-package-api-promotion-readiness-preflight.md` | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | M004 has since closed on the proven set below; M004a itself published nothing; its Eggpack-owned item was satisfied — `eggpack-manifest 0.1.0` published 2026-10-02 |
 | M004 package/API promotion | closed | `plans/implementation/eggpack-manifest-interoperability/004-registry-package-api-promotion-and-publication.md` | `plans/closure/eggpack-manifest-interoperability/004-status.md` | published `eggup-acquisition`/`eggup-eggfetch`/`eggup-eggpack` 0.1.2 from `02a1d32`; hosted run `37090397398` green; registry-only adapter-only and Eggsact-shaped proofs green; `v0.1.1`/`v0.1.2` unmoved |
+| M005 eggup-eggpack 0.1.3 security/correctness publication | blocked | `plans/implementation/eggpack-manifest-interoperability/005-eggup-eggpack-0.1.3-security-publication.md` | — | Acquisition M010 + Core M013 + Archive M004; exact registry pins must all exist |
