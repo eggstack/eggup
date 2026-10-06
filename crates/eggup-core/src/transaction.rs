@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::domain::{AbsentPolicy, CommitOwnership, InstallPlan, MemberId, Ownership};
-use crate::error::{Error, Result};
+use crate::error::{Error, RecoveryError, RecoveryResult, Result};
 use crate::integrity::hash_file;
 use crate::lock::MutationLock;
 use crate::stage::PreparedTransaction;
@@ -206,11 +206,8 @@ pub(crate) fn report_for_error(
         ),
         Error::VerificationFailed(m) => (FailureCategory::Verification, m.clone()),
         Error::CandidateExecution(m) => (FailureCategory::Verification, m.clone()),
+        #[cfg(test)]
         Error::Injected(m) => (FailureCategory::Injected, m.clone()),
-        Error::RecoveryRequired { evidence, detail } => (
-            FailureCategory::RetainedEvidence,
-            format!("{} at {}", detail, evidence.display()),
-        ),
         Error::InvalidInput(m) => (FailureCategory::InvalidInput, m.clone()),
         Error::UnknownMember(m) => (FailureCategory::InvalidInput, format!("unknown member {m}")),
         Error::Io { operation, source } => (
@@ -342,9 +339,10 @@ impl PreparedTransaction {
         fault: Option<CommitFault>,
         post_commit: Option<PostCommitCheck<'_>>,
         stale_recovery: Option<&dyn crate::lock::StaleLockVerifier>,
-    ) -> Result<TransactionReceipt> {
+    ) -> RecoveryResult<TransactionReceipt> {
+        #[cfg(test)]
         if fault == Some(CommitFault::LockCreation) {
-            return Err(Error::injected("injected lock creation failure"));
+            return Err(Error::injected("injected lock creation failure").into());
         }
         // Preflight ownership classification before taking the lock so a
         // change between preflight and locked revalidation is detectable.
@@ -357,7 +355,8 @@ impl PreparedTransaction {
                 self.plan.installation_root(),
                 self.plan.product(),
                 self.plan.release(),
-            ),
+            )
+            .map_err(RecoveryError::from),
             Some(verifier) => MutationLock::acquire_with_recovery(
                 self.plan.installation_root(),
                 self.plan.product(),
@@ -394,6 +393,7 @@ impl PreparedTransaction {
                 restore_entries(&entries, &HashSet::new(), fault.clone());
             return finish_failure(self, lock, backup_root, verified, rollback_failure, report);
         }
+        #[cfg(test)]
         if fault == Some(CommitFault::BeforeFirstCommit) {
             let error = Error::injected("injected pre-commit failure");
             let report = report_for_error(FailurePhase::Commit, None, &error);
@@ -405,12 +405,14 @@ impl PreparedTransaction {
         let mut committed = HashSet::new();
         let members = self.plan.artifacts().iter().cloned().collect::<Vec<_>>();
         for member in members {
+            #[cfg(test)]
             let commit_should_fail = fault.as_ref().is_some_and(|candidate| match candidate {
                 CommitFault::Commit(id) | CommitFault::CommitThenRollback(id, _) => {
                     id == member.id()
                 }
                 _ => false,
             });
+            #[cfg(test)]
             if commit_should_fail {
                 let error = Error::injected(format!("injected commit failure at {}", member.id()));
                 let report =
@@ -607,8 +609,11 @@ impl PreparedTransaction {
         backup_root: &Path,
         fault: Option<CommitFault>,
     ) -> std::result::Result<(), (Option<MemberId>, Error)> {
+        #[cfg(not(test))]
+        let _ = &fault;
         let members = self.plan.artifacts().iter().cloned().collect::<Vec<_>>();
         for member in members {
+            #[cfg(test)]
             if fault == Some(CommitFault::Backup(member.id().clone())) {
                 return Err((
                     Some(member.id().clone()),
@@ -1031,7 +1036,7 @@ fn finish_failure_no_mutation(
     lock: MutationLock,
     nothing_mutated: bool,
     report: FailureReport,
-) -> Result<TransactionReceipt> {
+) -> RecoveryResult<TransactionReceipt> {
     debug_assert!(nothing_mutated);
     drop(lock);
     Ok(TransactionReceipt {
@@ -1055,7 +1060,7 @@ fn finish_failure(
     rollback_verified: bool,
     rollback_failure: Option<FailureReport>,
     report: FailureReport,
-) -> Result<TransactionReceipt> {
+) -> RecoveryResult<TransactionReceipt> {
     if rollback_verified && rollback_failure.is_none() {
         match fs::remove_dir_all(&backup_root) {
             Ok(()) => {

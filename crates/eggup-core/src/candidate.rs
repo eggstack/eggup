@@ -7,7 +7,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::domain::{CommitOwnership, MemberId};
-use crate::error::{Error, Result};
+use crate::error::{Error, RecoveryError, RecoveryResult, Result};
 use crate::integrity::{IntegrityStatus, VerifiedTransaction};
 use crate::transaction::{PostCommitFailurePolicy, TransactionReceipt};
 
@@ -451,6 +451,7 @@ impl ValidatedTransaction {
         self.verified
             .prepared
             .commit_inner(ownership, &digests, None, None, None)
+            .map_err(RecoveryError::into_core)
     }
 
     /// Commits the complete artifact set, runs one caller check while the
@@ -477,6 +478,7 @@ impl ValidatedTransaction {
         self.verified
             .prepared
             .commit_inner(ownership, &digests, None, Some((policy, check)), None)
+            .map_err(RecoveryError::into_core)
     }
 
     /// Commits with caller-authorized stale-lock recovery.
@@ -493,7 +495,7 @@ impl ValidatedTransaction {
         self,
         ownership: CommitOwnership<'_>,
         recovery: &dyn crate::lock::StaleLockVerifier,
-    ) -> Result<TransactionReceipt> {
+    ) -> RecoveryResult<TransactionReceipt> {
         let digests = self.verified.verified_digests();
         self.verified
             .prepared
@@ -508,7 +510,7 @@ impl ValidatedTransaction {
         policy: PostCommitFailurePolicy,
         recovery: &dyn crate::lock::StaleLockVerifier,
         check: F,
-    ) -> Result<TransactionReceipt>
+    ) -> RecoveryResult<TransactionReceipt>
     where
         F: FnOnce() -> std::result::Result<(), E>,
         E: std::fmt::Display,
@@ -536,6 +538,7 @@ impl ValidatedTransaction {
         self.verified
             .prepared
             .commit_inner(ownership, &digests, Some(fault), None, None)
+            .map_err(RecoveryError::into_core)
     }
 
     #[cfg(test)]
@@ -546,16 +549,19 @@ impl ValidatedTransaction {
         fault: crate::transaction::CommitFault,
     ) -> Result<TransactionReceipt> {
         let digests = self.verified.verified_digests();
-        self.verified.prepared.commit_inner(
-            ownership,
-            &digests,
-            Some(fault),
-            Some((
-                policy,
-                Box::new(|| Err("injected post-commit failure".to_string())),
-            )),
-            None,
-        )
+        self.verified
+            .prepared
+            .commit_inner(
+                ownership,
+                &digests,
+                Some(fault),
+                Some((
+                    policy,
+                    Box::new(|| Err("injected post-commit failure".to_string())),
+                )),
+                None,
+            )
+            .map_err(RecoveryError::into_core)
     }
 }
 

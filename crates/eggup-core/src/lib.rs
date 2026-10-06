@@ -34,7 +34,7 @@ pub use domain::{
     MemberId, Ownership, OwnershipVerifier, PermissionsIntent, ProductId, ReleaseId,
     StagePlacement,
 };
-pub use error::{Error, Result};
+pub use error::{Error, RecoveryError, RecoveryResult, Result};
 pub use integrity::{
     hash_file, parse_sha256_sidecar, verify_file, IntegrityResult, IntegrityStatus, Sha256Manifest,
     VerifiedTransaction,
@@ -1797,7 +1797,10 @@ mod tests {
         .expect_err("the competing writer owns the domain");
 
         assert!(
-            matches!(error, Error::UpdateInProgress { .. }),
+            matches!(
+                error,
+                crate::error::RecoveryError::Core(Error::UpdateInProgress { .. })
+            ),
             "expected typed contention, got {error:?}"
         );
         assert!(
@@ -1842,7 +1845,7 @@ mod tests {
         let error =
             crate::lock::restore_claim(&claim, &lock_path, "pid=1 nonce=1 product=a release=b\n");
         assert!(
-            matches!(error, Error::RecoveryRequired { .. }),
+            matches!(error, crate::error::RecoveryError::RecoveryRequired { .. }),
             "a re-taken lock path must retain the claim, got {error:?}"
         );
         assert_eq!(

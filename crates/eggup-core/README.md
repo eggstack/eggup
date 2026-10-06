@@ -31,7 +31,11 @@ Locks are fail-closed by default: `MutationLock::acquire` never recovers a stale
 record and `inspect` is read-only. Recovery is opt-in through
 `MutationLock::acquire_with_recovery`, which displaces a record only when a
 caller-supplied `StaleLockVerifier` returns `StaleLockDecision::ProvenStale`
-for the exact observation Core reported. Core never decides staleness from PID
+for the exact observation Core reported. That opt-in API returns
+`RecoveryResult<T>`: ordinary failures arrive as `RecoveryError::Core(Error)`,
+and retained evidence as `RecoveryError::RecoveryRequired`, which carries the
+real path via `RecoveryError::evidence()`. Default `acquire` keeps returning
+`Result<T, Error>`. Core never decides staleness from PID
 liveness, record age, executable name, or service state; see
 `examples/stale_lock_recovery.rs`.
 
