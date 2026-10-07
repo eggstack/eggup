@@ -192,7 +192,7 @@ The existing Eggpack interoperability roadmap may retain its historical M002 num
 
 Plan: `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md`.
 
-Status: blocked on Acquisition M010 establishing workspace 0.1.3.
+Status: closed 2026-10-06; `eggup-archive 0.1.3` published from `bd43683` (run `37527706900` green); see `plans/closure/archive-extraction/004-status.md`. The earlier Acquisition M010 workspace-0.1.3 gate is satisfied.
 
 Publish the already-implemented Windows reserved-device validation,
 truthful-residue reporting, and hostile-entry regression coverage without API or

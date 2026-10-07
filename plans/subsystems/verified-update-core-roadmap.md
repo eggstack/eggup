@@ -1,6 +1,6 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M011 closed and hosted-green (run `37376971555`); M012 0.1.x API-compatibility corrective ready; M013 eggup-core 0.1.3 publication blocked on M012 + Acquisition M010
+Status: active; M001-M011 closed and hosted-green (run `37376971555`); M012 0.1.x API-compatibility corrective closed (run `37527706900`); M013 eggup-core 0.1.3 published 2026-10-06 from `bd43683`
 
 Long-term references:
 
@@ -403,7 +403,7 @@ Class: API compatibility / release corrective.
 
 Plan: `plans/implementation/verified-update-core/012-0.1x-public-error-compatibility-corrective.md`.
 
-Status: ready.
+Status: closed; implemented in `cb9d045` and hosted-green in run `37527706900`; see `plans/closure/verified-update-core/012-status.md`. `Error` retains exactly the seven variants published in `0.1.2`, and the retained stale-lock evidence moved to `RecoveryError`.
 
 Restore the published `eggup-core 0.1.2` `Error` variant set while retaining
 M010/M011 semantics. Keep fault injection structural but out of the packaged

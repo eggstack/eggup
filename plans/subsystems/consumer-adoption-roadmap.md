@@ -1,6 +1,6 @@
 # Consumer Adoption and Compatibility Roadmap
 
-Status: active; existing adopters closed; Gregg M004 and EggPool M007 remain intentionally unwritten pending the versioned Core handoff
+Status: active; existing adopters closed; the versioned Core handoff shipped 2026-10-06 (Acquisition M010, Core M012/M013), so Gregg M004 and EggPool M007 are now authorable and remain intentionally unwritten
 
 Long-term references:
 
@@ -142,7 +142,7 @@ Plan: `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adopti
 
 Adopt corrected core/acquisition plus the Unix service substrate after acquisition M004 and service M003 closure. Preserve eggsearch-owned release/Cargo fallback, health, cron watchdog, and Windows-specific behavior until the corresponding shared layers are qualified.
 
-Closed by `plans/closure/consumer-adoption/003-status.md`. Eggsearch uses the immutable Eggup revision for its shared updater and Unix manager paths; Windows self-replacement/SCM remain consumer-owned. The measured release binary increase was 12.6%. Gregg's former footprint/transport prerequisite was subsequently resolved by acquisition M005/M006; Gregg M004 is now writable but remains intentionally unwritten.
+Closed by `plans/closure/consumer-adoption/003-status.md`. Eggsearch uses the immutable Eggup revision for its shared updater and Unix manager paths; Windows self-replacement/SCM remain consumer-owned. The measured release binary increase was 12.6%. Gregg's former footprint/transport prerequisite was subsequently resolved by acquisition M005/M006, and the versioned Core handoff (Acquisition M010, Core M012/M013) shipped 2026-10-06; Gregg M004 is authorable but remains intentionally unwritten.
 
 ### M004 — Gregg adoption
 
@@ -151,7 +151,7 @@ Do not execute the Gregg migration yet. Gregg was a read-only reference/test ora
 - acquisition M005: external curl adapter + explicit curl/Eggfetch transport composition;
 - service M006: managed/direct/stopped/foreign-preserved daemon update disposition and revalidation semantics.
 
-The parity gaps themselves are now closed and hosted-green: Core M010/M011 and Service M009 are complete. Gregg remains **blocked / intentionally unwritten** only until the release boundary is safe and versioned: Core M012 must preserve 0.1.x source compatibility, Acquisition M010 must publish the corrected acquisition seam, and Core M013 must publish the resulting Core. Gregg-owned release/version/target/Cargo-fallback semantics remain downstream policy.
+The parity gaps themselves are now closed and hosted-green: Core M010/M011 and Service M009 are complete. The release boundary Gregg was waiting on is safe and versioned as of 2026-10-06: Core M012 preserved 0.1.x source compatibility (`Error` keeps the seven variants published in `0.1.2`), Acquisition M010 published the corrected acquisition seam, and Core M013 published the resulting Core as `eggup-core 0.1.3`. **Gregg M004 is authorable** and remains intentionally unwritten. Gregg-owned release/version/target/Cargo-fallback semantics remain downstream policy.
 
 ### M005 — CodeGG managed-runfile bundle adoption
 
@@ -179,7 +179,7 @@ Replace duplicated generic tar.gz/zip extraction and pair rollback with the qual
 
 Adopt only low-level primitives that reduce ownership without weakening provenance/package-manager logic.
 
-The 2026-10-05 review of EggPool `fe3c308d` confirms that only the `StandaloneRust` local executable transaction is a clean Eggup target. The `UvTool`, `Pipx`, `PipEnvironment`, source-checkout, release catalog, PEP-440-like ordering, DB/config compatibility and package-manager rollback paths remain EggPool-owned. Core M010/M011 are now closed; M007 stays unwritten until M012 closes the 0.1.x compatibility boundary and M013 publishes the versioned Core handoff.
+The 2026-10-05 review of EggPool `fe3c308d` confirms that only the `StandaloneRust` local executable transaction is a clean Eggup target. The `UvTool`, `Pipx`, `PipEnvironment`, source-checkout, release catalog, PEP-440-like ordering, DB/config compatibility and package-manager rollback paths remain EggPool-owned. Core M010/M011 are closed, and the 0.1.x compatibility boundary closed with M012 and the versioned Core handoff published with M013 on 2026-10-06; **M007 is authorable** and remains intentionally unwritten.
 
 ## 8. Cross-cutting requirements
 
@@ -204,7 +204,7 @@ The roadmap closes when simple, service-aware, and multi-artifact consumers use 
 | M001 eggsact | closed | `plans/implementation/consumer-adoption/001-eggsact-first-adoption.md` | `plans/closure/consumer-adoption/001-status.md` | — |
 | M002 stegoeggo | closed | `plans/implementation/consumer-adoption/002-stegoeggo-second-adoption.md` | `plans/closure/consumer-adoption/002-status.md` | — |
 | M003 eggsearch | closed | `plans/implementation/consumer-adoption/003-eggsearch-service-aware-adoption.md` | `plans/closure/consumer-adoption/003-status.md` | — |
-| M004 Gregg | blocked; plan intentionally unwritten | — | — | Core M012 + M013; Acquisition M010. Service M009 and Core M010/M011 are closed |
+| M004 Gregg | authorable; plan intentionally unwritten | — | — | Every prior gate is closed — Service M009, Core M010/M011/M012/M013, Acquisition M010 (`eggup-core 0.1.3` + `eggup-acquisition 0.1.3` published 2026-10-06) |
 | M005 CodeGG | closed | `plans/implementation/consumer-adoption/005-codegg-managed-runfile-bundle-adoption.md` | `plans/closure/consumer-adoption/005-status.md` | — |
 | M006 Egress | closed 2026-09-29 | `plans/implementation/consumer-adoption/006-egress-archive-pair-adoption.md` | `plans/closure/consumer-adoption/006-status.md` (+ M003-landed addendum) | — (Egress Delivery M003 landed) |
-| M007 EggPool | blocked/evidence-driven; plan intentionally unwritten | — | — | Core M012 + M013; package-manager/provenance paths explicitly excluded |
+| M007 EggPool | authorable/evidence-driven; plan intentionally unwritten | — | — | Core M012 + M013 closed 2026-10-06; package-manager/provenance paths remain explicitly excluded |

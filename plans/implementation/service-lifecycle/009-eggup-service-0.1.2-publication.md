@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 009 — eggup-service 0.1.2 publication
 
-Status: ready
+Status: closed; see `plans/closure/service-lifecycle/009-status.md` (`eggup-service 0.1.2` published 2026-10-05 from `7fb84bc`, registry id `3411496`, checksum `c6288eb1…50e3f`)
 
 Repository baseline: `db5b3121f17f92029a47c389e68a464bc4478b27`
 

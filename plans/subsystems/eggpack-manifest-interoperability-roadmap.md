@@ -246,7 +246,7 @@ Eggpack owes M004 nothing further; do not wait on it. At the time of M004, `eggu
 
 ### M005 — eggup-eggpack 0.1.3 security/correctness publication
 
-Status: blocked on Acquisition M010, Core M013, and Archive M004.
+Status: closed 2026-10-06; `eggup-eggpack 0.1.3` published from `bd43683` (run `37527706900` green); see `plans/closure/eggpack-manifest-interoperability/005-status.md`. All three gates — Acquisition M010, Core M013, and Archive M004 — are satisfied.
 
 Implementation plan: `plans/implementation/eggpack-manifest-interoperability/005-eggup-eggpack-0.1.3-security-publication.md`.
 

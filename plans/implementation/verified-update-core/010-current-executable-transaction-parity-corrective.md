@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 010 — current-executable transaction parity corrective
 
-Status: ready
+Status: closed; see `plans/closure/verified-update-core/010-status.md` (implementation `95f75678`; hosted-qualified on Stable/MSRV/macOS/Windows, run `37376971555`)
 
 Repository baseline: `db5b3121f17f92029a47c389e68a464bc4478b27`
 

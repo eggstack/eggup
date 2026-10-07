@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M006 closed; M007 conditionally closed; M008 closed; M009 eggup-curl 0.1.2 published/closed; M010 eggup-acquisition 0.1.3 ready; M011 eggup-eggfetch 0.1.3 blocked on M010
+Status: M001-M009 closed; M010 eggup-acquisition 0.1.3 published/closed 2026-10-06 (from `bb8fe41`, run `37525705132`); M011 eggup-eggfetch 0.1.3 published/closed 2026-10-06 (from `bd43683`, run `37527706900`)
 
 Long-term references:
 
@@ -228,7 +228,7 @@ Class: package promotion / correctness delivery.
 
 Plan: `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md`.
 
-Status: ready.
+Status: closed 2026-10-06; `eggup-acquisition 0.1.3` published from `bb8fe41` (run `37525705132` green on all four lanes); see `plans/closure/acquisition-transport/010-status.md`. Registry-only fixture 4/4, failing 2/4 against the defective published 0.1.2.
 
 Published `eggup-acquisition 0.1.2` came from `02a1d32` on 2026-10-02 and does
 not contain the two acquisition fixes that landed afterwards in `0b8cb98`: the

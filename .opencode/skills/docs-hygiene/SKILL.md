@@ -98,6 +98,13 @@ Each has occurred at least once — check for them explicitly:
     "`deny(missing_docs)`" is a crate-root attribute, not a workspace lint, so a
     crate with no `lib.rs` has no `missing_docs` enforcement at all. State the
     exception where the rule is stated.
+13. **A summary table reconciled while its prose is left behind.** After the
+    0.1.3 train every roadmap *status table* said `closed` while the milestone
+    *body* above it still said `ready`/`blocked` — including two files where
+    M011/M013 bodies were updated and M010/M012 in the same file were missed.
+    Reconciling a milestone means every place that names it: the plan's
+    `Status:` line, the roadmap body entry, the roadmap header, the status table,
+    and any prose that restates the gate.
 
 ## Reporting
 
