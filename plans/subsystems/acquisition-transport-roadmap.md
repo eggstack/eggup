@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M009 closed; M010 eggup-acquisition 0.1.3 published/closed 2026-10-06 (from `bb8fe41`, run `37525705132`); M011 eggup-eggfetch 0.1.3 published/closed 2026-10-06 (from `bd43683`, run `37527706900`)
+Status: M001-M009 closed; M010 eggup-acquisition 0.1.3 published/closed 2026-10-06 (from `bb8fe41`, run `37525705132`); M011 eggup-eggfetch 0.1.3 published/closed 2026-10-06 (from `bd43683`, run `37527706900`); M012 sub-second deadline test-determinism corrective ready for handoff
 
 Long-term references:
 
@@ -269,6 +269,26 @@ typed `Unavailable` instead of panicking, the current-thread runtime is cached
 per calling thread without changing sharing auto-traits, and `TooLarge`
 reports the actual enforced bound. No API or transport-policy change.
 
+### M012 — sub-second deadline test determinism corrective
+
+Class: test/qualification corrective.
+
+Plan: `plans/implementation/acquisition-transport/012-sub-second-deadline-test-determinism-corrective.md`.
+
+Status: ready for handoff.
+
+Two `eggup-curl` tests hold sub-second `FetchLimits` values that are both the
+serialization under test and the live wall-clock budget the parent enforces
+against a real spawned child, so a correct transport is reported broken on a
+loaded host. Reproduced at baseline `9326730` on macOS under load: 3/40 failures
+with `Timeout { phase: "total" }` and a reported `0.77s` duration against a 750ms
+budget.
+
+M012 is **test-only**. It separates the asserted serialization from the enforced
+budget and replaces an absolute `elapsed` ceiling with deadline- and
+stall-relative bounds. It must not widen a production deadline, add tolerance,
+or retry. M007's Windows live-loopback limitation is unaffected and retained.
+
 ## 8. Cross-cutting requirements
 
 Transport adapters must preserve bounded body/output behavior, redaction, cancellation cleanup, and partial-file cleanup. Proxy behavior must be explicit rather than inherited accidentally. Transport fallback is never release/source fallback: `NotFound`, verification failure, cancellation, size-limit failure, and staging/promotion failure do not silently select another source.
@@ -283,7 +303,7 @@ Eggfetch version/feature choice may materially affect binary size. Measure rathe
 
 ## 11. Completion definition
 
-The subsystem's mechanism path is complete through M008 when current-head hosted Stable/MSRV/macOS/Windows qualification is green, the corrected native Eggfetch and lightweight curl paths satisfy the common bounded acquisition contract and truthful deadline ceilings, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. M009 is a separate package-promotion gate that makes the already-qualified curl path registry-consumable; it must not reopen transport semantics. M009 closed on 2026-10-04. M010 is the current correctness-delivery publication for the two `0b8cb98` acquisition fixes. M011 follows only to publish the already-qualified Eggfetch audit fixes against the registry-visible 0.1.3 seam.
+The subsystem's mechanism path is complete through M008 when current-head hosted Stable/MSRV/macOS/Windows qualification is green, the corrected native Eggfetch and lightweight curl paths satisfy the common bounded acquisition contract and truthful deadline ceilings, caller-selected composition is qualified, core remains transport-neutral, and no medium-or-higher acquisition safety/contract issue remains. M009 is a separate package-promotion gate that makes the already-qualified curl path registry-consumable; it must not reopen transport semantics. M009 closed on 2026-10-04. M010 is the current correctness-delivery publication for the two `0b8cb98` acquisition fixes. M011 follows only to publish the already-qualified Eggfetch audit fixes against the registry-visible 0.1.3 seam. M012 is a test-only qualification corrective: it changes no transport semantics and no packaged behavior, and exists because two deadline tests assert against host scheduling rather than against the contract.
 
 ## 12. Milestone status
 
@@ -300,3 +320,4 @@ The subsystem's mechanism path is complete through M008 when current-head hosted
 | M009 | closed | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md` | `plans/closure/acquisition-transport/009-status.md` | `eggup-curl 0.1.2` published from `b485228`, run `37223895075` green on all lanes; registry-only fixture 6/6; M007 Windows live-loopback limitation retained |
 | M010 | closed | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md` | `plans/closure/acquisition-transport/010-status.md` | published from `bb8fe41` (run `37525705132` green); registry-only fixture 4/4 and fails 2/4 against the defective 0.1.2; curl/eggfetch float onto the fix |
 | M011 | closed | `plans/implementation/acquisition-transport/011-eggup-eggfetch-0.1.3-correctness-publication.md` | `plans/closure/acquisition-transport/011-status.md` | published from `bd43683` (run `37527706900` green); registry-only fixture 4/4 and aborts the process against 0.1.2 |
+| M012 | ready for handoff | `plans/implementation/acquisition-transport/012-sub-second-deadline-test-determinism-corrective.md` | — | test-only; no dependency, no publication. Pre-change reproduction 3/40 at load ~62-65. Closes open finding 1 in `plans/registry.md` when implemented |

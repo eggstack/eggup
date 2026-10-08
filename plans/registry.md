@@ -46,7 +46,7 @@ Eggup owns consumer-side acquisition, verification, candidate validation, local 
 | Workstream | Closed work | Evidence |
 |---|---|---|
 | Verified update core | M001-M013 closed; `eggup-core 0.1.3` published 2026-10-06; hosted runs `37376971555` and `37527706900` green on Stable/MSRV/macOS/Windows | `plans/closure/verified-update-core/` |
-| Acquisition transport | M001-M011 closed; M009 published `eggup-curl 0.1.2` (2026-10-04), M010 published `eggup-acquisition 0.1.3` (2026-10-06), M011 published `eggup-eggfetch 0.1.3` (2026-10-06); **no open milestone** | `plans/closure/acquisition-transport/` |
+| Acquisition transport | M001-M011 closed; M009 published `eggup-curl 0.1.2` (2026-10-04), M010 published `eggup-acquisition 0.1.3` (2026-10-06), M011 published `eggup-eggfetch 0.1.3` (2026-10-06); M012 registered, `ready for handoff` | `plans/closure/acquisition-transport/` |
 | Service lifecycle | M001-M009 closed; `eggup-service 0.1.2` published 2026-10-05 | `plans/closure/service-lifecycle/` |
 | Archive extraction | M001 lineage + M001d closed; M004 published `eggup-archive 0.1.3` 2026-10-06 | `plans/closure/archive-extraction/` |
 | Eggpack manifest interoperability | M001-M005 all closed; M004 published the 0.1.2 triple, M005 published `eggup-eggpack 0.1.3` 2026-10-06 with the member-identity cross-check | `plans/closure/eggpack-manifest-interoperability/` |
@@ -109,8 +109,14 @@ before a milestone closes.
    pristine `bb8fe41` under load, so it predates and is unrelated to the 0.1.3
    train). Hosted CI passes both on every lane. The tests assert real behavior;
    the defect is test robustness, not transport semantics. A corrective should
-   separate the deadline-under-test from host scheduling pressure. **No plan is
-   registered yet.**
+   separate the deadline-under-test from host scheduling pressure. **Acquisition
+   M012 is registered for this** —
+   `plans/implementation/acquisition-transport/012-sub-second-deadline-test-determinism-corrective.md`,
+   `ready for handoff`. Reproduced at baseline `9326730` under load on macOS
+   (14 cores, loadavg 62–68): **3/40 failures** on
+   `build_curl_args_passes_sub_second_deadlines_to_fake_curl`, panicking with
+   `Timeout { phase: "total" }` at a reported `0.77s` against a 750 ms budget.
+   This finding closes when M012 closes.
 2. **`CleanupDisposition::DeferredToProcessExit` is a source-visible addition to
    a closed enum.** Required by M010 for truthful Windows self-update reporting;
    no truthful value exists in the `0.1.2` two-variant set, and marking the enum
@@ -149,7 +155,7 @@ The 2026-10-05 Gregg/EggPool parity gaps are now **fully closed**. Core M010/M01
 | Subsystem | Status | Next milestone |
 |---|---|---|
 | Verified update core | M001-M013 closed/hosted-green (`37527706900`) | — (`eggup-core 0.1.3` published; the 0.1.x compatibility gate is discharged) |
-| Acquisition transport | M001-M011 closed; acquisition/eggfetch 0.1.3 published, curl 0.1.2 published | — |
+| Acquisition transport | M001-M011 closed; acquisition/eggfetch 0.1.3 published, curl 0.1.2 published; M012 registered | M012 sub-second deadline test-determinism corrective — test-only, no dependency and no publication; closes post-0.1.3 open finding 1 |
 | Service lifecycle | M001-M009 closed; `eggup-service 0.1.2` published 2026-10-05 | — (service substrate now resolvable from the registry) |
 | Archive extraction | M001 lineage + M004 closed; `eggup-archive 0.1.3` published 2026-10-06 | — |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
@@ -168,6 +174,7 @@ The 2026-10-05 Gregg/EggPool parity gaps are now **fully closed**. Core M010/M01
 | Acquisition transport | M009 eggup-curl 0.1.2 publication | closed 2026-10-04 | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md`; `plans/closure/acquisition-transport/009-status.md` | published from `b485228`, hosted run `37223895075` green on all lanes; registry-only fixture 6/6 with registry-source lockfile; no `src/` change; `v0.1.1`/`v0.1.2` unmoved, release `0.1.2` notes extended; M007 Windows live-loopback limitation retained |
 | Acquisition transport | M010 eggup-acquisition 0.1.3 publication | closed 2026-10-06 | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md`; `plans/closure/acquisition-transport/010-status.md` | published from `bb8fe41` (run `37525705132` green); registry-only fixture 4/4 and fails 2/4 against the defective 0.1.2 |
 | Acquisition transport | M011 eggup-eggfetch 0.1.3 correctness publication | closed 2026-10-06 | `plans/implementation/acquisition-transport/011-eggup-eggfetch-0.1.3-correctness-publication.md`; `plans/closure/acquisition-transport/011-status.md` | published from `bd43683` (run `37527706900` green); registry-only fixture 4/4 and **aborts the process** against 0.1.2 |
+| Acquisition transport | M012 sub-second deadline test determinism corrective | ready for handoff 2026-10-08 | `plans/implementation/acquisition-transport/012-sub-second-deadline-test-determinism-corrective.md` | test-only; no production change, no dependency, no republication of `eggup-curl 0.1.2`. Pre-change reproduction 3/40 at load ~62-65. Discriminating closure check is a **loaded** rerun, not an unloaded one |
 | Archive extraction | M004 eggup-archive 0.1.3 correctness publication | closed 2026-10-06 | `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md`; `plans/closure/archive-extraction/004-status.md` | published from `bd43683` (run `37527706900` green); registry-only tar.gz + zip fixtures 6/6; Windows device-alias case fails against 0.1.2 |
 | Eggpack manifest interoperability | M005 eggup-eggpack 0.1.3 security/correctness publication | closed 2026-10-06 | `plans/implementation/eggpack-manifest-interoperability/005-eggup-eggpack-0.1.3-security-publication.md`; `plans/closure/eggpack-manifest-interoperability/005-status.md` | published from `bd43683` (run `37527706900` green); member-identity cross-check ships; the `eggup-eggpack 0.1.2` acquisition-pin caveat is closed |
 | Planning/closure hygiene corrective | C012 post-M004 roadmap + registry reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/012-post-m004-roadmap-and-registry-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/012-status.md` | docs-only; Phase 9/10 + post-M004 registry/archive active surfaces reconciled |
