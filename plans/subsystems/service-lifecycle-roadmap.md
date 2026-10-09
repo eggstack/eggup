@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: active; M001-M009 closed; `eggup-service 0.1.2` published 2026-10-05
+Status: active; M001–M011 closed; `eggup-service 0.1.3` published 2026-10-09; downstream wg-basic M004 and M005 technical work closed; production signing/publication remains externally blocked
 
 Long-term references:
 
@@ -116,9 +116,14 @@ M006 daemon disposition + revalidation [closed; evidence reconciled via acquisit
                       M008 deadline-test determinism [CLOSED via run 36332823865]
                                 |
                                 v
-                      M009 eggup-service 0.1.2 publication [READY]
-                                |
-                                `--> Acquisition M010 workspace 0.1.3 bump may proceed
+                      M009 eggup-service 0.1.2 publication [CLOSED]
+                         |                   |
+                         |                   `--> Acquisition M010 workspace 0.1.3 bump
+                         v
+                      M010 failed-systemd quiescence [CLOSED; runtime change]
+                         |
+                         v
+                      M011 service 0.1.3 release [CLOSED; published 2026-10-09]
 ```
 
 ## 7. Milestones
@@ -200,6 +205,24 @@ Publish the already-qualified M001-M008 service substrate without runtime/source
 
 M009 must preserve the existing `v0.1.2` tag as the historical core/archive publication source; service 0.1.2 is a later package publication from its own recorded commit and is documented additively.
 
+### M010 — Owned failed-systemd service quiescence corrective
+
+Plan: `plans/implementation/service-lifecycle/010-owned-failed-systemd-service-quiescence-corrective.md`.
+
+Status: **closed**; see `plans/closure/service-lifecycle/010-status.md`.
+
+A real wg-basic failed-candidate recovery identified that systemd `ActiveState=failed` is mapped to generic `LifecycleState::Unknown`; the wg-basic adapter refuses this state before calling Eggup stop and Eggup's stop completion accepts only `inactive`. First build a discriminating real-systemd fixture: a failed unit may or may not converge to inactive after stop, and failure is not proof of quiescence. Implement the minimum portable source-compatible ownership-safe quiescence operation actually needed; do not add a public closed-enum `Failed` variant or treat all Unknown as Stopped. Recheck exact service owner, inspect manager/process state and preserve restart/deadline/foreign refusal invariants.
+
+M010 found and fixed an upstream runtime defect. On systemd 255, a successful stop left an exact-owned failed service reported as `failed`, so the former inactive-only poll could not complete. The implementation now proves post-stop ownership, manager state, job/process evidence, cgroup quiescence when present, and consistent `is-active` output. A live child in the cgroup remains incomplete, and a changed-ExecStart control is denied. The hosted Linux systemd lane and Stable/MSRV/macOS/Windows matrix are green; see the M010 closure for exact evidence.
+
+### M011 — Conditional published service patch for wg-basic
+
+Plan: `plans/implementation/service-lifecycle/011-verified-service-patch-publication.md`.
+
+Status: **closed; published 2026-10-09**. M010 closed with a required runtime change, so this plan was required. Pre-publication head `f65496f` passed hosted run `37876276212`; post-publication exact-version fixture and full five-job run `37883703334` also passed.
+
+`eggup-service 0.1.3` was published from source `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`, checksum `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`. Registry-only exact-version and post-publication systemd proof passed in run `37883703334`. The existing shared `v0.1.3` tag and all other crate identities remain unchanged. The GitHub release carries the package and an exact wg-basic M004 C001a dependency/checksum handoff. wg-basic adopted the exact registry package and subsequently closed M004 technically, then closed M005 and Phase 10; current hosted evidence and the remaining production signing/publication gate are recorded in the dated addendum to the M011 closure.
+
 ## 8. Cross-cutting requirements
 
 No destructive action on Foreign/Unknown. Permission errors return remediation rather than escalating. Service definition rendering must reject unsafe control characters/path ambiguity.
@@ -214,7 +237,7 @@ System-level versus user-level service registration differs across consumers. Us
 
 ## 11. Completion definition
 
-Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap. M008 closed the deadline-arithmetic determinism gap with a fresh green hosted matrix. M009 is now registered to publish the already-qualified 0.1.2 service package before the workspace advances to 0.1.3.
+Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap. M008 closed the deadline-arithmetic determinism gap with a fresh green hosted matrix. M009 published the 0.1.2 package; M010 closed the owned failed-systemd quiescence defect with a source-compatible runtime correction. M011 published 0.1.3; its closure records registry-only post-publication evidence and the wg-basic version/checksum handoff.
 
 ## 12. Milestone status
 
@@ -229,3 +252,5 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M007 | closed | `plans/implementation/service-lifecycle/007-utf8-safe-bounded-diagnostics-corrective.md` | `plans/closure/service-lifecycle/007-status.md` | — |
 | M008 | closed | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md` | `plans/closure/service-lifecycle/008-status.md` | — |
 | M009 | closed | `plans/implementation/service-lifecycle/009-eggup-service-0.1.2-publication.md` | `plans/closure/service-lifecycle/009-status.md` | — (published 2026-10-05 from `7fb84bc`; registry-only fixture 10/10; `v0.1.2` unmoved; no `src/` change). Unblocks the Acquisition M010 workspace bump |
+| M010 | closed — runtime corrective | `plans/implementation/service-lifecycle/010-owned-failed-systemd-service-quiescence-corrective.md` | `plans/closure/service-lifecycle/010-status.md` | run `37875012280` green on Stable/MSRV/macOS/Windows and real Linux systemd including auto-restart race; runtime change required |
+| M011 | closed; published 2026-10-09 | `plans/implementation/service-lifecycle/011-verified-service-patch-publication.md` | `plans/closure/service-lifecycle/011-status.md` | Source `feb6ae5`, checksum `9f7f7ea8…32124dc`; hosted run `37883703334` green; GitHub release extended without moving `v0.1.3` |

@@ -375,7 +375,11 @@ pub trait ServiceManager {
         timeout: Duration,
     ) -> Result<TransitionResult, ServiceError>;
 
-    /// Stops an `Owned` running service within `timeout`.
+    /// Stops an `Owned` service within `timeout`.
+    ///
+    /// An adapter may stop a recognized manager failure state only when exact
+    /// ownership is revalidated and it can prove there is no remaining work.
+    /// Other unknown states fail closed.
     fn stop(
         &mut self,
         spec: &ServiceSpec,
@@ -1355,6 +1359,18 @@ impl<E: CommandExecutor> SystemdManager<E> {
         ]
     }
 
+    fn quiescence_show_argv(&self) -> Vec<String> {
+        vec![
+            "systemctl".to_string(),
+            self.install.scope.flag().to_string(),
+            "show".to_string(),
+            self.install.unit_name.clone(),
+            "-p".to_string(),
+            "LoadState,ActiveState,SubState,ExecStart,MainPID,ControlPID,ControlGroup,Job"
+                .to_string(),
+        ]
+    }
+
     fn ownership_of(
         &self,
         spec: &ServiceSpec,
@@ -1441,6 +1457,238 @@ impl<E: CommandExecutor> SystemdManager<E> {
             );
         }
     }
+
+    fn stop_failed_owned(
+        &mut self,
+        spec: &ServiceSpec,
+        deadline: OperationDeadline,
+    ) -> Result<TransitionResult, ServiceError> {
+        let before = self.quiescence_observation(spec, deadline)?;
+        require_owned(spec.id(), before.ownership)?;
+        if before.active_state != "failed" {
+            if before.active_state == "inactive"
+                && quiescence_proven(&before, Path::new("/sys/fs/cgroup"))
+            {
+                return Ok(stopped_result(true, "already quiescent"));
+            }
+            return Ok(stopped_result(
+                false,
+                "failed-unit state changed before stop; quiescence unconfirmed",
+            ));
+        }
+
+        self.run_unit("stop", deadline)?;
+        loop {
+            let Some(remaining) = deadline.remaining() else {
+                return Ok(stopped_result(
+                    false,
+                    "failed-unit stop deadline expired; quiescence unconfirmed",
+                ));
+            };
+            let after = match self.quiescence_observation(spec, deadline) {
+                Ok(observation) => observation,
+                Err(error) => {
+                    return Ok(stopped_result(
+                        false,
+                        &format!("failed-unit post-stop observation failed: {error}"),
+                    ));
+                }
+            };
+            if after.ownership != Ownership::Owned || after.control_group != before.control_group {
+                return Ok(stopped_result(
+                    false,
+                    "failed-unit ownership or control group changed; quiescence unconfirmed",
+                ));
+            }
+            if !matches!(after.active_state.as_str(), "failed" | "inactive") {
+                return Ok(stopped_result(
+                    false,
+                    "failed unit became active or transitioning; quiescence unconfirmed",
+                ));
+            }
+            if quiescence_proven(&after, Path::new("/sys/fs/cgroup")) {
+                let confirmed = match self.quiescence_observation(spec, deadline) {
+                    Ok(observation) => observation,
+                    Err(_) => {
+                        return Ok(stopped_result(
+                            false,
+                            "failed-unit proof revalidation failed; quiescence unconfirmed",
+                        ));
+                    }
+                };
+                if confirmed != after || !quiescence_proven(&confirmed, Path::new("/sys/fs/cgroup"))
+                {
+                    return Ok(stopped_result(
+                        false,
+                        "failed-unit proof changed during revalidation; quiescence unconfirmed",
+                    ));
+                }
+                let active = self.is_active(deadline)?;
+                let expected = if after.active_state == "failed" {
+                    ("failed", Some(3))
+                } else {
+                    ("inactive", Some(3))
+                };
+                if active.0 == expected.0 && active.1 == expected.1 {
+                    return Ok(stopped_result(true, "owned failed unit is quiescent"));
+                }
+                return Ok(stopped_result(
+                    false,
+                    "systemd active-state observations disagree; quiescence unconfirmed",
+                ));
+            }
+            std::thread::sleep(remaining.min(Duration::from_millis(50)));
+        }
+    }
+
+    fn quiescence_observation(
+        &self,
+        spec: &ServiceSpec,
+        deadline: OperationDeadline,
+    ) -> Result<SystemdQuiescenceObservation, ServiceError> {
+        let out = self.executor.run(
+            &self.quiescence_show_argv(),
+            None,
+            deadline.command_timeout()?,
+        )?;
+        if out.status != Some(0) {
+            return Err(ServiceError::manager(
+                "systemd quiescence observation failed",
+            ));
+        }
+        parse_quiescence_observation(&out.stdout_text(), spec)
+    }
+
+    fn is_active(
+        &self,
+        deadline: OperationDeadline,
+    ) -> Result<(String, Option<i32>), ServiceError> {
+        let argv = vec![
+            "systemctl".to_string(),
+            self.install.scope.flag().to_string(),
+            "is-active".to_string(),
+            self.install.unit_name.clone(),
+        ];
+        let out = self
+            .executor
+            .run(&argv, None, deadline.command_timeout()?)
+            .map_err(permission_hint)?;
+        Ok((out.stdout_text().trim().to_owned(), out.status))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SystemdQuiescenceObservation {
+    ownership: Ownership,
+    active_state: String,
+    sub_state: String,
+    main_pid: u32,
+    control_pid: u32,
+    control_group: String,
+    job: String,
+}
+
+fn stopped_result(completed: bool, detail: &str) -> TransitionResult {
+    TransitionResult {
+        operation: ServiceOperation::Stop,
+        completed,
+        detail: ServiceError::bounded(detail),
+    }
+}
+
+fn parse_quiescence_observation(
+    text: &str,
+    spec: &ServiceSpec,
+) -> Result<SystemdQuiescenceObservation, ServiceError> {
+    let mut properties = std::collections::HashMap::new();
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            return Err(ServiceError::manager("malformed systemd observation"));
+        };
+        if properties.insert(key, value).is_some() {
+            return Err(ServiceError::manager("duplicate systemd observation field"));
+        }
+    }
+    let property = |key| {
+        properties
+            .get(key)
+            .copied()
+            .ok_or_else(|| ServiceError::manager("incomplete systemd observation"))
+    };
+    let (ownership, _, _) = systemd_ownership(text, spec)?;
+    let main_pid = property("MainPID")?
+        .parse()
+        .map_err(|_| ServiceError::manager("invalid systemd MainPID"))?;
+    let control_pid = property("ControlPID")?
+        .parse()
+        .map_err(|_| ServiceError::manager("invalid systemd ControlPID"))?;
+    Ok(SystemdQuiescenceObservation {
+        ownership,
+        active_state: property("ActiveState")?.to_string(),
+        sub_state: property("SubState")?.to_string(),
+        main_pid,
+        control_pid,
+        control_group: property("ControlGroup")?.to_string(),
+        job: property("Job")?.to_string(),
+    })
+}
+
+fn quiescence_proven(observation: &SystemdQuiescenceObservation, cgroup_root: &Path) -> bool {
+    if observation.ownership != Ownership::Owned
+        || !matches!(observation.active_state.as_str(), "failed" | "inactive")
+        || (observation.active_state == "failed" && observation.sub_state != "failed")
+        || (observation.active_state == "inactive"
+            && !matches!(observation.sub_state.as_str(), "dead" | "exited"))
+        || observation.main_pid != 0
+        || observation.control_pid != 0
+        || !matches!(observation.job.as_str(), "" | "n/a")
+    {
+        return false;
+    }
+    if observation.control_group.is_empty() {
+        // systemd has removed the unit's cgroup after all its tasks exited.
+        return true;
+    }
+    let Ok(root_metadata) = std::fs::symlink_metadata(cgroup_root) else {
+        return false;
+    };
+    if !root_metadata.is_dir() || root_metadata.file_type().is_symlink() {
+        return false;
+    }
+    let Some(relative) = observation.control_group.strip_prefix('/') else {
+        return false;
+    };
+    let mut path = cgroup_root.to_path_buf();
+    for component in relative.split('/') {
+        if component.is_empty() || component == "." || component == ".." {
+            return false;
+        }
+        path.push(component);
+        let metadata = match std::fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return true,
+            Err(_) => return false,
+        };
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return false;
+        }
+    }
+    let Ok(processes) = std::fs::read_to_string(path.join("cgroup.procs")) else {
+        return false;
+    };
+    let Ok(events) = std::fs::read_to_string(path.join("cgroup.events")) else {
+        return false;
+    };
+    let mut populated = None;
+    for line in events.lines() {
+        if let Some(value) = line.strip_prefix("populated ") {
+            if populated.is_some() || !matches!(value, "0" | "1") {
+                return false;
+            }
+            populated = Some(value == "1");
+        }
+    }
+    processes.trim().is_empty() && populated == Some(false)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1755,6 +2003,9 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
         let deadline = OperationDeadline::new(timeout)?;
         let (ownership, state) = self.ownership_until(spec, deadline)?;
         require_owned(spec.id(), ownership)?;
+        if state == LifecycleState::Unknown {
+            return self.stop_failed_owned(spec, deadline);
+        }
         if state == LifecycleState::Stopped {
             return Ok(TransitionResult {
                 operation: ServiceOperation::Stop,
@@ -3742,6 +3993,240 @@ mod unix_tests {
             let (_, state, _) = systemd_ownership(&text, &s).unwrap();
             assert_eq!(state, expect, "{active}");
         }
+    }
+
+    fn quiescence_show(active: &str, control_group: &str, main_pid: u32, job: &str) -> String {
+        format!(
+            "LoadState=loaded\nActiveState={active}\nSubState={}\nExecStart={{ path=/opt/app/bin ; argv[]=/opt/app/bin --serve ; ignore_errors=no }}\nMainPID={main_pid}\nControlPID=0\nControlGroup={control_group}\nJob={job}\n",
+            if active == "failed" { "failed" } else { "dead" }
+        )
+    }
+
+    #[test]
+    fn systemd_failed_stop_requires_proven_quiescence_and_revalidates_ownership() {
+        let fake = FakeExecutor::new();
+        let failed_state = show_loaded_active("/opt/app/bin", "--serve", "failed");
+        for _ in 0..1 {
+            fake.expect(
+                &[
+                    "systemctl",
+                    "--user",
+                    "show",
+                    "my-daemon.service",
+                    "-p",
+                    "LoadState,ActiveState,ExecStart",
+                ],
+                out(0, &failed_state),
+            );
+        }
+        let extended_argv = [
+            "systemctl",
+            "--user",
+            "show",
+            "my-daemon.service",
+            "-p",
+            "LoadState,ActiveState,SubState,ExecStart,MainPID,ControlPID,ControlGroup,Job",
+        ];
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(
+            &["systemctl", "--user", "stop", "my-daemon.service"],
+            out(0, ""),
+        );
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(
+            &["systemctl", "--user", "is-active", "my-daemon.service"],
+            out(3, "failed\n"),
+        );
+        let dir = temp_dir("sysd-failed-stop");
+        let mut manager = systemd_manager(fake, dir.join("my-daemon.service"));
+        let want = spec("my-daemon.service", "/opt/app/bin", &["--serve"]);
+        let result = manager.stop(&want, Duration::from_secs(2)).unwrap();
+        assert!(result.completed, "{result:?}");
+        assert_eq!(result.detail, "owned failed unit is quiescent");
+        assert!(manager.executor().is_exhausted());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn systemd_failed_stop_refuses_changed_identity_or_unknown_state() {
+        let old_owned = show_loaded_active("/opt/app/bin", "--serve", "failed");
+        let extended_argv = [
+            "systemctl",
+            "--user",
+            "show",
+            "my-daemon.service",
+            "-p",
+            "LoadState,ActiveState,SubState,ExecStart,MainPID,ControlPID,ControlGroup,Job",
+        ];
+
+        let fake = FakeExecutor::new();
+        fake.expect(
+            &[
+                "systemctl",
+                "--user",
+                "show",
+                "my-daemon.service",
+                "-p",
+                "LoadState,ActiveState,ExecStart",
+            ],
+            out(0, &old_owned),
+        );
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(
+            &["systemctl", "--user", "stop", "my-daemon.service"],
+            out(0, ""),
+        );
+        fake.expect(
+            &extended_argv,
+            out(
+                0,
+                "LoadState=loaded\nActiveState=failed\nSubState=failed\nExecStart={ path=/opt/other/bin ; argv[]=/opt/other/bin --serve ; ignore_errors=no }\nMainPID=0\nControlPID=0\nControlGroup=\nJob=\n",
+            ),
+        );
+        let dir = temp_dir("sysd-failed-drift");
+        let mut manager = systemd_manager(fake, dir.join("my-daemon.service"));
+        let want = spec("my-daemon.service", "/opt/app/bin", &["--serve"]);
+        let result = manager.stop(&want, Duration::from_secs(2)).unwrap();
+        assert!(!result.completed, "{result:?}");
+        assert!(result.detail.contains("ownership"));
+        assert!(manager.executor().is_exhausted());
+        let _ = std::fs::remove_dir_all(&dir);
+
+        let fake = FakeExecutor::new();
+        fake.expect(
+            &[
+                "systemctl",
+                "--user",
+                "show",
+                "my-daemon.service",
+                "-p",
+                "LoadState,ActiveState,ExecStart",
+            ],
+            out(0, &old_owned),
+        );
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("maintenance", "", 0, "")),
+        );
+        let dir = temp_dir("sysd-failed-unknown");
+        let mut manager = systemd_manager(fake, dir.join("my-daemon.service"));
+        let result = manager.stop(&want, Duration::from_secs(2)).unwrap();
+        assert!(!result.completed, "{result:?}");
+        assert!(result.detail.contains("changed before stop"));
+        assert!(manager.executor().is_exhausted());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn systemd_failed_stop_fails_closed_on_restart_race_or_conflicting_active_state() {
+        let old_owned = show_loaded_active("/opt/app/bin", "--serve", "failed");
+        let ownership_argv = [
+            "systemctl",
+            "--user",
+            "show",
+            "my-daemon.service",
+            "-p",
+            "LoadState,ActiveState,ExecStart",
+        ];
+        let extended_argv = [
+            "systemctl",
+            "--user",
+            "show",
+            "my-daemon.service",
+            "-p",
+            "LoadState,ActiveState,SubState,ExecStart,MainPID,ControlPID,ControlGroup,Job",
+        ];
+        let stop_argv = ["systemctl", "--user", "stop", "my-daemon.service"];
+        let want = spec("my-daemon.service", "/opt/app/bin", &["--serve"]);
+
+        let fake = FakeExecutor::new();
+        fake.expect(&ownership_argv, out(0, &old_owned));
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(&stop_argv, out(0, ""));
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("activating", "", 0, "")),
+        );
+        let dir = temp_dir("sysd-failed-restart-race");
+        let mut manager = systemd_manager(fake, dir.join("my-daemon.service"));
+        let result = manager.stop(&want, Duration::from_secs(2)).unwrap();
+        assert!(!result.completed, "{result:?}");
+        assert!(result.detail.contains("became active or transitioning"));
+        assert!(manager.executor().is_exhausted());
+        let _ = std::fs::remove_dir_all(&dir);
+
+        let fake = FakeExecutor::new();
+        fake.expect(&ownership_argv, out(0, &old_owned));
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(&stop_argv, out(0, ""));
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(
+            &["systemctl", "--user", "is-active", "my-daemon.service"],
+            out(0, "active\n"),
+        );
+        let dir = temp_dir("sysd-failed-inconsistent-state");
+        let mut manager = systemd_manager(fake, dir.join("my-daemon.service"));
+        let result = manager.stop(&want, Duration::from_secs(2)).unwrap();
+        assert!(!result.completed, "{result:?}");
+        assert!(result.detail.contains("observations disagree"));
+        assert!(manager.executor().is_exhausted());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn systemd_cgroup_quiescence_checks_processes_events_and_path_safety() {
+        let root = temp_dir("sysd-cgroup-proof");
+        let group = root.join("system.slice").join("owned.service");
+        std::fs::create_dir_all(&group).unwrap();
+        std::fs::write(group.join("cgroup.procs"), b"").unwrap();
+        std::fs::write(group.join("cgroup.events"), b"populated 0\nfrozen 0\n").unwrap();
+        let mut observation = SystemdQuiescenceObservation {
+            ownership: Ownership::Owned,
+            active_state: "failed".to_string(),
+            sub_state: "failed".to_string(),
+            main_pid: 0,
+            control_pid: 0,
+            control_group: "/system.slice/owned.service".to_string(),
+            job: String::new(),
+        };
+        assert!(quiescence_proven(&observation, &root));
+        observation.control_group = "/system.slice/removed.service".to_string();
+        assert!(quiescence_proven(&observation, &root));
+        observation.control_group = "/system.slice/owned.service".to_string();
+        std::fs::write(group.join("cgroup.procs"), b"123\n").unwrap();
+        assert!(!quiescence_proven(&observation, &root));
+        std::fs::write(group.join("cgroup.procs"), b"").unwrap();
+        std::fs::write(group.join("cgroup.events"), b"populated 1\nfrozen 0\n").unwrap();
+        assert!(!quiescence_proven(&observation, &root));
+        observation.control_group = "/system.slice/../foreign.service".to_string();
+        assert!(!quiescence_proven(&observation, &root));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

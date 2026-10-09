@@ -1,4 +1,6 @@
 /target/
+/crates/eggup-service/tests/published-api-0.1.2/target/
+/crates/eggup-service/tests/published-api-0.1.3/target/
 
 # macOS Finder metadata. Ignored so the tree can stay clean for the
 # no---allow-dirty publication step in the release plans.

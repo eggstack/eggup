@@ -46,9 +46,9 @@ explicitly in the plan and in the registry, or it will be discovered late.
   version (`0.1.2` → `0.1.3`).
 - Do not move `v0.1.1` / `v0.1.2` tags. Extend release notes instead.
 - Do not publish `eggup-transport-footprint` — it is `publish = false`.
-- Do not publish `eggup-service` without a milestone authorizing it. It is on
-  crates.io at `0.1.0`/`0.1.1` while its `0.1.2` has never been published, so
-  "it is unpublished" is the wrong mental model.
+- Do not publish `eggup-service` without explicit maintainer authorization for
+  Service M011. It is published through `0.1.2`; the M010 correction is the
+  unpublished `0.1.3` candidate.
 - Do not add release CI. Manual publication is a recorded decision.
 
 ## Qualification before publishing

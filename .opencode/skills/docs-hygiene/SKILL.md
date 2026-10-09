@@ -56,13 +56,14 @@ to stay correct.
 
 Each has occurred at least once — check for them explicitly:
 
-1. **CI lane understatement.** Windows runs six `cargo test` steps
-   (`ci.yml:48-53`), not just `cargo check`. MSRV is compile-only. Never call
-   `windows-check` "compile-only" — and count the steps, not the bullets: the
-   three named `eggup-service` tests are three steps, not one.
-2. **Publication status.** "Unpublished" is wrong for `eggup-service` — it is on
-   crates.io at `0.1.0`/`0.1.1` while its `0.1.2` was never published. Check
-   crates.io rather than inferring from a `publish = false` key or a plan.
+1. **CI lane understatement.** Windows runs nine `cargo test` steps
+   (`ci.yml:66-79`) plus packaged service verification. There is also a
+   privileged Linux `service-systemd` lane. Count commands, not bullets: three
+   named `eggup-service` diagnostic tests are three steps. The MSRV lane runs a
+   workspace check and packaged service verification; it does not run tests.
+2. **Publication status.** `eggup-service 0.1.2` is published; the corrected
+   `0.1.3` service candidate is not yet published. Check crates.io rather than
+   inferring from a `publish = false` key or a plan.
 3. **Enum tables lagging the source.** `architecture/core-transaction.md` once
    described a whole earlier generation of `eggup-core`'s enums. When a variant
    is added, renamed, or removed, update every table that lists variants.
@@ -82,9 +83,10 @@ Each has occurred at least once — check for them explicitly:
 8. **Broken markdown tables.** Copy-pasting a row between tables of different
    arity silently drops cells. Check column counts.
 9. **Counting steps, not bullets.** A CI lane that runs three separately-named
-   tests is three steps, not one. `windows-check` is six `cargo test` steps
-   (`ci.yml:48-53`): one combined three-crate run, one eggpack run, three named
-   `eggup-service` tests, and `windows_scm::tests`. Count the `- run:` lines.
+   tests is three steps, not one. `windows-check` is nine `cargo test` steps
+   (`ci.yml:66-79`): one combined three-crate run, eggpack, three named service
+   tests, SCM, two Core integration fixtures, and the full workspace run. It
+   then verifies the packaged service crate. Count the `- run:` lines.
 10. **A quoted phrase that was never written.** A governance section attributed
     a quoted comment to a skill file that did not contain it. When a doc quotes
     another doc, `grep` the quoted string — a paraphrase presented as a

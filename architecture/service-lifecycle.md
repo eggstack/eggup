@@ -64,11 +64,14 @@ eggup-service   ->  windows-args (=0.2.0)
   **Windows-target dependency**, so the Linux/macOS build never links it.
 - `windows-args` is cross-platform and is used for the SCM command-line parser,
   so the ownership tests in `windows_scm.rs` run on every host.
-- **The crate is published but lags the workspace.** It is on crates.io at
-  `0.1.0` and `0.1.1`; its `0.1.2` has not yet been published. Service M009 now
-  authorizes a future manual `0.1.2` publication, but until that milestone closes
-  the `Unreleased` section below is still not on the registry. `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
-  `eggup-eggpack`, and `eggup-curl` are the published `0.1.2` set.
+- **The crate is current with the workspace.** It is on crates.io at
+  `0.1.0`, `0.1.1`, `0.1.2`, and `0.1.3`; the `0.1.2` service publication came
+  from `7fb84bc`, after the shared `v0.1.2` tag, which remains the core/archive
+  source tag. Service M011 published the `0.1.3` owned failed-systemd
+  quiescence correction from source `feb6ae5`; its exact checksum and registry
+  qualification are in the M011 closure.
+  `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
+  `eggup-eggpack`, and `eggup-curl` are also published at `0.1.2` or later.
   `eggup-transport-footprint` is `publish = false`
   ([registry.md](../plans/registry.md)).
 - Dependency order position: 5th deepest in
@@ -798,6 +801,19 @@ narrow `parse_exec_start` (`lib.rs:1574`) plus `reconcile_config_identity`.
 `post_write` (`lib.rs:1883`) — `enable` and `daemon-reload` only when the caller
 asked for them via `SystemdInstall::{enable,reload}`. `start` / `stop` / `restart`
 are bounded by `OperationDeadline` and confirm the resulting state.
+
+`stop` handles an exact-owned unit reported as `failed` without changing the
+closed public `LifecycleState` enum. It re-reads the full systemd observation
+immediately before stopping and after the stop. Completion requires matching
+ownership, a stable failed/inactive state, no active job, zero `MainPID` and
+`ControlPID`, and either no unit control group or an empty cgroup v2 process
+list with `cgroup.events` reporting `populated 0`. It also checks that
+`systemctl is-active` agrees with the final `ActiveState`. Unknown state,
+changed identity/control group, inaccessible or malformed cgroup evidence, and
+restart/transition races return incomplete or an error; they do not authorize
+rollback against a possibly live process. It never calls `reset-failed`.
+`plans/closure/service-lifecycle/010-status.md` records the real-systemd
+qualification and its negative controls.
 
 `reconcile_config_identity` (`lib.rs:1491-1524`) is the subtle part: the config
 path is only treated as part of identity if it appears **exactly once** in the

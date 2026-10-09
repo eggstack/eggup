@@ -1,0 +1,10 @@
+[package]
+name = "eggup-service-published-api-compatibility"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+eggup-service = "=0.1.2"

@@ -208,6 +208,17 @@ claims are made by any of these crates.
   authenticity, and authorizes no filesystem destination; caller-bound
   destination APIs are unchanged.
 
+- `eggup-service 0.1.3` (Service M011; published 2026-10-09):
+  contains the Service M010 source-compatible correction for stopping an
+  exact-owned failed systemd unit only after identity, manager state, process,
+  and cgroup quiescence evidence agree. Unknown state, changed identity,
+  restart races, and a remaining cgroup task fail closed. Runtime source is
+  `0bde3fefbda07019529ad7566c02e6e4ec141fd6`; the package source commit is
+  `feb6ae5aea4c9b61c4051957f3662ca49d845f9e` and the registry checksum is
+  `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`.
+  M011's registry-only post-publication and hosted systemd evidence is recorded
+  in `plans/closure/service-lifecycle/011-status.md`.
+
 ## Unreleased
 
 The workspace-wide bug-audit fixes below are recorded here as well as in the
