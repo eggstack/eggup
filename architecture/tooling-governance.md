@@ -42,7 +42,7 @@ lane is a claim.
 | `crates/eggup-curl` | yes | External-curl adapter |
 | `crates/eggup-archive` | yes | Bounded allowlisted local extraction |
 | `crates/eggup-eggpack` | yes | Optional Eggpack ReleaseManifest v1 adapter |
-| `crates/eggup-service` | yes, but lagging (registry through `0.1.2`; M011 `0.1.3` candidate unpublished) | Manager-neutral service lifecycle |
+| `crates/eggup-service` | yes; registry through `0.1.3` (M011) | Manager-neutral service lifecycle |
 | `crates/eggup-transport-footprint` | no (`publish = false`) | Footprint fixture binaries |
 
 `resolver = "2"` is load-bearing rather than cosmetic: the workspace mixes
@@ -255,7 +255,7 @@ under time pressure, and it is the one that protects the layered design.
 |---|---|---|---|---|
 | `stable` | `ubuntu-latest` | stable + `rustfmt`, `clippy` | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --all-features --locked`; `cargo doc --workspace --no-deps --locked`; `cargo package -p eggup-service --locked` | Linux is the reference platform. The only lane that runs clippy, fmt, and doc; also verifies packaged service source |
 | `msrv` | `ubuntu-latest` | `1.89.0` (`ci.yml:30`) | `cargo check --workspace --all-targets --locked`; `cargo package -p eggup-service --locked` | The workspace type-checks and the packaged service crate verifies at the declared `rust-version` floor. Clippy and tests are not run here |
-| `service-systemd` | `ubuntu-latest` | stable | registry-only published 0.1.2 API check; privileged full test of registry-only 0.1.2 controls including failed-stop negative control; privileged workspace `systemd_failed_service` integration test (`ci.yml:34-47`) | Real systemd evidence for the old published limitation, failed-unit quiescence, auto-restart stop, residual cgroup refusal, and foreign preservation |
+| `service-systemd` | `ubuntu-latest` | stable | registry-only published 0.1.2 negative control; privileged current workspace systemd test; registry-only published 0.1.3 positive quiescence and Foreign/malformed controls | Real systemd evidence for the published limitation and correction, auto-restart stop, residual cgroup refusal, and foreign preservation |
 | `macos` | `macos-latest` | stable | `cargo test --workspace --all-targets --all-features --locked`; `cargo package -p eggup-service --locked` | The full test suite and packaged service source pass on a non-Linux Unix — the only evidence for macOS behavior |
 | `windows-check` | `windows-latest` | stable | nine `cargo test` steps (`ci.yml:66-79`), followed by `cargo package -p eggup-service --locked` (`ci.yml:80`) | Windows compiles and *runs* the workspace and separately verifies packaged service source. Targeted tests run first so a platform-specific failure is named before the broad run buries it |
 
@@ -600,23 +600,22 @@ CI added."
 | `eggup-eggfetch` | 0.1.3 | 0.1.0, 0.1.1, 0.1.2, **0.1.3** | Native HTTP adapter |
 | `eggup-curl` | 0.1.3 | **0.1.2** | External-curl adapter |
 | `eggup-eggpack` | 0.1.3 | 0.1.2, **0.1.3** | Only crate touching producer types; pins `=0.1.3` |
-| `eggup-service` | 0.1.3 | 0.1.0, 0.1.1, **0.1.2** | **Published but lagging** — M011 owns the unpublished 0.1.3 candidate |
+| `eggup-service` | 0.1.3 | 0.1.0, 0.1.1, 0.1.2, **0.1.3** | M011 published the owned failed-systemd quiescence correction |
 | `eggup-transport-footprint` | 0.1.3 | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
 All 8 crates share workspace version `0.1.3`; seven are on crates.io at
-`0.1.2` or `0.1.3`. Five have reached `0.1.3`.
+`0.1.2` or `0.1.3`. Six have reached `0.1.3`.
 
-**`eggup-service` is published but lags the workspace.** It is on crates.io at
-`0.1.0`, `0.1.1`, and `0.1.2`; `0.1.2` was published on 2026-10-05 from
-`7fb84bc` without moving the shared `v0.1.2` tag. M010 closed with a required
-source-compatible failed-systemd quiescence correction. The `0.1.3` source is
-being qualified by M011 and remains unpublished until explicit maintainer
-authorization. Consumers on `0.1.2` do not receive this behavior yet.
+**`eggup-service` is current with the workspace.** M011 published `0.1.3` on
+2026-10-09 with the M010 owned failed-systemd quiescence correction. The
+package was built from `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`, after the
+shared `v0.1.3` tag; that tag remains unchanged and package provenance is carried
+by `.cargo_vcs_info.json`.
 
 `CHANGELOG.md` discipline follows the same separation: every published crate
 keeps an `Unreleased` section (7 of 8 crates have a CHANGELOG; the fixture
-crate is the exception), while the service `0.1.3` release candidate identifies
-the M010 change and explicitly records that it has not been published.
+crate is the exception), while the service `0.1.3` release is documented in its
+published changelog and M011 record.
 
 ## 9. Reviewer's checklist
 
@@ -727,7 +726,6 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | Was | Resolution |
 |---|---|
 | `verify-workflow` + `AGENTS.md` described `windows-check` as `cargo check` / "compile-only" | Both now describe its nine `cargo test` steps plus packaged service verification, and the real Linux systemd service lane (§5) |
-| `AGENTS.md` and `registry.md` called `eggup-service` "unpublished" | At the time of correction it was on crates.io at `0.1.0`/`0.1.1`; Service M009 later published `0.1.2` on 2026-10-05. Current registry state is in §8; M011's `0.1.3` candidate remains unpublished |
 | `AGENTS.md` gave `eggup-eggpack` a partial dependency list, omitting `sha2` | `sha2` added; the list now matches `crates/eggup-eggpack/Cargo.toml` |
 | `AGENTS.md` stated "keep crate `README.md` + `CHANGELOG.md` current" as absolute | Now scoped to library crates, with `eggup-transport-footprint` named as the exception (§3.4) |
 | `core-transaction.md` listed a previous generation of `FailureCategory`, `FailurePhase`, `IntegrityRequirement`, `IntegrityStatus`, and `PermissionsIntent` | All five rows regenerated from source; the two `FailureCategory::Destination` references replaced with real variants |
@@ -740,9 +738,7 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | `registry.md` "Recently closed foundation" understated 3 workstreams and omitted 3 | Rewritten to match the closure directories |
 | `registry.md` "Planned / blocked work" declared 4 columns; 4 rows carried 5 | Cells merged; two rows that duplicated rows in the same table removed |
 | `planning-closure-hygiene-corrective/010` plan still read `Status: ready for handoff` | Set to closed, matching its closure record and C011/C012 |
-| Root `CHANGELOG.md` called `eggup-service` "not published" while `README.md`, [overview.md](overview.md), and the crate's own changelog said published | Rewritten; Service M009 later published `0.1.2`. Current state: published through `0.1.2`, with the M011 `0.1.3` correction awaiting authorization |
 | `tooling-governance.md` §2.1 listed `eggup-service` as "no (unpublished)" and §2.3 called it "the unpublished `eggup-service`", contradicting §8 of the same document | Both corrected to "published but lagging" |
-| `service-lifecycle.md` and `core-transaction.md` still labelled `eggup-service` unpublished | Corrected; service architecture now records published `0.1.2` and the separately qualified, unpublished `0.1.3` M011 candidate |
 | Windows lane counted as "four `cargo test` invocations" in §5, §7.3, the Resolved table, `verify-workflow`, and `docs-hygiene` | It now has **nine** test steps at `ci.yml:66-79` — the three named `eggup-service` tests are three steps, not one bullet. All five locations and the count-step drift class were updated |
 | §4.1 attributed the quote "dependency-surface review, no gate" to `verify-workflow`, and "review-only, no gate" to `AGENTS.md` | Neither string exists in those files. Replaced with the actual sentences from each |
 | §4 described `scripts/check-local.sh` as "6 lines" | It is 9 lines (shebang + `set -euo pipefail` + 5 `cargo` commands + blank); the per-line table already used the correct `4`-`8` numbering |

@@ -36,7 +36,7 @@ only** — nothing in the script or CI fails when a boundary is crossed.
 |---|---|---|
 | `stable` | ubuntu | fmt + clippy + full `cargo test` + `cargo doc` + packaged service verification; the only lane running clippy, fmt, and doc |
 | `msrv` | ubuntu, pinned `1.89.0` | workspace `cargo check` and packaged service verification at the MSRV |
-| `service-systemd` | ubuntu-latest | registry-only 0.1.2 API/behavior negative control and current privileged systemd fixtures |
+| `service-systemd` | ubuntu-latest | registry-only 0.1.2 negative control, current workspace systemd fixtures, and published registry-only 0.1.3 positive quiescence plus ownership controls |
 | `macos` | macos-latest | full `cargo test` + packaged service verification; the only macOS evidence |
 | `windows-check` | windows-latest | **runs nine test steps**, ending in a full `cargo test --workspace --all-targets`, then package verification — see below |
 

@@ -1,13 +1,13 @@
 # Service Lifecycle M011 — Publish the Qualified Failed-unit Quiescence Correction
 
-Status: release qualification complete; crates.io publication blocked on explicit maintainer authorization.
+Status: published 2026-10-09; post-publication hosted qualification and formal closure in progress.
 Repository planning baseline: `eggstack/eggup@0bde3fefbda07019529ad7566c02e6e4ec141fd6` (M010 strict closure and final hosted qualification, 2026-10-09).
 Source roadmap: `plans/subsystems/service-lifecycle-roadmap.md`.
 Primary class: infrastructure / release qualification.
 Hard dependency: Service M010 (`plans/implementation/service-lifecycle/010-owned-failed-systemd-service-quiescence-corrective.md`) CLOSED with the required runtime change, real-systemd proof, and no public API break.
-Operational dependency: explicit maintainer publishing authorization. The M010 implementation head passed hosted run `37875012280`; the exact M011 release-preparation head passed the complete hosted matrix in run `37876276212`.
+Operational dependency: explicit maintainer publishing authorization (satisfied 2026-10-09). The M010 implementation head passed hosted run `37875012280`; the pre-publication M011 head passed the complete hosted matrix in run `37876276212`.
 
-Registry preflight on 2026-10-09: `cargo info eggup-service@0.1.2 --registry crates-io` resolves the published baseline; `cargo info eggup-service@0.1.3 --registry crates-io` reports no such version. Final package at release-preparation commit `f65496fbd8950cb50d46620f57da336b2da232fb`: 10 files, 396.0 KiB unpacked, 72.7 KiB compressed, SHA-256 `4de199de96dc24a8af5f524db069f5b8c47a8d599b0d624be78539bc9e05b9c2`. Its `.cargo_vcs_info.json` names that exact commit and `crates/eggup-service`.
+Registry preflight on 2026-10-09 confirmed `eggup-service 0.1.2` and absence of `0.1.3`. Authorized publication completed for `eggup-service 0.1.3` only. Cargo downloaded and checksum-verified the published package: 10 files, 396.0 KiB unpacked, 72.7 KiB compressed, SHA-256 `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`. Its `.cargo_vcs_info.json` names source commit `feb6ae5aea4c9b61c4051957f3662ca49d845f9e` and path `crates/eggup-service`.
 
 Pre-publication qualification is complete. Hosted run
 `37876276212` is green on Stable, Rust 1.89 MSRV, macOS, Windows, and the
@@ -19,12 +19,13 @@ zero PIDs, empty ControlGroup, and no Job; current workspace 0.1.3 passed its
 positive real-systemd failed-stop fixture in the same run. Three external
 inspection controls pass for Owned, Foreign, and malformed registrations. The
 local workspace gate, registry-only fixture, `cargo package --list`, package
-verification, and `cargo publish --dry-run` pass. The package checksum and
-size are recorded above, and a final registry query still reports no 0.1.3.
-No non-dry-run publication is authorized. No further eligible Eggup
-implementation plan is registered; downstream wg-basic adoption remains
-blocked until an authorized publication supplies its immutable version and
-checksum.
+verification, and `cargo publish --dry-run` passed before publication. The
+package checksum and size are recorded above. Publication was explicitly
+authorized and completed. A fresh registry-only
+`=0.1.3` fixture now covers positive quiescence and Foreign/malformed controls.
+Downstream M004 remains active with independent rootful qualification and
+production trust-root blockers; this service publication does not close M004
+or unblock M005.
 
 ## 1. Objective
 
@@ -52,8 +53,8 @@ The M010 applicability decision is complete: this release plan is required to de
 3. Make the source changelog clearly identify the behavior correction and M010 runtime source revision. The exact release-prep commit must also be captured by packaged `.cargo_vcs_info.json`. Ensure package manifest exposes the expected version and dependency graph without Git/path replacement in packaged output.
 4. Run `cargo package -p eggup-service --list --locked`, `cargo package -p eggup-service --locked`, `cargo publish -p eggup-service --dry-run --locked`, and the external registry-only fixture. Before publication, fixture must still resolve 0.1.2 and the privileged systemd negative control must demonstrate the failed-case limitation. Build/verify the packaged crate on Linux, macOS, Windows, and Rust 1.89 CI lanes.
 5. Require hosted Stable + Rust 1.89 MSRV + macOS + Windows CI green at the exact candidate SHA. Re-run service real-systemd matrix or obtain an equally recent immutable qualified run on the same source.
-6. Obtain explicit maintainer authorization; publish **only eggup-service** to crates.io. If authentication/publish permission is unavailable, stop with a blocked publication record; do not change the status to closed.
-7. Verify registry checksum/source metadata, direct external `eggup-service = "=0.1.3"` (or newly authorized version) dependency and a positive proof of owned failed-unit quiescence. Verify other published crates and existing tags untouched.
+6. Obtain explicit maintainer authorization; publish **only eggup-service** to crates.io. Completed 2026-10-09.
+7. Verify registry checksum/source metadata, direct external `eggup-service = "=0.1.3"` dependency and a positive proof of owned failed-unit quiescence. Verify other published crates and existing tags untouched.
 8. Write exact version+checksum+API migration handoff to `dbowm91/wg-basic` M004 C001a. Reconcile current Eggup roadmap, registry, changelog and release notes without rewriting historical service M009 closure.
 
 ## 5. Failure, restart, and contention
@@ -84,6 +85,10 @@ cargo test --manifest-path crates/eggup-service/tests/published-api-0.1.2/Cargo.
 sudo env EGGUP_SYSTEMD_INTEGRATION=1 cargo test --manifest-path crates/eggup-service/tests/published-api-0.1.2/Cargo.toml --locked -- --nocapture
 sudo env EGGUP_SYSTEMD_INTEGRATION=1 cargo test -p eggup-service --test systemd_failed_service --locked -- --nocapture
 cargo tree --manifest-path crates/eggup-service/tests/published-api-0.1.2/Cargo.toml --locked
+cargo fmt --manifest-path crates/eggup-service/tests/published-api-0.1.3/Cargo.toml -- --check
+cargo check --manifest-path crates/eggup-service/tests/published-api-0.1.3/Cargo.toml --locked
+cargo test --manifest-path crates/eggup-service/tests/published-api-0.1.3/Cargo.toml --locked -- --nocapture
+sudo env EGGUP_SYSTEMD_INTEGRATION=1 cargo test --manifest-path crates/eggup-service/tests/published-api-0.1.3/Cargo.toml --locked -- --nocapture
 git diff --check
 ```
 
@@ -93,10 +98,10 @@ records registry sources in its lockfile, and matches the non-exhaustive public
 enum with a wildcard. Its privileged Linux integration test proves the old
 failed-unit stop limitation. The packaged candidate itself is built by
 `cargo package` in Stable/Linux, MSRV 1.89, macOS, and Windows CI jobs. After
-publication, add a fresh external fixture at the authorized exact version and
-test positive failed-unit quiescence plus Foreign/malformed controls. Log exact
-checksum, package byte size, and source revision before asking for publication
-authorization.
+publication, add a fresh external fixture at the exact version and test
+positive failed-unit quiescence plus Foreign/malformed controls. Log exact
+checksum, package byte size, and source revision. The external fixture and
+hosted systemd run are now required for closure.
 
 ## 8. Acceptance criteria
 

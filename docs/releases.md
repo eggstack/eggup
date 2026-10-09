@@ -19,7 +19,7 @@ All workspace crates currently declare source version `0.1.3`. Only the registry
 | `eggup-curl` | `0.1.2` | first publication was `0.1.2` |
 | `eggup-archive` | `0.1.2`, `0.1.3` | latest published `0.1.3` |
 | `eggup-eggpack` | `0.1.2`, `0.1.3` | latest published `0.1.3` |
-| `eggup-service` | `0.1.0`, `0.1.1`, `0.1.2` | M010 `0.1.3` candidate remains unpublished pending M011 authorization |
+| `eggup-service` | `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3` | M011 published the M010 owned failed-systemd quiescence correction on 2026-10-09 |
 | `eggup-transport-footprint` | — | `publish = false`; not on the registry at all |
 
 One consequence worth planning around:

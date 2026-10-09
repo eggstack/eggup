@@ -64,11 +64,12 @@ eggup-service   ->  windows-args (=0.2.0)
   **Windows-target dependency**, so the Linux/macOS build never links it.
 - `windows-args` is cross-platform and is used for the SCM command-line parser,
   so the ownership tests in `windows_scm.rs` run on every host.
-- **The crate is published but lags the workspace.** It is on crates.io at
-  `0.1.0`, `0.1.1`, and `0.1.2`; the `0.1.2` service publication came from
-  `7fb84bc`, after the shared `v0.1.2` tag, which remains the core/archive source
-  tag. The workspace now carries an unpublished `0.1.3` correction for owned
-  failed-systemd service quiescence; M011 owns its separate release qualification.
+- **The crate is current with the workspace.** It is on crates.io at
+  `0.1.0`, `0.1.1`, `0.1.2`, and `0.1.3`; the `0.1.2` service publication came
+  from `7fb84bc`, after the shared `v0.1.2` tag, which remains the core/archive
+  source tag. Service M011 published the `0.1.3` owned failed-systemd
+  quiescence correction from source `feb6ae5`; its exact checksum and registry
+  qualification are in the M011 closure.
   `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
   `eggup-eggpack`, and `eggup-curl` are also published at `0.1.2` or later.
   `eggup-transport-footprint` is `publish = false`

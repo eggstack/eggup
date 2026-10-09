@@ -45,6 +45,10 @@ jobs:
       # This fixture writes disposable unit files under /run/systemd/system.
       # Run the test process as root so systemd can load and control them.
       - run: sudo --preserve-env=PATH,HOME,RUSTUP_HOME,CARGO_HOME env EGGUP_SYSTEMD_INTEGRATION=1 "$HOME/.cargo/bin/cargo" test -p eggup-service --test systemd_failed_service --locked -- --nocapture
+      # These tests resolve the published crate and core from crates.io only.
+      - run: cargo fmt --manifest-path crates/eggup-service/tests/published-api-0.1.3/Cargo.toml -- --check
+      - run: cargo check --manifest-path crates/eggup-service/tests/published-api-0.1.3/Cargo.toml --locked
+      - run: sudo --preserve-env=PATH,HOME,RUSTUP_HOME,CARGO_HOME env EGGUP_SYSTEMD_INTEGRATION=1 "$HOME/.cargo/bin/cargo" test --manifest-path crates/eggup-service/tests/published-api-0.1.3/Cargo.toml --locked -- --nocapture
 
   macos:
     name: macOS tests
