@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: active; M001–M011 closed; `eggup-service 0.1.3` published 2026-10-09; downstream wg-basic M004 remains active with independent blockers
+Status: active; M001–M011 closed; `eggup-service 0.1.3` published 2026-10-09; downstream wg-basic M004 and M005 technical work closed; production signing/publication remains externally blocked
 
 Long-term references:
 
@@ -221,7 +221,7 @@ Plan: `plans/implementation/service-lifecycle/011-verified-service-patch-publica
 
 Status: **closed; published 2026-10-09**. M010 closed with a required runtime change, so this plan was required. Pre-publication head `f65496f` passed hosted run `37876276212`; post-publication exact-version fixture and full five-job run `37883703334` also passed.
 
-`eggup-service 0.1.3` was published from source `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`, checksum `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`. Registry-only exact-version and post-publication systemd proof passed in run `37883703334`. The existing shared `v0.1.3` tag and all other crate identities remain unchanged. The GitHub release carries the package and an exact wg-basic M004 C001a dependency/checksum handoff. wg-basic M004 remains active on its own rootful qualification and production trust-root requirements, and M005 stays blocked on M004.
+`eggup-service 0.1.3` was published from source `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`, checksum `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`. Registry-only exact-version and post-publication systemd proof passed in run `37883703334`. The existing shared `v0.1.3` tag and all other crate identities remain unchanged. The GitHub release carries the package and an exact wg-basic M004 C001a dependency/checksum handoff. wg-basic adopted the exact registry package and subsequently closed M004 technically, then closed M005 and Phase 10; current hosted evidence and the remaining production signing/publication gate are recorded in the dated addendum to the M011 closure.
 
 ## 8. Cross-cutting requirements
 

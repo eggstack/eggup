@@ -194,3 +194,27 @@ publication. Acquisition M012 remains independently ready and unchanged.
   `eggup-service 0.1.3` and M011 closed.
 - No other milestone status changed. wg-basic M004 remains active; M005 remains
   blocked on M004.
+
+## Downstream status addendum — wg-basic adoption and technical closure (2026-10-09)
+
+The preceding handoff and status describe the state immediately after the
+`eggup-service 0.1.3` publication. The downstream repository has since merged
+the M004 corrective and qualification work to `main` at
+`dbowm91/wg-basic@ff40f85` (merge of PR #1,
+`plans/m004-update-correctives`). The current main contains the formal M004,
+M005, and Phase 11 closure records; the earlier open-blocker disposition above
+is historical and is superseded by this addendum.
+
+| Downstream result | Evidence | Status |
+|---|---|---|
+| M004 adopted the published Eggup fix | `Cargo.toml` pins `eggup-service = "=0.1.3"`; `Cargo.lock` resolves registry package 0.1.3. `plans/closure/distribution/004-c001a-status.md` records the exact checksum and typed failed-unit recovery path. | closed |
+| M004 rootful updater qualification and corrective gates | `plans/closure/distribution/004-status.md` and `004-c001-status.md` / `004-c001a-status.md` / `004-c002-status.md`; dedicated systemd run [`37929914324`](https://github.com/dbowm91/wg-basic/actions/runs/37929914324), full CI [`37929917248`](https://github.com/dbowm91/wg-basic/actions/runs/37929917248), distribution native-target run [`37929920418`](https://github.com/dbowm91/wg-basic/actions/runs/37929920418). | technically closed |
+| M005 and Phase 10 lifecycle qualification | `plans/closure/distribution/005-status.md`; implementation head `c7de919c0b9d8f3326c50c799779ee5dc3734dca`; full CI [`37936112512`](https://github.com/dbowm91/wg-basic/actions/runs/37936112512), native artifact/lifecycle run [`37936276064`](https://github.com/dbowm91/wg-basic/actions/runs/37936276064). | technically closed |
+| Subsequent eligible Phase 11 implementation work | wg-basic registry and roadmap record M001–M004 closed; M004 closure [`plans/closure/ipv6-route-policy/004-status.md`](https://github.com/dbowm91/wg-basic/blob/ff40f85/plans/closure/ipv6-route-policy/004-status.md) records Phase 11 closure. wg-basic registry has no active implementation plan and keeps Phase 12 deferred. | no further eligible implementation plan |
+| Production release | wg-basic registry lists production signing/public release as blocked pending maintainer-provisioned key, signed draft, and explicit publication authorization. Fixture signing establishes technical mechanics only. | externally blocked; not part of M004 technical closure |
+
+M004's formal closure correctly separates technical completion from the
+production signing gate. M005 and Phase 11 are also closed, so no additional
+wg-basic implementation plan became eligible after those closures. No new
+Eggup implementation plan was unblocked; Acquisition M012 remains independently
+ready, as before. No Eggup runtime or publication state changed.
