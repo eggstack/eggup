@@ -1,6 +1,6 @@
 # Service Lifecycle M011 — Publish the Qualified Failed-unit Quiescence Correction
 
-Status: published 2026-10-09; post-publication hosted qualification and formal closure in progress.
+Status: closed; `eggup-service 0.1.3` published 2026-10-09 and post-publication qualification passed.
 Repository planning baseline: `eggstack/eggup@0bde3fefbda07019529ad7566c02e6e4ec141fd6` (M010 strict closure and final hosted qualification, 2026-10-09).
 Source roadmap: `plans/subsystems/service-lifecycle-roadmap.md`.
 Primary class: infrastructure / release qualification.

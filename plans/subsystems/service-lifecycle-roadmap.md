@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: active; M001–M010 closed; M011 0.1.3 published and awaiting post-publication closure; downstream wg-basic M004 remains active with independent blockers
+Status: active; M001–M011 closed; `eggup-service 0.1.3` published 2026-10-09; downstream wg-basic M004 remains active with independent blockers
 
 Long-term references:
 
@@ -123,7 +123,7 @@ M006 daemon disposition + revalidation [closed; evidence reconciled via acquisit
                       M010 failed-systemd quiescence [CLOSED; runtime change]
                          |
                          v
-                      M011 service 0.1.3 release [QUALIFIED; publish authorization pending]
+                      M011 service 0.1.3 release [CLOSED; published 2026-10-09]
 ```
 
 ## 7. Milestones
@@ -219,9 +219,9 @@ M010 found and fixed an upstream runtime defect. On systemd 255, a successful st
 
 Plan: `plans/implementation/service-lifecycle/011-verified-service-patch-publication.md`.
 
-Status: **published; post-publication qualification and closure in progress**. M010 closed with a required runtime change, so this plan was required. Pre-publication head `f65496f` passed hosted run `37876276212` on Stable/MSRV/macOS/Windows and real Linux systemd.
+Status: **closed; published 2026-10-09**. M010 closed with a required runtime change, so this plan was required. Pre-publication head `f65496f` passed hosted run `37876276212`; post-publication exact-version fixture and full five-job run `37883703334` also passed.
 
-`eggup-service 0.1.3` was published from source `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`, checksum `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`. A registry-only exact-version fixture and post-publication hosted systemd proof are part of closure. The existing shared `v0.1.3` tag and all other crate identities remain unchanged. The package supports a direct wg-basic dependency update to `=0.1.3`; wg-basic M004 remains active on its own rootful qualification and production trust-root requirements, and M005 stays blocked on M004.
+`eggup-service 0.1.3` was published from source `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`, checksum `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`. Registry-only exact-version and post-publication systemd proof passed in run `37883703334`. The existing shared `v0.1.3` tag and all other crate identities remain unchanged. The GitHub release carries the package and an exact wg-basic M004 C001a dependency/checksum handoff. wg-basic M004 remains active on its own rootful qualification and production trust-root requirements, and M005 stays blocked on M004.
 
 ## 8. Cross-cutting requirements
 
@@ -253,4 +253,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M008 | closed | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md` | `plans/closure/service-lifecycle/008-status.md` | — |
 | M009 | closed | `plans/implementation/service-lifecycle/009-eggup-service-0.1.2-publication.md` | `plans/closure/service-lifecycle/009-status.md` | — (published 2026-10-05 from `7fb84bc`; registry-only fixture 10/10; `v0.1.2` unmoved; no `src/` change). Unblocks the Acquisition M010 workspace bump |
 | M010 | closed — runtime corrective | `plans/implementation/service-lifecycle/010-owned-failed-systemd-service-quiescence-corrective.md` | `plans/closure/service-lifecycle/010-status.md` | run `37875012280` green on Stable/MSRV/macOS/Windows and real Linux systemd including auto-restart race; runtime change required |
-| M011 | published; post-publication closure in progress | `plans/implementation/service-lifecycle/011-verified-service-patch-publication.md` | `plans/closure/service-lifecycle/011-status.md` | `eggup-service 0.1.3`, source `feb6ae5`, checksum `9f7f7ea8…32124dc`; hosted post-publish systemd qualification pending |
+| M011 | closed; published 2026-10-09 | `plans/implementation/service-lifecycle/011-verified-service-patch-publication.md` | `plans/closure/service-lifecycle/011-status.md` | Source `feb6ae5`, checksum `9f7f7ea8…32124dc`; hosted run `37883703334` green; GitHub release extended without moving `v0.1.3` |
