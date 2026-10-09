@@ -37,7 +37,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       # This fixture writes disposable unit files under /run/systemd/system.
       # Run the test process as root so systemd can load and control them.
-      - run: sudo --preserve-env=PATH,HOME cargo test -p eggup-service --test systemd_failed_service --locked -- --nocapture
+      - run: sudo --preserve-env=PATH,HOME,RUSTUP_HOME,CARGO_HOME env EGGUP_SYSTEMD_INTEGRATION=1 "$HOME/.cargo/bin/cargo" test -p eggup-service --test systemd_failed_service --locked -- --nocapture
 
   macos:
     name: macOS tests
