@@ -4,6 +4,8 @@ use eggup_service::{
     LifecycleState, ServiceId, ServiceManager, ServiceSpec, SystemExecutor, SystemdInstall,
     SystemdManager, SystemdScope,
 };
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::Duration;
@@ -168,6 +170,69 @@ fn assert_no_cgroup_tasks(show: &str) {
     );
 }
 
+#[cfg(target_os = "linux")]
+fn failed_unit_with_residual_cgroup_process_is_not_complete() {
+    let directory =
+        std::env::temp_dir().join(format!("eggup-m010-residual-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).expect("create helper directory");
+    let script = directory.join("fail-after-spawning-child");
+    let pid_file = directory.join("child.pid");
+    std::fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\n/usr/bin/sleep 120 &\necho $! > {}\nexit 23\n",
+            pid_file.display()
+        ),
+    )
+    .expect("write helper executable");
+    let mut permissions = std::fs::metadata(&script)
+        .expect("stat helper executable")
+        .permissions();
+    permissions.set_mode(0o700);
+    std::fs::set_permissions(&script, permissions).expect("make helper executable");
+
+    let definition = format!(
+        "[Unit]\nDescription=Eggup M010 residual cgroup fixture\n[Service]\nType=exec\nExecStart={}\nKillMode=process\nRestart=no\n",
+        script.display()
+    );
+    let fixture = UnitFixture::new("residual", &definition);
+    let start = fixture.start();
+    assert_success(&start, "start residual-process fixture");
+    let before = fixture.wait_for_active_state("failed");
+    let pid: u32 = std::fs::read_to_string(&pid_file)
+        .expect("read fixture child pid")
+        .trim()
+        .parse()
+        .expect("fixture child pid is numeric");
+    struct ChildCleanup(u32);
+    impl Drop for ChildCleanup {
+        fn drop(&mut self) {
+            let _ = Command::new("/usr/bin/kill")
+                .arg(self.0.to_string())
+                .output();
+        }
+    }
+    let _child_cleanup = ChildCleanup(pid);
+    assert!(Path::new(&format!("/proc/{pid}")).exists());
+    eprintln!("residual_process_before={before:?} pid={pid}");
+
+    let mut manager = manager(&fixture, &definition);
+    let want = spec(&fixture.name, script.to_str().expect("UTF-8 helper path"));
+    let stop = manager
+        .stop(&want, Duration::from_secs(5))
+        .expect("owned failed unit stop should return a bounded result");
+    let after = fixture.show();
+    eprintln!("residual_process_stop={stop:?} after_show={after:?}");
+    assert!(
+        !stop.completed,
+        "live process/cgroup cannot be called quiescent"
+    );
+    assert!(Path::new(&format!("/proc/{pid}")).exists());
+    drop(_child_cleanup);
+    drop(fixture);
+    let _ = std::fs::remove_dir_all(directory);
+}
+
 #[test]
 fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
     if std::env::var_os("EGGUP_SYSTEMD_INTEGRATION").is_none() {
@@ -212,9 +277,38 @@ fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
         stop.completed,
         "owned failed unit was not proven quiescent: {stop:?}"
     );
-    assert_eq!(active_after, "inactive");
+    assert!(matches!(active_after.as_str(), "failed" | "inactive"));
     assert_eq!(active_status_after, Some(3));
+    assert!(after
+        .lines()
+        .any(|line| line == format!("ActiveState={active_after}")));
     assert_no_cgroup_tasks(&after);
+
+    let recovered_definition = "[Unit]\nDescription=Eggup M010 caller-repaired fixture\n[Service]\nType=exec\nExecStart=/usr/bin/sleep 120\nRestart=no\n";
+    std::fs::write(&failed.path, recovered_definition).expect("write caller-repaired unit");
+    assert_success(
+        &systemctl(&["daemon-reload"]),
+        "reload caller-repaired unit",
+    );
+    let mut recovered_manager = manager(&failed, recovered_definition);
+    let recovered_spec = ServiceSpec::new(
+        ServiceId::new(failed.name.clone()).expect("repaired service id"),
+        PathBuf::from("/usr/bin/sleep"),
+        vec!["120".to_string()],
+        None,
+    )
+    .expect("repaired service spec");
+    let started = recovered_manager
+        .start(&recovered_spec, Duration::from_secs(5))
+        .expect("start caller-repaired unit");
+    assert!(started.completed, "{started:?}");
+    let stopped = recovered_manager
+        .stop(&recovered_spec, Duration::from_secs(5))
+        .expect("stop caller-repaired unit");
+    assert!(stopped.completed, "{stopped:?}");
+
+    #[cfg(target_os = "linux")]
+    failed_unit_with_residual_cgroup_process_is_not_complete();
 
     let running_definition = "[Unit]\nDescription=Eggup M010 foreign-unit fixture\n[Service]\nType=exec\nExecStart=/usr/bin/sleep 120\nRestart=no\n";
     let foreign = UnitFixture::new("foreign", running_definition);

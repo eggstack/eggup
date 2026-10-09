@@ -1,0 +1,8 @@
+/Users/davidbowman/projects/eggup/crates/eggup-service/tests/published-api-0.1.2/target/debug/deps/eggup_service-19b9c998c258cb24.d: /Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/lib.rs /Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/disposition.rs /Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/lifecycle_update.rs /Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/windows_scm.rs
+
+/Users/davidbowman/projects/eggup/crates/eggup-service/tests/published-api-0.1.2/target/debug/deps/libeggup_service-19b9c998c258cb24.rmeta: /Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/lib.rs /Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/disposition.rs /Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/lifecycle_update.rs /Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/windows_scm.rs
+
+/Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/lib.rs:
+/Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/disposition.rs:
+/Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/lifecycle_update.rs:
+/Users/davidbowman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/eggup-service-0.1.2/src/windows_scm.rs:

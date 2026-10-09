@@ -43,7 +43,7 @@ Record before/after `systemctl show -p LoadState,ActiveState,SubState,ExecStart,
 - An unknown manager state, foreign or changed `ExecStart`, unknown/suspicious control-group identity, inconsistent observations, active manager job, restart race, permission failure, or timed-out call must produce a bounded, classified failure and retain recovery authority with the caller (no implicit restart).
 - `systemctl reset-failed` is not a substitute for `stop`, and must not be invoked merely to normalize `is-active`. If test evidence requires it, stop for a new reviewed design because it clears manager diagnostics and rate-limit counters.
 - Preserve absolute `OperationDeadline` budgets, process-output byte limits, bounded subprocess cleanup, exact service-registration matching, private data redaction and no automatic privilege escalation.
-- Preserve `LifecycleState` public source compatibility. It is a closed public enum; adding a `Failed` variant breaks downstream exhaustive pattern matches in a nominal 0.1.x update. Prefer a systemd-specific typed quiescence/diagnostic result or a backward-compatible additive method only if necessary.
+- Preserve the existing `LifecycleState` variants and meanings. The enum is already `#[non_exhaustive]`, so external consumers must include a wildcard arm; do not rely on the original plan's incorrect claim that it is closed. Keep failure diagnosis internal to the systemd adapter and do not add a public variant for this correction.
 - No application-specific notion of database compatibility, service health HTTP, unit string, or VPN state enters Eggup.
 
 ## 5. Scope and non-scope
@@ -76,7 +76,7 @@ Add a product-neutral consumer fixture or a short pinned external wg-basic smoke
 
 ### WP4 — Security/API review and native portability
 
-Diff public `LifecycleState`, `Ownership`, `ServiceManager` and `TransitionResult` against published service 0.1.2; compile an external exhaustive-enum-match consumer, and reject a breaking API. Confirm no service change on macOS launchd, cron, Windows SCM or non-systemd Linux. Keep the dependency graph and Rust 1.89 intact, `unsafe_code = deny`, and no new shell-based command construction.
+Diff public `LifecycleState`, `Ownership`, `ServiceManager` and `TransitionResult` against published service 0.1.2; compile a registry-only external consumer using the required wildcard enum match and reject removed or newly required API. Confirm no service change on macOS launchd, cron, Windows SCM or non-systemd Linux. Keep the dependency graph and Rust 1.89 intact, `unsafe_code = deny`, and no new shell-based command construction.
 
 ## 7. Failure, restart, contention and cancellation
 
@@ -111,7 +111,7 @@ Update `architecture/service-lifecycle.md`, `crates/eggup-service/README.md`, `c
 1. Exact Owned failed candidates can be stopped/proven quiescent through Eggup without generic downstream systemctl fallback, **or** the documented discriminating fixture proves existing Eggup API is fully sufficient and identifies only the downstream guard as defective; record the narrower conclusion honestly.
 2. A failed/foreign/malformed/ambiguous state cannot yield a false completion or mutate a foreign service.
 3. Real systemd and deterministic negative-control fixtures pass, including failed->inactive or failed-state persistence as actually observed, and deadline/restart races.
-4. `LifecycleState` existing public matches compile, no platform regressions, no new dependency or privilege escalation.
+4. An external consumer matching the published non-exhaustive `LifecycleState` with a wildcard still compiles; no platform regressions, new dependency, or privilege escalation.
 5. All required current-head CI and Rust 1.89 gates pass, and an exact source/behavior/consumer handoff is recorded.
 
 If M010 closes as `existing API sufficient, no service runtime change`, **do not publish a gratuitous service patch**; mark M011 not needed and unblock the downstream corrective using proven 0.1.2. Otherwise M011 owns the registry release.

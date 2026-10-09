@@ -58,4 +58,10 @@ changed by this release.
 
 ## Unreleased
 
-Nothing yet.
+- **Fixed: owned failed systemd units could never complete `stop`.** The
+  adapter now recognizes the specific `ActiveState=failed` case without
+  changing the public `LifecycleState` enum, revalidates the exact `ExecStart`
+  identity around the stop, and reports completion only after manager job,
+  process IDs, active-state output, and cgroup evidence agree that the unit is
+  quiescent. Unknown states and remaining cgroup tasks fail closed. No
+  `reset-failed`, privilege escalation, or new dependency is introduced.

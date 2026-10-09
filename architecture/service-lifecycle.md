@@ -799,6 +799,19 @@ narrow `parse_exec_start` (`lib.rs:1574`) plus `reconcile_config_identity`.
 asked for them via `SystemdInstall::{enable,reload}`. `start` / `stop` / `restart`
 are bounded by `OperationDeadline` and confirm the resulting state.
 
+`stop` handles an exact-owned unit reported as `failed` without changing the
+closed public `LifecycleState` enum. It re-reads the full systemd observation
+immediately before stopping and after the stop. Completion requires matching
+ownership, a stable failed/inactive state, no active job, zero `MainPID` and
+`ControlPID`, and either no unit control group or an empty cgroup v2 process
+list with `cgroup.events` reporting `populated 0`. It also checks that
+`systemctl is-active` agrees with the final `ActiveState`. Unknown state,
+changed identity/control group, inaccessible or malformed cgroup evidence, and
+restart/transition races return incomplete or an error; they do not authorize
+rollback against a possibly live process. It never calls `reset-failed`.
+`plans/closure/service-lifecycle/010-status.md` records the real-systemd
+qualification and its negative controls.
+
 `reconcile_config_identity` (`lib.rs:1491-1524`) is the subtle part: the config
 path is only treated as part of identity if it appears **exactly once** in the
 spec's canonical args and once in the observed args. Zero occurrences in the

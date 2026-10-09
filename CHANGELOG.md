@@ -215,6 +215,15 @@ per-crate changelogs, because they are **not** on the registry. Published
 baselines are `0.1.2` for all seven published crates. No publication milestone
 authorizes these entries yet.
 
+- `eggup-service` corrects owned failed-systemd stop handling (Service M010):
+  an exact-owned failed unit can complete `stop` only after manager state,
+  ownership, pending-job, process-ID, and cgroup evidence agree that it is
+  quiescent. Unknown states, changed unit identity, active restart races, and
+  remaining cgroup processes fail closed. The public lifecycle enum and
+  dependency graph are unchanged; the Linux systemd fixture records both the
+  failed-to-quiescent behavior and a residual-cgroup negative control. This fix
+  is not yet published; Service M011 is the conditional publication milestone.
+
 The two `0b8cb98` acquisition fixes that previously lived in this section are no
 longer here: they were published as `eggup-acquisition 0.1.3` on 2026-10-06
 (Acquisition Transport M010) and are recorded in the `0.1.3` section above.

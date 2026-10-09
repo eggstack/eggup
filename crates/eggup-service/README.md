@@ -80,7 +80,9 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
   - systemd: explicit `--system`/`--user` scope, narrow `ExecStart` parsing
     (ambiguous/specifier shapes yield `Unknown`), atomic definition writes,
     explicit `enable`/`daemon-reload` only, bounded `start`/`stop`/`restart`
-    with state confirmation, no `sudo`;
+    with state confirmation, no `sudo`; a recognized exact-owned `failed`
+    unit is stopped only after ownership revalidation and proof that its manager
+    job, main/control processes, and cgroup work are gone;
   - launchd: explicit `gui/<uid>` vs `system` targets (never guessed),
     structured `ProgramArguments` parsing (malformed yields `Unknown`),
     label-only never proves ownership, bounded `bootstrap`/`bootout`/
