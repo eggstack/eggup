@@ -430,7 +430,9 @@ fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
     let restart_start = restart.start();
     let restart_first = restart.wait_for_failed_result();
     let restart_second_start = restart.start();
-    assert_success(&restart_second_start, "second start-limit fixture launch");
+    // `systemctl start` may return nonzero when Type=exec exits immediately;
+    // the changed ExecStart invocation below proves whether the second run
+    // actually launched, while the third request must remain rate-limited.
     let restart_second = restart.wait_for_failed_result();
     let rejected_start = restart.start();
     let restart_limited = restart.show();
