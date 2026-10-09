@@ -4131,6 +4131,75 @@ mod unix_tests {
     }
 
     #[test]
+    fn systemd_failed_stop_fails_closed_on_restart_race_or_conflicting_active_state() {
+        let old_owned = show_loaded_active("/opt/app/bin", "--serve", "failed");
+        let ownership_argv = [
+            "systemctl",
+            "--user",
+            "show",
+            "my-daemon.service",
+            "-p",
+            "LoadState,ActiveState,ExecStart",
+        ];
+        let extended_argv = [
+            "systemctl",
+            "--user",
+            "show",
+            "my-daemon.service",
+            "-p",
+            "LoadState,ActiveState,SubState,ExecStart,MainPID,ControlPID,ControlGroup,Job",
+        ];
+        let stop_argv = ["systemctl", "--user", "stop", "my-daemon.service"];
+        let want = spec("my-daemon.service", "/opt/app/bin", &["--serve"]);
+
+        let fake = FakeExecutor::new();
+        fake.expect(&ownership_argv, out(0, &old_owned));
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(&stop_argv, out(0, ""));
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("activating", "", 0, "")),
+        );
+        let dir = temp_dir("sysd-failed-restart-race");
+        let mut manager = systemd_manager(fake, dir.join("my-daemon.service"));
+        let result = manager.stop(&want, Duration::from_secs(2)).unwrap();
+        assert!(!result.completed, "{result:?}");
+        assert!(result.detail.contains("became active or transitioning"));
+        assert!(manager.executor().is_exhausted());
+        let _ = std::fs::remove_dir_all(&dir);
+
+        let fake = FakeExecutor::new();
+        fake.expect(&ownership_argv, out(0, &old_owned));
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(&stop_argv, out(0, ""));
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(
+            &extended_argv,
+            out(0, &quiescence_show("failed", "", 0, "")),
+        );
+        fake.expect(
+            &["systemctl", "--user", "is-active", "my-daemon.service"],
+            out(0, "active\n"),
+        );
+        let dir = temp_dir("sysd-failed-inconsistent-state");
+        let mut manager = systemd_manager(fake, dir.join("my-daemon.service"));
+        let result = manager.stop(&want, Duration::from_secs(2)).unwrap();
+        assert!(!result.completed, "{result:?}");
+        assert!(result.detail.contains("observations disagree"));
+        assert!(manager.executor().is_exhausted());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn systemd_cgroup_quiescence_checks_processes_events_and_path_safety() {
         let root = temp_dir("sysd-cgroup-proof");
         let group = root.join("system.slice").join("owned.service");

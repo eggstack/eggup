@@ -1,13 +1,14 @@
 #![forbid(unsafe_code)]
 
 use eggup_service::{
-    LifecycleState, ServiceId, ServiceManager, ServiceSpec, SystemExecutor, SystemdInstall,
-    SystemdManager, SystemdScope,
+    CommandExecutor, CommandOutput, LifecycleState, ServiceError, ServiceId, ServiceManager,
+    ServiceSpec, SystemdInstall, SystemdManager, SystemdScope,
 };
 #[cfg(target_os = "linux")]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::Mutex;
 use std::time::Duration;
 
 const SHOW_PROPERTIES: &str =
@@ -16,6 +17,34 @@ const SHOW_PROPERTIES: &str =
 struct UnitFixture {
     name: String,
     path: PathBuf,
+}
+
+#[derive(Debug, Default)]
+struct RecordingExecutor {
+    inner: eggup_service::SystemExecutor,
+    calls: Mutex<Vec<(Vec<String>, Option<i32>)>>,
+}
+
+impl RecordingExecutor {
+    fn calls(&self) -> Vec<(Vec<String>, Option<i32>)> {
+        self.calls.lock().expect("call log mutex").clone()
+    }
+}
+
+impl CommandExecutor for RecordingExecutor {
+    fn run(
+        &self,
+        argv: &[String],
+        stdin_data: Option<&[u8]>,
+        timeout: Duration,
+    ) -> Result<CommandOutput, ServiceError> {
+        let output = self.inner.run(argv, stdin_data, timeout)?;
+        self.calls
+            .lock()
+            .expect("call log mutex")
+            .push((argv.to_vec(), output.status));
+        Ok(output)
+    }
 }
 
 impl UnitFixture {
@@ -63,6 +92,21 @@ impl UnitFixture {
             std::thread::sleep(Duration::from_millis(20));
         }
     }
+
+    fn wait_for_result(&self, wanted: &str) -> String {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let show = self.show();
+            if show.lines().any(|line| line == format!("Result={wanted}")) {
+                return show;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "unit did not reach Result={wanted}: {show}"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
 }
 
 impl Drop for UnitFixture {
@@ -100,9 +144,9 @@ fn spec(name: &str, executable: &str) -> ServiceSpec {
     .expect("service spec")
 }
 
-fn manager(fixture: &UnitFixture, definition: &str) -> SystemdManager {
+fn manager(fixture: &UnitFixture, definition: &str) -> SystemdManager<RecordingExecutor> {
     SystemdManager::new(
-        SystemExecutor::new(),
+        RecordingExecutor::default(),
         SystemdInstall::new(
             fixture.name.clone(),
             SystemdScope::System,
@@ -128,6 +172,12 @@ fn require_systemd_host() {
         Path::new("/sys/fs/cgroup/cgroup.controllers").exists(),
         "M010 cgroup quiescence qualification requires cgroup v2"
     );
+    eprintln!(
+        "kernel={}",
+        std::fs::read_to_string("/proc/sys/kernel/osrelease")
+            .expect("read Linux kernel release")
+            .trim()
+    );
     let output = systemctl(&["show-environment"]);
     assert_success(&output, "systemctl show-environment");
 }
@@ -143,6 +193,7 @@ fn assert_no_cgroup_tasks(show: &str) {
         .get("ControlGroup")
         .expect("ControlGroup property");
     if group.is_empty() {
+        eprintln!("cgroup_quiescence=ControlGroup absent");
         return;
     }
     assert!(group.starts_with('/'), "untrusted ControlGroup: {group:?}");
@@ -164,10 +215,30 @@ fn assert_no_cgroup_tasks(show: &str) {
         "live cgroup processes: {processes}"
     );
     let events = std::fs::read_to_string(path.join("cgroup.events")).expect("read cgroup events");
+    eprintln!("cgroup_quiescence=path={path:?} procs={processes:?} events={events:?}");
     assert!(
         events.lines().any(|line| line == "populated 0"),
         "cgroup still populated: {events}"
     );
+}
+
+fn cgroup_snapshot(show: &str) -> String {
+    let group = show
+        .lines()
+        .find_map(|line| line.strip_prefix("ControlGroup="))
+        .unwrap_or("<missing>");
+    if group.is_empty() {
+        return "ControlGroup absent".to_string();
+    }
+    if !group.starts_with('/') || group.split('/').any(|part| part == "..") {
+        return format!("unsafe ControlGroup {group:?}");
+    }
+    let path = Path::new("/sys/fs/cgroup").join(group.trim_start_matches('/'));
+    format!(
+        "ControlGroup={group:?} cgroup.procs={:?} cgroup.events={:?}",
+        std::fs::read_to_string(path.join("cgroup.procs")),
+        std::fs::read_to_string(path.join("cgroup.events"))
+    )
 }
 
 #[cfg(target_os = "linux")]
@@ -222,7 +293,19 @@ fn failed_unit_with_residual_cgroup_process_is_not_complete() {
         .stop(&want, Duration::from_secs(5))
         .expect("owned failed unit stop should return a bounded result");
     let after = fixture.show();
-    eprintln!("residual_process_stop={stop:?} after_show={after:?}");
+    eprintln!(
+        "residual_process_stop={stop:?} after_show={after:?} cgroup={}",
+        cgroup_snapshot(&after)
+    );
+    eprintln!(
+        "residual_process_stop_commands={:?}",
+        manager
+            .executor()
+            .calls()
+            .into_iter()
+            .filter(|(argv, _)| argv.get(2).map(String::as_str) == Some("stop"))
+            .collect::<Vec<_>>()
+    );
     assert!(
         !stop.completed,
         "live process/cgroup cannot be called quiescent"
@@ -273,6 +356,15 @@ fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
     eprintln!(
         "failed_stop={stop:?} after_show={after:?} after_is_active=({active_after:?}, {active_status_after:?})"
     );
+    eprintln!(
+        "failed_stop_commands={:?}",
+        failed_manager
+            .executor()
+            .calls()
+            .into_iter()
+            .filter(|(argv, _)| argv.get(2).map(String::as_str) == Some("stop"))
+            .collect::<Vec<_>>()
+    );
     assert!(
         stop.completed,
         "owned failed unit was not proven quiescent: {stop:?}"
@@ -306,6 +398,30 @@ fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
         .stop(&recovered_spec, Duration::from_secs(5))
         .expect("stop caller-repaired unit");
     assert!(stopped.completed, "{stopped:?}");
+
+    let restart_definition = "[Unit]\nDescription=Eggup M010 restart-limit fixture\nStartLimitIntervalSec=1s\nStartLimitBurst=2\n[Service]\nType=exec\nExecStart=/usr/bin/false\nRestart=on-failure\nRestartSec=50ms\n";
+    let restart = UnitFixture::new("restart-limit", restart_definition);
+    let restart_start = restart.start();
+    let restart_failed = restart.wait_for_result("start-limit-hit");
+    eprintln!(
+        "restart_limit_start_status={:?} show={restart_failed:?}",
+        restart_start.status.code()
+    );
+    assert!(restart_failed
+        .lines()
+        .any(|line| line == "ActiveState=failed"));
+    let mut restart_manager = manager(&restart, restart_definition);
+    let restart_spec = spec(&restart.name, "/usr/bin/false");
+    let restart_stop = restart_manager
+        .stop(&restart_spec, Duration::from_secs(5))
+        .expect("stop rate-limited failed unit");
+    let restart_after = restart.show();
+    eprintln!(
+        "restart_limit_stop={restart_stop:?} show={restart_after:?} cgroup={}",
+        cgroup_snapshot(&restart_after)
+    );
+    assert!(restart_stop.completed, "{restart_stop:?}");
+    assert_no_cgroup_tasks(&restart_after);
 
     #[cfg(target_os = "linux")]
     failed_unit_with_residual_cgroup_process_is_not_complete();
