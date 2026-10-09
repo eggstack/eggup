@@ -43,12 +43,29 @@ impl UnitFixture {
     fn start(&self) -> Output {
         systemctl(&["start", &self.name])
     }
+
+    fn wait_for_active_state(&self, wanted: &str) -> String {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let show = self.show();
+            if show
+                .lines()
+                .any(|line| line == format!("ActiveState={wanted}"))
+            {
+                return show;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "unit did not reach ActiveState={wanted}: {show}"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
 }
 
 impl Drop for UnitFixture {
     fn drop(&mut self) {
         let _ = systemctl(&["stop", &self.name]);
-        let _ = systemctl(&["reset-failed", &self.name]);
         let _ = std::fs::remove_file(&self.path);
         let _ = systemctl(&["daemon-reload"]);
     }
@@ -162,18 +179,15 @@ fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
     let failed_definition = "[Unit]\nDescription=Eggup M010 failed-unit fixture\n[Service]\nType=exec\nExecStart=/usr/bin/false\nRestart=no\n";
     let failed = UnitFixture::new("failed", failed_definition);
     let start = failed.start();
-    assert!(
-        !start.status.success(),
-        "false fixture unexpectedly succeeded"
-    );
-    let before = failed.show();
+    let before = failed.wait_for_active_state("failed");
     let (active_before, active_status_before) = failed.is_active();
     eprintln!(
-        "systemd={} before_show={before:?} before_is_active=({active_before:?}, {active_status_before:?})",
+        "systemd={} start_status={:?} before_show={before:?} before_is_active=({active_before:?}, {active_status_before:?})",
         String::from_utf8_lossy(&systemctl(&["--version"]).stdout)
             .lines()
             .next()
-            .unwrap_or("unknown")
+            .unwrap_or("unknown"),
+        start.status.code()
     );
     assert!(before.lines().any(|line| line == "LoadState=loaded"));
     assert!(before.lines().any(|line| line == "ActiveState=failed"));
