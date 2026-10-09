@@ -29,6 +29,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.89.0
       - run: cargo check --workspace --all-targets --locked
 
+  service-systemd:
+    name: Linux systemd service qualification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # This fixture writes disposable unit files under /run/systemd/system.
+      # Run the test process as root so systemd can load and control them.
+      - run: sudo --preserve-env=PATH,HOME cargo test -p eggup-service --test systemd_failed_service --locked -- --nocapture
+
   macos:
     name: macOS tests
     runs-on: macos-latest
