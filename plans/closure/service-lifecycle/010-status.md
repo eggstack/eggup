@@ -8,9 +8,9 @@ Source roadmap: `plans/subsystems/service-lifecycle-roadmap.md#M010--owned-faile
 
 Reviewed repository baseline (plan): `70ec4e63c52988bc6c82bea30d14f72eefda920a`
 
-Implementation source: `753bc7c281a9b8bfa29dafea46805a7245060409`
+Implementation source: `0bde3fefbda07019529ad7566c02e6e4ec141fd6`
 
-Hosted qualification: GitHub Actions run [`37874476249`](https://github.com/eggstack/eggup/actions/runs/37874476249), exact head `753bc7c281a9b8bfa29dafea46805a7245060409`, all five jobs green.
+Hosted qualification: GitHub Actions run [`37875012280`](https://github.com/eggstack/eggup/actions/runs/37875012280), exact head `0bde3fefbda07019529ad7566c02e6e4ec141fd6`, all five jobs green.
 
 ## Executive finding
 
@@ -46,10 +46,11 @@ start/stop succeeded.
 | Failed diagnosis does not mean quiescent | Real failed fixture remained `ActiveState=failed`, `is-active=failed`/3, with MainPID=0, ControlPID=0, no Job, and no ControlGroup after successful `systemctl stop` | passed |
 | Manager proof and independent task proof | Stable post-stop observation, manager-job check, zero process IDs, and validated cgroup-v2 `cgroup.procs`/`cgroup.events` when present; residual child fixture remained populated and incomplete | passed |
 | Restart/start-limit case | Real fixture recorded two distinct failed ExecStart invocations, rejected a third start without changing invocation identity, and retained systemd's “Start request repeated too quickly” journal evidence; subsequent stop completed | passed |
+| Stop during automatic restart | Real fixture observed `ActiveState=activating`, `SubState=auto-restart`; Eggup stop completed, and post-stop state was `inactive`/`dead`, status 3, with zero process IDs and no cgroup | passed |
 | Ownership/state races and malformed data | Deterministic fake-executor tests cover identity flap, unknown state, active/restart race, inconsistent status, unsafe cgroup, remaining process, and bounded timeout; mutation refusals remain fail-closed | passed |
 | Ordinary running stop and repair path | Real systemd disposable sleep unit started and stopped after caller repaired its unit definition | passed |
 | Public API compatibility | No public signatures or enum variants changed; external fixture resolves registry `eggup-service =0.1.2` and compiles wildcard matching for the already-`#[non_exhaustive]` `LifecycleState` | passed |
-| Platform/MSRV qualification | Exact-head Stable, Rust 1.89 MSRV, macOS, Windows, and Linux systemd jobs green in run `37874476249` | passed |
+| Platform/MSRV qualification | Exact-head Stable, Rust 1.89 MSRV, macOS, Windows, and Linux systemd jobs green in run `37875012280` | passed |
 | Package integrity / dependency scope | `cargo package` verifies 10-file service package; dry-run upload succeeds; no dependency or workspace manifest changes | passed |
 | Documentation and plan governance | Service README/changelog, root changelog, service architecture, source plan, roadmap, registry, and this closure updated | passed |
 
@@ -85,6 +86,11 @@ failed starts and the same `ExecStart` invocation after the rejected third
 request; the journal recorded the start-limit message. This avoids depending on
 the optional `NRestarts` show property or localized journal text as a test gate.
 
+A separate restart-race fixture used `Restart=on-failure` and observed
+`ActiveState=activating`, `SubState=auto-restart` before invoking Eggup stop.
+Stop completed and systemd then reported `ActiveState=inactive`, `SubState=dead`,
+`MainPID=0`, `ControlPID=0`, `Job=`, and status 3 from `is-active`.
+
 The test uses disposable system unit files under `/run/systemd/system`, removes
 them, and reloads systemd on teardown. It does not alter unrelated units. The
 real native lane qualifies system scope; user scope is not exercised by the
@@ -95,10 +101,12 @@ hosted VM, while deterministic adapter tests cover the shared proof logic.
 On the implementation tree:
 
 ```text
+rtk ./scripts/check-local.sh
+  passed on `753bc7c` before the final native auto-restart fixture was added
 rtk cargo fmt --all
   passed
 rtk cargo test -p eggup-service --all-targets --all-features --locked
-  110 passed (3 suites)
+  110 passed (3 suites), after adding the native auto-restart fixture at `0bde3fe`
 rtk cargo package -p eggup-service --list --locked
   passed; 10 package files
 rtk cargo package -p eggup-service --locked
@@ -121,7 +129,7 @@ rebuild and record the checksum from its final clean release-preparation source
 commit. Crates.io reported no `eggup-service 0.1.3` version. No publish command
 without `--dry-run` was issued.
 
-Exact hosted run `37874476249` results:
+Exact hosted run `37875012280` results:
 
 | Lane | Result |
 |---|---|
@@ -134,7 +142,8 @@ Exact hosted run `37874476249` results:
 Earlier hosted attempts `37874216157` and `37874306959` exposed fixture
 assumptions (localized journal wording, and a deliberately failing service's
 start exit status). They were corrected in the test harness; final exact-head
-run `37874476249` supersedes them and passed every lane.
+run `37874476249` passed every lane before the additional real auto-restart case;
+the final run `37875012280` includes that case and passed every lane.
 
 ## Invariant, failure, and recovery review
 

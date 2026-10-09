@@ -1,11 +1,13 @@
 # Service Lifecycle M011 — Publish the Qualified Failed-unit Quiescence Correction
 
-Status: blocked on Service M010 strict closure with a required runtime change. Skip this milestone if M010 proves published 0.1.2 already suffices.
-Repository planning baseline: `eggstack/eggup@70ec4e63c52988bc6c82bea30d14f72eefda920a` (2026-10-08); implementation must rebaseline on M010's final qualified SHA.
+Status: ready for release qualification; crates.io publication blocked on explicit maintainer authorization.
+Repository planning baseline: `eggstack/eggup@0bde3fefbda07019529ad7566c02e6e4ec141fd6` (M010 strict closure and final hosted qualification, 2026-10-09).
 Source roadmap: `plans/subsystems/service-lifecycle-roadmap.md`.
 Primary class: infrastructure / release qualification.
-Hard dependency: Service M010 (`plans/implementation/service-lifecycle/010-owned-failed-systemd-service-quiescence-corrective.md`) CLOSED, including real-systemd proof and no breaking public API.
-Operational dependency: manual publishing permission and a fresh hosted Stable/MSRV/macOS/Windows result.
+Hard dependency: Service M010 (`plans/implementation/service-lifecycle/010-owned-failed-systemd-service-quiescence-corrective.md`) CLOSED with the required runtime change, real-systemd proof, and no public API break.
+Operational dependency: explicit maintainer publishing authorization. The fresh hosted Stable/MSRV/macOS/Windows and systemd run `37875012280` is green on the M010 implementation head; M011 requires a new exact-source run after release preparation.
+
+Registry preflight on 2026-10-09: `cargo info eggup-service@0.1.2 --registry crates-io` resolves the published baseline; `cargo info eggup-service@0.1.3 --registry crates-io` reports no such version. A preliminary `eggup-service 0.1.3` package/dry-run succeeded at `753bc7c`; M011 must rebuild and record final release-prep bytes and checksum after the exact changelog and external negative-control fixture are committed.
 
 ## 1. Objective
 
