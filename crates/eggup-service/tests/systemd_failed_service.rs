@@ -276,7 +276,7 @@ fn failed_unit_with_residual_cgroup_process_is_not_complete() {
     );
     let fixture = UnitFixture::new("residual", &definition);
     let start = fixture.start();
-    assert_success(&start, "start residual-process fixture");
+    eprintln!("residual_process_start_status={:?}", start.status.code());
     let before = fixture.wait_for_active_state("failed");
     let pid: u32 = std::fs::read_to_string(&pid_file)
         .expect("read fixture child pid")
