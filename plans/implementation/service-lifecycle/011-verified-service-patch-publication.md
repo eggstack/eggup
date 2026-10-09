@@ -1,0 +1,77 @@
+# Service Lifecycle M011 — Publish the Qualified Failed-unit Quiescence Correction
+
+Status: blocked on Service M010 strict closure with a required runtime change. Skip this milestone if M010 proves published 0.1.2 already suffices.
+Repository planning baseline: `eggstack/eggup@70ec4e63c52988bc6c82bea30d14f72eefda920a` (2026-10-08); implementation must rebaseline on M010's final qualified SHA.
+Source roadmap: `plans/subsystems/service-lifecycle-roadmap.md`.
+Primary class: infrastructure / release qualification.
+Hard dependency: Service M010 (`plans/implementation/service-lifecycle/010-owned-failed-systemd-service-quiescence-corrective.md`) CLOSED, including real-systemd proof and no breaking public API.
+Operational dependency: manual publishing permission and a fresh hosted Stable/MSRV/macOS/Windows result.
+
+## 1. Objective
+
+Make the M010 corrected `eggup-service` state/quiescence contract consumable from crates.io by `wg-basic`, with exact reproducible packaged source, registry-only compatibility evidence and no accidental change to other Eggup crates. The current repository uses workspace package version `0.1.3`; the previously published `eggup-service 0.1.2` is immutable. Publish the next valid, unused service patch version after explicit registry inspection; `0.1.3` is the expected candidate, not permission to assume availability or overwrite anything.
+
+## 2. Detection and cross-repository blocker
+
+`wg-basic` pins `eggup-service = "=0.1.2"`, which lacks a proven safe path for its failed-candidate rollback. It is not acceptable to adopt unpublished Eggup Git/path code as production or to permit `wg-basic` release CI to drift to a dependency different from the frozen installed binary.
+
+Eggup's M010 must first determine whether the service adapter itself needs a runtime change. If that plan closes with verified `eggup-service 0.1.2` support and only a downstream guard defect, this publication plan is **not applicable**, not partially completed.
+
+## 3. Invariants
+
+- This plan never silently changes M010's reviewed service API or behaviour. Any regression first returns to M010.
+- `eggup-service` remains compatible with `eggup-core ^0.1.0` and Rust 1.89; run an external, registry-only fixture to prove exact resolution of the published core 0.1.3 graph.
+- All other crates preserve their existing published identity/source/version. Workspace version `0.1.3` is not authority to republish already-published core/archive/acquisition/eggpack crates.
+- Do not move old `v0.1.2` or `v0.1.3` tags. If service source ships from a later commit, record package-specific source provenance, SHA, checksum and registry identity precisely.
+- No automatic publication. An explicit maintainer-authorized crates.io publish operation is a separate irreversible boundary.
+- No breaking enum variant or public signature change masquerading as `0.1.3`. Preserve exhaustive-match consumer compatibility and the no-unsafe rule.
+
+## 4. Ordered work packages
+
+1. Retrieve Service M010 strict closure evidence and exact implementation commit, full native/negative test matrix, API diff and affected platform list.
+2. Inspect crates.io for `eggup-service` current versions, publish ownership and exact `0.1.3` absence. If `0.1.3` is already occupied, stop/replan next version with compatibility evaluation; do not republish or silently bump workspace/other crates.
+3. Make the source changelog clearly identify the behavior correction and exact service source revision. Ensure package manifest exposes the expected version and dependency graph without Git/path replacement in packaged output.
+4. Run `cargo package -p eggup-service --locked`, package file inventory, `cargo publish -p eggup-service --dry-run --locked`, and external registry-only fixture. Before publication, fixture should still resolve 0.1.2 and detect the failed-case limitation, providing a discriminating negative control.
+5. Require hosted Stable + Rust 1.89 MSRV + macOS + Windows CI green at the exact candidate SHA. Re-run service real-systemd matrix or obtain an equally recent immutable qualified run on the same source.
+6. Obtain explicit maintainer authorization; publish **only eggup-service** to crates.io. If authentication/publish permission is unavailable, stop with a blocked publication record; do not change the status to closed.
+7. Verify registry checksum/source metadata, direct external `eggup-service = "=0.1.3"` (or newly authorized version) dependency and a positive proof of owned failed-unit quiescence. Verify other published crates and existing tags untouched.
+8. Write exact version+checksum+API migration handoff to `dbowm91/wg-basic` M004 C001a. Reconcile current Eggup roadmap, registry, changelog and release notes without rewriting historical service M009 closure.
+
+## 5. Failure, restart, and contention
+
+Publishing is immutable. On ambiguous registry result after an attempted publish, query the registry and package checksum before retrying; never assume timeout means no artifact exists. No live host services, install receipts or artifact bytes are mutated by release qualification. If core ABI compatibility, platform behaviour or ownership proof changes during package reconstruction, block and return to M010.
+
+## 6. Public API and platform compatibility
+
+No public enum variant changes. No loss of `ServiceManager` or `SystemdManager` methods, no new mandatory features/third-party dependencies. Cross-platform source compatibility for Unix non-systemd/macOS/Windows must be verified with the exact packaged crate, not merely workspace tests.
+
+## 7. Tests and broad verification
+
+```text
+git status --porcelain
+git rev-parse HEAD
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test -p eggup-service --all-targets --all-features --locked
+cargo test --workspace --all-targets --all-features --locked
+cargo doc --workspace --no-deps --locked
+cargo +1.89.0 check --workspace --all-targets --locked
+cargo package -p eggup-service --list --locked
+cargo package -p eggup-service --locked
+cargo publish -p eggup-service --dry-run --locked
+git diff --check
+```
+
+External test fixture: `eggup-service = "=NEW_VERSION"` and `eggup-core` as resolved purely from registry, cargo tree showing no workspace Git/path override; test Failed/Foreign/malformed cases and exhaustive public enum matches. Log exact checksum, package byte size and source revision.
+
+## 8. Acceptance criteria
+
+Exact reviewed service correction is published under an unused immutable version; checksum/provenance and registry-only test pass; no other crate/tag changes; supported platform/MSRV tests pass; downstream adoption version is explicit; release/security policy is unchanged.
+
+## 9. Stop conditions
+
+M010 is closed as `no upstream runtime fix needed`, version occupied, publish authority absent, registry-only fixture fails, source/package drift, significant native failure, public API break, workspace version train conflict, or an attempt to move `v0.1.3`. Classify `skipped`, `blocked`, or `corrective required` accurately, not `closed`.
+
+## 10. Closure evidence and handoff
+
+After publication only, write `plans/closure/service-lifecycle/011-status.md` with M010 closure SHA, package/commit/version/checksum, registry preflight, exact gates, downstream fixture, operator authorization result, supported-platform matrix, tag integrity, known limitations, and `wg-basic` adoption pointer. This is a release step, not consent to auto-publish wg-basic itself.
