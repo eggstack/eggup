@@ -113,8 +113,11 @@ fn published_0_1_2_cannot_complete_stop_for_owned_failed_unit() {
     )
     .expect("systemd install descriptor");
     let mut manager = SystemdManager::new(SystemExecutor::new(), install);
+    let before_stop = manager.inspect(&spec).expect("inspect failed unit");
+    assert_eq!(before_stop.ownership, eggup_service::Ownership::Owned);
+    assert_eq!(before_stop.state, eggup_service::LifecycleState::Unknown);
     let stop = manager
-        .stop(&spec, Duration::from_millis(300))
+        .stop(&spec, Duration::from_secs(5))
         .expect("0.1.2 returns a bounded stop result");
     let after = fixture.show();
     eprintln!("published_0_1_2_before={before:?} stop={stop:?} after={after:?}");
