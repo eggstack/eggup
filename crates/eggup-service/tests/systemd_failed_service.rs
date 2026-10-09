@@ -93,6 +93,24 @@ impl UnitFixture {
         }
     }
 
+    fn wait_for_sub_state(&self, wanted: &str) -> String {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let show = self.show();
+            if show
+                .lines()
+                .any(|line| line == format!("SubState={wanted}"))
+            {
+                return show;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "unit did not reach SubState={wanted}: show={show}"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
     fn wait_for_failed_result(&self) -> String {
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         loop {
@@ -459,6 +477,33 @@ fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
     );
     assert!(restart_stop.completed, "{restart_stop:?}");
     assert_no_cgroup_tasks(&restart_after);
+
+    let auto_restart_definition = "[Unit]\nDescription=Eggup M010 auto-restart race fixture\nStartLimitIntervalSec=60s\nStartLimitBurst=20\n[Service]\nType=exec\nExecStart=/usr/bin/false\nRestart=on-failure\nRestartSec=500ms\n";
+    let auto_restart = UnitFixture::new("auto-restart", auto_restart_definition);
+    let auto_start = auto_restart.start();
+    let racing_before = auto_restart.wait_for_sub_state("auto-restart");
+    let mut auto_restart_manager = manager(&auto_restart, auto_restart_definition);
+    let auto_spec = spec(&auto_restart.name, "/usr/bin/false");
+    let racing_stop = auto_restart_manager
+        .stop(&auto_spec, Duration::from_secs(5))
+        .expect("stop during real systemd auto-restart should return a bounded result");
+    let racing_after = auto_restart.show();
+    let (racing_active, racing_active_status) = auto_restart.is_active();
+    eprintln!(
+        "auto_restart_race_start_status={:?} before={racing_before:?} stop={racing_stop:?} after={racing_after:?} is_active=({racing_active:?}, {racing_active_status:?}) journal={:?}",
+        auto_start.status.code(),
+        journal(&auto_restart.name),
+    );
+    assert!(
+        racing_stop.completed,
+        "auto-restart race did not quiesce: {racing_stop:?}"
+    );
+    assert_eq!(racing_active, "inactive");
+    assert_eq!(racing_active_status, Some(3));
+    assert!(racing_after
+        .lines()
+        .any(|line| line == "ActiveState=inactive"));
+    assert_no_cgroup_tasks(&racing_after);
 
     #[cfg(target_os = "linux")]
     failed_unit_with_residual_cgroup_process_is_not_complete();

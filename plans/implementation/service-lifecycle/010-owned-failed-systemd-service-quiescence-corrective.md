@@ -1,6 +1,6 @@
 # Service Lifecycle M010 — Owned Failed-systemd Service Quiescence Corrective
 
-Status: ready for implementation.
+Status: closed; see `plans/closure/service-lifecycle/010-status.md`.
 Repository baseline: `eggstack/eggup@70ec4e63c52988bc6c82bea30d14f72eefda920a` (2026-10-08).
 Source roadmap: `plans/subsystems/service-lifecycle-roadmap.md`.
 Primary class: invariant / corrective.
@@ -21,7 +21,7 @@ Enable a consumer to stop a failed candidate and restore a compatible applicatio
 - Earlier service M005/M006 closure tests exercised ordinary owned Running/Stopped, foreign preservation, and selected lifecycle failures, but did not discriminate an exact owned `failed` systemd unit from a genuinely unknown/unowned unit after candidate start failure.
 - systemd documents `failed` as an error/diagnostic state; `reset-failed` clears failure metadata and restart limits. Resetting failure history is neither necessary nor sufficient to prove quiescence and must not be treated as an automatic repair action.
 
-Hard dependency: historical service M001–M009 closure only; this is ready independently of wg-basic implementation. Release/publication M011 is blocked on this plan's strict closure.
+Hard dependency: historical service M001–M009 closure only; this was ready independently of wg-basic implementation. M011 is now dependency-ready because M010 closed with a required runtime change; crates.io publication remains a separate explicit authorization boundary.
 
 ## 3. Discriminating research fixture first (mandatory)
 
@@ -126,4 +126,4 @@ Write `plans/closure/service-lifecycle/010-status.md` only after real implementa
 
 ## 14. Handoff
 
-Eggup Service M011 is operationally blocked on M010's closed, **runtime-changed** disposition. The wg-basic C001a handoff can qualify against a published patched service version after M011, or against the already published 0.1.2 only if M010's evidence proves no Eggup production change is required.
+Eggup Service M011 is dependency-ready on M010's closed, **runtime-changed** disposition. The wg-basic C001a handoff can qualify against a published patched service version after M011; the already published 0.1.2 does not provide the required failed-owned-unit quiescence behavior.
