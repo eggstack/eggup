@@ -93,17 +93,16 @@ impl UnitFixture {
         }
     }
 
-    fn wait_for_start_limit(&self) -> (String, String) {
+    fn wait_for_failed_result(&self) -> String {
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         loop {
             let show = self.show();
-            let journal = journal(&self.name);
-            if journal.contains("Start request repeated too quickly") {
-                return (show, journal);
+            if show.lines().any(|line| line == "ActiveState=failed") {
+                return show;
             }
             assert!(
                 std::time::Instant::now() < deadline,
-                "unit did not reach the systemd start limit: show={show}, journal={journal}"
+                "unit did not reach failed state: show={show}"
             );
             std::thread::sleep(Duration::from_millis(20));
         }
@@ -408,15 +407,44 @@ fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
         .expect("stop caller-repaired unit");
     assert!(stopped.completed, "{stopped:?}");
 
-    let restart_definition = "[Unit]\nDescription=Eggup M010 restart-limit fixture\nStartLimitIntervalSec=1s\nStartLimitBurst=2\n[Service]\nType=exec\nExecStart=/usr/bin/false\nRestart=on-failure\nRestartSec=50ms\n";
+    let restart_definition = "[Unit]\nDescription=Eggup M010 restart-limit fixture\nStartLimitIntervalSec=60s\nStartLimitBurst=2\n[Service]\nType=exec\nExecStart=/usr/bin/false\nRestart=no\n";
     let restart = UnitFixture::new("restart-limit", restart_definition);
     let restart_start = restart.start();
-    let (restart_failed, restart_journal) = restart.wait_for_start_limit();
-    eprintln!(
-        "restart_limit_start_status={:?} show={restart_failed:?} journal={restart_journal:?}",
-        restart_start.status.code(),
+    let restart_first = restart.wait_for_failed_result();
+    let restart_second_start = restart.start();
+    assert_success(&restart_second_start, "second start-limit fixture launch");
+    let restart_second = restart.wait_for_failed_result();
+    let rejected_start = restart.start();
+    let restart_limited = restart.show();
+    let first_exec = restart_first
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .expect("first failed invocation");
+    let second_exec = restart_second
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .expect("second failed invocation");
+    let limited_exec = restart_limited
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .expect("rate-limited invocation record");
+    assert_ne!(first_exec, second_exec, "second launch must execute again");
+    assert_eq!(
+        second_exec, limited_exec,
+        "rejected launch must not execute"
     );
-    assert!(restart_failed
+    assert!(
+        !rejected_start.status.success(),
+        "third start must be rate limited"
+    );
+    eprintln!(
+        "restart_limit_start_status={:?} second_status={:?} rejected_status={:?} first={restart_first:?} second={restart_second:?} limited={restart_limited:?} journal={:?}",
+        restart_start.status.code(),
+        restart_second_start.status.code(),
+        rejected_start.status.code(),
+        journal(&restart.name),
+    );
+    assert!(restart_limited
         .lines()
         .any(|line| line == "ActiveState=failed"));
     let mut restart_manager = manager(&restart, restart_definition);
