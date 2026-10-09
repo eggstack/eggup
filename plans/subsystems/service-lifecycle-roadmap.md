@@ -1,6 +1,6 @@
 # Service Lifecycle Roadmap
 
-Status: active; M001–M010 closed; M011 service 0.1.3 release qualification in progress, with publication pending explicit maintainer authorization; `eggup-service 0.1.2` published 2026-10-05
+Status: active; M001–M010 closed; M011 service 0.1.3 release qualification complete, with publication pending explicit maintainer authorization; `eggup-service 0.1.2` published 2026-10-05
 
 Long-term references:
 
@@ -123,7 +123,7 @@ M006 daemon disposition + revalidation [closed; evidence reconciled via acquisit
                       M010 failed-systemd quiescence [CLOSED; runtime change]
                          |
                          v
-                      M011 service 0.1.3 release [READY; publish authorization pending]
+                      M011 service 0.1.3 release [QUALIFIED; publish authorization pending]
 ```
 
 ## 7. Milestones
@@ -219,9 +219,9 @@ M010 found and fixed an upstream runtime defect. On systemd 255, a successful st
 
 Plan: `plans/implementation/service-lifecycle/011-verified-service-patch-publication.md`.
 
-Status: **release qualification in progress; publication blocked on explicit maintainer authorization**. M010 closed with a required runtime change, so this plan is applicable.
+Status: **release qualification complete; publication blocked on explicit maintainer authorization**. M010 closed with a required runtime change, so this plan is applicable. Exact candidate head `f65496f` passed hosted run `37876276212` on Stable/MSRV/macOS/Windows and real Linux systemd.
 
-Qualify and prepare the exact corrected service crate as `0.1.3`; workspace currently declares 0.1.3 while service published 0.1.2. Registry preflight confirms 0.1.3 is unused. The final release-preparation commit must be rebuilt, packaged and checked against registry-only consumers, with Stable/MSRV/macOS/Windows and current real-systemd evidence. Preserve historical shared tags and all other crate identities. Crates.io publication remains a distinct explicit authorization boundary. After publication, supply the immutable version/checksum to wg-basic; do not publish wg-basic itself.
+The exact corrected `eggup-service 0.1.3` candidate is built and checked against registry-only consumers, with Stable/MSRV/macOS/Windows and current real-systemd evidence. Package checksum is `4de199de96dc24a8af5f524db069f5b8c47a8d599b0d624be78539bc9e05b9c2` at source `f65496f`; `0.1.3` remains absent from crates.io. Preserve historical shared tags and all other crate identities. Crates.io publication remains a distinct explicit authorization boundary. After publication, supply the immutable version/checksum to wg-basic; do not publish wg-basic itself.
 
 ## 8. Cross-cutting requirements
 
@@ -237,7 +237,7 @@ System-level versus user-level service registration differs across consumers. Us
 
 ## 11. Completion definition
 
-Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap. M008 closed the deadline-arithmetic determinism gap with a fresh green hosted matrix. M009 published the 0.1.2 package; M010 closed the owned failed-systemd quiescence defect with a source-compatible runtime correction. M011 is the active service 0.1.3 release qualification, pending explicit registry-publication authorization.
+Manager mechanics remain shared by service-bearing consumers without losing application-specific policy. M006 additionally requires product-neutral reference parity for mature daemon-update dispositions without downstream migration. M007 closed the bounded-diagnostic panic gap. M008 closed the deadline-arithmetic determinism gap with a fresh green hosted matrix. M009 published the 0.1.2 package; M010 closed the owned failed-systemd quiescence defect with a source-compatible runtime correction. M011's 0.1.3 release qualification is complete; publication and downstream wg-basic handoff await explicit registry-publication authorization.
 
 ## 12. Milestone status
 
@@ -253,4 +253,4 @@ Manager mechanics remain shared by service-bearing consumers without losing appl
 | M008 | closed | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md` | `plans/closure/service-lifecycle/008-status.md` | — |
 | M009 | closed | `plans/implementation/service-lifecycle/009-eggup-service-0.1.2-publication.md` | `plans/closure/service-lifecycle/009-status.md` | — (published 2026-10-05 from `7fb84bc`; registry-only fixture 10/10; `v0.1.2` unmoved; no `src/` change). Unblocks the Acquisition M010 workspace bump |
 | M010 | closed — runtime corrective | `plans/implementation/service-lifecycle/010-owned-failed-systemd-service-quiescence-corrective.md` | `plans/closure/service-lifecycle/010-status.md` | run `37875012280` green on Stable/MSRV/macOS/Windows and real Linux systemd including auto-restart race; runtime change required |
-| M011 | release qualification in progress; publication blocked on explicit authorization | `plans/implementation/service-lifecycle/011-verified-service-patch-publication.md` | not yet written | M010 closed; `eggup-service 0.1.3` absent; registry preflight passed; exact-source package and registry-only old-version negative control required; no publish without maintainer authorization |
+| M011 | release qualification complete; publication blocked on explicit authorization | `plans/implementation/service-lifecycle/011-verified-service-patch-publication.md` | not yet written | Hosted run `37876276212` green at `f65496f`; package SHA-256 recorded in plan; registry-only 0.1.2 negative control passes; no publish without maintainer authorization |
