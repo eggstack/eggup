@@ -12,7 +12,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 const SHOW_PROPERTIES: &str =
-    "LoadState,ActiveState,SubState,ExecStart,MainPID,ControlPID,ControlGroup,Job,Result";
+    "LoadState,ActiveState,SubState,ExecStart,MainPID,ControlPID,ControlGroup,Job,Result,NRestarts";
 
 struct UnitFixture {
     name: String,
@@ -93,16 +93,17 @@ impl UnitFixture {
         }
     }
 
-    fn wait_for_result(&self, wanted: &str) -> String {
+    fn wait_for_start_limit(&self) -> (String, String) {
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         loop {
             let show = self.show();
-            if show.lines().any(|line| line == format!("Result={wanted}")) {
-                return show;
+            let journal = journal(&self.name);
+            if journal.contains("Start request repeated too quickly") {
+                return (show, journal);
             }
             assert!(
                 std::time::Instant::now() < deadline,
-                "unit did not reach Result={wanted}: {show}"
+                "unit did not reach the systemd start limit: show={show}, journal={journal}"
             );
             std::thread::sleep(Duration::from_millis(20));
         }
@@ -123,6 +124,14 @@ fn systemctl(args: &[&str]) -> Output {
         .args(args)
         .output()
         .expect("run systemctl")
+}
+
+fn journal(unit: &str) -> String {
+    let output = Command::new("/usr/bin/journalctl")
+        .args(["--no-pager", "--output=cat", "--lines=30", "--unit", unit])
+        .output()
+        .expect("run journalctl");
+    String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
 fn assert_success(output: &Output, operation: &str) {
@@ -402,10 +411,10 @@ fn real_systemd_owned_failed_service_stop_is_observed_and_quiescent() {
     let restart_definition = "[Unit]\nDescription=Eggup M010 restart-limit fixture\nStartLimitIntervalSec=1s\nStartLimitBurst=2\n[Service]\nType=exec\nExecStart=/usr/bin/false\nRestart=on-failure\nRestartSec=50ms\n";
     let restart = UnitFixture::new("restart-limit", restart_definition);
     let restart_start = restart.start();
-    let restart_failed = restart.wait_for_result("start-limit-hit");
+    let (restart_failed, restart_journal) = restart.wait_for_start_limit();
     eprintln!(
-        "restart_limit_start_status={:?} show={restart_failed:?}",
-        restart_start.status.code()
+        "restart_limit_start_status={:?} show={restart_failed:?} journal={restart_journal:?}",
+        restart_start.status.code(),
     );
     assert!(restart_failed
         .lines()
