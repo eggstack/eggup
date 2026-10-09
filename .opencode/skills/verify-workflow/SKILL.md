@@ -34,10 +34,11 @@ only** — nothing in the script or CI fails when a boundary is crossed.
 
 | Job | Runner | What it adds |
 |---|---|---|
-| `stable` | ubuntu | fmt + clippy + full `cargo test` + `cargo doc`; the only lane running clippy, fmt, and doc |
-| `msrv` | ubuntu, pinned `1.89.0` | `cargo check --workspace --all-targets --locked` — compile-only, no clippy, no tests |
-| `macos` | macos-latest | full `cargo test`; the only macOS evidence |
-| `windows-check` | windows-latest | **runs tests**, ending in a full `cargo test --workspace --all-targets` — see below |
+| `stable` | ubuntu | fmt + clippy + full `cargo test` + `cargo doc` + packaged service verification; the only lane running clippy, fmt, and doc |
+| `msrv` | ubuntu, pinned `1.89.0` | workspace `cargo check` and packaged service verification at the MSRV |
+| `service-systemd` | ubuntu-latest | registry-only 0.1.2 API/behavior negative control and current privileged systemd fixtures |
+| `macos` | macos-latest | full `cargo test` + packaged service verification; the only macOS evidence |
+| `windows-check` | windows-latest | **runs nine test steps**, ending in a full `cargo test --workspace --all-targets`, then package verification — see below |
 
 `windows-check` is *not* compile-only, and it is no longer a curated subset. It
 runs the platform-sensitive steps, then the two Core fixture files, then the
@@ -56,7 +57,8 @@ whole workspace:
 6. `cargo test -p eggup-core --test stale_lock_recovery --locked` — exercises
    the claim/race fixtures natively; `rename` semantics differ per platform, so
    compile-only evidence is not sufficient for M011.
-7. `cargo test --workspace --all-targets --locked`
+7. `cargo test --workspace --all-targets --locked --no-fail-fast`
+8. `cargo package -p eggup-service --locked` — verifies package-produced source on Windows
 
 Step 7 exists because the per-crate steps cannot catch a regression in an
 untargeted crate. It passes `--no-fail-fast` deliberately: this lane is the only
@@ -85,6 +87,8 @@ narrowing the step, and keep `--no-fail-fast`.
   `eggup-transport-footprint` binaries are behind `required-features`, so **no
   MSRV lane and no Windows lane ever compiles them**. Only `stable` and `macos`
   build non-default features.
+- The `msrv` package check applies the Rust 1.89 floor to `eggup-service` only;
+  other crates are covered by the workspace `cargo check`.
 - clippy and fmt run on Linux only — a `#[cfg(windows)]` or `#[cfg(target_os = "macos")]`
   clippy violation is caught by no lane.
 - `macos` is the only lane that runs `cargo test` with `--all-features`, and

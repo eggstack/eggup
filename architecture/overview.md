@@ -42,8 +42,9 @@ manager, and producer concerns.
 
 Derived from the `crates/*/Cargo.toml` manifests. Arrows point from dependent to
 dependency (compile-time direction). All 8 crates carry the workspace version
-`0.1.2`; six of them are published at `0.1.2` on crates.io. `eggup-service` is
-published but lags at `0.1.1`, and `eggup-transport-footprint` is `publish = false`.
+`0.1.3`; seven library crates are published at `0.1.2` or `0.1.3` on crates.io.
+`eggup-service` is published through `0.1.2`, with its M010 `0.1.3` correction
+being qualified by M011. `eggup-transport-footprint` is `publish = false`.
 
 ```text
                          eggup-transport-footprint   (publish = false, 3 bins)
@@ -243,9 +244,10 @@ Contract-level detail that belongs to no single crate:
 - [closure records](../plans/closure/README.md) — requirement → evidence matrices
 
 Publication state: `eggup-core`, `eggup-archive`, `eggup-acquisition`,
-`eggup-eggfetch`, `eggup-eggpack`, and `eggup-curl` are published at `0.1.2`.
-`eggup-service` **is** on crates.io but only at `0.1.0`/`0.1.1`, so its `0.1.2`
-has never been published and no milestone authorizes it.
+`eggup-eggfetch`, and `eggup-eggpack` are published at `0.1.3`;
+`eggup-curl` and `eggup-service` are published through `0.1.2`. The
+`eggup-service 0.1.3` M010 correction is being qualified by M011 and remains
+unpublished pending explicit maintainer authorization.
 `eggup-transport-footprint` is `publish = false` by design and has no registry
 version. CI never publishes; releases are manual — see
 [tooling-governance.md](tooling-governance.md) §8.

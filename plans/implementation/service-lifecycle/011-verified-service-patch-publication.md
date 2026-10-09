@@ -9,15 +9,23 @@ Operational dependency: explicit maintainer publishing authorization. The fresh 
 
 Registry preflight on 2026-10-09: `cargo info eggup-service@0.1.2 --registry crates-io` resolves the published baseline; `cargo info eggup-service@0.1.3 --registry crates-io` reports no such version. A preliminary `eggup-service 0.1.3` package/dry-run succeeded at `753bc7c`; M011 must rebuild and record final release-prep bytes and checksum after the exact changelog and external negative-control fixture are committed.
 
+Pre-publication progress: M010 strict closure, registry version preflight, and
+the 0.1.2 public-API compile fixture are complete. A systemd integration test
+against registry-only `eggup-service =0.1.2` now serves as the required
+behavioral negative control: it creates an exact-owned failed unit with no
+remaining control group and asserts the published library cannot report stop
+completion. The final release-prep source, hosted run, package bytes, and
+checksum remain to be recorded. No non-dry-run publication is authorized.
+
 ## 1. Objective
 
 Make the M010 corrected `eggup-service` state/quiescence contract consumable from crates.io by `wg-basic`, with exact reproducible packaged source, registry-only compatibility evidence and no accidental change to other Eggup crates. The current repository uses workspace package version `0.1.3`; the previously published `eggup-service 0.1.2` is immutable. Publish the next valid, unused service patch version after explicit registry inspection; `0.1.3` is the expected candidate, not permission to assume availability or overwrite anything.
 
 ## 2. Detection and cross-repository blocker
 
-`wg-basic` pins `eggup-service = "=0.1.2"`, which lacks a proven safe path for its failed-candidate rollback. It is not acceptable to adopt unpublished Eggup Git/path code as production or to permit `wg-basic` release CI to drift to a dependency different from the frozen installed binary.
+`wg-basic` pins `eggup-service = "=0.1.2"`, which lacks a safe completion path for its failed-candidate rollback. M010's real-systemd negative control proved the published stop reports incomplete even when the exact-owned failed unit has no remaining tasks; M010 therefore requires an Eggup runtime change. It is not acceptable to adopt unpublished Eggup Git/path code as production or to permit `wg-basic` release CI to drift to a dependency different from the frozen installed binary.
 
-Eggup's M010 must first determine whether the service adapter itself needs a runtime change. If that plan closes with verified `eggup-service 0.1.2` support and only a downstream guard defect, this publication plan is **not applicable**, not partially completed.
+The M010 applicability decision is complete: this release plan is required to deliver the qualified behavior to registry-only consumers.
 
 ## 3. Invariants
 
@@ -32,8 +40,8 @@ Eggup's M010 must first determine whether the service adapter itself needs a run
 
 1. Retrieve Service M010 strict closure evidence and exact implementation commit, full native/negative test matrix, API diff and affected platform list.
 2. Inspect crates.io for `eggup-service` current versions, publish ownership and exact `0.1.3` absence. If `0.1.3` is already occupied, stop/replan next version with compatibility evaluation; do not republish or silently bump workspace/other crates.
-3. Make the source changelog clearly identify the behavior correction and exact service source revision. Ensure package manifest exposes the expected version and dependency graph without Git/path replacement in packaged output.
-4. Run `cargo package -p eggup-service --locked`, package file inventory, `cargo publish -p eggup-service --dry-run --locked`, and external registry-only fixture. Before publication, fixture should still resolve 0.1.2 and detect the failed-case limitation, providing a discriminating negative control.
+3. Make the source changelog clearly identify the behavior correction and M010 runtime source revision. The exact release-prep commit must also be captured by packaged `.cargo_vcs_info.json`. Ensure package manifest exposes the expected version and dependency graph without Git/path replacement in packaged output.
+4. Run `cargo package -p eggup-service --list --locked`, `cargo package -p eggup-service --locked`, `cargo publish -p eggup-service --dry-run --locked`, and the external registry-only fixture. Before publication, fixture must still resolve 0.1.2 and the privileged systemd negative control must demonstrate the failed-case limitation. Build/verify the packaged crate on Linux, macOS, Windows, and Rust 1.89 CI lanes.
 5. Require hosted Stable + Rust 1.89 MSRV + macOS + Windows CI green at the exact candidate SHA. Re-run service real-systemd matrix or obtain an equally recent immutable qualified run on the same source.
 6. Obtain explicit maintainer authorization; publish **only eggup-service** to crates.io. If authentication/publish permission is unavailable, stop with a blocked publication record; do not change the status to closed.
 7. Verify registry checksum/source metadata, direct external `eggup-service = "=0.1.3"` (or newly authorized version) dependency and a positive proof of owned failed-unit quiescence. Verify other published crates and existing tags untouched.
@@ -61,10 +69,22 @@ cargo +1.89.0 check --workspace --all-targets --locked
 cargo package -p eggup-service --list --locked
 cargo package -p eggup-service --locked
 cargo publish -p eggup-service --dry-run --locked
+cargo fmt --manifest-path crates/eggup-service/tests/published-api-0.1.2/Cargo.toml -- --check
+cargo check --manifest-path crates/eggup-service/tests/published-api-0.1.2/Cargo.toml --locked
+sudo env EGGUP_SYSTEMD_INTEGRATION=1 cargo test --manifest-path crates/eggup-service/tests/published-api-0.1.2/Cargo.toml --test systemd_failed_stop_negative_control --locked -- --nocapture
 git diff --check
 ```
 
-External test fixture: `eggup-service = "=NEW_VERSION"` and `eggup-core` as resolved purely from registry, cargo tree showing no workspace Git/path override; test Failed/Foreign/malformed cases and exhaustive public enum matches. Log exact checksum, package byte size and source revision.
+The compatibility fixture at `crates/eggup-service/tests/published-api-0.1.2/`
+resolves `eggup-service = "=0.1.2"` and `eggup-core` purely from the registry,
+records registry sources in its lockfile, and matches the non-exhaustive public
+enum with a wildcard. Its privileged Linux integration test proves the old
+failed-unit stop limitation. The packaged candidate itself is built by
+`cargo package` in Stable/Linux, MSRV 1.89, macOS, and Windows CI jobs. After
+publication, add a fresh external fixture at the authorized exact version and
+test positive failed-unit quiescence plus Foreign/malformed controls. Log exact
+checksum, package byte size, and source revision before asking for publication
+authorization.
 
 ## 8. Acceptance criteria
 
@@ -72,7 +92,7 @@ Exact reviewed service correction is published under an unused immutable version
 
 ## 9. Stop conditions
 
-M010 is closed as `no upstream runtime fix needed`, version occupied, publish authority absent, registry-only fixture fails, source/package drift, significant native failure, public API break, workspace version train conflict, or an attempt to move `v0.1.3`. Classify `skipped`, `blocked`, or `corrective required` accurately, not `closed`.
+Version occupied, publish authority absent, registry-only fixture fails, source/package drift, significant native failure, public API break, workspace version train conflict, or an attempt to move `v0.1.3`. Classify publication as `blocked` when authorization is absent; do not mark the release plan closed before registry verification and downstream handoff.
 
 ## 10. Closure evidence and handoff
 

@@ -208,21 +208,21 @@ claims are made by any of these crates.
   authenticity, and authorizes no filesystem destination; caller-bound
   destination APIs are unchanged.
 
+- `eggup-service 0.1.3` (Service M011 release candidate; **not published**):
+  contains the Service M010 source-compatible correction for stopping an
+  exact-owned failed systemd unit only after identity, manager state, process,
+  and cgroup quiescence evidence agree. Unknown state, changed identity,
+  restart races, and a remaining cgroup task fail closed. Runtime source is
+  `0bde3fefbda07019529ad7566c02e6e4ec141fd6`; the final package source commit
+  is identified by `.cargo_vcs_info.json`. M011 qualification is in progress;
+  explicit maintainer authorization is still required before publication.
+
 ## Unreleased
 
 The workspace-wide bug-audit fixes below are recorded here as well as in the
 per-crate changelogs, because they are **not** on the registry. Published
 baselines are `0.1.2` for all seven published crates. No publication milestone
 authorizes these entries yet.
-
-- `eggup-service` corrects owned failed-systemd stop handling (Service M010):
-  an exact-owned failed unit can complete `stop` only after manager state,
-  ownership, pending-job, process-ID, and cgroup evidence agree that it is
-  quiescent. Unknown states, changed unit identity, active restart races, and
-  remaining cgroup processes fail closed. The public lifecycle enum and
-  dependency graph are unchanged; the Linux systemd fixture records both the
-  failed-to-quiescent behavior and a residual-cgroup negative control. This fix
-  is not yet published; Service M011 is the conditional publication milestone.
 
 The two `0b8cb98` acquisition fixes that previously lived in this section are no
 longer here: they were published as `eggup-acquisition 0.1.3` on 2026-10-06

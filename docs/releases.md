@@ -1,7 +1,7 @@
 # Releases, pinning, and upgrading
 
 Eggup is published to crates.io. **crates.io is the source of truth** for what
-exists. The table below was queried from the crates.io API on **2026-10-05**
+exists. The table below was rechecked against crates.io with `cargo info` on **2026-10-09**
 and matches the workspace manifests; re-check it when a release milestone
 closes, since registry state is the one fact here that changes without a
 commit. See also
@@ -9,17 +9,17 @@ commit. See also
 
 ## Published state
 
-All crates share the source version `0.1.2`. Only the registry differs.
+All workspace crates currently declare source version `0.1.3`. Only the registry differs.
 
 | Crate | On crates.io | Notes |
 |---|---|---|
-| `eggup-core` | `0.1.0`, `0.1.1`, `0.1.2` | |
-| `eggup-acquisition` | `0.1.0`, `0.1.1`, `0.1.2` | |
-| `eggup-eggfetch` | `0.1.0`, `0.1.1`, `0.1.2` | |
+| `eggup-core` | `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3` | latest published `0.1.3` |
+| `eggup-acquisition` | `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3` | latest published `0.1.3` |
+| `eggup-eggfetch` | `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3` | latest published `0.1.3` |
 | `eggup-curl` | `0.1.2` | first publication was `0.1.2` |
-| `eggup-archive` | `0.1.2` | first publication was `0.1.2` |
-| `eggup-eggpack` | `0.1.2` | first publication was `0.1.2` |
-| `eggup-service` | `0.1.0`, `0.1.1`, `0.1.2` | published last, from a different source commit than the `v0.1.2` tag |
+| `eggup-archive` | `0.1.2`, `0.1.3` | latest published `0.1.3` |
+| `eggup-eggpack` | `0.1.2`, `0.1.3` | latest published `0.1.3` |
+| `eggup-service` | `0.1.0`, `0.1.1`, `0.1.2` | M010 `0.1.3` candidate remains unpublished pending M011 authorization |
 | `eggup-transport-footprint` | — | `publish = false`; not on the registry at all |
 
 One consequence worth planning around:

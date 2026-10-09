@@ -56,7 +56,7 @@ consumers of `0.1.1` need no migration and pick up the corrected behavior by
 upgrading within the `0.1.x` range. No public API was added, removed, or
 changed by this release.
 
-## Unreleased
+## 0.1.3 — 2026-10-09 (release candidate; not yet published)
 
 - **Fixed: owned failed systemd units could never complete `stop`.** The
   adapter now recognizes the specific `ActiveState=failed` case without
@@ -65,3 +65,9 @@ changed by this release.
   process IDs, active-state output, and cgroup evidence agree that the unit is
   quiescent. Unknown states and remaining cgroup tasks fail closed. No
   `reset-failed`, privilege escalation, or new dependency is introduced.
+  The runtime implementation is Service M010 source commit
+  `0bde3fefbda07019529ad7566c02e6e4ec141fd6`; the package's exact release-prep
+  source revision is recorded by `.cargo_vcs_info.json` and the M011
+  qualification record. This candidate has not been published.
+
+## Unreleased
