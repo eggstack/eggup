@@ -286,10 +286,18 @@ fn every_case_produces_identical_outcomes_in_both_formats() {
 ///
 /// The assertion is whitespace-insensitive so that a `rustfmt` line break
 /// cannot silently disarm it, and it fails if the path is duplicated.
+///
+/// The line endings are normalized before the module marker is located. A
+/// checkout that writes CRLF (`core.autocrlf` on Windows) would otherwise
+/// leave the `\n`-anchored marker unmatched, and this guard would fail on a
+/// tree whose member-write path is correct. The marker keeps its
+/// `mod tests {` anchor because `src/lib.rs` carries an earlier `#[cfg(test)]`
+/// item that must not be mistaken for the module.
 #[test]
 fn member_write_path_exists_exactly_once_in_non_test_code() {
     let source = include_str!("../src/lib.rs");
-    let production = source
+    let normalized = source.replace("\r\n", "\n");
+    let production = normalized
         .split_once("\n#[cfg(test)]\nmod tests {")
         .map(|(head, _)| head)
         .expect("the inline test module marker must be present in src/lib.rs");
