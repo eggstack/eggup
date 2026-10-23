@@ -8,11 +8,25 @@
 //!
 //! Nothing here sleeps on the wall clock and nothing needs a real privilege
 //! failure.
+//!
+//! Platform gate note: the gate is applied **per test** so this module still
+//! compiles and still runs its platform-independent fixtures on Windows. Two
+//! of the fixtures below depend on POSIX path spelling: the allowlist probe
+//! needs an absolute path (`/nonexistent-...` is not absolute on Windows), and
+//! the systemd `ExecStart` payload carries the spec executable verbatim —
+//! while the crate's narrow `ExecStart` grammar rejects a backslash, a
+//! Windows executable path contains one, so the payload could not be
+//! classified as `Owned` there. The remaining fixtures in this file are
+//! platform-independent and still run everywhere.
 
 use eggup_service::{
     CommandExecutor, CommandOutput, ManagerFailureKind, ServiceError, ServiceId, ServiceManager,
-    ServiceSpec, SystemExecutor, SystemdInstall, SystemdManager, SystemdScope,
+    ServiceSpec, SystemdInstall, SystemdManager, SystemdScope,
 };
+// `SystemExecutor` is used only by the Unix-gated allowlist probes: the
+// missing-binary path they exercise is spelled as a POSIX absolute path.
+#[cfg(unix)]
+use eggup_service::SystemExecutor;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -158,10 +172,14 @@ fn permission_kind_is_constructible_on_every_lane() {
 
 // ---- NotFound ----
 
+// The absolute-path branch of the program allowlist validates the path and
+// reports a missing binary as `NotFound`. No process is spawned.
+//
+// Unix-scoped: the fixture's program path is a POSIX absolute path, and a
+// Windows path is not absolute for the allowlist's `is_absolute` check.
+#[cfg(unix)]
 #[test]
 fn not_found_kind_is_reachable_through_the_allowlist_path() {
-    // The absolute-path branch of the program allowlist validates the path and
-    // reports a missing binary as `NotFound`. No process is spawned.
     let executor = SystemExecutor::new();
     let err = executor
         .run(
@@ -173,6 +191,7 @@ fn not_found_kind_is_reachable_through_the_allowlist_path() {
     assert_eq!(err.manager_kind(), Some(ManagerFailureKind::NotFound));
 }
 
+#[cfg(unix)]
 #[test]
 fn not_found_kind_negative_control_rejects_a_wrong_expectation() {
     let executor = SystemExecutor::new();
@@ -222,6 +241,12 @@ fn timeout_kind_negative_control_rejects_a_wrong_expectation() {
 
 // ---- Protocol ----
 
+// Unix-scoped: the scripted `ExecStart` payload carries the spec executable
+// verbatim, and the crate's narrow `ExecStart` grammar rejects a backslash —
+// a Windows executable path contains one, so the unit could not be classified
+// as `Owned` there and the install would be denied instead of failing with a
+// protocol error.
+#[cfg(unix)]
 #[test]
 fn protocol_kind_is_reported_for_a_nonzero_manager_exit() {
     // The manager ran and reported a failure the crate cannot accept: a
@@ -237,6 +262,7 @@ fn protocol_kind_is_reported_for_a_nonzero_manager_exit() {
     let _ = std::fs::remove_file(&unit_path);
 }
 
+#[cfg(unix)]
 #[test]
 fn protocol_kind_negative_control_rejects_a_wrong_expectation() {
     let (mut manager, unit_path) = systemd_manager(
@@ -303,6 +329,9 @@ fn scm_os_code_negative_control_rejects_a_wrong_expectation() {
 
 // ---- The kind, not the text ----
 
+// Unix-scoped: same scripted `ExecStart` payload as the protocol fixture
+// above, and the same backslash constraint.
+#[cfg(unix)]
 #[test]
 fn the_kind_is_reachable_without_reading_the_detail_text() {
     let (mut manager, unit_path) = systemd_manager(

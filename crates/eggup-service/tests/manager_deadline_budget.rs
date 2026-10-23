@@ -10,16 +10,28 @@
 //!
 //! The proof is made on the budgets handed to the executor and on the call
 //! count. Nothing here sleeps on the wall clock.
+//!
+//! Platform gate note: the gate is applied **per test** so this module still
+//! compiles and still runs its platform-independent fixture on Windows. The
+//! scripted install needs a unit the crate classifies as `Owned`, and that
+//! classification comes from the `ExecStart` payload, which carries the spec
+//! executable verbatim; the crate's narrow `ExecStart` grammar rejects a
+//! backslash, and a Windows executable path contains one. The Unix-only
+//! helpers carry the same gate, so the Windows build stays warning-free.
 
+#[cfg(unix)]
 use eggup_service::{
     CommandExecutor, CommandOutput, ServiceError, ServiceId, ServiceManager, ServiceSpec,
     SystemdInstall, SystemdManager, SystemdScope,
 };
+#[cfg(unix)]
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// The platform's "absolute path" spelling of the fixture executable.
+#[cfg(unix)]
 fn platform_exe() -> &'static str {
     if cfg!(windows) {
         r"C:\opt\app\bin.exe"
@@ -28,6 +40,7 @@ fn platform_exe() -> &'static str {
     }
 }
 
+#[cfg(unix)]
 fn fixture_spec() -> ServiceSpec {
     ServiceSpec::new(
         ServiceId::new("eggup-m013-budget").unwrap(),
@@ -39,6 +52,7 @@ fn fixture_spec() -> ServiceSpec {
 }
 
 /// A `systemctl show` payload that the crate classifies as `Owned`.
+#[cfg(unix)]
 fn owned_show() -> String {
     format!(
         "LoadState=loaded\nActiveState=inactive\nExecStart={{ path={exe} ; argv[]={exe} --serve ; ignore_errors=no }}\n",
@@ -47,15 +61,18 @@ fn owned_show() -> String {
 }
 
 /// The shared record of every manager invocation.
+#[cfg(unix)]
 type Calls = Arc<Mutex<Vec<(Vec<String>, Duration)>>>;
 
 /// Records the argv and the timeout budget of every manager invocation.
+#[cfg(unix)]
 #[derive(Debug, Clone)]
 struct RecordingExecutor {
     calls: Calls,
     show: String,
 }
 
+#[cfg(unix)]
 impl RecordingExecutor {
     fn new(show: String) -> (Self, Calls) {
         let calls: Calls = Arc::new(Mutex::new(Vec::new()));
@@ -69,6 +86,7 @@ impl RecordingExecutor {
     }
 }
 
+#[cfg(unix)]
 impl CommandExecutor for RecordingExecutor {
     fn run(
         &self,
@@ -98,6 +116,7 @@ fn no_invocation_gets_a_fresh_full_budget(budgets: &[Duration], budget: Duration
     budgets.iter().all(|b| *b < budget)
 }
 
+#[cfg(unix)]
 fn budgets_of(calls: &Calls) -> Vec<Duration> {
     calls
         .lock()
@@ -107,6 +126,7 @@ fn budgets_of(calls: &Calls) -> Vec<Duration> {
         .collect()
 }
 
+#[cfg(unix)]
 fn argvs_of(calls: &Calls) -> Vec<Vec<String>> {
     calls
         .lock()
@@ -116,6 +136,10 @@ fn argvs_of(calls: &Calls) -> Vec<Vec<String>> {
         .collect()
 }
 
+/// Unix-scoped: the scripted install needs a unit the crate classifies as
+/// `Owned`, which the scripted `ExecStart` payload cannot express on Windows
+/// (see the platform gate note above).
+#[cfg(unix)]
 #[test]
 fn a_scripted_systemd_install_shares_one_budget_across_every_manager_call() {
     let budget = Duration::from_secs(30);

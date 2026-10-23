@@ -5,6 +5,45 @@
 Nothing in this section has been published. `0.1.2` is the published baseline on
 crates.io, and no publication milestone authorizes these entries.
 
+**Spawn-failure diagnosability (Acquisition Transport M015).**
+
+- **Fixed: a spawn failure reported no cause.** When `Command::spawn()` failed,
+  the adapter discarded the returned `io::Error` and reported the same
+  cause-free string every time: `curl spawn failed for {redacted}`. A missing
+  executable (`ENOENT`), a non-executable file (`EACCES`), and a transient
+  resource failure (`EAGAIN`/`ENOMEM`) were therefore **indistinguishable** in
+  the only record a consumer has of the failure. A hosted CI run failed with
+  exactly that message and could not be attributed, because the diagnostic
+  carried no way to tell the causes apart. The detail now names the cause:
+  `curl spawn failed for {redacted}: {kind}[ (os error {code})]`, where
+  `{kind}` is the `std::io::ErrorKind` (`NotFound`, `PermissionDenied`,
+  `WouldBlock`, …) and the ` (os error {code})` suffix is present whenever the
+  error carries a raw OS code.
+- **Unchanged: the classification.** A spawn failure is still
+  `AcquisitionError::Unavailable`, and `Unavailable` still falls back under
+  `CompositionPolicy::UnavailableOnly`. The cause is **evidence inside the
+  detail**, never a change of variant: `Io` is terminal under every
+  composition policy and is not used for a spawn failure.
+- **Unchanged: the redaction.** The URL is still redacted exactly as before —
+  no userinfo, no query string, no fragment, and the seam's 256-byte
+  truncation. The added cause segment is derived **only** from the
+  `ErrorKind` discriminant and the numeric OS code; the OS-provided message
+  text is never rendered, so no path or credential material can enter the
+  diagnostic through it. The detail stays bounded by the seam's shared
+  512-byte UTF-8-safe rule.
+
+**Compatibility, stated precisely.** This crate's **public API is unchanged**
+and its observable behavior is unchanged: no public signature, field,
+constructor, or error variant was added, removed, or retyped, and no wire
+request changes. The `Unavailable` / `Transport` classification of every
+failure is unchanged, and the fallback contract is unchanged. The only
+consumer-visible difference is the **text** of the spawn-failure detail, which
+now carries the OS cause after the established
+`curl spawn failed for {redacted}` prefix. **No consumer migration is required
+in this crate**, and no publication or version bump is authorized by this
+milestone: the published `0.1.2` artifact keeps the cause-free detail until a
+separate republication milestone ships this change.
+
 **Test-strengthening and internal consolidation (Acquisition Transport M013).**
 
 - **Fixed: nine tests could report a pass while asserting nothing.** Each of the

@@ -8,20 +8,39 @@
 //! executable-containment gate was applied at all.
 //!
 //! Nothing here sleeps on the wall clock and nothing touches a real crontab.
+//!
+//! Platform gate note: the cron fixtures below are Unix-scoped, and the gate
+//! is applied **per test** so this module still compiles and still runs its
+//! platform-independent fixture on Windows. A crontab body names a POSIX
+//! absolute path (`/opt/app/bin`), and the crate's executable-containment
+//! gate compares the managed block body against the spec executable
+//! verbatim. On Windows the same fixture would spell the executable
+//! `C:\opt\app\bin.exe`, so the block body would no longer name it and the
+//! adapter would refuse the request material — and `crontab` does not exist
+//! there at all. The Unix-only helpers carry the same gate, so the Windows
+//! build stays warning-free.
 
+#[cfg(unix)]
 use eggup_service::{
     CommandExecutor, CommandOutput, CronManager, Ownership, ServiceError, ServiceId,
     ServiceManager, ServiceSpec,
 };
+#[cfg(unix)]
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::sync::{Arc, Mutex};
+#[cfg(unix)]
 use std::time::Duration;
 
+#[cfg(unix)]
 const MARKER: &str = "eggup-m013-cron-block";
+#[cfg(unix)]
 const EXE: &str = "/opt/app/bin";
+#[cfg(unix)]
 const DESIRED: &str = "*/5 * * * * /opt/app/bin --serve";
 
 /// The platform's "absolute path" spelling of the fixture executable.
+#[cfg(unix)]
 fn platform_exe() -> &'static str {
     if cfg!(windows) {
         r"C:\opt\app\bin.exe"
@@ -30,6 +49,7 @@ fn platform_exe() -> &'static str {
     }
 }
 
+#[cfg(unix)]
 fn fixture_spec() -> ServiceSpec {
     ServiceSpec::new(
         ServiceId::new("eggup-m013-cron").unwrap(),
@@ -41,20 +61,24 @@ fn fixture_spec() -> ServiceSpec {
 }
 
 /// A crontab that carries exactly one managed block whose body is `DESIRED`.
+#[cfg(unix)]
 fn owned_crontab() -> String {
     format!("# BEGIN {MARKER}\n{DESIRED}\n# END {MARKER}\n")
 }
 
 /// A crontab whose managed block has the marker but a different body.
+#[cfg(unix)]
 fn foreign_crontab() -> String {
     format!("# BEGIN {MARKER}\n0 0 * * * /opt/other/bin --serve\n# END {MARKER}\n")
 }
 
 /// The shared record of every manager invocation.
+#[cfg(unix)]
 type Calls = Arc<Mutex<Vec<Vec<String>>>>;
 
 /// Records every manager invocation and answers `crontab -l` with a scripted
 /// crontab.
+#[cfg(unix)]
 #[derive(Debug, Clone)]
 struct RecordingExecutor {
     calls: Calls,
@@ -62,6 +86,7 @@ struct RecordingExecutor {
     list_status: i32,
 }
 
+#[cfg(unix)]
 impl RecordingExecutor {
     fn new(crontab: String) -> (Self, Calls) {
         let calls: Calls = Arc::new(Mutex::new(Vec::new()));
@@ -87,6 +112,7 @@ impl RecordingExecutor {
     }
 }
 
+#[cfg(unix)]
 impl CommandExecutor for RecordingExecutor {
     fn run(
         &self,
@@ -120,6 +146,7 @@ impl CommandExecutor for RecordingExecutor {
     }
 }
 
+#[cfg(unix)]
 fn count_lists(calls: &Calls) -> usize {
     calls
         .lock()
@@ -129,6 +156,7 @@ fn count_lists(calls: &Calls) -> usize {
         .count()
 }
 
+#[cfg(unix)]
 fn count_writes(calls: &Calls) -> usize {
     calls
         .lock()
@@ -138,6 +166,7 @@ fn count_writes(calls: &Calls) -> usize {
         .count()
 }
 
+#[cfg(unix)]
 fn manager(executor: RecordingExecutor) -> CronManager<RecordingExecutor> {
     CronManager::new(
         executor,
@@ -149,6 +178,7 @@ fn manager(executor: RecordingExecutor) -> CronManager<RecordingExecutor> {
 }
 
 /// Item 4 — `inspect` lists the crontab exactly once.
+#[cfg(unix)]
 #[test]
 fn cron_inspect_issues_exactly_one_listing() {
     let (executor, calls) = RecordingExecutor::new(owned_crontab());
@@ -164,6 +194,7 @@ fn cron_inspect_issues_exactly_one_listing() {
 }
 
 /// Item 4 — the pre-write re-listing safety check is retained.
+#[cfg(unix)]
 #[test]
 fn cron_install_and_uninstall_retain_the_pre_write_re_listing() {
     let (executor, calls) = RecordingExecutor::new(String::new());
@@ -190,6 +221,7 @@ fn cron_install_and_uninstall_retain_the_pre_write_re_listing() {
 
 /// Item 5 — the managed block is `Owned` when its body names the spec
 /// executable.
+#[cfg(unix)]
 #[test]
 fn cron_managed_block_is_owned_when_the_body_names_the_spec_executable() {
     let (executor, _calls) = RecordingExecutor::new(owned_crontab());
@@ -200,6 +232,7 @@ fn cron_managed_block_is_owned_when_the_body_names_the_spec_executable() {
 
 /// Item 5 — a same-marker block with different content is `Foreign` and is
 /// never mutated.
+#[cfg(unix)]
 #[test]
 fn cron_same_marker_different_content_is_foreign_and_never_mutated() {
     let (executor, calls) = RecordingExecutor::new(foreign_crontab());
@@ -230,6 +263,7 @@ fn cron_same_marker_different_content_is_foreign_and_never_mutated() {
 
 /// Item 5 — an unrelated crontab entry that merely mentions the executable
 /// path does NOT make a non-matching managed block look `Owned`.
+#[cfg(unix)]
 #[test]
 fn an_unrelated_entry_naming_the_executable_does_not_make_a_block_owned() {
     let crontab = format!(
@@ -253,6 +287,7 @@ fn an_unrelated_entry_naming_the_executable_does_not_make_a_block_owned() {
 /// Item 5 — the executable-containment gate refuses inconsistent request
 /// material with `InvalidInput`, identically across `inspect`, `install` and
 /// `uninstall`, and before any listing or mutation happens.
+#[cfg(unix)]
 #[test]
 fn cron_inconsistent_request_material_is_refused_before_any_listing() {
     // The managed block body names `/opt/app/bin`; the spec names a different
@@ -300,6 +335,7 @@ fn cron_inconsistent_request_material_is_refused_before_any_listing() {
 }
 
 /// An unlistable crontab reports `Unknown`, never `Absent`.
+#[cfg(unix)]
 #[test]
 fn an_unlistable_crontab_reports_unknown_and_never_absent() {
     let (executor, calls) = RecordingExecutor::failing_list(String::new());

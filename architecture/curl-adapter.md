@@ -28,14 +28,14 @@ source-level knowledge of it.
 It **owns**:
 
 - argv construction for a `curl` invocation that expresses the caller's URL and
-  the adapter's bounded policy (`build_curl_args`, `lib.rs:510-555`).
+  the adapter's bounded policy (`build_curl_args`, `lib.rs:540-585`).
 - Executable selection, which is explicit and caller-driven
   (`CurlTransport::with_executable`, `lib.rs:177-189`).
 - Process lifecycle: spawn, bounded polling, kill, reap, reader-thread joins
-  (`run_curl_to_file`, `lib.rs:571-732`).
+  (`run_curl_to_file`, `lib.rs:601-762`).
 - HTTP status capture for the **same** request that produced the body, and the
   mapping of that status plus curl's exit code onto seam outcomes
-  (`classify_curl_result`, `lib.rs:735-803`).
+  (`classify_curl_result`, `lib.rs:765-833`).
 - Redirect, protocol, and proxy flags; `--disable` neutralization of the user's
   `~/.curlrc`.
 - Exclusive owner-private temp staging and no-clobber promotion, using the
@@ -155,10 +155,10 @@ pub struct CurlConfig {
 | Field | Default (`Default` / `strict()`) | Meaning and enforcement |
 |---|---|---|
 | `connect_timeout` | `DEFAULT_CONNECT_TIMEOUT` = 10 s | Ceiling only. Serialized to `--connect-timeout` and clamped against the caller's value (§4.3). Enforced by curl; there is no parent-side connect deadline. |
-| `total_timeout` | `DEFAULT_TOTAL_TIMEOUT` = 120 s | Ceiling only. Serialized to `--max-time` **and** independently enforced by the parent's wall deadline `start + eff_total` (`lib.rs:586-587`, `:668-675`). |
+| `total_timeout` | `DEFAULT_TOTAL_TIMEOUT` = 120 s | Ceiling only. Serialized to `--max-time` **and** independently enforced by the parent's wall deadline `start + eff_total` (`lib.rs:616-617`, `:698-705`). |
 | `max_redirects` | `DEFAULT_MAX_REDIRECTS` = 10 | Passed as `--max-redirs` only when `follow_redirects` is true. `validate()` rejects `> 50` (`lib.rs:138-142`). |
-| `follow_redirects` | `true` | Decides whether `--location` is passed at all (`lib.rs:524-528`). When false, a 3xx response is a hard `Transport` failure, not `NotFound`. |
-| `allowed_protocols` | `vec!["http", "https"]` | Bounds the initial request via `--proto =http,https` and the redirect targets via a possibly-narrowed `--proto-redir` (`lib.rs:537-543`). `validate()` requires 1..=8 entries, each 1..=16 ASCII-alphanumeric bytes (`lib.rs:143-154`). |
+| `follow_redirects` | `true` | Decides whether `--location` is passed at all (`lib.rs:554-558`). When false, a 3xx response is a hard `Transport` failure, not `NotFound`. |
+| `allowed_protocols` | `vec!["http", "https"]` | Bounds the initial request via `--proto =http,https` and the redirect targets via a possibly-narrowed `--proto-redir` (`lib.rs:567-573`). `validate()` requires 1..=8 entries, each 1..=16 ASCII-alphanumeric bytes (`lib.rs:143-154`). |
 | `proxy` | `CurlProxy::Disabled` | `Disabled` adds `--noproxy *` and contributes no environment; `FromEnvironment` snapshots 8 proxy keys; `Custom` injects caller pairs verbatim (§4.4). |
 
 `strict()` is a literal alias for `default()` (`lib.rs:84-86`). There is no
@@ -211,11 +211,11 @@ caller `(1 s, 1 s)` against `strict()` gives effective `(1 s, 1 s)`. Because the
 two are equal, an elapsed-time test against the connect ceiling would hold for
 *every* curl exit 28, so the classifier reports the weaker, always-true `"total"`
 phase instead of mislabelling a total timeout as a connect timeout
-(`lib.rs:756-768`, test `exit_28_is_labelled_total_when_connect_and_total_
-ceilings_coincide` at `lib.rs:827`). See `CHANGELOG.md` "Fixed: a mislabelled
+(`lib.rs:786-798`, test `exit_28_is_labelled_total_when_connect_and_total_
+ceilings_coincide` at `lib.rs:857`). See `CHANGELOG.md` "Fixed: a mislabelled
 timeout phase".
 
-Serialization for the two flags is `duration_decimal_seconds` (`lib.rs:430-454`):
+Serialization for the two flags is `duration_decimal_seconds` (`lib.rs:460-484`):
 microsecond-resolution decimal seconds with a `.` separator and trailing
 fractional zeros stripped (`100 ms -> "0.1"`, `250 ms -> "0.25"`,
 `1.5 s -> "1.5"`, `2 s -> "2"`). Truncation to whole microseconds can only
@@ -223,17 +223,17 @@ decrease the value, so curl never receives a longer deadline than the caller
 asked for. Zero and sub-microsecond positive durations are rejected with
 `InvalidInput` rather than silently rounded up to a second — the deliberate
 M008 behavior, pinned by `duration_decimal_seconds_serializes_sub_second_inputs_
-truthfully` (`lib.rs:1366`) and `build_curl_args_passes_decimal_deadlines_never_
-above_ceiling` (`lib.rs:1454`).
+truthfully` (`lib.rs:1485`) and `build_curl_args_passes_decimal_deadlines_never_
+above_ceiling` (`lib.rs:1573`).
 
 ### 4.4 `CurlProxy` and environment handling
 
-`proxy_env_snapshot` (`lib.rs:456-477`) turns the decision into an explicit
+`proxy_env_snapshot` (`lib.rs:486-507`) turns the decision into an explicit
 pair list: `Disabled` yields an empty list; `FromEnvironment` reads exactly
 `HTTP_PROXY`, `http_proxy`, `HTTPS_PROXY`, `https_proxy`, `ALL_PROXY`,
 `all_proxy`, `NO_PROXY`, `no_proxy` at call time; `Custom` clones the caller's
 pairs. That list is the **only** thing added to the child environment, which is
-otherwise cleared (§7). `ProxyKind` (`lib.rs:558-568`) is just the boolean
+otherwise cleared (§7). `ProxyKind` (`lib.rs:588-598`) is just the boolean
 "should `--noproxy *` be passed" projection of the same decision.
 
 ## 5. Executable selection and hardening
@@ -260,7 +260,7 @@ a path, or to call `discover_curl_executable()` and then pass what it got,
 keeps the selection decision visible at the call site and lets a caller pin
 `/usr/bin/curl` and assert it is a regular file first.
 
-`--disable` is the first argument of every invocation (`lib.rs:517-523`), with
+`--disable` is the first argument of every invocation (`lib.rs:547-553`), with
 the in-code rationale "Ignore ~/.curlrc so ambient config cannot smuggle
 proxy/auth policy". This matters because curl reads `~/.curlrc` (and
 `CURL_HOME`) by default, and a user config could otherwise inject `--proxy`,
@@ -281,7 +281,7 @@ two methods of the seam trait
 
 | Seam guarantee | Honored in `eggup-curl` at |
 |---|---|
-| Exact caller URL, no discovery/version/mirror logic | `let url = request.url().to_string()` used verbatim in argv (`lib.rs:582`); nothing else about the URL is inspected except the scheme for `--proto-redir` narrowing |
+| Exact caller URL, no discovery/version/mirror logic | `let url = request.url().to_string()` used verbatim in argv (`lib.rs:612`); nothing else about the URL is inspected except the scheme for `--proto-redir` narrowing |
 | `limits.validate()` before any I/O, every call | `lib.rs:209` and `lib.rs:279`, ahead of temp creation, spawn, or filesystem access |
 | Re-check `CurlFlag` at the boundary | `if cancel.is_cancelled()` at `lib.rs:211-213` and `lib.rs:281-283`, before staging |
 | Effective deadlines are `min(request, adapter)` | `effective_timeouts` at `lib.rs:214` / `:299`, and `POLL_INTERVAL`/parent deadline enforcement in the poll loop |
@@ -310,7 +310,7 @@ Two seam-adjacent facts worth confirming on review:
 
 ### 7.1 argv construction
 
-`build_curl_args` (`lib.rs:510-555`) produces, in order:
+`build_curl_args` (`lib.rs:540-585`) produces, in order:
 
 ```text
 --disable --silent --show-error --no-progress-meter
@@ -332,14 +332,14 @@ Notes a reviewer needs:
   array to `execvp`; nothing is concatenated into a command string, and no
   `sh -c` is involved. The workspace-level "no shell interpolation" invariant
   holds here (`overview.md`, cross-cutting invariants).
-- **The `--` terminator** (`lib.rs:552`) prevents the URL from being parsed as
+- **The `--` terminator** (`lib.rs:582`) prevents the URL from being parsed as
   an option. Combined with `validate()`'s ASCII-alphanumeric protocol-name rule,
   a caller cannot inject an extra flag through `allowed_protocols`.
 - **`--output -`** sends the body to stdout. The adapter never hands curl a
   pathname: the temp file was created by the adapter with `create_new`, and the
   adapter keeps writing through its own retained descriptor. This is the M007
   fix for curl reopening an Eggup-exclusive temp by name
-  (`lib.rs:604-605`, `CHANGELOG.md` M007 entry,
+  (`lib.rs:634-635`, `CHANGELOG.md` M007 entry,
   `plans/closure/acquisition-transport/007-status.md`).
 - **`--write-out %{stderr}%{http_code}`** routes the status to stderr, keeping
   the body channel on stdout uncontaminated. The status therefore comes from
@@ -347,7 +347,7 @@ Notes a reviewer needs:
   whose answer could disagree with the body.
 - **`--max-filesize <max_bytes>`** gives curl its own bound, so a large response
   can be refused by curl itself (exit 63) in addition to the adapter's counter.
-- **`--proto-redir` narrowing** (`redirect_protocols`, `lib.rs:487-507`): if the
+- **`--proto-redir` narrowing** (`redirect_protocols`, `lib.rs:517-537`): if the
   request URL's scheme is `https` (case-insensitive), `http` is filtered out of
   the redirect allowlist, so a `302 Location: http://…` is refused rather than
   followed in cleartext. A cleartext request keeps the full list. If narrowing
@@ -363,11 +363,11 @@ Notes a reviewer needs:
 
 ### 7.2 spawn
 
-`run_curl_to_file` (`lib.rs:571-732`) does, in order: take `start = Instant::now()`
-and `deadline = start + eff_total` (`:588-589`); clone the caller's `File` handle
-(`:590-592`); build the `Command` with `stdin(Stdio::null())`,
+`run_curl_to_file` (`lib.rs:601-762`) does, in order: take `start = Instant::now()`
+and `deadline = start + eff_total` (`:616-617`); clone the caller's `File` handle
+(`:618-620`); build the `Command` with `stdin(Stdio::null())`,
 `stdout(Stdio::piped())`, `stderr(Stdio::piped())`, and `env_clear()`; re-add
-only the proxy pairs; then `spawn()` (`:594-605`).
+only the proxy pairs; then `spawn()` (`:622-633`).
 
 Consequences of `env_clear()` worth stating explicitly: the child receives **no**
 `HOME`, `PATH`, `TMPDIR`, `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, or
@@ -377,30 +377,61 @@ parent environment will not have that honored; it depends on the discovered
 executable's compiled-in CA store.
 
 Any `spawn()` error — `ENOENT`, `EACCES`, `ENOTDIR`, and equally a real
-resource failure — is mapped to
-`AcquisitionError::Unavailable("curl spawn failed for {redacted}")`
-(`lib.rs:601-603`). This is the single most important classification decision in
+resource failure — is mapped to `AcquisitionError::Unavailable`
+(`lib.rs:631-633`). This is the single most important classification decision in
 the crate: `Unavailable` is the only hard failure that `ComposedTransport` will
 fall back on under the default `CompositionPolicy::UnavailableOnly`
 (`acquisition/src/lib.rs:1034-1042`).
 
+**The detail carries the OS cause.** The failure is reported as:
+
+```text
+curl spawn failed for {redacted}: {kind}[ (os error {code})]
+```
+
+where `{redacted}` is the same redacted URL every other message uses, `{kind}`
+is the `std::io::ErrorKind` in its `Debug` form (`NotFound`,
+`PermissionDenied`, `WouldBlock`, `NotADirectory`, …), and ` (os error {code})`
+is present only when the error carries a raw OS code — a missing executable
+renders as `NotFound (os error 2)` on Unix. The detail is produced by the
+private helper `spawn_failure_detail` (`lib.rs:439`) and bounded by the seam's
+shared 512-byte UTF-8-safe rule.
+
+**Why the cause is now preserved (Acquisition M015).** The classification above
+was always deliberate; the defect was that the `io::Error` returned by
+`Command::spawn()` was **discarded** by a `map_err(|_| …)`, so the only record a
+consumer had of the failure was the same string for every possible cause. A
+hosted CI run failed with exactly that message and could not be attributed: a
+missing executable, a non-executable file, and a transient resource failure
+were indistinguishable in the diagnostic. The cause is now **evidence inside
+the detail**, and it never changes the variant — `Unavailable` still falls back,
+and `Io` (terminal under every policy) is never used for a spawn failure.
+
+**The cause segment carries no free-form OS text.** Only the `ErrorKind`
+discriminant and the numeric code are rendered; the OS-provided message text is
+not. An OS message is free-form, platform-specific, and can echo a path, so
+rendering it would risk carrying caller-supplied material into a diagnostic that
+this crate's redaction rule governs. The added cause segment therefore
+introduces **no URL material and no credential material** beyond the redacted
+URL the detail already carried.
+
 ### 7.3 pipes, threads, and the poll loop
 
-Two reader threads are started (`:612-646`):
+Two reader threads are started (`:642-676`):
 
 - **Body reader** owns the piped stdout plus the *cloned* `File`, and reads
-  through `stdout.take(max_bytes.saturating_add(1))` (`:614`). It accumulates
+  through `stdout.take(max_bytes.saturating_add(1))` (`:644`). It accumulates
   `written`, sets an `AtomicBool` overflow flag when `written > max_bytes`
-  (`:623-625`), and `write_all`s each chunk to the retained descriptor. When the
+  (`:653-655`), and `write_all`s each chunk to the retained descriptor. When the
   `take` limit is reached, `read` returns `Ok(0)` and the loop ends, so the
   reader always terminates on its own.
 - **Status reader** owns piped stderr, reads to EOF, and retains at most
-  `MAX_WRITE_OUT_BYTES` = 64 bytes (`:29-30`, `:632-646`). It keeps *draining*
+  `MAX_WRITE_OUT_BYTES` = 64 bytes (`:29-30`, `:662-676`). It keeps *draining*
   after the bound is reached (`n.min(room)` with `room == 0`), so a chatty curl
   can never block on a full stderr pipe. Raw stderr text is never surfaced in an
   error message.
 
-The parent then polls every `POLL_INTERVAL` = 5 ms (`:31-32`, `:648-689`), in
+The parent then polls every `POLL_INTERVAL` = 5 ms (`:31-32`, `:678-719`), in
 this order per iteration:
 
 1. overflow flag set -> kill, wait, join both readers, remove owned temp, return
@@ -416,7 +447,7 @@ this order per iteration:
 The teardown sequence is identical in all four branches: `child.kill()`,
 `child.wait()`, `body_reader.join()`, `status_reader.join()`,
 `__remove_owned_temp(output)`, then return. On the normal path the child was
-already reaped by `try_wait`, and a second `let _ = child.wait();` at `:690` is
+already reaped by `try_wait`, and a second `let _ = child.wait();` at `:716` is
 harmless belt-and-braces.
 
 ### 7.4 What a reviewer must confirm here
@@ -431,8 +462,8 @@ harmless belt-and-braces.
   small — but it is not zero, and a future flag that spawns a helper would need
   a process-group kill to stay correct.
 - **`wait()` after a failed `kill()` is unbounded.** Both `let _ = child.kill()`
-  and `let _ = child.wait()` discard errors (`:650-651`, `:658-659`, `:669-670`,
-  `:679-680`). If `kill()` were ever to fail *and* the child kept running,
+  and `let _ = child.wait()` discard errors (`:680-681`, `:688-689`, `:699-700`,
+  `:709-710`). If `kill()` were ever to fail *and* the child kept running,
   `wait()` would block with no deadline. In practice a `kill()` failure on a
   child we spawned means the child is already gone, and `wait()` then returns
   immediately; this is a documented-shape assumption, not an enforced one.
@@ -481,23 +512,23 @@ not depend on that milestone closing.
 
 ## 8. Status classification and outcome mapping
 
-`classify_curl_result` (`lib.rs:735-803`) takes the child's exit code, the
+`classify_curl_result` (`lib.rs:765-833`) takes the child's exit code, the
 bounded stderr bytes, the temp path, the redacted URL, and the timing inputs,
 and returns `CurlOutcome::Success | CurlOutcome::NotFound` or an
 `AcquisitionError`. Exit code is consulted **first**, and status second.
 
 | Condition | Result | Location |
 |---|---|---|
-| `Some(28)` (curl operation timeout) | `Timeout { phase }`; `"connect"` only when `eff_connect < eff_total` **and** `elapsed <= eff_connect + POLL_INTERVAL + 5 ms`; otherwise `"total"` | `lib.rs:756-768` |
-| `Some(63)` (`--max-filesize` exceeded) | remove owned temp, `TooLarge { limit: max_bytes }` | `lib.rs:770-773` |
-| `Some(0)` | fall through to status classification | `lib.rs:774` |
-| Any other `Some(_)`, or `None` (killed by signal) | remove owned temp, `Transport("curl transfer failed (exit N) for {redacted}")` | `lib.rs:775-785` |
-| `Some(200..=299)` with exit 0 | `CurlOutcome::Success` | `lib.rs:788` |
-| `Some(404)` with exit 0 | `CurlOutcome::NotFound` | `lib.rs:789` |
-| Any other status (3xx not followed, 4xx, 5xx) | remove owned temp, `Transport("HTTP {status} from {redacted}")` | `lib.rs:790-795` |
-| Unparseable/absent status with exit 0 | remove owned temp, `Transport("curl status capture failed for {redacted}")` | `lib.rs:796-801` |
+| `Some(28)` (curl operation timeout) | `Timeout { phase }`; `"connect"` only when `eff_connect < eff_total` **and** `elapsed <= eff_connect + POLL_INTERVAL + 5 ms`; otherwise `"total"` | `lib.rs:786-798` |
+| `Some(63)` (`--max-filesize` exceeded) | remove owned temp, `TooLarge { limit: max_bytes }` | `lib.rs:800-803` |
+| `Some(0)` | fall through to status classification | `lib.rs:804` |
+| Any other `Some(_)`, or `None` (killed by signal) | remove owned temp, `Transport("curl transfer failed (exit N) for {redacted}")` | `lib.rs:805-815` |
+| `Some(200..=299)` with exit 0 | `CurlOutcome::Success` | `lib.rs:818` |
+| `Some(404)` with exit 0 | `CurlOutcome::NotFound` | `lib.rs:819` |
+| Any other status (3xx not followed, 4xx, 5xx) | remove owned temp, `Transport("HTTP {status} from {redacted}")` | `lib.rs:820-825` |
+| Unparseable/absent status with exit 0 | remove owned temp, `Transport("curl status capture failed for {redacted}")` | `lib.rs:826-831` |
 
-Then, before the outcome is trusted (`lib.rs:687-705`): the body reader is
+Then, before the outcome is trusted (`lib.rs:717-735`): the body reader is
 joined, `bytes_written > max_bytes` is re-checked (a second, race-closing
 overflow check), the parent's handle is flushed, and the status reader is
 joined.
@@ -523,8 +554,8 @@ HEAD-probe fallback. Because the status comes from the same request, a body is
 never promoted under a status that belongs to a different request. A non-zero
 exit is treated as "the transfer did not complete" **even when curl still
 printed an HTTP code** — the partial body is removed and never promoted
-(`lib.rs:776-784`), which is what `truncated_transfer_is_hard_failure_without_
-promotion` (`lib.rs:1166`) pins.
+(`lib.rs:806-814`), which is what `truncated_transfer_is_hard_failure_without_
+promotion` (`lib.rs:1285`) pins.
 
 ## 9. Control flow, step by step
 
@@ -569,7 +600,7 @@ temp's `0600` Unix mode and can never be world-readable; the temp name is then
 unlinked best-effort after commit, and a failure there cannot retroactively turn
 a committed destination into an error
 (`acquisition/src/lib.rs:566-603`). `artifact_temp_is_owner_private_and_no_
-clobber` (`lib.rs:1698`) asserts both the `0600` mode and that a pre-existing
+clobber` (`lib.rs:1926`) asserts both the `0600` mode and that a pre-existing
 destination keeps its `FOREIGN` contents.
 
 ## 10. Errors and redaction
@@ -577,20 +608,20 @@ destination keeps its `FOREIGN` contents.
 Every message this crate authors is category text plus the seam's redacted URL,
 truncated by `bound` to at most 512 bytes **at a UTF-8 character boundary**
 (`lib.rs:407-415`; the boundary property is pinned by
-`diagnostic_bound_never_splits_multibyte_code_points`, `lib.rs:872`). `bound`
+`diagnostic_bound_never_splits_multibyte_code_points`, `lib.rs:902`). `bound`
 itself is a one-line delegation to the seam's shared rule
 (`eggup_acquisition::__adapter_bound_detail`), so this crate keeps **no local
 copy** of the truncation logic.
 
 The redacted string is `request.redacted()` -> `redact_url`
-(`acquisition/src/lib.rs:404-432`), computed once per fetch at `lib.rs:583` and
+(`acquisition/src/lib.rs:404-432`), computed once per fetch at `lib.rs:613` and
 passed down. It strips `user:password@`, replaces the fragment with
 `#<redacted>`, replaces the query with `?<redacted>`, and truncates overlong
 URLs at 256 bytes with an ellipsis.
 
 | Message | Contains |
 |---|---|
-| `Unavailable("curl spawn failed for {redacted}")` | redacted URL |
+| `Unavailable("curl spawn failed for {redacted}: {kind} (os error {code})")` | redacted URL + the `ErrorKind` and the raw OS code of the failed `spawn()` |
 | `Unavailable("curl not found on PATH")` / `"PATH is unset"` | nothing |
 | `Transport("curl transfer failed (exit {code}) for {redacted}")` | numeric exit code + redacted URL |
 | `Transport("HTTP {status} from {redacted}")` | numeric status + redacted URL |
@@ -602,7 +633,7 @@ URLs at 256 bytes with an ellipsis.
 Deliberately excluded from every message: curl's own stderr (the bounded 64-byte
 capture is read and parsed for the status, then dropped), the command line, the
 argv, proxy environment values, the exact URL, and any body bytes.
-`credential_material_is_redacted` (`lib.rs:1746`) asserts that userinfo, query,
+`credential_material_is_redacted` (`lib.rs:1974`) asserts that userinfo, query,
 and fragment sentinels never appear in the `Display` output of a failing fetch.
 
 One asymmetry to keep in mind when reading logs: the redaction covers Eggup's
@@ -618,18 +649,18 @@ diagnostics, while the child process's command line carries the exact URL
 | Caller limits invalid (zero bound, zero timeout, `connect > total`) | `InvalidInput` before staging, spawn, or any filesystem write | `lib.rs:209`, `:279` |
 | `dest` has no parent / parent missing / parent is a symlink | `InvalidInput` (no parent) or `Io` (unreadable parent) | `lib.rs:284-293` |
 | `dest` already exists | `InvalidInput("artifact destination already exists; refusing to overwrite")`; foreign content preserved | `lib.rs:294-298`; race-safe re-check in `__promote_no_clobber` |
-| Cancel already requested | `Cancelled`, no temp left behind | `lib.rs:211-213`, `:281-283`; test `lib.rs:1569` |
-| Executable missing / not executable / spawn failure | `Unavailable`; no `dest`; temp cleaned by `Guard` | `lib.rs:601-603`; test `lib.rs:1053` |
-| curl exits non-zero (TLS, DNS, connect, proxy, partial body, signal) | `Transport("curl transfer failed (exit N) …")`; temp removed; never promoted | `lib.rs:775-785`; tests `lib.rs:1151`, `:1121` |
-| curl exit 28 (operation timeout) | `Timeout { phase: "connect" \| "total" }` | `lib.rs:756-768`; tests `lib.rs:827`, `:1182` |
-| Parent wall deadline reached | kill + reap + join, `Timeout { phase: "total" }` | `lib.rs:666-673`; test `lib.rs:1531` |
-| Response exceeds `max_metadata_bytes` / `max_artifact_bytes` | `TooLarge { limit }` from three independent places (curl `--max-filesize` exit 63, the reader's `overflow` flag, the post-join byte count); `dest` never created | `lib.rs:770-773`, `:623-625`, `:649-655`, `:695-698`, `:257-259`, `:341-347` |
-| Cancel observed mid-transfer | kill + reap + join, `Cancelled`, owned temp removed, `dest` untouched | `lib.rs:655-662`; test `lib.rs:1591` |
-| `try_wait` error | kill + reap + join, `Io("waiting for curl: …")` | `lib.rs:676-683` |
-| Owned-file write/flush failure, reader thread panic | `Io`; child already reaped or reaped by the teardown | `lib.rs:687-694`, `:699-705` |
-| Status unparseable with exit 0 | `Transport("curl status capture failed …")` — fail closed, never a guessed `NotFound` | `lib.rs:796-801` |
-| Sub-microsecond positive duration | `InvalidInput` rather than a widened second | `lib.rs:437-442`; test `lib.rs:1366` |
-| Reader thread blocked on a full stdout pipe | Resolved by the overflow flag plus parent kill within one `POLL_INTERVAL` | `lib.rs:612`, `:623-625`, `:649-656` |
+| Cancel already requested | `Cancelled`, no temp left behind | `lib.rs:211-213`, `:281-283`; test `lib.rs:1797` |
+| Executable missing / not executable / spawn failure | `Unavailable` (never `Transport`, never `Io`), with the detail naming the OS cause — the `ErrorKind` and, when present, the raw OS code; no `dest`; temp cleaned by `Guard` | `lib.rs:631-633`; helper `lib.rs:439`; tests `lib.rs:1083`, `lib.rs:1127` |
+| curl exits non-zero (TLS, DNS, connect, proxy, partial body, signal) | `Transport("curl transfer failed (exit N) …")`; temp removed; never promoted | `lib.rs:805-815`; tests `lib.rs:1270`, `:1285` |
+| curl exit 28 (operation timeout) | `Timeout { phase: "connect" \| "total" }` | `lib.rs:786-798`; tests `lib.rs:857`, `:1395` |
+| Parent wall deadline reached | kill + reap + join, `Timeout { phase: "total" }` | `lib.rs:696-703`; test `lib.rs:1740` |
+| Response exceeds `max_metadata_bytes` / `max_artifact_bytes` | `TooLarge { limit }` from three independent places (curl `--max-filesize` exit 63, the reader's `overflow` flag, the post-join byte count); `dest` never created | `lib.rs:800-803`, `:653-655`, `:679-685`, `:731-733`, `:257-259`, `:341-347` |
+| Cancel observed mid-transfer | kill + reap + join, `Cancelled`, owned temp removed, `dest` untouched | `lib.rs:685-692`; test `lib.rs:1819` |
+| `try_wait` error | kill + reap + join, `Io("waiting for curl: …")` | `lib.rs:706-713` |
+| Owned-file write/flush failure, reader thread panic | `Io`; child already reaped or reaped by the teardown | `lib.rs:717-724`, `:729-735` |
+| Status unparseable with exit 0 | `Transport("curl status capture failed …")` — fail closed, never a guessed `NotFound` | `lib.rs:826-831` |
+| Sub-microsecond positive duration | `InvalidInput` rather than a widened second | `lib.rs:467-472`; test `lib.rs:1485` |
+| Reader thread blocked on a full stdout pipe | Resolved by the overflow flag plus parent kill within one `POLL_INTERVAL` | `lib.rs:642`, `:653-655`, `:679-686` |
 
 ### Review checklist
 
@@ -644,20 +675,20 @@ diagnostics, while the child process's command line carries the exact URL
 - [ ] Only exact `404` maps to `NotFound`; non-zero exit still wins over a printed status code; status still comes from the same request as the body.
 - [ ] `--proto-redir` is still narrowed per request for `https` URLs.
 - [ ] Promotion is still `__promote_no_clobber` from a temp in the destination parent; a raced-in `dest` still fails without overwrite.
-- [ ] Diagnostics still use `request.redacted()` + numeric category only, `bound()` at a UTF-8 boundary; raw curl stderr still never surfaces.
+- [ ] Diagnostics still use `request.redacted()` + category or OS-cause text only (never free-form OS or upstream text), `bound()` at a UTF-8 boundary; raw curl stderr still never surfaces.
 - [ ] No authenticity, signature, or publisher-trust claim has appeared in any doc or error string.
 
 ## 12. Testing approach
 
-26 `#[test]` functions, all in-crate (`lib.rs:805-1808`). No test reaches a
+28 `#[test]` functions, all in-crate (`lib.rs:835-2036`). No test reaches a
 public network: the two harnesses are a loopback `TcpListener`
-(`serve_once`, `lib.rs:936-975`) and a fake `curl` shell script
-(`fake_curl_script`, `lib.rs:1000-1029`) that records its own `"$@"` and `env`
+(`serve_once`, `lib.rs:966-1005`) and a fake `curl` shell script
+(`fake_curl_script`, `lib.rs:1030-1059`) that records its own `"$@"` and `env`
 into files so argv and environment can be asserted directly.
 
 **A test that cannot construct its fixture fails; it never reports a pass.**
 The nine tests that drive a *real* `curl` obtain their executable through
-`require_curl_executable()` / `require_transport()` (`lib.rs:915-934`), which
+`require_curl_executable()` / `require_transport()` (`lib.rs:945-964`), which
 **panic with an actionable message** naming the missing prerequisite and the
 remedy ("no `curl` executable was discoverable on `PATH` … install `curl` or put
 a curl executable on `PATH`"). The earlier `let Some(t) = transport() else
@@ -666,14 +697,14 @@ a curl executable on `PATH`"). The earlier `let Some(t) = transport() else
 mechanically prevented (see the guard suite below).
 
 The one environment-conditional test is
-`connect_phase_timeout_is_typed_end_to_end` (`lib.rs:1276`): it needs a host
+`connect_phase_timeout_is_typed_end_to_end` (`lib.rs:1395`): it needs a host
 that blackholes the route to `10.255.255.1:81` so the connect ceiling expires
 instead of failing fast with `ENETUNREACH`/`EHOSTUNREACH`. It is explicitly
 marked as ignored **with a recorded reason** and is therefore reported as
 *ignored*, never as *passed*; its coverage is **not** claimed. The connect/total
 **label** it would prove is proven deterministically instead, by
 `classify_curl_result_labels_connect_and_total_without_a_subprocess`
-(`lib.rs:1307`), which injects `start` and needs no subprocess, no network, and
+(`lib.rs:1426`), which injects `start` and needs no subprocess, no network, and
 no sub-second wall-clock budget.
 
 **What makes process-based behavior testable here:**
@@ -690,33 +721,34 @@ no sub-second wall-clock budget.
 
 | Test | Covers | Line |
 |---|---|---|
-| `exit_28_is_labelled_total_when_connect_and_total_ceilings_coincide` | Coincident-ceiling phase attribution, both directions | 827 |
-| `diagnostic_bound_never_splits_multibyte_code_points` | UTF-8-safe 512-byte truncation | 872 |
-| `executable_selection_and_discovery_are_explicit` | Empty path, invalid config, discovery hit/miss typed as `Unavailable` | 1031 |
-| `missing_executable_and_spawn_failure_are_unavailable` | `Unavailable` for both operations, no `dest` | 1053 |
-| `metadata_success_not_found_and_server_error` | 200 bytes, 404 `NotFound`, 500 `Transport` | 1080 |
-| `artifact_success_not_found_and_server_error` | 4096 bytes byte-exact, 404 leaves no `dest`, 500 no `dest` | 1104 |
-| `tls_like_process_failure_is_transport_not_unavailable` | Exit 35 is `Transport`, not `is_unavailable()` | 1151 |
-| `truncated_transfer_is_hard_failure_without_promotion` | Headers-then-close with a declared `Content-Length` | 1166 |
-| `metadata_and_artifact_size_overflow` | `TooLarge` on both paths, no promotion | 1193 |
-| `total_phase_timeout_is_typed_end_to_end` | Stalled body -> exactly `Timeout { phase: "total" }` | 1231 |
-| `connect_phase_timeout_is_typed_end_to_end` | Unroutable connect -> exactly `Timeout { phase: "connect" }`; **ignored, environment-conditional, reason recorded** | 1276 |
-| `classify_curl_result_labels_connect_and_total_without_a_subprocess` | The connect/total label at the `classify_curl_result` layer, with `start` injected; no subprocess, no network | 1307 |
-| `duration_decimal_seconds_serializes_sub_second_inputs_truthfully` | Exact decimal output, zero and sub-microsecond rejection | 1366 |
-| `https_request_never_allows_a_cleartext_redirect_target` | `--proto` / `--proto-redir` narrowing incl. `HTTPS://` and http-only config | 1396 |
-| `build_curl_args_passes_decimal_deadlines_never_above_ceiling` | Both deadline flags, sub-microsecond rejection | 1454 |
-| `sub_second_deadlines_serialize_truthfully_without_a_subprocess` | 250 ms/750 ms -> `0.25`/`0.75`; `--max-time` is the *effective* ceiling; sub-microsecond rejection; no subprocess, no network, no wall clock | 1514 |
-| `build_curl_args_passes_sub_second_deadlines_to_fake_curl` | argv carries `--connect-timeout 0.25`; the total budget is decoupled from the enforced ceiling (30 s) so the assertion cannot expire for scheduling reasons | 1595 |
-| `sub_second_total_timeout_kills_child_promptly` | 250 ms total vs 4 s stall; elapsed `>=` the short total timeout and `<` 2 s, dir empty | 1621 |
-| `cancellation_before_spawn_cleans_temp` | Early `Cancelled`, no `.part` leftovers | 1678 |
-| `cancellation_during_body_stream_kills_and_reaps_child` | Cancel during an active 64 KiB transfer | 1700 |
-| `redirect_follow_and_reject` | Follow returns target bytes; `follow_redirects(false)` -> `Transport` | 1731 |
-| `proxy_disabled_uses_noproxy_and_cleared_env` | `--noproxy`, `--disable`, `--output -`, no `HTTP_PROXY` in child env | 1765 |
-| `proxy_custom_env_is_explicit` | No `--noproxy`, exact injected pair in child env | 1785 |
-| `artifact_temp_is_owner_private_and_no_clobber` | Promoted mode `0600`; foreign `dest` preserved | 1807 |
-| `credential_material_is_redacted` | userinfo / query / fragment sentinels absent from `Display` | 1855 |
-| `invalid_limits_fail_before_spawn` | Zero metadata bound -> `InvalidInput`, no `dest` | 1872 |
-| `composition_with_fixture_falls_back_from_unavailable_curl` | `Unavailable` -> `ComposedTransport` + `FixtureTransport` under `UnavailableOnly` | 1896 |
+| `exit_28_is_labelled_total_when_connect_and_total_ceilings_coincide` | Coincident-ceiling phase attribution, both directions | 857 |
+| `diagnostic_bound_never_splits_multibyte_code_points` | UTF-8-safe 512-byte truncation | 902 |
+| `executable_selection_and_discovery_are_explicit` | Empty path, invalid config, discovery hit/miss typed as `Unavailable` | 1061 |
+| `missing_executable_and_spawn_failure_are_unavailable` | `Unavailable` for both operations, no `dest` | 1083 |
+| `spawn_failure_detail_names_the_os_cause_and_stays_unavailable` | still `Unavailable`; the detail names the `ErrorKind` and the raw OS code; no URL or credential material | 1127 |
+| `metadata_success_not_found_and_server_error` | 200 bytes, 404 `NotFound`, 500 `Transport` | 1199 |
+| `artifact_success_not_found_and_server_error` | 4096 bytes byte-exact, 404 leaves no `dest`, 500 no `dest` | 1223 |
+| `tls_like_process_failure_is_transport_not_unavailable` | Exit 35 is `Transport`, not `is_unavailable()` | 1270 |
+| `truncated_transfer_is_hard_failure_without_promotion` | Headers-then-close with a declared `Content-Length` | 1285 |
+| `metadata_and_artifact_size_overflow` | `TooLarge` on both paths, no promotion | 1312 |
+| `total_phase_timeout_is_typed_end_to_end` | Stalled body -> exactly `Timeout { phase: "total" }` | 1350 |
+| `connect_phase_timeout_is_typed_end_to_end` | Unroutable connect -> exactly `Timeout { phase: "connect" }`; **ignored, environment-conditional, reason recorded** | 1395 |
+| `classify_curl_result_labels_connect_and_total_without_a_subprocess` | The connect/total label at the `classify_curl_result` layer, with `start` injected; no subprocess, no network | 1426 |
+| `duration_decimal_seconds_serializes_sub_second_inputs_truthfully` | Exact decimal output, zero and sub-microsecond rejection | 1485 |
+| `https_request_never_allows_a_cleartext_redirect_target` | `--proto` / `--proto-redir` narrowing incl. `HTTPS://` and http-only config | 1515 |
+| `build_curl_args_passes_decimal_deadlines_never_above_ceiling` | Both deadline flags, sub-microsecond rejection | 1573 |
+| `sub_second_deadlines_serialize_truthfully_without_a_subprocess` | 250 ms/750 ms -> `0.25`/`0.75`; `--max-time` is the *effective* ceiling; sub-microsecond rejection; no subprocess, no network, no wall clock | 1633 |
+| `build_curl_args_passes_sub_second_deadlines_to_fake_curl` | argv carries `--connect-timeout 0.25`; the total budget is decoupled from the enforced ceiling (30 s) so the assertion cannot expire for scheduling reasons | 1714 |
+| `sub_second_total_timeout_kills_child_promptly` | 250 ms total vs 4 s stall; elapsed `>=` the short total timeout and `<` 2 s, dir empty | 1740 |
+| `cancellation_before_spawn_cleans_temp` | Early `Cancelled`, no `.part` leftovers | 1797 |
+| `cancellation_during_body_stream_kills_and_reaps_child` | Cancel during an active 64 KiB transfer | 1819 |
+| `redirect_follow_and_reject` | Follow returns target bytes; `follow_redirects(false)` -> `Transport` | 1850 |
+| `proxy_disabled_uses_noproxy_and_cleared_env` | `--noproxy`, `--disable`, `--output -`, no `HTTP_PROXY` in child env | 1884 |
+| `proxy_custom_env_is_explicit` | No `--noproxy`, exact injected pair in child env | 1904 |
+| `artifact_temp_is_owner_private_and_no_clobber` | Promoted mode `0600`; foreign `dest` preserved | 1926 |
+| `credential_material_is_redacted` | userinfo / query / fragment sentinels absent from `Display` | 1974 |
+| `invalid_limits_fail_before_spawn` | Zero metadata bound -> `InvalidInput`, no `dest` | 1991 |
+| `composition_with_fixture_falls_back_from_unavailable_curl` | `Unavailable` -> `ComposedTransport` + `FixtureTransport` under `UnavailableOnly` | 2015 |
 
 An **integration** suite lives in `tests/` (excluded from the published package
 by `Cargo.toml`'s `exclude`):
@@ -739,12 +771,12 @@ compiles and runs on Windows.
 
 The `#[cfg(not(windows))]` gate is a **known, deliberate platform difference**,
 not a silent coverage gap, and the reason is recorded in the test module itself
-(`lib.rs:817-824`): the loopback HTTP fixture is Unix-only, and the Windows lane
+(`lib.rs:847-854`): the loopback HTTP fixture is Unix-only, and the Windows lane
 exercises the same transport paths through the real `curl.exe` integration tests
 instead. The Windows lane therefore runs a **smaller test set** than the Linux
 and macOS lanes, and the excluded coverage must not be inferred from them.
 
-`cancellation_before_spawn_cleans_temp` (`lib.rs:1678`) is **not**
+`cancellation_before_spawn_cleans_temp` (`lib.rs:1797`) is **not**
 `#[cfg]`-gated, so it runs on Windows too — but it now needs a discoverable
 `curl` there as well, because the fail-loudly treatment applies on every
 platform.
@@ -774,7 +806,7 @@ temp/promotion helpers. The differences a consumer actually pays for:
 | Per-call overhead | one process + two reader threads per fetch | a private current-thread `tokio` runtime per call (`eggfetch/src/lib.rs:196-228`) |
 | Status evidence | `%{stderr}%{http_code}` from the same transfer, bounded to 64 bytes | `StatusClass` from the response itself (`eggfetch/src/lib.rs:473-488`) |
 | Unavailability | a real, typed signal: missing/spawn failure -> `Unavailable` (the seam's `Unavailable` variant was added for this adapter) | reported through `__adapter_unavailable` for client-construction failures only |
-| Redirect downgrade denial | per-request `--proto-redir` narrowing (`lib.rs:487-507`) | `RedirectPolicy::strict` via eggfetch |
+| Redirect downgrade denial | per-request `--proto-redir` narrowing (`lib.rs:517-537`) | `RedirectPolicy::strict` via eggfetch |
 | Ambient config surface | exists and is neutralized by `--disable` plus `env_clear()` | none |
 | URL exposure | exact URL in `argv` for the child's lifetime (§7.4) | no command line |
 | `https`-only callers | same | same |
@@ -831,9 +863,9 @@ Nothing here was changed — these are notes for the owning documents.
 
 | Claim | Reality |
 |---|---|
-| `README.md:20` writes the status flag as `-w "%{stderr}%{http_code}"` | The code uses the long form `--write-out` (`lib.rs:550-551`). Same flag; the README is shorthand. |
-| `acquisition/src/lib.rs:310-316` documents `__adapter_unavailable` as the constructor "`eggup-curl`" uses; `acquisition.md` §2 repeats that | **Resolved in M013.** `eggup-curl` used to construct `AcquisitionError::Unavailable(..)` directly at three call sites; all three now go through `__adapter_unavailable` (`lib.rs:384`, `:402`, `:602`), so the seam's bounding applies to them. Classification and content are unchanged. |
+| `README.md:20` writes the status flag as `-w "%{stderr}%{http_code}"` | The code uses the long form `--write-out` (`lib.rs:580-581`). Same flag; the README is shorthand. |
+| `acquisition/src/lib.rs:310-316` documents `__adapter_unavailable` as the constructor "`eggup-curl`" uses; `acquisition.md` §2 repeats that | **Resolved in M013.** `eggup-curl` used to construct `AcquisitionError::Unavailable(..)` directly at three call sites; all three now go through `__adapter_unavailable` (`lib.rs:384`, `:402`, `:632`), so the seam's bounding applies to them. Classification and content are unchanged. |
 | `architecture/eggfetch-adapter.md:3` and `:77` cite `lib.rs` line numbers for `eggup-eggfetch` from an older revision (1180 lines) | Current `eggup-eggfetch/src/lib.rs` is 1229 lines; several cited offsets have shifted. Owned by that document, not this one. |
 | `discover_in` reads "the first existing regular file" (`lib.rs:374-375`) | It tests `fs::symlink_metadata(...).is_file()` (`lib.rs:395-399`), which does **not** follow symlinks. A `curl` reachable only through a symlink in a `PATH` entry is skipped and the search continues to the next entry. A caller who needs a symlinked `curl` should pass the path to `with_executable` directly. |
-| Nothing in `README.md`/`CHANGELOG.md` mentions the child environment beyond proxy keys | `env_clear()` (`lib.rs:597`) also withholds `HOME`, `PATH`, `SSL_CERT_FILE`, and `CURL_CA_BUNDLE` from curl, so a consumer's environment-based CA-bundle configuration is not honored. This is consistent with the documented "cleared environment" posture, but the CA-bundle consequence is unstated. |
+| Nothing in `README.md`/`CHANGELOG.md` mentions the child environment beyond proxy keys | `env_clear()` (`lib.rs:627`) also withholds `HOME`, `PATH`, `SSL_CERT_FILE`, and `CURL_CA_BUNDLE` from curl, so a consumer's environment-based CA-bundle configuration is not honored. This is consistent with the documented "cleared environment" posture, but the CA-bundle consequence is unstated. |
 | Nothing in the docs mentions it | The exact URL is passed on the child's command line for the life of the process (§7.4). `redact_url` covers diagnostics only. |

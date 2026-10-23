@@ -414,6 +414,36 @@ fn bound(s: String) -> String {
     eggup_acquisition::__adapter_bound_detail(s)
 }
 
+/// Renders the diagnostic detail for a failed `spawn()`.
+///
+/// The cause segment is derived **only** from the [`std::io::ErrorKind`]
+/// discriminant and the numeric raw OS code. The OS-provided message text is
+/// deliberately **not** rendered: it is free-form, platform-specific, and can
+/// echo a path, so rendering it would risk carrying caller-supplied material
+/// into a diagnostic that this crate's redaction rule governs.
+///
+/// Exact format:
+///
+/// ```text
+/// curl spawn failed for {redacted}: {kind}[ (os error {code})]
+/// ```
+///
+/// `{redacted}` is the **already redacted** URL; this helper must never be
+/// given the raw URL. `{kind}` is the `ErrorKind` in its `Debug` form (for
+/// example `NotFound`, `PermissionDenied`, `WouldBlock`). The ` (os error
+/// {code})` suffix is present only when the error carries a raw OS code.
+///
+/// The caller keeps the `Unavailable` classification: the cause is evidence in
+/// the detail, never a change of variant, because `Unavailable` is the only
+/// hard failure that falls back under `CompositionPolicy::UnavailableOnly`.
+fn spawn_failure_detail(redacted: &str, error: &std::io::Error) -> String {
+    let kind = format!("{:?}", error.kind());
+    match error.raw_os_error() {
+        Some(code) => format!("curl spawn failed for {redacted}: {kind} (os error {code})"),
+        None => format!("curl spawn failed for {redacted}: {kind}"),
+    }
+}
+
 /// Serializes a positive Rust `Duration` as locale-independent decimal seconds
 /// suitable for curl `--connect-timeout` and `--max-time`.
 ///
@@ -598,8 +628,8 @@ fn run_curl_to_file(
     for (k, v) in &proxy_env {
         cmd.env(k, v);
     }
-    let mut child = cmd.spawn().map_err(|_| {
-        AcquisitionError::__adapter_unavailable(format!("curl spawn failed for {redacted}"))
+    let mut child = cmd.spawn().map_err(|e| {
+        AcquisitionError::__adapter_unavailable(spawn_failure_detail(&redacted, &e))
     })?;
     // Curl streams the body on stdout. A duplicate of Eggup's exclusive open
     // file handle is moved to the reader thread; no pathname is reopened.
@@ -1073,6 +1103,95 @@ mod tests {
         assert!(matches!(err, AcquisitionError::Unavailable(_)));
         assert!(!dest.exists());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// M015 (§6.1, §10): a spawn failure keeps the `Unavailable`
+    /// classification **and** now carries the OS cause.
+    ///
+    /// Before this milestone the `io::Error` returned by `Command::spawn()` was
+    /// discarded by a `map_err(|_| …)`, so a missing executable (`ENOENT`), a
+    /// non-executable file (`EACCES`), and a transient resource failure
+    /// (`EAGAIN`) all rendered the identical, cause-free string
+    /// `curl spawn failed for {redacted}`. A hosted CI run failed with exactly
+    /// that message and could not be attributed, because the diagnostic carried
+    /// no way to tell the causes apart.
+    ///
+    /// The expected cause is observed **independently** here — this test
+    /// performs its own spawn of the same missing path and reads the platform's
+    /// own error — so the assertion is not circular with the adapter's
+    /// rendering and does not hard-code a platform-specific errno.
+    ///
+    /// Deterministic by construction: no network, no wall-clock budget, no
+    /// `PATH` dependency, and no real `curl` required.
+    #[test]
+    fn spawn_failure_detail_names_the_os_cause_and_stays_unavailable() {
+        const MISSING: &str = "/nonexistent-eggup-curl-binary-m015";
+        const USERINFO: &str = "S3CR3T-USERINFO-9917";
+        const QUERY: &str = "TOKEN-QUERY-5523";
+        const FRAGMENT: &str = "FRAG-SENTINEL-7788";
+        let url = format!("https://user:{USERINFO}@example.com/x?token={QUERY}#{FRAGMENT}");
+
+        // The platform's own error for this spawn, observed independently.
+        let observed = std::process::Command::new(MISSING)
+            .spawn()
+            .expect_err("spawning a missing executable must fail");
+        let expected_kind = format!("{:?}", observed.kind());
+
+        let t = CurlTransport::with_executable(MISSING, CurlConfig::strict()).unwrap();
+        let err = t
+            .fetch_metadata(&req(&url), limits(), &CancelFlag::new())
+            .unwrap_err();
+
+        // (a) The classification is unchanged: still `Unavailable`, still
+        // eligible for fallback under `CompositionPolicy::UnavailableOnly`.
+        assert!(matches!(err, AcquisitionError::Unavailable(_)));
+        assert!(err.is_unavailable());
+
+        let detail = match &err {
+            AcquisitionError::Unavailable(detail) => detail.clone(),
+            other => panic!("expected Unavailable, got {other:?}"),
+        };
+
+        // (b) The detail now names the OS cause.
+        assert!(
+            detail.contains(&expected_kind),
+            "detail does not name the ErrorKind {expected_kind}: {detail}"
+        );
+        match observed.raw_os_error() {
+            Some(code) => assert!(
+                detail.contains(&format!("os error {code}")),
+                "detail does not carry the raw OS code {code}: {detail}"
+            ),
+            None => assert!(
+                !detail.contains("os error"),
+                "detail carries an OS code the platform did not produce: {detail}"
+            ),
+        }
+        assert!(
+            detail.starts_with("curl spawn failed for "),
+            "detail lost the established prefix: {detail}"
+        );
+
+        // (b') The exact documented format is pinned, so it cannot drift
+        // silently: `curl spawn failed for {redacted}: {kind}[ (os error {code})]`.
+        let redacted = eggup_acquisition::redact_url(&url);
+        let expected_detail = match observed.raw_os_error() {
+            Some(code) => {
+                format!("curl spawn failed for {redacted}: {expected_kind} (os error {code})")
+            }
+            None => format!("curl spawn failed for {redacted}: {expected_kind}"),
+        };
+        assert_eq!(detail, expected_detail);
+
+        // (c) The detail carries no URL or credential material, and the
+        // redaction of the URL is preserved.
+        assert!(!detail.contains(USERINFO), "userinfo leaked: {detail}");
+        assert!(!detail.contains(QUERY), "query leaked: {detail}");
+        assert!(!detail.contains(FRAGMENT), "fragment leaked: {detail}");
+        assert!(detail.contains("<redacted>"), "redaction lost: {detail}");
+
+        // (d) The detail stays bounded by the seam's shared rule.
+        assert!(detail.len() <= 512, "detail is not bounded: {detail}");
     }
 
     #[test]

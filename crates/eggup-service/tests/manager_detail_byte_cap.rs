@@ -13,16 +13,30 @@
 //!
 //! The fixture observes the composed detail through `Display`, which is the
 //! one rendering both the pre-M013 and the post-M013 error shapes share.
+//!
+//! Platform gate note: the gate is applied **per test** so this module still
+//! compiles and still runs its platform-independent fixture on Windows. The
+//! composed detail comes from a cron write, and the cron request material is
+//! refused unless the managed block body names the spec executable — a
+//! crontab body names a POSIX absolute path, so the same fixture cannot be
+//! spelled for Windows. The Unix-only helpers carry the same gate, so the
+//! Windows build stays warning-free.
 
+#[cfg(unix)]
 use eggup_service::{
     CommandExecutor, CommandOutput, CronManager, ServiceError, ServiceId, ServiceManager,
     ServiceSpec,
 };
+#[cfg(unix)]
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::sync::{Arc, Mutex};
+#[cfg(unix)]
 use std::time::Duration;
 
+#[cfg(unix)]
 const MARKER: &str = "eggup-m013-bytecap";
+#[cfg(unix)]
 const DESIRED: &str = "*/5 * * * * /opt/app/bin --serve";
 
 /// The declared ceiling for manager-derived free text.
@@ -33,6 +47,7 @@ const DECLARED_CEILING: usize = 512;
 const CRAB_OFFSET: usize = 490;
 
 /// The platform's "absolute path" spelling of the fixture executable.
+#[cfg(unix)]
 fn platform_exe() -> &'static str {
     if cfg!(windows) {
         r"C:\opt\app\bin.exe"
@@ -41,6 +56,7 @@ fn platform_exe() -> &'static str {
     }
 }
 
+#[cfg(unix)]
 fn fixture_spec() -> ServiceSpec {
     ServiceSpec::new(
         ServiceId::new("eggup-m013-bytecap").unwrap(),
@@ -74,12 +90,14 @@ fn is_bounded_at_the_ceiling(rendered: &str) -> bool {
 
 /// A recording executor that answers `crontab -l` with an empty crontab and
 /// fails `crontab -` with a long stderr.
+#[cfg(unix)]
 #[derive(Debug, Clone)]
 struct FailingWriteExecutor {
     stderr: String,
     calls: Arc<Mutex<Vec<Vec<String>>>>,
 }
 
+#[cfg(unix)]
 impl CommandExecutor for FailingWriteExecutor {
     fn run(
         &self,
@@ -104,6 +122,10 @@ impl CommandExecutor for FailingWriteExecutor {
     }
 }
 
+/// Unix-scoped: the composed detail comes from a cron write, and the cron
+/// request material is refused unless the managed block body names the spec
+/// executable (see the platform gate note above).
+#[cfg(unix)]
 #[test]
 fn a_long_manager_detail_is_bounded_at_the_declared_ceiling() {
     let stderr = long_stderr();
