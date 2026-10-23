@@ -167,11 +167,21 @@ impl PreparedTransaction {
     }
 
     /// Returns the exact live destination for a prepared member.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnknownMember`] when `member` is not part of this
+    /// transaction's artifact set.
     pub fn destination(&self, member: &crate::domain::MemberId) -> Result<PathBuf> {
         self.plan.destination(member)
     }
 
     /// Returns the private staged path for a prepared member.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnknownMember`] when `member` is not part of this
+    /// transaction's artifact set.
     pub fn staged_path(&self, member: &crate::domain::MemberId) -> Result<PathBuf> {
         let artifact = self
             .plan

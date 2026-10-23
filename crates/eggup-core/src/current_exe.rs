@@ -34,6 +34,15 @@ impl CurrentExecutable {
     /// `std::env::current_exe` is only a starting point: on some platforms it
     /// reports the invocation path, which may traverse symlinks. The result is
     /// always canonicalized and re-proven before it is used for mutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] when the running executable cannot be reported or
+    /// canonicalized, [`Error::InvalidInput`] when the resolved path is not
+    /// absolute or has no parent directory, and [`Error::DestinationConflict`]
+    /// when the resolved target is not a regular, non-symlinked file beneath a
+    /// real directory — including a hard-linked image, whose exact identity
+    /// cannot be proven.
     pub fn resolve() -> Result<Self> {
         let reported = std::env::current_exe()
             .map_err(|source| Error::io("resolving current executable", source))?;
@@ -45,6 +54,16 @@ impl CurrentExecutable {
     ///
     /// This is the seam a child-process fixture uses to address a specific
     /// image; production callers normally use [`resolve`](Self::resolve).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when `executable` is not an absolute
+    /// path, when the canonicalized target is empty, or when the target has
+    /// no parent directory or no file name; [`Error::Io`] when the target or
+    /// its directory cannot be read or canonicalized; and
+    /// [`Error::DestinationConflict`] when the target is not a regular,
+    /// non-symlinked file beneath a real directory — including a hard-linked
+    /// image, whose exact identity cannot be proven.
     pub fn bind(executable: impl Into<PathBuf>) -> Result<Self> {
         let reported = executable.into();
         if !reported.is_absolute() {

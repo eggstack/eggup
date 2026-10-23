@@ -1,5 +1,11 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
+// Crate-local doc-accuracy check. `clippy::missing_errors_doc` lives in
+// `clippy::pedantic`, which this workspace does not enable, so without this
+// attribute the gate never notices a public fallible item that documents no
+// failure mode. Enabling it here keeps the check inside the existing gate and
+// affects no other crate.
+#![warn(clippy::missing_errors_doc)]
 #![doc = "Policy-neutral local mechanics for verified multi-artifact updates."]
 #![doc = ""]
 #![doc = "The core crate deliberately does not fetch bytes, manage services, or choose release policy."]
@@ -48,6 +54,9 @@ pub use transaction::{
 
 #[cfg(test)]
 mod test_support;
+
+#[cfg(test)]
+mod failure_taxonomy_tests;
 
 #[cfg(test)]
 mod tests {

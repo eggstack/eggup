@@ -2,9 +2,28 @@ use std::fmt;
 use std::io;
 
 /// The result type used by eggup-core.
+///
+/// `Err` means setup failed and nothing live changed. A post-lock outcome is
+/// reported through a [`crate::TransactionReceipt`], not through this type.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Errors produced while validating a local update plan or preparing private stage state.
+/// The error type of every `eggup-core` fallible entry point.
+///
+/// `Error` is a **closed** enum with exactly the seven variants below, so a
+/// downstream exhaustive `match` compiles unchanged. It covers both the
+/// pre-transaction failures (plan validation, private stage creation and copy)
+/// and the commit-time failures that are returned as `Err` rather than as a
+/// receipt: lock contention (`UpdateInProgress`), a preflight ownership
+/// conflict (`DestinationConflict`), failed integrity or candidate evidence
+/// (`VerificationFailed`, `CandidateExecution`), and live filesystem failures
+/// (`Io`).
+///
+/// Everything reached **after** the mutation lock is held is reported through a
+/// [`crate::TransactionReceipt`], not through this type: an ownership conflict
+/// or flap produces a `RolledBack` receipt, and a failure that cannot be
+/// resolved produces a `RecoveryRequired` receipt with a real
+/// `recovery_path`. See `architecture/core-transaction.md` §8 "Failure
+/// semantics".
 #[derive(Debug)]
 pub enum Error {
     /// A caller supplied a value that violates a core invariant.
@@ -68,6 +87,11 @@ pub enum RecoveryError {
 }
 
 /// The result type returned by the recovery-aware entry points.
+///
+/// `Err` means setup failed and nothing live changed, or that real evidence was
+/// retained for an operator to inspect. A post-lock outcome that resolved
+/// cleanly is reported through a [`crate::TransactionReceipt`], not through
+/// this type.
 pub type RecoveryResult<T> = std::result::Result<T, RecoveryError>;
 
 impl RecoveryError {

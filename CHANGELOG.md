@@ -221,149 +221,129 @@ claims are made by any of these crates.
 
 ## Unreleased
 
-The workspace-wide bug-audit fixes below are recorded here as well as in the
-per-crate changelogs, because they are **not** on the registry. Published
-baselines are `0.1.2` for all seven published crates. No publication milestone
-authorizes these entries yet.
+The entries below are **unpublished** work. The current published baselines are
+`0.1.3` for `eggup-core`, `eggup-acquisition`, `eggup-eggfetch`,
+`eggup-archive`, `eggup-eggpack` and `eggup-service`; `0.1.2` for
+`eggup-curl`; `eggup-transport-footprint` is `publish = false`. Nothing here
+has been published: each entry names the published version that still carries
+the defect it corrects, and republication is a separate milestone.
 
-The two `0b8cb98` acquisition fixes that previously lived in this section are no
-longer here: they were published as `eggup-acquisition 0.1.3` on 2026-10-06
-(Acquisition Transport M010) and are recorded in the `0.1.3` section above.
+Work published by the 0.1.3 train is recorded in the `0.1.3` section above,
+not here. Per-crate release notes live in `crates/*/CHANGELOG.md`; this
+section aggregates them, it does not replace them.
 
-- `eggup-core` gains current-executable transaction parity (Verified Update Core
-  M010): `CurrentExecutable` and `InstallPlan::for_current_executable` let a
-  program replace the executable it is running through the ordinary one-member
-  transaction model, with `StagePlacement::InsideInstallationRoot` so no write
-  authority above the executable's own directory is ever required. Exact image
-  identity is canonicalized and re-proved under the lock immediately before the
-  first live rename. New `CleanupDisposition::DeferredToProcessExit` reports
-  truthfully that a kept-installed Windows self-update still holds a mapped old
-  generation whose deletion is scheduled for process exit. `self-replace` is
-  added as a **Windows-only** dependency; the Unix/macOS graph is unchanged
-  (`sha2` only). `CleanupDisposition` is not `#[non_exhaustive]`, so this new
-  variant is a source-visible addition to that one enum; no `eggstack` consumer
-  references the type. Retained evidence is reported through a new
-  `RecoveryError` rather than a new `Error` variant, so an exhaustive `match` on
-  `Error` compiles unchanged (Verified Update Core M012).
+- `eggup-core` corrects the bounded candidate deadline (Verified Update Core
+  M014): `run_bounded` evaluated its documented wall-clock deadline only while
+  the direct child was still alive, so a descendant that inherited the output
+  pipe and held it open pinned the call indefinitely, and the timeout path left
+  both reader threads unjoined. The deadline is now an unconditional maximum
+  bound on the whole bounded execution and `run_bounded` always returns: a
+  still-running direct child is killed and reaped exactly as before, an
+  already-exited child is not killed again, and the call no longer waits for
+  pipe EOF. The descendant case is bounded and fail-closed — `timed_out` is
+  set, `output_limited` is clear, `success()` is false, and the direct child's
+  exit code stays observable through `exit_code`. Reader-thread lifecycle is
+  explicit: a reader that delivered its result is joined, and a reader still
+  blocked at the deadline is abandoned, because core has no `libc`, `nix`, or
+  `windows-sys` dependency and `unsafe` is denied. The public surface is
+  unchanged: `Error` keeps exactly the seven published `0.1.2` variants, the
+  output bound stays per stream, the ownership model, transaction state
+  machine, lock, receipts, and failure taxonomy are untouched, and the
+  dependency surface remains `sha2` only. **Unpublished** — `eggup-core 0.1.3`
+  on crates.io still carries the defect, and `eggup-eggpack`'s `=0.1.3` pin
+  blocks propagation until a separate adapter republication. No consumer
+  migration is required.
 
-- `eggup-core` gains proof-authorized stale-lock recovery (Verified Update Core
-  M011): `LockObservation`, `StaleLockDecision`, `StaleLockVerifier`, and
-  `MutationLock::acquire_with_recovery`. Core exposes a bounded observation of
-  one exact record and displaces it only when the caller's verifier returns
-  `ProvenStale`; PID liveness, age, and service state remain consumer policy.
-  Claiming re-reads, renames into a same-directory Eggup-owned claim path, and
-  re-verifies the claimed object before anything is created, so a replaced
-  record is never deleted and a competing writer always wins. The default
-  `MutationLock::acquire` remains fail-closed and never recovers.
+- `eggup-core` corrects the published failure taxonomy and documents its
+  public failure surface (Verified Update Core M015): the unreachable
+  `FailureCategory::RetainedEvidence` variant and its `retained-evidence`
+  string are removed, so every remaining category describes a failure that can
+  actually occur; the remaining seven `as_str()` strings are byte-identical to
+  the published ones. Every public fallible item now carries an `# Errors`
+  section stating which `Error` variants it can return, that a receipt — not
+  an `Err` — is how a post-lock outcome is reported, that `Owned` is never
+  inferred, and that a member without verified integrity evidence is rejected
+  with no escape hatch. `clippy::missing_errors_doc` is enabled crate-locally so
+  the existing gate keeps that documentation honest; the workspace lint table
+  is unchanged and no other crate is affected. `Error` keeps exactly the seven
+  published variants and `FailureCategory` stays `#[non_exhaustive]`, so
+  downstream matchers keep compiling; the only downstream break is an explicit
+  reference to the removed variant name. **Unpublished** — `eggup-core 0.1.3`
+  still carries the defect, and `eggup-eggpack`'s `=0.1.3` pin blocks
+  propagation. No consumer migration is required beyond deleting such a name
+  reference.
 
-- Eggpack Interop audit fix — **security, in a published crate**
-  (`eggup-eggpack`, unpublished here): archive members were bound
-  positionally, with no identity cross-check. A `BoundExtraction` from a
-  different `ArchivePlan`, or reused after member reordering, could commit each
-  member's bytes under another member's declared identity — digest-invisible
-  when two declared members share identical content. Bound members are now
-  cross-checked against the declared member they would bind to and a mismatch
-  fails closed with `AdapterError::MapMismatch`. No API change. Consumers
-  resolving `eggup-eggpack 0.1.2` from crates.io do **not** have this fix until
-  a new version is published. See `crates/eggup-eggpack/CHANGELOG.md`.
+- `eggup-archive` corrects its public cleanup contract and removes a duplicated
+  member-write path (Archive Extraction M005): the four `cleanup()` entry
+  points documented that they "remove" the extraction directory, but the shared
+  implementation emptied the owned tree through the retained handle and then
+  unconditionally returned `Err(ExtractionErrorKind::CleanupFailed)`, leaving
+  the `Ok` path unreachable in a published crate. All four now share one
+  truthful contract — `Ok(())` means the owned root held no entries at the
+  final handle-relative listing, `Err(..)` with `kind() == CleanupFailed` means
+  it could not be fully emptied, and `residue_path()` names the recorded root
+  path — while the crate still never removes the root directory itself and
+  never traverses the root pathname; the residual empty directory remains the
+  caller's to remove. The tar.gz and zip member-write bodies are now one shared
+  helper, behaviour-preserving. **Behaviour change:** the success path of
+  `cleanup()` is now reachable, so a caller that wrote `cleanup().unwrap_err()`
+  will panic and must match on the result instead; capture the residual path
+  from `root()` before the consuming call. No new dependency and no public
+  signature change. **Unpublished** — `eggup-archive 0.1.3` on crates.io still
+  carries the defect, and `eggup-eggpack`'s `=0.1.3` archive pin blocks
+  propagation. Integrity remains SHA-256 checksum evidence only.
 
-- Core audit fixes (unpublished): bound-source staging dropped the executable
-  bit for every `PermissionsIntent::Preserve` member; a fully successful
-  rollback could be reported as `RecoveryRequired` with
-  `rollback_verified: false`; injected fault failures are now classified
-  structurally rather than by substring, without adding a public `Error` variant,
-  so the published `Error` surface stays compatible (Verified Update Core M012).
-  See `crates/eggup-core/CHANGELOG.md`.
+- `eggup-service` collapses two divergent copies of the destructive
+  commit/rollback engine into one (Service Lifecycle M012): `disposition.rs`
+  and `lifecycle_update.rs` each carried a full orchestrator that had already
+  drifted apart in safety-relevant ways — the disposition copy did not
+  re-inspect after a transition, tolerated an ownership that was no longer
+  `Owned`, swallowed a rollback-quiesce `inspect()` error and could stop an
+  unproven target, and left its rollback restore unpanic-guarded, while the
+  lifecycle copy could panic on an `unreachable!()` for a desired state outside
+  `{Running, Stopped}`. There is now one engine (`commit_engine`) reached by
+  both public orchestrators, and the stricter behaviour wins everywhere: a
+  manager's `completed` flag is a self-report and is re-verified by
+  observation, an ownership that is no longer `Owned` is always a typed
+  failure, an unobservable or non-owned service is never stopped before a
+  rollback, and an invalid desired state produces a typed bounded failure
+  instead of a panic. The two former behavioural differences survive as named,
+  separately testable policy inputs (`CommitEnginePolicy::post_transition_verification`,
+  `CommitEnginePolicy::ownership_loss_tolerance`), both defaulting to the
+  stricter behaviour, with the selection observable in the returned receipt.
+  Three structurally identical ownership enums become one type:
+  `eggup_service::Ownership` re-exports `eggup_core::Ownership` and
+  `eggup_service::CronOwnership` is a public alias of it. The manager command
+  output type is renamed `ManagerCommandOutput`, with the old spelling kept as
+  a non-deprecated type alias, and manager-output diagnostic text is now
+  bounded by one declared ceiling, `MAX_DIAGNOSTIC_BYTES` (512 bytes).
+  **Unpublished** — `eggup-service 0.1.3` remains the published version and
+  the `v0.1.3` tag is unmoved; republication is a separate milestone. No
+  consumer migration is required: every affected spelling still resolves.
 
-- Archive audit fixes (unpublished): Windows device-name validation accepted
-  `COM0`/`LPT0` and the reserved console names `CONIN$`, `CONOUT$`, `CLOCK$`;
-  `residue_path()` could report a non-empty root as cleaned. See
-  `crates/eggup-archive/CHANGELOG.md`.
-
-- Eggfetch audit fixes (unpublished): `block_on` could panic via `.expect()`
-  when a tokio runtime failed to build, and `TooLarge` could report
-  `limit: 0`. Both now surface as typed errors. See
-  `crates/eggup-eggfetch/CHANGELOG.md`.
-
-- Acquisition audit fixes (unpublished; **these two are M010's publication
-  payload**, confirmed by diffing the published `0.1.2` source against the
-  working tree): a fallback adapter restarted the caller's total time budget, so
-  one composed fetch could run for roughly twice the documented `total_timeout`
-  — the fallback now receives only the remaining budget; and a part file was
-  left on disk when securing it to `0600` failed, which now drops the handle
-  and removes the candidate. Note that `FetchLimits` validation at every
-  transport boundary, the retirement of `Option` from `max_artifact_bytes`, and
-  UTF-8-safe bounded diagnostics all shipped in the published `0.1.2` — a
-  consumer resolving `eggup-acquisition 0.1.2` already has those.
-
-- Eggpack Interop M002 (published in `eggup-eggpack 0.1.2` on 2026-10-02; see the 0.1.2 section above): `eggup-eggpack` gains the archive
-  extraction handoff (`archive_format_for_name`, `validate_acquired_archive`,
-  `archive_plan_for`, `core_plan_for_archive`, `bind_archive_members`) that
-  translates `ManifestProjection::Archive` into a validated
-  `eggup_archive::ArchivePlan` plus a core `InstallPlan` and `BoundSources`
-  for `prepare_with_bound_sources`, with exact member size/digest facts and
-  fail-closed format/count/permission mapping. New `AdapterError::
-  UnsupportedArchiveFormat` variant (the error enum is `non_exhaustive`, so
-  this is additive). The adapter performs no extraction, commit, or cleanup
-  itself; orchestration and deferred cleanup stay caller-owned. Direct/bundle
-  APIs are unchanged and `materialize_artifact_set` still returns
-  `ArchiveExtractionRequired` for archive projections. New runtime
-  dependencies are `eggup-archive =0.1.2` and `sha2 0.10.9`; `eggup-core`
-  remains archive/Eggpack independent. The later M003a caller-bound
-  destination seam and the M004 registry promotion shipped in the same
-  `0.1.2` version; Eggsact's own Git-to-registry consumer migration is still
-  separately authorized in `eggstack/eggsact` and is not claimed here.
-
-- Acquisition M008 (published in `eggup-curl 0.1.2` on 2026-10-04; see the 0.1.2 section above): `eggup-curl` deadline
-  arguments now serialize at microsecond precision with a `.` decimal
-  separator, so sub-second connect/total ceilings (`100 ms -> "0.1"`,
-  `250 ms -> "0.25"`, `1.5 s -> "1.5"`, `2 s -> "2"`) are passed to curl
-  truthfully instead of being widened to whole seconds. Truncation to
-  whole microseconds never widens the input. Sub-microsecond positive
-  durations are rejected at validation rather than silently extended.
-  Connect-phase timeout attribution uses only the parent scheduling
-  tolerance (`POLL_INTERVAL + 5 ms`); the previous one-second
-  truthfulness allowance is removed. No public `FetchLimits` API or
-  default values changed; no fallback, release, service, or core policy
-  changed. No consumer migration performed.
-
-- Service M007 (unpublished corrective): bounded service errors and manager
-  output excerpts now truncate at UTF-8 character boundaries within their
-  existing 512-byte and 256-byte limits. Long permission errors retain their
-  bounded remediation hint. No lifecycle behavior or consumer migration
-  changed; no publication performed.
-
-- Acquisition M007: the `eggup-acquisition` half shipped in `eggup-acquisition
-  0.1.2` on 2026-10-02; the `eggup-curl` half shipped in `eggup-curl 0.1.2` on
-  2026-10-04 (see the 0.1.2 section above). Diagnostics truncate only at
-  UTF-8 boundaries; `FetchLimits::max_artifact_bytes` is a mandatory positive
-  finite `u64` (migration: `Some(n)` → `n`, remove `None`); curl streams body
-  bytes into Eggup's retained exclusive file handle and captures bounded HTTP
-  status separately. No fallback, release, service, or core policy changed.
-  No consumer migration performed.
-
-- Acquisition M005 (published: `eggup-curl` 0.1.2 on 2026-10-04 and
-  `eggup-acquisition` 0.1.2 on 2026-10-02; see the 0.1.2 section above): the
-  `eggup-curl` external-curl adapter plus
-  `AcquisitionError::Unavailable` and `eggup-acquisition::ComposedTransport`
-  with `CompositionPolicy::{UnavailableOnly (default), UnavailableOrTransport}`.
-  Curl-only binaries avoid an embedded HTTP/TLS stack; Eggfetch-only binaries
-  avoid curl; dual binaries compose both for the same exact URL. Exact 404
-  remains terminal `NotFound`; default fallback occurs only on unavailability.
-  No `eggup-core` change; no Gregg modification or dependency. No consumer
-  migration performed.
-
-- Service M006 (unpublished): product-neutral `UpdateRuntimeDisposition`
-  (`ManagedRunning`, `ManagedStopped`, `DirectRunning`, `Stopped`,
-  `ForeignPreserved`) with pure `plan_unix`/`plan_windows` reference planners,
-  caller-owned `DirectRuntimeControl` seam, and `commit_with_disposition`
-  orchestration reusing Core M007 `KeepInstalled | RollBack` / `RecoveryRequired`
-  semantics. Artifact authority and manager mutation authority are separate;
-  `ForeignPreserved` performs zero manager mutation and `DirectRunning` uses
-  only exact direct control. Preparation precedes quiescence and authority is
-  revalidated immediately before mutation. Existing `commit_with_lifecycle`
-  behavior is preserved. No Gregg modification, migration, or dependency. No
-  publication or consumer migration performed.
+- `eggup-service` corrects its manager failure taxonomy, its timeout model,
+  and its cron ownership rule (Service Lifecycle M013): `ServiceError::Manager`
+  now carries a machine-readable `ManagerFailureKind` (`Spawn`, `Timeout`,
+  `Permission`, `NotFound`, `Protocol`, `LocalFilesystem`) alongside the
+  bounded detail and the platform OS code, and the crate no longer classifies
+  its own failures by substring-matching its own error text — `permission_hint`
+  and its call sites are gone. Every adapter now creates exactly one
+  `OperationDeadline` per operation, so a single systemd `install` no longer
+  spends several times its declared budget across chained operations.
+  `CronManager` lists the crontab once per `inspect` instead of twice, states
+  its ownership rule once instead of applying two disagreeing rules, and
+  refuses inconsistent request material with `InvalidInput` before any listing
+  or mutation. Manager-derived free text has one 512-byte ceiling instead of
+  two competing ones. The public surface gains an `# Errors`/`# Panics`
+  documentation sweep, with the Windows SCM surface excluded because it is
+  reserved by Service M014. **Behaviour change:** a published-behaviour
+  tightening applies to cron consumers whose block body omits the spec
+  executable, which now fail closed instead of proceeding. **Not published by
+  this milestone** — `eggup-service 0.1.3` remains the published version, the
+  `v0.1.3` tag is unmoved, and no consumer migration is required until a
+  republication milestone ships it; at that point a consumer matching
+  `ServiceError::Manager` positionally must match
+  `ServiceError::Manager { kind, detail, os_code }` and branch on `kind`.
 
 ## 0.1.1
 

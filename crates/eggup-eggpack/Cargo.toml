@@ -21,7 +21,6 @@ eggup-core = { version = "=0.1.3", path = "../eggup-core" }
 eggup-archive = { version = "=0.1.3", path = "../eggup-archive" }
 eggup-acquisition = { version = "=0.1.3", path = "../eggup-acquisition" }
 eggpack-manifest = "=0.1.0"
-sha2 = "0.10.9"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

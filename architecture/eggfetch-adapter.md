@@ -84,9 +84,9 @@ request and default limits, performing **no** network I/O.
 Private, but load-bearing for review: `ProxyDecision::environment`
 (`lib.rs:39-47`), `EggfetchConfig::{timeout, effective_request_timeout,
 validate_timeouts, redirect_policy, build_client}` (`lib.rs:125-183`),
-`block_on` (`lib.rs:221-270`), `bound` (`lib.rs:460-470`), `StatusClass` /
-`classify` (`lib.rs:472-485`), `map_request_error` (`lib.rs:487-508`),
-`map_fetch_error` (`lib.rs:510-543`).
+`block_on` (`lib.rs:221-270`), `bound` (`lib.rs:466-468`), `StatusClass` /
+`classify` (`lib.rs:470-483`), `map_request_error` (`lib.rs:485-506`),
+`map_fetch_error` (`lib.rs:508-541`).
 
 The crate imports `eggfetch_core::{Client, HttpVersionPolicy, ProxyEnvironment,
 RedirectPolicy, Timeout}` (`lib.rs:8`) — the only upstream items it depends on.
@@ -119,7 +119,7 @@ Fail-closed validation, reached only through `EggfetchTransport::strict` →
 An invalid proxy never silently degrades to a direct connection: it becomes
 `Transport("proxy configuration/routing failure")` at construction
 (`lib.rs:176-182`), and `InvalidProxyUrl` at request time maps to the same fixed
-string (`lib.rs:492-494`, `lib.rs:534-536`). The upstream error display is
+string (`lib.rs:490-492`, `lib.rs:532-534`). The upstream error display is
 deliberately dropped because it can contain credential-bearing proxy URLs
 (`lib.rs:177-181`).
 
@@ -142,7 +142,7 @@ effective total   = min(request.total_timeout,   config.total_timeout)
 ```
 
 Worked example, matching `effective_formula_is_minimum_per_phase`
-(`lib.rs:1222-1230`): adapter `timeouts(1s, 10s)`, request `5s/5s` → effective
+(`lib.rs:1220-1228`): adapter `timeouts(1s, 10s)`, request `5s/5s` → effective
 `(1s, 5s)`. Connect is clamped by the adapter ceiling, total by the request.
 
 The clamp is applied per fetch, not just documented: both trait methods build an
@@ -166,9 +166,9 @@ the precondition holds for every fetch the adapter performs.
 | Exact URL used verbatim, redaction only for diagnostics | `request.url().to_string()` for the request (`lib.rs:289`, `lib.rs:365`); `request.redacted()` only inside messages |
 | Caller bounds validated at the I/O boundary | `limits.validate()?` first line of both methods (`lib.rs:280`, `lib.rs:344`); re-run every call because `FetchLimits` fields stay public for 0.1.x |
 | `min(request, adapter)` per phase | `effective_request_timeout` → per-request `.timeout()` (`lib.rs:132-135`, `lib.rs:296`, `lib.rs:378`) |
-| `NotFound` is data, never an error, never fallback | `classify` returns `NotFound` only for exact 404 (`lib.rs:479-485`); returned as `Ok(FetchOutcome::NotFound)` |
+| `NotFound` is data, never an error, never fallback | `classify` returns `NotFound` only for exact 404 (`lib.rs:477-483`); returned as `Ok(FetchOutcome::NotFound)` |
 | `Unavailable` reserved for adapter inability to attempt | Only the runtime-build / thread-teardown paths (`lib.rs:250`, `lib.rs:259`, `lib.rs:266`) |
-| `TooLarge.limit` is the bound that was exceeded | `map_fetch_error` takes a mandatory `u64` (`lib.rs:514-518`) and every call site passes the bound it actually enforces |
+| `TooLarge.limit` is the bound that was exceeded | `map_fetch_error` takes a mandatory `u64` (`lib.rs:512-516`) and every call site passes the bound it actually enforces |
 | Artifacts streamed, never fully buffered | `bytes_stream()` + chunk loop (`lib.rs:413-434`); no whole-body `Vec` on the artifact path |
 | `dest` created atomically, no-clobber, temp in destination parent | `__acquire_exclusive_temp(&parent, "eggup-eggfetch")` (`lib.rs:395-396`) then `__promote_no_clobber` (`lib.rs:442`) |
 | Owned-temp-only cleanup | local `Guard` calling `__remove_owned_temp(&self.path)` (`lib.rs:397-411`, `lib.rs:450`) |
@@ -230,7 +230,7 @@ covers connect and total.
 Cancellation is cooperative and chunk-granular. It cannot interrupt a read that
 is already blocked on a stalled connection; such a fetch is bounded by the
 total deadline instead, not by the flag. This is visible in
-`artifact_body_stall_after_partial_data_times_out` (`lib.rs:1074-1101`), which
+`artifact_body_stall_after_partial_data_times_out` (`lib.rs:1072-1099`), which
 expects `Timeout`, not `Cancelled`.
 
 The artifact size check happens *after* accumulating the chunk, so the temp file
@@ -278,9 +278,9 @@ Declared at client construction in `build_client` (`lib.rs:155-183`):
 
 The downgrade rule is exercised directly against `RedirectPolicy` rather than
 over the wire in `downgrade_policy_denies_https_to_http`
-(`lib.rs:666-678`): same-scheme redirect is accepted, `https → http` is an
+(`lib.rs:664-676`): same-scheme redirect is accepted, `https → http` is an
 error. The over-the-wire test `redirect_limit_is_enforced`
-(`lib.rs:831-862`) runs a self-redirect loop with `max_redirects = 2` and
+(`lib.rs:829-860`) runs a self-redirect loop with `max_redirects = 2` and
 asserts a `Transport` hard failure.
 
 **Scope of the TLS claim.** This is transport confidentiality and server
@@ -298,58 +298,65 @@ The crate surfaces only seam variants; it never defines its own error type.
 
 | Eggfetch condition | Seam category | Where |
 |---|---|---|
-| `DecodedBodyTooLarge` | `TooLarge { limit: <bound enforced at this call site> }` | `lib.rs:521` |
-| `Timeout { phase: Connect }` | `Timeout { phase: "connect" }` | `lib.rs:495-501`, `lib.rs:522-528` |
+| `DecodedBodyTooLarge` | `TooLarge { limit: <bound enforced at this call site> }` | `lib.rs:519` |
+| `Timeout { phase: Connect }` | `Timeout { phase: "connect" }` | `lib.rs:493-499`, `lib.rs:520-526` |
 | `Timeout { phase: Total }` | `Timeout { phase: "total" }` | same |
-| Any other `TimeoutPhase` | `Timeout { phase: "total" }` (conservative default) | `lib.rs:499`, `lib.rs:526` |
-| `TransportIoTimeout` | `Timeout { phase: "total" }` — an inactivity timeout on an established connection, so caller deadlines stay truthful | `lib.rs:529-531` |
-| `InvalidProxyUrl` | `Transport("proxy configuration/routing failure")` — fixed text | `lib.rs:492-494`, `lib.rs:534-536` |
-| Any other error | `Transport("request build failed for {redacted}: {kind}")` or `Transport("fetch failed for {redacted}: {kind}")` | `lib.rs:502-506`, `lib.rs:537-541` |
+| Any other `TimeoutPhase` | `Timeout { phase: "total" }` (conservative default) | `lib.rs:497`, `lib.rs:524` |
+| `TransportIoTimeout` | `Timeout { phase: "total" }` — an inactivity timeout on an established connection, so caller deadlines stay truthful | `lib.rs:527-529` |
+| `InvalidProxyUrl` | `Transport("proxy configuration/routing failure")` — fixed text | `lib.rs:490-492`, `lib.rs:532-534` |
+| Any other error | `Transport("request build failed for {redacted}: {kind}")` or `Transport("fetch failed for {redacted}: {kind}")` | `lib.rs:500-504`, `lib.rs:535-539` |
 | HTTP non-2xx, non-404 | `Transport("HTTP {status} from {redacted} while fetching …")` | `lib.rs:304-307`, `lib.rs:386-389` |
 | Runtime build / thread teardown | `Unavailable` | `lib.rs:250`, `lib.rs:259`, `lib.rs:266` |
 | Parent missing / symlinked / `dest` present | `InvalidInput` | `lib.rs:348-364` |
-| Staging or promotion filesystem error | `Io` | `lib.rs:352`, `lib.rs:433`, `lib.rs:437` |
+| Staging or promotion filesystem error | `Io { operation, source }` — the typed variant; the underlying `io::Error` is preserved, so `source()` returns it and `source.kind()` is matchable without parsing `Display` | `lib.rs:352`, `lib.rs:433`, `lib.rs:437` |
 
 Redaction discipline, all four layers:
 
 - URLs appear only as `request.redacted()`, which is the seam's
   `redact_url`: credentials replaced with `<redacted>@`, fragments and query
-  strings replaced, 256-byte truncation (`crates/eggup-acquisition/src/lib.rs:350-379`).
+  strings replaced, 256-byte truncation (`crates/eggup-acquisition/src/lib.rs:404-432`).
 - Upstream `eggfetch_core::Error` **display** is never embedded; only
-  `e.kind()` category text is (`lib.rs:505`, `lib.rs:540`). The comments at
-  `lib.rs:490-491` and `lib.rs:532-533` give the reason: upstream strings may
+  `e.kind()` category text is (`lib.rs:503`, `lib.rs:538`). The comments at
+  `lib.rs:488-489` and `lib.rs:530-531` give the reason: upstream strings may
   carry proxy URLs with credentials.
-- Every message passes through the local `bound()` (`lib.rs:460-470`), which
-  truncates to 512 bytes on a UTF-8 char boundary. The boundary-walking loop is
-  the one covered by `diagnostic_bound_never_splits_multibyte_code_points`
-  (`lib.rs:549-557`).
-- `error_diagnostics_never_expose_credential_sentinels` (`lib.rs:1173-1220`)
+- Every message passes through the local `bound()` (`lib.rs:466-475`), which
+  truncates to 512 bytes on a UTF-8 char boundary. Since M013 it is a one-line
+  delegation to the seam's shared rule
+  (`eggup_acquisition::__adapter_bound_detail`), so this crate keeps **no local
+  copy** of the boundary-walking loop. The boundary property is still covered by
+  `diagnostic_bound_never_splits_multibyte_code_points` (`lib.rs:548-555`).
+- The typed `Io` path carries no URL, credential, or proxy material: `operation`
+  is a static label chosen at the construction site and `source` is the raw
+  `io::Error`. `tests/typed_io_contract.rs` proves that a failure raised while
+  fetching a credential-bearing URL surfaces neither the userinfo nor the query
+  through `Display` or `source()`.
+- `error_diagnostics_never_expose_credential_sentinels` (`lib.rs:1171-1218`)
   asserts, against userinfo / query / proxy-password sentinels, that neither
   `Display` nor `Debug` of the adapter's errors contain them — and separately
   asserts that a raw `InvalidProxyUrl` *does* contain the password, so the test
   proves the mapper is load-bearing rather than accidentally clean.
 
 `NotFound` is never produced from an error path. It exists only as the exact-404
-branch of `classify` (`lib.rs:482`).
+branch of `classify` (`lib.rs:480`).
 
 ## 10. Invariants and failure modes
 
 | Condition | Observable outcome | Where handled |
 |---|---|---|
 | Exact HTTP 404 | `Ok(FetchOutcome::NotFound)`; no file created, no temp left behind | `lib.rs:303`, `lib.rs:384` |
-| Any other non-2xx, including 5xx and observed 3xx | `Err(Transport)` | `lib.rs:304-307`, `lib.rs:385-389`, `lib.rs:479-485` |
-| Redirect bound exceeded | `Err(Transport)` | client `RedirectPolicy` + `map_fetch_error`; test `lib.rs:831-862` |
-| HTTPS → HTTP redirect target | `Err(Transport)` | `RedirectPolicy::strict`; test `lib.rs:666-678` |
+| Any other non-2xx, including 5xx and observed 3xx | `Err(Transport)` | `lib.rs:304-307`, `lib.rs:385-389`, `lib.rs:477-483` |
+| Redirect bound exceeded | `Err(Transport)` | client `RedirectPolicy` + `map_fetch_error`; test `lib.rs:829-860` |
+| HTTPS → HTTP redirect target | `Err(Transport)` | `RedirectPolicy::strict`; test `lib.rs:664-676` |
 | Metadata body exceeds `max_metadata_bytes` | `Err(TooLarge { limit: max })`; no `dest` touched | `lib.rs:314`, `lib.rs:322` |
 | Artifact body exceeds `max_artifact_bytes` | `Err(TooLarge { limit: max })`; temp removed, `dest` never created | `lib.rs:426-430` |
-| Connect or total deadline elapsed (including mid-body stall) | `Err(Timeout { phase })` | `lib.rs:296`, `lib.rs:378`, `lib.rs:522-531` |
+| Connect or total deadline elapsed (including mid-body stall) | `Err(Timeout { phase })` | `lib.rs:296`, `lib.rs:378`, `lib.rs:520-529` |
 | Cancellation observed at a checkpoint | `Err(Cancelled)`; artifact temp removed by `Guard` | `lib.rs:281`, `lib.rs:309`, `lib.rs:345`, `lib.rs:418`, `lib.rs:439` |
-| Truncated body (declared `Content-Length` not delivered) | `Err(Transport)`; `dest` never promoted | stream error mapping, `lib.rs:415`, `lib.rs:421`; test `lib.rs:766-791` |
+| Truncated body (declared `Content-Length` not delivered) | `Err(Transport)`; `dest` never promoted | stream error mapping, `lib.rs:415`, `lib.rs:421`; test `lib.rs:764-789` |
 | `dest` already exists (or races in during streaming) | `Err(InvalidInput)`; foreign bytes preserved byte-for-byte | pre-check `lib.rs:360-364`; commit `lib.rs:442` via `__promote_no_clobber` |
 | Parent missing, not a directory, or a symlink | `Err(Io)` / `Err(InvalidInput)` | `lib.rs:348-357` |
 | Adapter ceilings zero or `connect > total` | `EggfetchTransport::strict` returns `Err(InvalidInput)`; no transport exists | `lib.rs:137-149`, `lib.rs:156` |
-| Caller `FetchLimits` invalid via public struct literal | `Err(InvalidInput)` before route, network, or filesystem work | `lib.rs:280`, `lib.rs:344`; test `lib.rs:690-733` |
-| Invalid proxy URL in config | `EggfetchTransport::strict` returns `Err(Transport)`; never a silent direct connection | `lib.rs:176-182`; test `lib.rs:897-904` |
+| Caller `FetchLimits` invalid via public struct literal | `Err(InvalidInput)` before route, network, or filesystem work | `lib.rs:280`, `lib.rs:344`; test `lib.rs:688-731` |
+| Invalid proxy URL in config | `EggfetchTransport::strict` returns `Err(Transport)`; never a silent direct connection | `lib.rs:176-182`; test `lib.rs:895-902` |
 | Runtime build failure or thread teardown | `Err(Unavailable)` — fallible, and safe for composition fallback | `lib.rs:244-269` |
 | Write or flush failure on the temp | `Err(Io)`; `dest` never promoted | `lib.rs:433`, `lib.rs:437` |
 
@@ -360,43 +367,51 @@ call created.
 
 ## 11. Testing approach
 
-All 25 `#[test]` functions are in `crates/eggup-eggfetch/src/lib.rs:545-1231`.
+All 25 `#[test]` functions are in `crates/eggup-eggfetch/src/lib.rs:543-1229`.
 The design goal is that **no test requires the public internet or an external
 process**: a minimal HTTP/1.1 server is built on `std::net::TcpListener` bound
 to `127.0.0.1:0`.
 
 | Test | Line | Exercises |
 |---|---|---|
-| `diagnostic_bound_never_splits_multibyte_code_points` | 549 | `bound()` UTF-8 safety with 2-byte, 3-byte, and 4-byte code points |
-| `strict_config_uses_expected_policy` | 654 | The four default constants and the `eggfetch_version()` pin |
-| `downgrade_policy_denies_https_to_http` | 666 | `RedirectPolicy::strict` accepts same-scheme, denies HTTPS→HTTP |
-| `metadata_200_is_success` | 680 | 200 metadata returns exact bytes |
-| `invalid_public_limits_fail_before_eggfetch_io` | 690 | Five invalid `FetchLimits` literals rejected for both methods; asserts `dest` absent and the temp dir empty |
-| `oversized_metadata_is_too_large` | 735 | 128 KiB against a 64 KiB cap → `TooLarge` |
-| `streaming_download_writes_exact_bytes` | 746 | 8192-byte artifact written byte-exact; `bytes_written == 8192` |
-| `truncation_is_a_hard_failure_without_promotion` | 766 | Abort after headers → `Transport`, `dest` never appears |
-| `not_found_is_typed_distinctly` | 793 | 404 for both methods; artifact case asserts `dest` absent |
-| `server_error_never_becomes_not_found` | 821 | 500 → `Transport`, never `NotFound` |
-| `redirect_limit_is_enforced` | 831 | Self-redirect loop with `max_redirects = 2` → `Transport` |
-| `total_timeout_is_a_hard_failure` | 864 | 3 s server stall vs 300 ms deadline |
-| `invalid_proxy_fails_closed` | 897 | Malformed `HTTPS_PROXY` makes `strict()` return `Err` |
-| `output_file_is_cleaned_on_failure` | 906 | 500 on the artifact path: no `dest`, no `.eggup-eggfetch-*` temp |
-| `seam_fixture_and_adapter_agree_on_not_found` | 932 | Cross-checks `NotFound` typing against the seam's `FixtureTransport` |
-| `request_stricter_than_adapter_wins` | 958 | 5 s adapter vs 50 ms request → `Timeout` (request wins) |
-| `adapter_stricter_than_request_wins` | 986 | 50 ms adapter vs 5 s request → `Timeout` (adapter wins) |
-| `connect_exceeding_total_is_rejected_in_both_layers` | 1015 | Seam `FetchLimits::new` and adapter `strict()` both reject; zero deadline rejected |
-| `metadata_body_stall_times_out_without_fallback` | 1029 | Headers then 2 s stall vs 300 ms → `Timeout` |
-| `artifact_body_stall_after_partial_data_times_out` | 1074 | Partial body then stall → `Timeout`, no promotion, no `.part` residue |
-| `timeout_never_becomes_not_found` | 1103 | Timeout stays `Timeout`, is not `NotFound` or `InvalidInput` |
-| `artifact_refuses_existing_destination_without_overwrite` | 1128 | Pre-existing `dest` fails; foreign content intact; no residue |
+| `diagnostic_bound_never_splits_multibyte_code_points` | 548 | `bound()` UTF-8 safety with 2-byte, 3-byte, and 4-byte code points |
+| `strict_config_uses_expected_policy` | 653 | The four default constants and the `eggfetch_version()` pin |
+| `downgrade_policy_denies_https_to_http` | 665 | `RedirectPolicy::strict` accepts same-scheme, denies HTTPS→HTTP |
+| `metadata_200_is_success` | 679 | 200 metadata returns exact bytes |
+| `invalid_public_limits_fail_before_eggfetch_io` | 689 | Five invalid `FetchLimits` literals rejected for both methods; asserts `dest` absent and the temp dir empty |
+| `oversized_metadata_is_too_large` | 734 | 128 KiB against a 64 KiB cap → `TooLarge` |
+| `streaming_download_writes_exact_bytes` | 745 | 8192-byte artifact written byte-exact; `bytes_written == 8192` |
+| `truncation_is_a_hard_failure_without_promotion` | 765 | Abort after headers → `Transport`, `dest` never appears |
+| `not_found_is_typed_distinctly` | 792 | 404 for both methods; artifact case asserts `dest` absent |
+| `server_error_never_becomes_not_found` | 820 | 500 → `Transport`, never `NotFound` |
+| `redirect_limit_is_enforced` | 830 | Self-redirect loop with `max_redirects = 2` → `Transport` |
+| `total_timeout_is_a_hard_failure` | 863 | 3 s server stall vs 300 ms deadline |
+| `invalid_proxy_fails_closed` | 896 | Malformed `HTTPS_PROXY` makes `strict()` return `Err` |
+| `output_file_is_cleaned_on_failure` | 905 | 500 on the artifact path: no `dest`, no `.eggup-eggfetch-*` temp |
+| `seam_fixture_and_adapter_agree_on_not_found` | 931 | Cross-checks `NotFound` typing against the seam's `FixtureTransport` |
+| `request_stricter_than_adapter_wins` | 957 | 5 s adapter vs 50 ms request → `Timeout` (request wins) |
+| `adapter_stricter_than_request_wins` | 985 | 50 ms adapter vs 5 s request → `Timeout` (adapter wins) |
+| `connect_exceeding_total_is_rejected_in_both_layers` | 1014 | Seam `FetchLimits::new` and adapter `strict()` both reject; zero deadline rejected |
+| `metadata_body_stall_times_out_without_fallback` | 1028 | Headers then 2 s stall vs 300 ms → `Timeout` |
+| `artifact_body_stall_after_partial_data_times_out` | 1073 | Partial body then stall → `Timeout`, no promotion, no `.part` residue |
+| `timeout_never_becomes_not_found` | 1102 | Timeout stays `Timeout`, is not `NotFound` or `InvalidInput` |
+| `artifact_refuses_existing_destination_without_overwrite` | 1127 | Pre-existing `dest` fails; foreign content intact; no residue |
 | `exclusive_temp_helper_is_owner_private_for_eggfetch_prefix` (unix) | 1158 | Temp file mode is `0o600` |
-| `error_diagnostics_never_expose_credential_sentinels` | 1173 | Redaction audit across `Display`, `Debug`, and the proxy mapper |
-| `effective_formula_is_minimum_per_phase` | 1222 | `min()` per phase, pinned numerically |
+| `error_diagnostics_never_expose_credential_sentinels` | 1172 | Redaction audit across `Display`, `Debug`, and the proxy mapper |
+| `effective_formula_is_minimum_per_phase` | 1221 | `min()` per phase, pinned numerically |
 
-Harness helpers: `temp_dir` (`lib.rs:581-589`, pid + nanos under the OS temp
-dir), `serve_once` (`lib.rs:592-638`, parameterized status / headers / body /
+Two **integration** suites live in `tests/` (excluded from the published package
+by `Cargo.toml`'s `exclude`):
+
+| Suite | Tests | Demonstrates |
+|---|---|---|
+| `tests/typed_io_contract.rs` | 2 | the adapter's typed I/O path preserves the underlying `io::Error` and its `ErrorKind`, and surfaces no URL material |
+| `tests/assertion_guard.rs` | 3 | the **pattern guard** (no vacuous early exit in this crate's sources), the **reason guard** (every ignored test records a reason), and the **behavior witness** (each required behavior has a named, non-vacuous, asserting test) |
+
+Harness helpers: `temp_dir` (`lib.rs:579-587`, pid + nanos under the OS temp
+dir), `serve_once` (`lib.rs:590-636`, parameterized status / headers / body /
 split-body / pre-body stall / abort-after-headers), `ok_server`
-(`lib.rs:640-652`), `serve_partial_then_stall` (`lib.rs:1052-1072`).
+(`lib.rs:638-650`), `serve_partial_then_stall` (`lib.rs:1050-1070`).
 
 The tests that need no server at all: `bound()` UTF-8 safety, config defaults,
 downgrade policy, proxy fail-closed, two-layer timeout validation, the seam
@@ -430,6 +445,29 @@ Evidence-based comparison, both read from source.
 | Consumer-supplied per-request user agent | `EggfetchConfig::user_agent` | not modelled the same way; `CurlConfig` has no user-agent field |
 | Explicit protocol allowlist per request | not exposed — HTTP/1 is fixed to `Http1Only` | `CurlConfig::allowed_protocols` is caller-configurable |
 
+### 12.1 The `User-Agent` capability asymmetry (recorded, deferred)
+
+This adapter owns the adapter capability surface, so the asymmetry is recorded
+here as well as in [acquisition.md](acquisition.md) §11.1.
+
+- **The seam contract has no user-agent.** `AcquisitionRequest` carries only a
+  URL and `AcquisitionTransport` only the request, destination, limits, and
+  cancellation flag, so no seam invariant is violated by the difference below.
+- **`eggup-eggfetch` exposes a caller-settable `User-Agent`**
+  (`EggfetchConfig::user_agent`, defaulting to `DEFAULT_USER_AGENT`);
+  `eggup-curl` exposes none.**
+- **The concrete consequence:** a caller that switches transports loses control
+  of the `User-Agent`, and the wire value changes from this adapter's default
+  (or whatever the caller set) to curl's own default. A transport switch is
+  therefore *not* byte-identical on the wire.
+- **Owner:** the finding is **deferred, not closed**, to the named follow-up
+  milestone **"Acquisition M014 — adapter capability parity (`User-Agent` and
+  the `CurlConfig` public-field API boundary)"**. That milestone owns the
+  API-boundary consequence: `CurlConfig`'s fields are public and **not**
+  `#[non_exhaustive]`, so adding a caller-settable user-agent is source-breaking
+  for every external struct-literal construction and belongs at the intentional
+  0.2/1.0 boundary, not inside a corrective.
+
 In short: eggfetch costs binary size and a TLS stack but buys a
 library-integrated timeout and no subprocess lifecycle; curl costs a
 subprocess, an external binary dependency, and a hand-written duration
@@ -461,11 +499,11 @@ stream; those two links are expected to resolve once those documents land.
 - `architecture/eggfetch-adapter.md` (prior revision) cited 1180 source lines and
   described `block_on` as building a runtime per call with `.expect()` on
   failure. The current code caches one runtime per calling thread and returns
-  `Unavailable` (`lib.rs:196-200`, `lib.rs:236-269`); the file is 1231 lines.
+  `Unavailable` (`lib.rs:196-200`, `lib.rs:236-269`); the file is 1229 lines.
   The `expect` description is now contradicted by
   `CHANGELOG.md` (`Unreleased`) as well.
 - The same prior revision wrote `TooLarge { limit: max.unwrap_or(0) }`. The
-  mapper now takes a mandatory `u64` and there is no `Option` (`lib.rs:510-518`).
+  mapper now takes a mandatory `u64` and there is no `Option` (`lib.rs:508-516`).
 - `README.md:7` attributes the policy to `EggfetchTransport::strict`; the
   values are chosen by `EggfetchConfig::strict` and merely validated by the
   transport.

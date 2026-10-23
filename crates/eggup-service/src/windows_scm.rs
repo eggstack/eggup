@@ -6,8 +6,9 @@ use std::time::Duration;
 
 use crate::{
     reconcile_config_identity, require_owned, HealthState, LifecycleSnapshot, LifecycleState,
-    OperationDeadline, Ownership, RegistrationSnapshot, ServiceError, ServiceId, ServiceManager,
-    ServiceOperation, ServiceSpec, TransitionResult, MAX_TRANSITION_TIMEOUT,
+    ManagerFailureKind, OperationDeadline, Ownership, RegistrationSnapshot, ServiceError,
+    ServiceId, ServiceManager, ServiceOperation, ServiceSpec, TransitionResult,
+    MAX_TRANSITION_TIMEOUT,
 };
 
 const MAX_SCM_NAME_CHARS: usize = 256;
@@ -17,6 +18,13 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const MAX_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Caller-selected Windows service startup mode.
+///
+/// # Errors
+///
+/// Infallible: this type carries a caller choice and cannot fail. The Service
+/// Control Manager conditions it takes part in — an access denial (OS code
+/// `5`) and a registration that disappeared before the operation — are
+/// reported by [`WindowsScmManager`]'s operations, not by this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowsStartType {
     /// Start automatically when Windows starts.
@@ -28,6 +36,13 @@ pub enum WindowsStartType {
 }
 
 /// Caller-selected SCM error-control setting.
+///
+/// # Errors
+///
+/// Infallible: this type carries a caller choice and cannot fail. The Service
+/// Control Manager conditions it takes part in — an access denial (OS code
+/// `5`) and a registration that disappeared before the operation — are
+/// reported by [`WindowsScmManager`]'s operations, not by this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowsErrorControl {
     /// Log the error and continue startup.
@@ -41,6 +56,13 @@ pub enum WindowsErrorControl {
 }
 
 /// A caller-selected SCM dependency by service key or load-order group.
+///
+/// # Errors
+///
+/// Infallible: this type carries a caller choice and cannot fail. The Service
+/// Control Manager conditions it takes part in — an access denial (OS code
+/// `5`) and a registration that disappeared before the operation — are
+/// reported by [`WindowsScmManager`]'s operations, not by this type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WindowsServiceDependency {
     /// Require another service to start first.
@@ -54,6 +76,16 @@ pub enum WindowsServiceDependency {
 /// The descriptor intentionally omits failure actions, service descriptions,
 /// dependencies, custom passwords, and service-entrypoint configuration. A
 /// refresh preserves existing fields that this descriptor does not own.
+///
+/// # Errors
+///
+/// The validating builders on this type report
+/// [`ServiceError::InvalidInput`]: an empty, overlong, path-like, or
+/// control-character service name, display name, account name, or dependency
+/// name; a duplicate dependency name; and a zero or overlong transition
+/// timeout. The Service Control Manager's own conditions — an access denial
+/// (OS code `5`) and a registration that disappeared before the operation —
+/// are reported by [`WindowsScmManager`]'s operations, not by this type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WindowsScmInstall {
     service_id: ServiceId,
@@ -67,6 +99,14 @@ pub struct WindowsScmInstall {
 
 impl WindowsScmInstall {
     /// Creates a caller-owned SCM install descriptor.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when the service name is empty,
+    /// overlong (`MAX_SCM_NAME_CHARS` UTF-16 units), path-like, or contains a
+    /// control character; when the display name is empty, overlong, or
+    /// contains a control character; or when the account name is empty,
+    /// overlong, or contains a control character.
     pub fn new(
         service_name: impl Into<String>,
         display_name: impl Into<String>,
@@ -94,6 +134,13 @@ impl WindowsScmInstall {
 
     /// Sets caller-owned SCM dependencies. An empty list explicitly clears
     /// dependencies during refresh; leaving this unset preserves them.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when a dependency name is empty,
+    /// overlong (`MAX_SCM_NAME_CHARS` UTF-16 units), path-like, or contains a
+    /// control character, or when the list names the same service or group
+    /// twice.
     pub fn with_dependencies(
         mut self,
         dependencies: Vec<WindowsServiceDependency>,
@@ -104,6 +151,11 @@ impl WindowsScmInstall {
     }
 
     /// Sets the bounded timeout used by install/uninstall and SCM polling.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when the timeout is zero or exceeds
+    /// [`MAX_TRANSITION_TIMEOUT`].
     pub fn with_transition_timeout(mut self, timeout: Duration) -> Result<Self, ServiceError> {
         if timeout.is_zero() || timeout > MAX_TRANSITION_TIMEOUT {
             return Err(ServiceError::invalid("transition timeout out of range"));
@@ -211,10 +263,22 @@ fn validate_dependencies(dependencies: &[WindowsServiceDependency]) -> Result<()
     Ok(())
 }
 
+/// Renders the bounded detail for one SCM failure.
+///
+/// The mapping is: OS code `5` becomes the access-denied sentence that names
+/// the remediation and no elevation path; every other code becomes a bounded
+/// generic failure sentence that still carries the raw code.
+///
+/// # Errors
+///
+/// Infallible: this renders a diagnostic, it does not produce an error. The
+/// conditions it encodes — an access denial (OS code `5`) and any other SCM
+/// code, reported as a typed [`ServiceError::Manager`] that keeps the raw OS
+/// code reachable — are produced by [`WindowsBackend::map_error`].
 #[cfg(any(windows, test))]
 fn scm_error_detail(operation: &'static str, code: Option<i32>) -> String {
     if code == Some(5) {
-        format!("{operation} denied by Windows SCM; run with an account authorized for this service operation")
+        format!("{operation} denied by Windows SCM (code 5); run with an account authorized for this service operation")
     } else {
         format!(
             "{operation} failed in Windows SCM (code {})",
@@ -223,11 +287,103 @@ fn scm_error_detail(operation: &'static str, code: Option<i32>) -> String {
     }
 }
 
+/// Why an SCM service handle could not be opened.
+///
+/// The two codes that carry a *meaning* about the registration stay distinct
+/// so the mapping is lossless: `1060` (the specified service does not exist)
+/// and `1072` (the service is marked for deletion). Every other SCM code is
+/// carried verbatim in [`OpenFailure::Other`] and surfaces as a typed error,
+/// never as a panic.
+#[cfg(any(windows, test))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OpenFailure {
+    /// SCM code `1060`: the specified service does not exist.
+    NotFound,
+    /// SCM code `1072`: the service is marked for deletion.
+    MarkedForDelete,
+    /// Any other SCM failure, carrying the raw OS code when the platform
+    /// supplied one.
+    Other(Option<i32>),
+}
+
+/// Classifies a raw SCM OS code into an [`OpenFailure`].
+///
+/// `1060` and `1072` are the only codes that carry a meaning about the
+/// registration; every other code — and a failure that carried no code at
+/// all — is carried verbatim so nothing is lost.
+#[cfg(any(windows, test))]
+fn classify_open_code(code: Option<i32>) -> OpenFailure {
+    match code {
+        Some(1060) => OpenFailure::NotFound,
+        Some(1072) => OpenFailure::MarkedForDelete,
+        other => OpenFailure::Other(other),
+    }
+}
+
+/// The typed error an unmapped SCM open failure produces.
+///
+/// The raw OS code stays reachable through [`ServiceError::manager_os_code`],
+/// so the mapping is lossless. Code `5` (access denied) becomes
+/// [`ManagerFailureKind::Permission`]; every other code becomes
+/// [`ManagerFailureKind::Protocol`].
+///
+/// # Errors
+///
+/// Always returns a typed [`ServiceError::Manager`]. It never panics and
+/// never degrades into an "absent" or "marked for delete" reading: only the
+/// SCM's `1060` and `1072` codes may take those paths.
+#[cfg(any(windows, test))]
+fn unmapped_open_error(code: Option<i32>) -> ServiceError {
+    ServiceError::manager_with_os_code(
+        ManagerFailureKind::from_scm_os_code(code),
+        scm_error_detail("open service", code),
+        code,
+    )
+}
+
+/// The typed error a mutating SCM operation reports when the handle cannot be
+/// opened.
+///
+/// `1060` and `1072` are the only codes that mean "the service is gone":
+/// they become a conflict naming the operation. Any other code becomes a
+/// typed manager error that keeps the raw OS code.
+///
+/// # Errors
+///
+/// Always returns a typed [`ServiceError`]: [`ServiceError::Conflict`] for the
+/// disappeared case, [`ServiceError::Manager`] for every other code. It never
+/// panics.
+#[cfg(any(windows, test))]
+fn open_failure(operation: &'static str, failure: OpenFailure) -> ServiceError {
+    match failure {
+        OpenFailure::NotFound | OpenFailure::MarkedForDelete => {
+            ServiceError::conflict(format!("service disappeared before {operation}"))
+        }
+        OpenFailure::Other(code) => unmapped_open_error(code),
+    }
+}
+
 /// Native Windows SCM adapter implementing the manager-neutral contract.
 ///
 /// `new` is available on Windows. The ownership, command-line parser, and
 /// deterministic backend tests are platform-independent. No `sc.exe`, shell,
 /// ambient `PATH`, or automatic elevation is used.
+///
+/// # Errors
+///
+/// The adapter's operations report the Service Control Manager's conditions as
+/// typed [`ServiceError`]s and never as a panic:
+///
+/// * an access denial (OS code `5`) becomes [`ServiceError::Manager`] with
+///   [`ManagerFailureKind::Permission`] and a bounded remediation detail that
+///   names no elevation path;
+/// * a registration that disappeared before the operation — the SCM's `1060`
+///   (does not exist) and `1072` (marked for deletion) codes — becomes
+///   [`ServiceError::Conflict`];
+/// * any other SCM code becomes [`ServiceError::Manager`] with the raw OS
+///   code still reachable through [`ServiceError::manager_os_code`];
+/// * an observation whose ownership is not `Owned` is denied with
+///   [`ServiceError::OwnershipDenied`].
 #[derive(Debug)]
 pub struct WindowsScmManager {
     backend: Box<dyn ScmBackend>,
@@ -236,6 +392,14 @@ pub struct WindowsScmManager {
 
 impl WindowsScmManager {
     /// Creates an adapter using the local Windows Service Control Manager.
+    ///
+    /// # Errors
+    ///
+    /// This constructor is infallible: it does not contact the Service Control
+    /// Manager, and every SCM handle is opened per operation. The conditions
+    /// the adapter reports are the ones named on [`WindowsScmManager`]: an
+    /// access denial (OS code `5`), a registration that disappeared before
+    /// the operation, and any other SCM code carried losslessly.
     #[cfg(windows)]
     pub fn new(install: WindowsScmInstall) -> Self {
         Self {
@@ -311,6 +475,7 @@ impl WindowsScmManager {
         let lookup = self.backend.query(spec.id(), deadline.command_timeout()?)?;
         if deadline.expired() {
             return Err(ServiceError::manager(
+                ManagerFailureKind::Timeout,
                 "SCM query exceeded transition deadline",
             ));
         }
@@ -419,6 +584,7 @@ impl ServiceManager for WindowsScmManager {
         let lookup = self.backend.query(spec.id(), deadline.command_timeout()?)?;
         if deadline.expired() {
             return Err(ServiceError::manager(
+                ManagerFailureKind::Timeout,
                 "SCM inspection exceeded transition deadline",
             ));
         }
@@ -716,16 +882,42 @@ impl ServiceManager for WindowsScmManager {
     }
 }
 
+/// The SCM lifecycle states the adapter observes.
+///
+/// Every variant except `Unknown` is constructed by the `#[cfg(windows)]` SCM
+/// backend, and by the test helpers in test builds. On a non-Windows build
+/// none of them is constructed, so each carries its own `allow(dead_code)`
+/// instead of one enum-wide allowance: a variant added later is not covered by
+/// that allowance and is still reported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)] // Several SCM states are only constructible on Windows, but tested cross-platform.
 enum ScmState {
+    /// The service is stopped.
+    #[cfg_attr(not(windows), allow(dead_code))]
     Stopped,
+    /// The service is starting.
+    #[cfg_attr(not(windows), allow(dead_code))]
     StartPending,
+    /// The service is stopping.
+    #[cfg_attr(not(windows), allow(dead_code))]
     StopPending,
+    /// The service is running.
+    #[cfg_attr(not(windows), allow(dead_code))]
     Running,
+    /// The service is continuing after a pause.
+    #[cfg_attr(not(windows), allow(dead_code))]
     ContinuePending,
+    /// The service is pausing.
+    #[cfg_attr(not(windows), allow(dead_code))]
     PausePending,
+    /// The service is paused.
+    #[cfg_attr(not(windows), allow(dead_code))]
     Paused,
+    /// The SCM reported a state the adapter cannot classify.
+    ///
+    /// No `windows-service` service state maps to this variant, so it is
+    /// constructed by the test helpers only. It is unreachable on every
+    /// platform and therefore needs its allowance unconditionally.
+    #[allow(dead_code)]
     Unknown,
 }
 
@@ -737,11 +929,23 @@ struct ScmRecord {
     wait_hint: Duration,
 }
 
+/// The outcome of an SCM lookup.
+///
+/// Every variant is constructed by the `#[cfg(windows)]` SCM backend, and by
+/// the test helpers in test builds. On a non-Windows build none of them is
+/// constructed, so each carries its own `allow(dead_code)` instead of one
+/// enum-wide allowance: a variant added later is not covered by that
+/// allowance and is still reported.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)] // Production variants are constructed by the Windows backend.
 enum ScmLookup {
+    /// The registration does not exist (SCM code `1060`).
+    #[cfg_attr(not(windows), allow(dead_code))]
     Absent,
+    /// The registration is marked for deletion (SCM code `1072`).
+    #[cfg_attr(not(windows), allow(dead_code))]
     MarkedForDelete,
+    /// The registration exists and was read.
+    #[cfg_attr(not(windows), allow(dead_code))]
     Present(ScmRecord),
 }
 
@@ -913,7 +1117,14 @@ impl WindowsBackend {
             windows_service::Error::Winapi(io_error) => io_error.raw_os_error(),
             _ => None,
         };
-        ServiceError::manager(scm_error_detail(operation, code))
+        // The kind is decided from the raw OS code, and the code itself stays
+        // reachable programmatically: it is carried in the error's `os_code`
+        // and is also rendered into the bounded detail.
+        ServiceError::manager_with_os_code(
+            ManagerFailureKind::from_scm_os_code(code),
+            scm_error_detail(operation, code),
+            code,
+        )
     }
 
     fn manager(
@@ -924,20 +1135,28 @@ impl WindowsBackend {
             .map_err(|error| Self::map_error(error, operation))
     }
 
+    /// Opens a service handle, mapping the SCM's absence codes to
+    /// [`OpenFailure`] and every other code to a typed error.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::Manager`] when the Service Control Manager itself
+    /// cannot be reached, or when the failure carried no OS code at all. The
+    /// codes that mean something about the registration — `1060` and `1072` —
+    /// are returned as [`OpenFailure`] so the caller keeps the lossless
+    /// mapping; every other OS code is returned as [`OpenFailure::Other`] with
+    /// the raw code attached.
     fn open(
         id: &ServiceId,
         access: windows_service::service::ServiceAccess,
-    ) -> Result<Result<windows_service::service::Service, u32>, ServiceError> {
+    ) -> Result<Result<windows_service::service::Service, OpenFailure>, ServiceError> {
         use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
         let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
             .map_err(|error| Self::map_error(error, "open SCM"))?;
         match manager.open_service(id.as_str(), access) {
             Ok(service) => Ok(Ok(service)),
-            Err(windows_service::Error::Winapi(error)) if error.raw_os_error() == Some(1060) => {
-                Ok(Err(1060))
-            }
-            Err(windows_service::Error::Winapi(error)) if error.raw_os_error() == Some(1072) => {
-                Ok(Err(1072))
+            Err(windows_service::Error::Winapi(error)) => {
+                Ok(Err(classify_open_code(error.raw_os_error())))
             }
             Err(error) => Err(Self::map_error(error, "open service")),
         }
@@ -972,9 +1191,9 @@ impl ScmBackend for WindowsBackend {
             id,
             ServiceAccess::QUERY_CONFIG | ServiceAccess::QUERY_STATUS,
         )? {
-            Err(1060) => Ok(ScmLookup::Absent),
-            Err(1072) => Ok(ScmLookup::MarkedForDelete),
-            Err(_) => unreachable!(),
+            Err(OpenFailure::NotFound) => Ok(ScmLookup::Absent),
+            Err(OpenFailure::MarkedForDelete) => Ok(ScmLookup::MarkedForDelete),
+            Err(OpenFailure::Other(code)) => Err(unmapped_open_error(code)),
             Ok(service) => {
                 let config = service
                     .query_config()
@@ -1045,10 +1264,10 @@ impl ScmBackend for WindowsBackend {
                     .map_err(|error| Self::map_error(error, "query config before refresh"))?;
                 (service, config)
             }
-            Err(1060 | 1072) => {
+            Err(OpenFailure::NotFound | OpenFailure::MarkedForDelete) => {
                 return Err(ServiceError::conflict("service disappeared before refresh"))
             }
-            Err(_) => unreachable!(),
+            Err(failure) => return Err(open_failure("refresh", failure)),
         };
         let mut info = Self::info(install, spec);
         // Preserve fields outside this adapter's ownership. In particular, dependencies and
@@ -1073,8 +1292,10 @@ impl ScmBackend for WindowsBackend {
             Ok(service) => service
                 .start::<&std::ffi::OsStr>(&[])
                 .map_err(|error| Self::map_error(error, "start service")),
-            Err(1060 | 1072) => Err(ServiceError::conflict("service disappeared before start")),
-            Err(_) => unreachable!(),
+            Err(OpenFailure::NotFound | OpenFailure::MarkedForDelete) => {
+                Err(ServiceError::conflict("service disappeared before start"))
+            }
+            Err(failure) => Err(open_failure("start", failure)),
         }
     }
 
@@ -1085,8 +1306,10 @@ impl ScmBackend for WindowsBackend {
                 .stop()
                 .map(drop)
                 .map_err(|error| Self::map_error(error, "stop service")),
-            Err(1060 | 1072) => Err(ServiceError::conflict("service disappeared before stop")),
-            Err(_) => unreachable!(),
+            Err(OpenFailure::NotFound | OpenFailure::MarkedForDelete) => {
+                Err(ServiceError::conflict("service disappeared before stop"))
+            }
+            Err(failure) => Err(open_failure("stop", failure)),
         }
     }
 
@@ -1096,8 +1319,10 @@ impl ScmBackend for WindowsBackend {
             Ok(service) => service
                 .delete()
                 .map_err(|error| Self::map_error(error, "delete service")),
-            Err(1060 | 1072) => Err(ServiceError::conflict("service disappeared before delete")),
-            Err(_) => unreachable!(),
+            Err(OpenFailure::NotFound | OpenFailure::MarkedForDelete) => {
+                Err(ServiceError::conflict("service disappeared before delete"))
+            }
+            Err(failure) => Err(open_failure("delete", failure)),
         }
     }
 }
@@ -1205,6 +1430,59 @@ mod tests {
         .unwrap()
         .with_transition_timeout(Duration::from_secs(1))
         .unwrap()
+    }
+
+    #[test]
+    fn former_panic_sites_report_typed_errors_instead_of_panicking() {
+        // The five former panic sites all funnel through the seam's
+        // own open-failure contract. `1060` and `1072` keep their lossless
+        // meaning; every other code becomes a typed manager error that still
+        // carries the raw OS code.
+        assert_eq!(classify_open_code(Some(1060)), OpenFailure::NotFound);
+        assert_eq!(classify_open_code(Some(1072)), OpenFailure::MarkedForDelete);
+        assert_eq!(classify_open_code(Some(5)), OpenFailure::Other(Some(5)));
+        assert_eq!(classify_open_code(None), OpenFailure::Other(None));
+        assert_eq!(
+            classify_open_code(Some(4242)),
+            OpenFailure::Other(Some(4242))
+        );
+
+        // The four mutating operations: refresh, start, stop, delete.
+        for operation in ["refresh", "start", "stop", "delete"] {
+            for gone in [OpenFailure::NotFound, OpenFailure::MarkedForDelete] {
+                let error = open_failure(operation, gone);
+                assert!(
+                    matches!(error, ServiceError::Conflict(_)),
+                    "{operation}: the disappeared case must be a typed conflict, got {error:?}"
+                );
+            }
+            let unmapped = open_failure(operation, OpenFailure::Other(Some(4242)));
+            assert_eq!(
+                unmapped.manager_os_code(),
+                Some(4242),
+                "{operation}: the raw OS code must stay reachable"
+            );
+            assert_eq!(
+                unmapped.manager_kind(),
+                Some(ManagerFailureKind::Protocol),
+                "{operation}: an unmapped code must be a typed manager failure"
+            );
+        }
+
+        // The inspection path: an unmapped code is a typed manager failure,
+        // never an "absent" or "marked for delete" reading.
+        let unmapped = unmapped_open_error(Some(4242));
+        assert_eq!(unmapped.manager_os_code(), Some(4242));
+        assert_eq!(unmapped.manager_kind(), Some(ManagerFailureKind::Protocol));
+
+        // The access-denied case keeps its kind and its bounded remediation.
+        let denied = unmapped_open_error(Some(5));
+        assert_eq!(denied.manager_os_code(), Some(5));
+        assert_eq!(denied.manager_kind(), Some(ManagerFailureKind::Permission));
+        assert!(
+            denied.to_string().contains("account authorized"),
+            "the access-denied detail must name the remediation: {denied}"
+        );
     }
 
     #[test]
@@ -1538,7 +1816,11 @@ mod tests {
         let result = manager.restart(&spec(), Duration::from_millis(20));
         assert!(
             matches!(&result, Ok(result) if !result.completed)
-                || matches!(&result, Err(ServiceError::Manager(detail)) if detail.contains("deadline"))
+                || matches!(
+                    &result,
+                    Err(ServiceError::Manager { kind, .. })
+                        if *kind == ManagerFailureKind::Timeout
+                )
         );
         assert!(!manager.backend.test_calls().contains(&"start"));
     }

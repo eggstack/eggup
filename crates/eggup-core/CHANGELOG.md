@@ -28,6 +28,117 @@ explains why that addition is not removable.
 Nothing in this section has been published. `0.1.3` is the published baseline on
 crates.io, and no publication milestone authorizes these entries.
 
+**Public-API contract truthfulness correction (Verified Update Core M015).** The
+published failure taxonomy contained a category that could never be produced:
+`FailureCategory::RetainedEvidence` was never constructed by any producer, yet
+`as_str()` published the name `retained-evidence` to consumers. Separately, the
+crate's public fallible surface documented **no** failure modes at all — it
+carried zero `# Errors` rustdoc sections across all of `src/`.
+
+- **Removed: `FailureCategory::RetainedEvidence`.** The variant and its
+  `as_str` arm are gone. The variant was residue of M012's relocation of
+  retained-evidence reporting into `RecoveryError`; that meaning is carried by
+  `TransactionDisposition::RecoveryRequired`, by
+  `CleanupDisposition::RetainedForRecovery`, and by the real path in
+  `TransactionReceipt::recovery_path` — never by a failure category. The
+  published taxonomy is now exactly seven categories, and **every one of them
+  describes a failure that can actually occur**.
+- **Unchanged: the remaining `as_str()` strings.** `lock-contention`,
+  `ownership-conflict`, `verification`, `filesystem`, `invalid-input`,
+  `injected`, and `post-commit-check` are byte-identical to what `0.1.3`
+  published. The only string that disappears is `retained-evidence`, and no
+  runtime failure could ever carry it — no producer existed — so no consumer
+  could have observed it in a `FailureReport`, in a receipt, or in a
+  persisted category.
+- **Unchanged: the failure space.** No produced `FailureReport`, no
+  `TransactionReceipt`, no `Error`, and no `RecoveryError` differs before and
+  after. `Error` keeps **exactly** the seven variants `0.1.3` published (plus
+  the `#[cfg(test)]`-only `Error::Injected`), and `RecoveryError` keeps its
+  two variants and its `#[non_exhaustive]` attribute.
+- **Added: failure-mode documentation on the public fallible surface.** Every
+  public fallible item now carries an `# Errors` section that states which
+  `Error` variants it can return and under what condition, that a receipt —
+  not an `Err` — is how a post-lock outcome is reported, that the ownership
+  direction stays fail-closed (`Owned` is never inferred; a verifier's
+  ambiguity is `Unknown`), and that a member without verified integrity
+  evidence is rejected with no escape hatch. The wording points at
+  `crates/eggup-core/docs/{domain,verification,transaction}.md` and
+  `architecture/core-transaction.md` §8 rather than restating them. SHA-256
+  remains integrity evidence only: no authenticity or signature claim was
+  introduced anywhere.
+- **Added: a crate-local doc-accuracy check.** `clippy::missing_errors_doc` is
+  now enabled for `eggup-core` only, so the existing gate's `-D warnings` makes
+  a missing `# Errors` section a hard error for this crate. The workspace lint
+  table is unchanged and no other crate is affected.
+- **Documented, not removed: `FailureCategory::Injected` is test-only.** It is
+  produced only by this crate's own test fault harness, because its only
+  producer is the `#[cfg(test)]`-only `Error::Injected`; a shipped
+  `eggup-core` build never produces the `injected` category. This is the same
+  class of unreachable branch as the removed variant, so it is now stated
+  explicitly in the rustdoc rather than left implicit.
+- **Compatibility.** Removing a variant of the `#[non_exhaustive]`
+  `FailureCategory` does not break a downstream matcher: every downstream
+  matcher must already carry a wildcard arm, and that arm now covers one
+  fewer variant. **The one caveat**: `eggup-core 0.1.3` on crates.io *does*
+  publish `FailureCategory::RetainedEvidence`, so a downstream crate that
+  named it explicitly — a match arm, an equality assertion, or a constant
+  `as_str()` call — will fail to compile once this change is published. That
+  is a compile-time break, not a silent behavior change, and it is the only
+  downstream break this correction introduces. **No consumer migration is
+  required** beyond deleting such a name reference.
+- **Unpublished.** `eggup-core 0.1.3` on crates.io still carries the defect.
+  The fix reaches consumers only when a new version is published, and no
+  publication milestone authorizes that here. Because `eggup-eggpack` pins
+  `eggup-core = "=0.1.3"`, an adapter republication is required before the fix
+  can reach that crate. **Republication is a separate milestone**; the `v0.1.3`
+  tag must not move.
+- **No migration path** is required: no API changed shape beyond the removal
+  above, no data format changed, and no consumer action is needed beyond
+  picking up the fixed version.
+
+**Bounded candidate deadline correction (Verified Update Core M014).** `run_bounded`
+documented `CommandSpec::timeout` as the maximum wall-clock execution time of a
+candidate command, but the implementation evaluated the deadline only while the direct
+child was still alive and joined its reader threads only on the success path. A
+descendant that inherited the stdout or stderr pipe and held it open after the direct
+child exited pinned the call indefinitely, and the timeout path additionally left both
+reader threads unjoined. A published library could therefore hang past its own
+documented safety bound.
+
+- **Fixed: the deadline is now an unconditional maximum wall-clock bound** on the whole
+  bounded execution. It is evaluated on every poll whether or not the direct child has
+  already exited, so `run_bounded` always returns. When the deadline elapses, a still
+  running direct child is killed and reaped exactly as before; an already exited child
+  is not killed and not reaped again, and the call no longer waits for pipe EOF.
+- **Changed: the descendant case is now bounded and fail-closed.** When the direct
+  child exited but a descendant still held the output pipe open, the call returns at the
+  deadline with `timed_out` set, `output_limited` clear, `success()` false, and the
+  direct child's exit code still observable through `exit_code`. The stream the
+  descendant still holds contributes no bytes, because they were never captured. Core
+  terminates only the direct child it spawned; a descendant is never killed.
+- **Fixed: reader-thread lifecycle is now explicit.** A reader that delivered its
+  result is joined, which is bounded because a reader only has to return after its
+  send. A reader still blocked in `read()` at the deadline cannot be joined without
+  waiting past the deadline, and core cannot terminate a descendant it does not own —
+  it has no `libc`, `nix`, or `windows-sys` dependency and `unsafe` is denied — so such
+  a reader is abandoned explicitly and ends when the pipe reaches EOF.
+- **Unchanged: the public surface.** `CommandSpec`, `CommandOutput` and its accessors
+  keep their published shape, `Error` keeps exactly the seven published `0.1.2`
+  variants, the output bound stays per stream at the published defaults (64 KiB, 5 s),
+  and the overflow semantics stay as published: an overflowing stream is reported as
+  empty. The ownership model, the transaction state machine, the lock, the receipts,
+  and the failure taxonomy are untouched.
+- **Compatibility.** Source compatibility is unchanged. The behavior change is
+  confined to calls that today never return: such a call now returns at the deadline
+  with `timed_out == true`. No caller can depend on a hang, so this is a defect
+  correction rather than a semantic break.
+- **Unpublished.** `eggup-core 0.1.3` on crates.io still carries the defect; the fix
+  reaches consumers only when a new version is published, and no publication milestone
+  authorizes that here. Because `eggup-eggpack` pins `eggup-core = "=0.1.3"`, an
+  adapter republication is required before the fix can reach that crate.
+- **No migration path** is required: no API changed, no data format changed, and no
+  consumer action is needed beyond picking up the fixed version.
+
 **Compatibility correction (Verified Update Core M012).** An earlier revision of
 this file claimed that adding variants here was additive because `Error`,
 `CleanupDisposition`, and `FailureCategory` were all `#[non_exhaustive]`. Only
@@ -43,7 +154,9 @@ The state after M012:
   classifies injected failures structurally through a `#[cfg(test)]`-only
   variant. `Error::RecoveryRequired` moved to a new `RecoveryError` type.
 - `FailureCategory` **is** `#[non_exhaustive]`, so
-  `FailureCategory::RetainedEvidence` is genuinely additive.
+  `FailureCategory::RetainedEvidence` is genuinely additive. (M015 later
+  removed that variant, because no producer ever existed for it; see the M015
+  entry above. The `#[non_exhaustive]` attribute itself is unchanged.)
 - `CleanupDisposition` is **not** `#[non_exhaustive]`, so
   `CleanupDisposition::DeferredToProcessExit` is a source-visible addition. It
   is required by M010: a kept-installed Windows self-update cannot unlink the

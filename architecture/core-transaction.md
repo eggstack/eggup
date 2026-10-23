@@ -1,6 +1,8 @@
 # `eggup-core` — Verified Update Transaction Deep Dive
 
 Status: current as of `eggup-core` 0.1.2 (`M009` closure, published to crates.io).
+The failure-taxonomy and public-failure-mode material reflects Verified Update Core
+M015, which is an unpublished source change; `0.1.3` remains the published baseline.
 
 This is a review reference. Every behavioral claim below is grounded in source, and
 `file:line` references are relative to the workspace root. Where code and crate
@@ -114,7 +116,7 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 | --- | --- | --- |
 | `CommandSpec` | Bounded external-command request (program, args, cwd, timeout, output cap, explicit env only) | `candidate.rs:19` |
 | `CommandOutput` | Exit code, captured stdout/stderr, `timed_out`, `output_limited`, `success` | `candidate.rs:84` |
-| `run_bounded` | Spawn/wait/poll with kill-on-timeout and output truncation | `candidate.rs:125` |
+| `run_bounded` | Spawn/wait/poll under an unconditional wall-clock deadline, with kill-on-timeout and output truncation | `candidate.rs:125` |
 | `CandidateValidator` | Trait: `validate(&VerifiedTransaction) -> Result<()>` | `candidate.rs:228` |
 | `ExactIdentityValidator` | Runs a member's staged file and requires exact stdout | `candidate.rs:235` |
 | `CrossMemberAgreementValidator` | Requires every member to print the same identity | `candidate.rs:336` |
@@ -136,7 +138,7 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:25-44`.
 | `CleanupDisposition` | `Cleaned` / `RetainedForRecovery` | `transaction.rs:34` |
 | `PostCommitFailurePolicy` | `KeepInstalled` / `RollBack` | `transaction.rs:52` |
 | `FailurePhase` | `Lock`, `Ownership`, `StageRevalidation`, `Backup`, `Commit`, `PostCommit`, `Rollback`, `Finalize` | `transaction.rs:64` |
-| `FailureCategory` | `LockContention`, `OwnershipConflict`, `Verification`, `Filesystem`, `InvalidInput`, `Injected`, `PostCommitCheck` | `transaction.rs:102` |
+| `FailureCategory` | `LockContention`, `OwnershipConflict`, `Verification`, `Filesystem`, `InvalidInput`, `Injected` (test-only), `PostCommitCheck` — seven categories, each with a producer | `transaction.rs:135` |
 | `FailureReport` | Phase + category + optional member + bounded (≤512 B) core-authored detail | `transaction.rs:139` |
 | `TransactionReceipt` | The terminal artifact: disposition, rollback facts, cleanup, recovery path, up to three reports | `transaction.rs:226` |
 
@@ -305,6 +307,18 @@ caller timeout, kills the child on expiry, and caps captured output. The bounds 
 observables on the result, not silent truncations: `timed_out` and `output_limited`
 (`candidate.rs:109-120`).
 
+The caller timeout is an **unconditional maximum wall-clock bound** on the whole bounded
+execution. It is evaluated on every poll whether or not the direct child has already
+exited, so `run_bounded` always returns. A descendant of the direct child can inherit the
+stdout or stderr pipe and hold it open after the direct child exited; core terminates only
+the direct child it spawned, so such a descendant is never killed. The call returns at the
+deadline with `timed_out` set and the direct child's exit code still observable, and the
+stream the descendant still holds contributes no bytes. The only work that may extend past
+the deadline is the kill and reap of a still-running direct child; that allowance is
+bounded by the child's own termination and is not a second, larger deadline. A reader
+thread that delivered its result is joined; a reader still blocked in `read()` at the
+deadline is abandoned explicitly and ends when the pipe reaches EOF.
+
 `ExactIdentityValidator` (`candidate.rs:235`) requires exact stdout equality for one
 member; `CrossMemberAgreementValidator` (`candidate.rs:336`) requires every member in a
 bundle to print the same identity. Timeout and output-overflow are converted into
@@ -418,6 +432,44 @@ so after `KeepInstalled` resolves — the only point at which rollback is no lon
 `CleanupDisposition::DeferredToProcessExit` rather than claiming it was cleaned. The
 Windows-only `self-replace` dependency exists solely for that call; the Unix and macOS
 dependency graphs are unchanged.
+
+### The published failure taxonomy
+
+`FailureCategory` (`transaction.rs:135`) is `#[non_exhaustive]` and classifies
+**produced** failures. Every member describes a failure that can actually
+occur, and each has exactly one producer:
+
+| Category | `as_str()` | Producer |
+| --- | --- | --- |
+| `LockContention` | `lock-contention` | `report_for_error` from `Error::UpdateInProgress` (`transaction.rs:261`) |
+| `OwnershipConflict` | `ownership-conflict` | `report_for_error` from `Error::DestinationConflict` (`transaction.rs:265`) |
+| `Verification` | `verification` | `report_for_error` from `Error::VerificationFailed` and `Error::CandidateExecution` (`transaction.rs:269-270`) |
+| `Filesystem` | `filesystem` | `report_for_error` from `Error::Io` (`transaction.rs:275`) |
+| `InvalidInput` | `invalid-input` | `report_for_error` from `Error::InvalidInput` and `Error::UnknownMember` (`transaction.rs:273-274`) |
+| `Injected` | `injected` | this crate's own test fault harness only — a shipped build never produces it (`transaction.rs:272`, `#[cfg(test)]`) |
+| `PostCommitCheck` | `post-commit-check` | direct construction on the failed post-commit check (`transaction.rs:561`) |
+
+The `as_str()` string is the only stable identifier a consumer may persist or
+aggregate: a downstream crate cannot enumerate a `#[non_exhaustive]` enum, so it
+sees the taxonomy only through a wildcard arm and `as_str()`. The strings are a
+published contract and do not change.
+
+**Retained evidence is not a category.** It is reported as the
+`TransactionDisposition::RecoveryRequired` disposition together with
+`CleanupDisposition::RetainedForRecovery` and the real path in
+`TransactionReceipt::recovery_path()`. `FailureCategory::RetainedEvidence` was
+residue of M012's relocation of that reporting into `RecoveryError`: no
+producer ever existed for it, so Verified Update Core M015 removed it rather
+than documenting a branch that cannot be taken. `FailureCategory::Injected` has
+the same shape — reachable only in this crate's own test builds — but unlike
+the removed variant it is a deliberate, documented test-harness classification,
+so M015 states that in its rustdoc and leaves it in place.
+
+Every public fallible item of this crate documents its failure modes in an
+`# Errors` rustdoc section, and `clippy::missing_errors_doc` is enabled
+crate-locally (`crates/eggup-core/src/lib.rs:8`), so the existing gate's
+`-D warnings` keeps that documentation honest. The lint is not enabled in the
+workspace lint table, so no other crate is affected.
 
 ### Receipts and the receipt status variants
 
@@ -632,6 +684,11 @@ This is the central review artifact. Two rules govern the whole table:
    problems are all reported as `Ok(receipt)` with `Committed`, `RolledBack`, or
    `RecoveryRequired`. The lock is dropped on the way out unless the receipt requires
    `RecoveryRequired` or `RetainedForRecovery`.
+
+The stable category attached to each reported failure comes from the published
+`FailureCategory` taxonomy; every category has a producer, and retained
+evidence is a disposition rather than a category. See
+[The published failure taxonomy](#the-published-failure-taxonomy).
 
 | Condition | Outcome | Caller obligation | Ref |
 | --- | --- | --- | --- |

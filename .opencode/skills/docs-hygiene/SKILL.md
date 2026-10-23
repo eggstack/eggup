@@ -61,8 +61,8 @@ Each has occurred at least once — check for them explicitly:
    privileged Linux `service-systemd` lane. Count commands, not bullets: three
    named `eggup-service` diagnostic tests are three steps. The MSRV lane runs a
    workspace check and packaged service verification; it does not run tests.
-2. **Publication status.** `eggup-service 0.1.2` is published; the corrected
-   `0.1.3` service candidate is not yet published. Check crates.io rather than
+2. **Publication status.** `eggup-service 0.1.3` is published (2026-10-09);
+   `eggup-curl` is published only at `0.1.2`. Check crates.io rather than
    inferring from a `publish = false` key or a plan.
 3. **Enum tables lagging the source.** `architecture/core-transaction.md` once
    described a whole earlier generation of `eggup-core`'s enums. When a variant

@@ -19,7 +19,7 @@ Full dependency rules and per-crate boundary rationale:
 - `crates/eggup-curl` — external-curl adapter, no embedded HTTP/TLS stack; depends only on `eggup-acquisition`. Must not know `eggup-eggfetch` exists. Transport composition lives in the seam, never in an adapter.
 - `crates/eggup-service` — manager-neutral lifecycle; depends only on `eggup-core` (+ `windows-args`, + `windows-service` on Windows).
 - `crates/eggup-archive` — bounded allowlisted local tar.gz/zip extraction; deps `tar`, `zip`, `flate2`, `fs_at`, `sha2`, dev-dep `eggup-core`. No transport, authenticity, or live-installation policy.
-- `crates/eggup-eggpack` — optional leaf adapter for Eggpack ReleaseManifest v1; published (`=0.1.2`), depends on `core` + `archive` + `acquisition` (each pinned `=0.1.2`, local paths) + `eggpack-manifest = "=0.1.0"` from the registry + `sha2 = "0.10.9"`. Only crate allowed to touch producer types.
+- `crates/eggup-eggpack` — optional leaf adapter for Eggpack ReleaseManifest v1; published (`=0.1.3`), depends on `core` + `archive` + `acquisition` (each pinned `=0.1.3`, local paths) + `eggpack-manifest = "=0.1.0"` from the registry; its exact dependency list is owned by `crates/eggup-eggpack/Cargo.toml`. Only crate allowed to touch producer types.
 - `crates/eggup-transport-footprint` — non-published (`publish = false`) footprint fixtures: `curl_only` / `eggfetch_only` / `dual` binaries behind `required-features`.
 
 New crates must join `Cargo.toml` members, inherit the 5 shared keys (`version`, `edition`, `rust-version`, `license`, `repository`), and set `[lints] workspace = true`. The 7 library crates also carry `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]`; `eggup-transport-footprint` is the sole exception (binary-only, no `lib.rs`, and no `README.md`/`CHANGELOG.md` — see §3.4 of the governance deep dive).
@@ -96,4 +96,4 @@ Process detail: [`architecture/tooling-governance.md`](architecture/tooling-gove
 ## Releasing
 
 Publication is a tracked milestone, never a side effect and never automated by CI. See the `release-workflow` skill and
-[`architecture/tooling-governance.md`](architecture/tooling-governance.md) §8. Note that `eggup-eggpack` pins `=0.1.2`, so a seam fix needs a separate adapter republication to reach it.
+[`architecture/tooling-governance.md`](architecture/tooling-governance.md) §8. Note that `eggup-eggpack` pins its Eggup dependencies exactly (see `crates/eggup-eggpack/Cargo.toml`), so a seam fix needs a separate adapter republication to reach it.

@@ -72,7 +72,7 @@ In plain dependency order, deepest first:
 4. **`eggup-curl`** → `eggup-acquisition` only. External-process adapter, no HTTP/TLS stack.
 5. **`eggup-service`** → `eggup-core` + `windows-args` (+ `windows-service` on Windows). Lifecycle adapters.
 6. **`eggup-archive`** → `tar`, `zip`, `flate2`, `fs_at`, `sha2` (dev-dep `eggup-core`). Bounded local extraction.
-7. **`eggup-eggpack`** → `eggup-core` + `eggup-archive` + `eggup-acquisition` (`=0.1.2`) + `eggpack-manifest =0.1.0` + `sha2`. Leaf producer adapter.
+7. **`eggup-eggpack`** → `eggup-core` + `eggup-archive` + `eggup-acquisition` (`=0.1.3`) + `eggpack-manifest =0.1.0`. Leaf producer adapter.
 8. **`eggup-transport-footprint`** → `eggup-acquisition` + optional `eggup-curl` / `eggup-eggfetch`. **Non-published** footprint fixtures.
 
 Two consequences worth knowing before reviewing anything:

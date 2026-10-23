@@ -30,8 +30,12 @@ check and resolves a failed check using explicit `KeepInstalled` or
 `RollBack` policy.
 
 Candidate commands use literal argv vectors, clear inherited environment, null
-stdin, a controlled working directory, a wall-clock deadline, bounded stdout
-and stderr, and kill/reap on timeout or output overflow. `ExactIdentityValidator`
-and `CrossMemberAgreementValidator` are consumer-policy-neutral helpers; a
-consumer can supply a custom `CandidateValidator` for a different identity
-contract. No fallback or release ordering is selected by core.
+stdin, a controlled working directory, an unconditional wall-clock deadline, bounded
+stdout and stderr, and kill/reap on timeout or output overflow. The deadline bounds the
+whole bounded execution, so a bounded call always returns; the normative statement of
+that contract, and of what a descendant holding the output pipe open means for the
+result, lives in the `run_bounded` rustdoc in `src/candidate.rs` and in
+`architecture/core-transaction.md`. `ExactIdentityValidator` and
+`CrossMemberAgreementValidator` are consumer-policy-neutral helpers; a consumer can
+supply a custom `CandidateValidator` for a different identity contract. No fallback or
+release ordering is selected by core.

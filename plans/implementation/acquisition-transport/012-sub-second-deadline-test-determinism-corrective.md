@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 012 — sub-second deadline test determinism corrective
 
-Status: ready for handoff
+Status: conditionally closed 2026-10-23; implemented and green on the native macOS lane, with the discriminating **loaded** re-run showing 0 failures where the pre-M012 tree fails, and every new assertion proven to fire against a mutated control. Closure record: `plans/closure/acquisition-transport/012-status.md`. The remaining condition is the outstanding qualification: the Linux, Windows, and hosted CI lanes and the whole-tree gate were **not run**.
 
 Repository baseline: `93267304f96bb4de50128080769f3c77dd03892c`
 

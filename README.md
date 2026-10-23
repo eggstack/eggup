@@ -15,7 +15,7 @@ Requires Rust **1.89**+ (edition 2021). The only dependency is `sha2`.
 
 ```toml
 [dependencies]
-eggup-core = "0.1.2"
+eggup-core = "0.1.3"
 ```
 
 ```rust
@@ -126,14 +126,13 @@ user-facing guidance and never overrides them.
 ## Publication state
 
 `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
-`eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`, and
-`eggup-eggpack` are published at `0.1.3`; `eggup-curl` and `eggup-service` are
-published at `0.1.2`. Service M010's `0.1.3` correction is still in M011 release
-qualification and has not been published.
-`eggup-service` was published later from a different source commit than the shared
-`v0.1.2` tag, which denotes the `eggup-core`/`eggup-archive` publication; the tag
-was not moved. `eggup-transport-footprint` is `publish = false` by design. CI never
+`eggup-eggpack`, and `eggup-service` are published at `0.1.3`; `eggup-curl` is
+published at `0.1.2`. `eggup-service` was published later, on 2026-10-09, from a
+different source commit than the shared `v0.1.3` tag, which denotes the
+`eggup-core`/`eggup-archive` publication; the tag was not moved.
+`eggup-transport-footprint` is `publish = false` by design. CI never
 publishes; releases are manual and milestone-gated.
 
 Note that published releases trail the working tree — see
-[docs/releases.md](docs/releases.md) for the limitations you inherit at `0.1.2`.
+[docs/releases.md](docs/releases.md) for the limitations each published version
+carries.

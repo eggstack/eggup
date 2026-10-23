@@ -13,8 +13,12 @@
 //! oracle. No Gregg code, dependency, or product terminology is used here.
 
 use crate::{
-    LifecycleSnapshot, LifecycleState, LifecycleUpdatePolicy, Ownership, PostInstallCheck,
-    PostInstallCheckError, ServiceManager, ServiceSpec, TransitionResult,
+    commit_engine::{
+        quiesce_for_rollback, remaining, restore_and_check, safe_inspect, safe_transition_to,
+    },
+    CommitEnginePolicy, LifecycleFailure, LifecycleSnapshot, LifecycleState, LifecycleUpdatePolicy,
+    Ownership, PostInstallCheck, PostInstallCheckError, ServiceManager, ServiceSpec,
+    TransitionResult,
 };
 use eggup_core::{
     CommitOwnership, PostCommitFailurePolicy, TransactionDisposition, ValidatedTransaction,
@@ -122,6 +126,13 @@ pub struct WindowsPlannerInput {
 }
 
 /// Pure Unix-like manager/direct decision logic.
+///
+/// # Errors
+///
+/// [`crate::ServiceError::InvalidInput`] when the inputs do not prove a
+/// decidable outcome: the manager state is unknown while the manager
+/// ownership is unknown and the manager is not active, or the manager and
+/// direct states are both unproven.
 pub fn plan_unix(
     input: &UnixPlannerInput,
 ) -> Result<UpdateRuntimeDisposition, crate::ServiceError> {
@@ -221,6 +232,12 @@ pub fn plan_unix(
 }
 
 /// Pure Windows SCM/executable decision logic including pending states.
+///
+/// # Errors
+///
+/// [`crate::ServiceError::InvalidInput`] when the service is installed but
+/// its executable is absent or unparseable, so the ownership of the
+/// registration cannot be decided.
 pub fn plan_windows(
     input: &WindowsPlannerInput,
 ) -> Result<UpdateRuntimeDisposition, crate::ServiceError> {
@@ -273,50 +290,22 @@ pub struct DispositionBaseline {
     pub direct: Option<DirectObservation>,
 }
 
-fn mk_failure(
-    spec: &ServiceSpec,
-    phase: crate::LifecycleUpdatePhase,
-    detail: impl fmt::Display,
-    snapshot: Option<&LifecycleSnapshot>,
-) -> crate::LifecycleFailure {
-    crate::LifecycleFailure {
-        phase,
-        service_id: spec.id().as_str().to_owned(),
-        detail: bound_detail(detail.to_string()),
-        ownership: snapshot.map(|s| s.ownership),
-        state: snapshot.map(|s| s.state),
-    }
-}
-
-fn bound_detail(mut detail: String) -> String {
-    detail = detail.chars().filter(|c| !c.is_control()).collect();
-    crate::truncate_utf8_bytes(detail, 512)
-}
-
-fn remaining(deadline: Instant) -> Duration {
-    deadline.saturating_duration_since(Instant::now())
-}
-
-fn safe_manager_inspect<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    phase: crate::LifecycleUpdatePhase,
-) -> Result<LifecycleSnapshot, crate::LifecycleFailure> {
-    match catch_unwind(AssertUnwindSafe(|| manager.inspect(spec))) {
-        Ok(Ok(s)) => Ok(s),
-        Ok(Err(e)) => Err(mk_failure(spec, phase, e, None)),
-        Err(_) => Err(mk_failure(
-            spec,
-            phase,
-            "service manager panicked while inspecting",
-            None,
-        )),
-    }
-}
-
 /// Disposition-aware orchestration over an existing `ValidatedTransaction`.
 ///
 /// See module docs for ordering and revalidation rules.
+///
+/// This entry point runs the unified commit engine under
+/// [`CommitEnginePolicy::default`], the stricter of the two former engine
+/// copies' behaviours. Use [`commit_with_disposition_with_engine_policy`] to
+/// select the named policy inputs explicitly.
+///
+/// # Errors
+///
+/// [`crate::LifecycleUpdateError`] when the update cannot be completed
+/// safely: the commit engine could not commit, roll back, or restore the
+/// service to its pre-update state. The error carries the transaction
+/// disposition, the observed lifecycle state, and whether manual artifact
+/// recovery is required.
 #[allow(clippy::too_many_arguments)]
 pub fn commit_with_disposition<M, D, C>(
     manager: &mut M,
@@ -328,6 +317,54 @@ pub fn commit_with_disposition<M, D, C>(
     check: &C,
     planned: UpdateRuntimeDisposition,
     baseline: &DispositionBaseline,
+) -> Result<crate::LifecycleUpdateReceipt, crate::LifecycleUpdateError>
+where
+    M: ServiceManager,
+    D: DirectRuntimeControl,
+    C: PostInstallCheck,
+{
+    commit_with_disposition_with_engine_policy(
+        manager,
+        spec,
+        direct,
+        transaction,
+        ownership,
+        policy,
+        check,
+        planned,
+        baseline,
+        CommitEnginePolicy::default(),
+    )
+}
+
+/// Disposition-aware orchestration under an explicitly selected commit-engine
+/// policy.
+///
+/// Identical to [`commit_with_disposition`] except that the two named
+/// commit-engine inputs — post-transition verification and ownership-loss
+/// tolerance — are chosen by the caller instead of taking their stricter
+/// defaults. The selected policy is observable in the returned receipt's
+/// `engine_policy` field.
+///
+/// # Errors
+///
+/// [`crate::LifecycleUpdateError`] when the update cannot be completed
+/// safely: the commit engine could not commit, roll back, or restore the
+/// service to its pre-update state. The error carries the transaction
+/// disposition, the observed lifecycle state, and whether manual artifact
+/// recovery is required.
+#[allow(clippy::too_many_arguments)]
+pub fn commit_with_disposition_with_engine_policy<M, D, C>(
+    manager: &mut M,
+    spec: &ServiceSpec,
+    direct: Option<&mut D>,
+    transaction: ValidatedTransaction,
+    ownership: CommitOwnership<'_>,
+    policy: LifecycleUpdatePolicy,
+    check: &C,
+    planned: UpdateRuntimeDisposition,
+    baseline: &DispositionBaseline,
+    engine: CommitEnginePolicy,
 ) -> Result<crate::LifecycleUpdateReceipt, crate::LifecycleUpdateError>
 where
     M: ServiceManager,
@@ -358,7 +395,7 @@ where
     };
     if !baseline_ok {
         return Err(crate::LifecycleUpdateError::Preflight {
-            failure: mk_failure(
+            failure: LifecycleFailure::new(
                 spec,
                 Phase::Inspect,
                 "planned disposition does not match baseline authority/state",
@@ -367,13 +404,13 @@ where
         });
     }
 
-    let fresh_manager = safe_manager_inspect(manager, spec, Phase::Inspect)
+    let fresh_manager = safe_inspect(manager, spec, Phase::Inspect)
         .map_err(|f| crate::LifecycleUpdateError::Preflight { failure: f })?;
     if fresh_manager.ownership != baseline.manager_ownership
         || fresh_manager.state != baseline.manager_state
     {
         return Err(crate::LifecycleUpdateError::Preflight {
-            failure: mk_failure(
+            failure: LifecycleFailure::new(
                 spec,
                 Phase::Inspect,
                 "lifecycle authority/state changed before mutation",
@@ -386,7 +423,7 @@ where
     if planned == UpdateRuntimeDisposition::DirectRunning {
         let Some(d) = direct.as_ref() else {
             return Err(crate::LifecycleUpdateError::Preflight {
-                failure: mk_failure(
+                failure: LifecycleFailure::new(
                     spec,
                     Phase::Inspect,
                     "direct control required but not provided",
@@ -398,12 +435,12 @@ where
             Ok(Ok(o)) => o,
             Ok(Err(e)) => {
                 return Err(crate::LifecycleUpdateError::Preflight {
-                    failure: mk_failure(spec, Phase::Inspect, e, Some(&fresh_manager)),
+                    failure: LifecycleFailure::new(spec, Phase::Inspect, e, Some(&fresh_manager)),
                 });
             }
             Err(_) => {
                 return Err(crate::LifecycleUpdateError::Preflight {
-                    failure: mk_failure(
+                    failure: LifecycleFailure::new(
                         spec,
                         Phase::Inspect,
                         "direct runtime panicked while inspecting",
@@ -414,7 +451,7 @@ where
         };
         let Some(base_direct) = baseline.direct.as_ref() else {
             return Err(crate::LifecycleUpdateError::Preflight {
-                failure: mk_failure(
+                failure: LifecycleFailure::new(
                     spec,
                     Phase::Inspect,
                     "direct baseline missing for DirectRunning",
@@ -427,7 +464,7 @@ where
             || fresh_direct.state != DirectState::Running
         {
             return Err(crate::LifecycleUpdateError::Preflight {
-                failure: mk_failure(
+                failure: LifecycleFailure::new(
                     spec,
                     Phase::Inspect,
                     "direct runtime identity/state changed before mutation",
@@ -445,46 +482,21 @@ where
 
     match planned {
         UpdateRuntimeDisposition::ManagedRunning => {
-            let stop_result = catch_unwind(AssertUnwindSafe(|| {
-                manager.stop(spec, policy.quiesce_timeout)
-            }));
-            let stop_failure = match stop_result {
-                Ok(Err(e)) => Some(mk_failure(spec, Phase::Quiesce, e, Some(&before))),
-                Err(_) => Some(mk_failure(
-                    spec,
-                    Phase::Quiesce,
-                    "service manager panicked while stopping",
-                    Some(&before),
-                )),
-                Ok(Ok(r)) if !r.completed => Some(mk_failure(
-                    spec,
-                    Phase::Quiesce,
-                    "stop did not complete",
-                    Some(&before),
-                )),
-                Ok(Ok(_)) => match safe_manager_inspect(manager, spec, Phase::Quiesce) {
-                    Ok(after)
-                        if after.ownership == Ownership::Owned
-                            && after.state == LifecycleState::Stopped =>
-                    {
-                        pre_commit_quiesced = true;
-                        None
-                    }
-                    Ok(after) => Some(mk_failure(
-                        spec,
-                        Phase::Quiesce,
-                        "ownership/state changed after stop",
-                        Some(&after),
-                    )),
-                    Err(f) => Some(f),
-                },
-            };
+            let stop_failure = crate::commit_engine::quiesce_service(
+                manager,
+                spec,
+                &before,
+                policy.quiesce_timeout,
+            )
+            .err();
             if let Some(f) = stop_failure {
-                let restore = restore_owned_state(
+                let restore = safe_transition_to(
                     manager,
                     spec,
                     LifecycleState::Running,
                     policy.rollback_restore_timeout,
+                    Phase::Quiesce,
+                    &engine,
                 )
                 .err();
                 return Err(crate::LifecycleUpdateError::Quiesce {
@@ -492,6 +504,7 @@ where
                     restore_failure: restore,
                 });
             }
+            pre_commit_quiesced = true;
             commit_manager_path(
                 manager,
                 spec,
@@ -502,12 +515,13 @@ where
                 check,
                 planned,
                 pre_commit_quiesced,
+                engine,
             )
         }
         UpdateRuntimeDisposition::DirectRunning => {
             let Some(d) = direct_slot.as_mut() else {
                 return Err(crate::LifecycleUpdateError::Preflight {
-                    failure: mk_failure(
+                    failure: LifecycleFailure::new(
                         spec,
                         Phase::Inspect,
                         "direct control required but not provided",
@@ -517,14 +531,19 @@ where
             };
             let stop_result = catch_unwind(AssertUnwindSafe(|| (**d).stop(policy.quiesce_timeout)));
             let stop_failure = match stop_result {
-                Ok(Err(e)) => Some(mk_failure(spec, Phase::Quiesce, e, Some(&before))),
-                Err(_) => Some(mk_failure(
+                Ok(Err(e)) => Some(LifecycleFailure::new(
+                    spec,
+                    Phase::Quiesce,
+                    e,
+                    Some(&before),
+                )),
+                Err(_) => Some(LifecycleFailure::new(
                     spec,
                     Phase::Quiesce,
                     "direct runtime panicked while stopping",
                     Some(&before),
                 )),
-                Ok(Ok(r)) if !r.completed => Some(mk_failure(
+                Ok(Ok(r)) if !r.completed => Some(LifecycleFailure::new(
                     spec,
                     Phase::Quiesce,
                     "direct stop did not complete",
@@ -537,14 +556,19 @@ where
                         pre_commit_quiesced = true;
                         None
                     }
-                    Ok(Ok(_)) => Some(mk_failure(
+                    Ok(Ok(_)) => Some(LifecycleFailure::new(
                         spec,
                         Phase::Quiesce,
                         "direct runtime state changed after stop",
                         Some(&before),
                     )),
-                    Ok(Err(e)) => Some(mk_failure(spec, Phase::Quiesce, e, Some(&before))),
-                    Err(_) => Some(mk_failure(
+                    Ok(Err(e)) => Some(LifecycleFailure::new(
+                        spec,
+                        Phase::Quiesce,
+                        e,
+                        Some(&before),
+                    )),
+                    Err(_) => Some(LifecycleFailure::new(
                         spec,
                         Phase::Quiesce,
                         "direct runtime panicked while re-observing",
@@ -574,6 +598,7 @@ where
                 policy,
                 check,
                 pre_commit_quiesced,
+                engine,
             )
         }
         UpdateRuntimeDisposition::ManagedStopped
@@ -588,73 +613,8 @@ where
             check,
             planned,
             pre_commit_quiesced,
+            engine,
         ),
-    }
-}
-
-fn restore_owned_state<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    wanted: LifecycleState,
-    timeout: Duration,
-) -> Result<(), crate::LifecycleFailure> {
-    use crate::LifecycleUpdatePhase as Phase;
-    if timeout.is_zero() {
-        return Err(mk_failure(
-            spec,
-            Phase::RestoreOld,
-            "lifecycle operation deadline exhausted",
-            None,
-        ));
-    }
-    let current = manager
-        .inspect(spec)
-        .map_err(|e| mk_failure(spec, Phase::RestoreOld, e, None))?;
-    if current.ownership != Ownership::Owned {
-        return Err(mk_failure(
-            spec,
-            Phase::RestoreOld,
-            "service ownership is no longer Owned",
-            Some(&current),
-        ));
-    }
-    match (wanted, current.state) {
-        (LifecycleState::Running, LifecycleState::Running)
-        | (LifecycleState::Stopped, LifecycleState::Stopped) => Ok(()),
-        (LifecycleState::Running, LifecycleState::Stopped) => {
-            let r = manager
-                .start(spec, timeout)
-                .map_err(|e| mk_failure(spec, Phase::RestoreOld, e, Some(&current)))?;
-            if !r.completed {
-                return Err(mk_failure(
-                    spec,
-                    Phase::RestoreOld,
-                    "service transition did not complete",
-                    Some(&current),
-                ));
-            }
-            Ok(())
-        }
-        (LifecycleState::Stopped, LifecycleState::Running) => {
-            let r = manager
-                .stop(spec, timeout)
-                .map_err(|e| mk_failure(spec, Phase::RestoreOld, e, Some(&current)))?;
-            if !r.completed {
-                return Err(mk_failure(
-                    spec,
-                    Phase::RestoreOld,
-                    "service transition did not complete",
-                    Some(&current),
-                ));
-            }
-            Ok(())
-        }
-        _ => Err(mk_failure(
-            spec,
-            Phase::RestoreOld,
-            "service state is Unknown or Transitioning",
-            Some(&current),
-        )),
     }
 }
 
@@ -669,6 +629,7 @@ fn commit_manager_path<M, C>(
     check: &C,
     planned: UpdateRuntimeDisposition,
     pre_commit_quiesced: bool,
+    engine: CommitEnginePolicy,
 ) -> Result<crate::LifecycleUpdateReceipt, crate::LifecycleUpdateError>
 where
     M: ServiceManager,
@@ -691,12 +652,13 @@ where
                     policy.restore,
                     check,
                     deadline,
+                    &engine,
                 )
             }));
             let f = match work {
                 Ok(Ok(())) => return Ok(()),
                 Ok(Err(f)) => f,
-                Err(_) => mk_failure(
+                Err(_) => LifecycleFailure::new(
                     spec,
                     Phase::PostInstallCheck,
                     "post-commit service work panicked",
@@ -706,10 +668,10 @@ where
             post_commit_failure = Some(f.clone());
             if policy.post_commit_failure == PostCommitFailurePolicy::RollBack {
                 rollback_quiesce_failure = match catch_unwind(AssertUnwindSafe(|| {
-                    quiesce_manager_for_rollback(manager, spec, deadline)
+                    quiesce_for_rollback(manager, spec, deadline)
                 })) {
                     Ok(v) => v,
-                    Err(_) => Some(mk_failure(
+                    Err(_) => Some(LifecycleFailure::new(
                         spec,
                         Phase::QuiesceForRollback,
                         "service manager panicked while quiescing before artifact rollback",
@@ -723,8 +685,15 @@ where
         Ok(r) => r,
         Err(core) => {
             let restore = if pre_commit_quiesced {
-                restore_owned_state(manager, spec, before.state, policy.rollback_restore_timeout)
-                    .err()
+                safe_transition_to(
+                    manager,
+                    spec,
+                    before.state,
+                    policy.rollback_restore_timeout,
+                    Phase::RestoreOld,
+                    &engine,
+                )
+                .err()
             } else {
                 None
             };
@@ -751,11 +720,13 @@ where
                 UpdateRuntimeDisposition::ManagedRunning | UpdateRuntimeDisposition::ManagedStopped
             );
             if should_restore {
-                if let Err(f) = restore_owned_state(
+                if let Err(f) = safe_transition_to(
                     manager,
                     spec,
                     before.state,
                     policy.rollback_restore_timeout,
+                    Phase::RestoreOld,
+                    &engine,
                 ) {
                     rollback_restore_failure = Some(f);
                     restoration = crate::LifecycleRestorationStatus::Failed;
@@ -766,7 +737,7 @@ where
             restoration = crate::LifecycleRestorationStatus::NotAttemptedRecoveryRequired;
         }
     }
-    let final_snapshot = match safe_manager_inspect(manager, spec, Phase::FinalInspect) {
+    let final_snapshot = match safe_inspect(manager, spec, Phase::FinalInspect) {
         Ok(s) => Some(s),
         Err(obs) => {
             return Ok(crate::LifecycleUpdateReceipt {
@@ -779,6 +750,7 @@ where
                 rollback_quiesce_failure,
                 rollback_restore_failure,
                 observation_failure: Some(obs),
+                engine_policy: engine,
             });
         }
     };
@@ -792,9 +764,11 @@ where
         rollback_quiesce_failure,
         rollback_restore_failure,
         observation_failure: None,
+        engine_policy: engine,
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn restore_manager_success<M, C>(
     manager: &mut M,
     spec: &ServiceSpec,
@@ -803,6 +777,7 @@ fn restore_manager_success<M, C>(
     intent: crate::RestoreIntent,
     check: &C,
     deadline: Instant,
+    engine: &CommitEnginePolicy,
 ) -> Result<(), crate::LifecycleFailure>
 where
     M: ServiceManager,
@@ -810,10 +785,10 @@ where
 {
     use crate::LifecycleUpdatePhase as Phase;
     if planned == UpdateRuntimeDisposition::ForeignPreserved {
-        let snapshot = safe_manager_inspect(manager, spec, Phase::RestoreNew)?;
+        let snapshot = safe_inspect(manager, spec, Phase::RestoreNew)?;
         let budget = remaining(deadline);
         if budget.is_zero() {
-            return Err(mk_failure(
+            return Err(LifecycleFailure::new(
                 spec,
                 Phase::PostInstallCheck,
                 "post-commit deadline exhausted before post-install check",
@@ -822,7 +797,7 @@ where
         }
         return check
             .check(spec, &snapshot, budget)
-            .map_err(|e| mk_failure(spec, Phase::PostInstallCheck, e, Some(&snapshot)));
+            .map_err(|e| LifecycleFailure::new(spec, Phase::PostInstallCheck, e, Some(&snapshot)));
     }
     let wanted = match planned {
         UpdateRuntimeDisposition::Stopped => match intent {
@@ -835,197 +810,7 @@ where
             crate::RestoreIntent::EnsureStopped => LifecycleState::Stopped,
         },
     };
-    safe_transition_owned_to(
-        manager,
-        spec,
-        wanted,
-        remaining(deadline),
-        Phase::RestoreNew,
-    )?;
-    let snapshot = safe_manager_inspect(manager, spec, Phase::RestoreNew)?;
-    let budget = remaining(deadline);
-    if budget.is_zero() {
-        return Err(mk_failure(
-            spec,
-            Phase::PostInstallCheck,
-            "post-commit deadline exhausted before post-install check",
-            Some(&snapshot),
-        ));
-    }
-    check
-        .check(spec, &snapshot, budget)
-        .map_err(|e| mk_failure(spec, Phase::PostInstallCheck, e, Some(&snapshot)))
-}
-
-/// Panic-safe [`transition_owned_to`].
-///
-/// The caller's `catch_unwind` wraps the whole post-commit block, so a panic
-/// escaping here would be labelled with the wrong phase. Catching it at the
-/// point of execution records it under `phase` — so a panicking `start`/`stop`
-/// during `RestoreNew` cannot be reported as a post-install check failure.
-fn safe_transition_owned_to<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    wanted: LifecycleState,
-    timeout: Duration,
-    phase: crate::LifecycleUpdatePhase,
-) -> Result<(), crate::LifecycleFailure> {
-    match catch_unwind(AssertUnwindSafe(|| {
-        transition_owned_to(manager, spec, wanted, timeout, phase)
-    })) {
-        Ok(result) => result,
-        Err(_) => Err(mk_failure(
-            spec,
-            phase,
-            "service manager panicked while transitioning",
-            None,
-        )),
-    }
-}
-
-fn transition_owned_to<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    wanted: LifecycleState,
-    timeout: Duration,
-    phase: crate::LifecycleUpdatePhase,
-) -> Result<(), crate::LifecycleFailure> {
-    if timeout.is_zero() {
-        return Err(mk_failure(
-            spec,
-            phase,
-            "lifecycle operation deadline exhausted",
-            None,
-        ));
-    }
-    let current = manager
-        .inspect(spec)
-        .map_err(|e| mk_failure(spec, phase, e, None))?;
-    if current.ownership != Ownership::Owned {
-        if wanted == LifecycleState::Stopped && current.state == LifecycleState::Stopped {
-            return Ok(());
-        }
-        return Err(mk_failure(
-            spec,
-            phase,
-            "service ownership is no longer Owned",
-            Some(&current),
-        ));
-    }
-    match (wanted, current.state) {
-        (LifecycleState::Running, LifecycleState::Running)
-        | (LifecycleState::Stopped, LifecycleState::Stopped) => Ok(()),
-        (LifecycleState::Running, LifecycleState::Stopped) => {
-            let r = manager
-                .start(spec, timeout)
-                .map_err(|e| mk_failure(spec, phase, e, Some(&current)))?;
-            if !r.completed {
-                return Err(mk_failure(
-                    spec,
-                    phase,
-                    "service transition did not complete",
-                    Some(&current),
-                ));
-            }
-            Ok(())
-        }
-        (LifecycleState::Stopped, LifecycleState::Running) => {
-            let r = manager
-                .stop(spec, timeout)
-                .map_err(|e| mk_failure(spec, phase, e, Some(&current)))?;
-            if !r.completed {
-                return Err(mk_failure(
-                    spec,
-                    phase,
-                    "service transition did not complete",
-                    Some(&current),
-                ));
-            }
-            Ok(())
-        }
-        _ => Err(mk_failure(
-            spec,
-            phase,
-            "service state is Unknown or Transitioning",
-            Some(&current),
-        )),
-    }
-}
-
-fn quiesce_manager_for_rollback<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    deadline: Instant,
-) -> Option<crate::LifecycleFailure> {
-    use crate::LifecycleUpdatePhase as Phase;
-    let budget = remaining(deadline);
-    if budget.is_zero() {
-        return Some(mk_failure(
-            spec,
-            Phase::QuiesceForRollback,
-            "post-commit deadline exhausted before rollback quiescence",
-            None,
-        ));
-    }
-    // An inspect failure is not "no information, proceed": ownership could not
-    // be established, so the destructive `stop` below would run against an
-    // unproven target. Treat it as Unknown and refuse to quiesce.
-    let observed = match manager.inspect(spec) {
-        Ok(snapshot) => Some(snapshot),
-        Err(e) => {
-            return Some(mk_failure(
-                spec,
-                Phase::QuiesceForRollback,
-                format!("refusing to quiesce unobservable service before rollback: {e}"),
-                None,
-            ))
-        }
-    };
-    if observed
-        .as_ref()
-        .is_some_and(|s| s.ownership == Ownership::Owned && s.state == LifecycleState::Stopped)
-    {
-        return None;
-    }
-    if let Some(obs) = observed.as_ref() {
-        if obs.ownership != Ownership::Owned {
-            return Some(mk_failure(
-                spec,
-                Phase::QuiesceForRollback,
-                "refusing to quiesce non-owned service before rollback",
-                Some(obs),
-            ));
-        }
-    }
-    match manager.stop(spec, budget) {
-        Err(e) => Some(mk_failure(
-            spec,
-            Phase::QuiesceForRollback,
-            e,
-            observed.as_ref(),
-        )),
-        Ok(r) if !r.completed => Some(mk_failure(
-            spec,
-            Phase::QuiesceForRollback,
-            "stop did not complete before artifact rollback",
-            observed.as_ref(),
-        )),
-        Ok(_) => match manager.inspect(spec) {
-            Ok(after)
-                if after.ownership == Ownership::Owned
-                    && after.state == LifecycleState::Stopped =>
-            {
-                None
-            }
-            Ok(after) => Some(mk_failure(
-                spec,
-                Phase::QuiesceForRollback,
-                "stopped state could not be confirmed before artifact rollback",
-                Some(&after),
-            )),
-            Err(e) => Some(mk_failure(spec, Phase::QuiesceForRollback, e, None)),
-        },
-    }
+    restore_and_check(manager, spec, wanted, check, deadline, engine)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1039,6 +824,7 @@ fn commit_direct_path<M, D, C>(
     policy: LifecycleUpdatePolicy,
     check: &C,
     pre_commit_quiesced: bool,
+    engine: CommitEnginePolicy,
 ) -> Result<crate::LifecycleUpdateReceipt, crate::LifecycleUpdateError>
 where
     M: ServiceManager,
@@ -1067,7 +853,7 @@ where
                         if wanted == DirectState::Running {
                             let budget = remaining(deadline);
                             if budget.is_zero() {
-                                return Err(mk_failure(
+                                return Err(LifecycleFailure::new(
                                     spec,
                                     Phase::RestoreNew,
                                     "lifecycle operation deadline exhausted",
@@ -1075,7 +861,7 @@ where
                                 ));
                             }
                             let Some(d) = direct.as_mut() else {
-                                return Err(mk_failure(
+                                return Err(LifecycleFailure::new(
                                     spec,
                                     Phase::RestoreNew,
                                     "direct control missing during restore",
@@ -1083,10 +869,10 @@ where
                                 ));
                             };
                             let r = (**d).start(budget).map_err(|e| {
-                                mk_failure(spec, Phase::RestoreNew, e, Some(&before_c))
+                                LifecycleFailure::new(spec, Phase::RestoreNew, e, Some(&before_c))
                             })?;
                             if !r.completed {
-                                return Err(mk_failure(
+                                return Err(LifecycleFailure::new(
                                     spec,
                                     Phase::RestoreNew,
                                     "direct transition did not complete",
@@ -1096,14 +882,14 @@ where
                         }
                         // Read-only manager observation for the check snapshot; direct
                         // state is caller-owned and not part of LifecycleSnapshot.
-                        safe_manager_inspect(manager, spec, Phase::RestoreNew)
+                        safe_inspect(manager, spec, Phase::RestoreNew)
                     },
                 ));
                 let snapshot = match restored {
                     Ok(Ok(snapshot)) => snapshot,
                     Ok(Err(failure)) => return Err(failure),
                     Err(_) => {
-                        return Err(mk_failure(
+                        return Err(LifecycleFailure::new(
                             spec,
                             Phase::RestoreNew,
                             "direct runtime panicked while restoring",
@@ -1113,21 +899,21 @@ where
                 };
                 let budget = remaining(deadline);
                 if budget.is_zero() {
-                    return Err(mk_failure(
+                    return Err(LifecycleFailure::new(
                         spec,
                         Phase::PostInstallCheck,
                         "post-commit deadline exhausted before post-install check",
                         Some(&snapshot),
                     ));
                 }
-                check
-                    .check(spec, &snapshot, budget)
-                    .map_err(|e| mk_failure(spec, Phase::PostInstallCheck, e, Some(&snapshot)))
+                check.check(spec, &snapshot, budget).map_err(|e| {
+                    LifecycleFailure::new(spec, Phase::PostInstallCheck, e, Some(&snapshot))
+                })
             }));
             let f = match work {
                 Ok(Ok(())) => return Ok(()),
                 Ok(Err(f)) => f,
-                Err(_) => mk_failure(
+                Err(_) => LifecycleFailure::new(
                     spec,
                     Phase::PostInstallCheck,
                     "post-commit direct work panicked",
@@ -1140,7 +926,7 @@ where
                     quiesce_direct_for_rollback(direct.as_deref_mut(), spec, deadline)
                 })) {
                     Ok(v) => v,
-                    Err(_) => Some(mk_failure(
+                    Err(_) => Some(LifecycleFailure::new(
                         spec,
                         Phase::QuiesceForRollback,
                         "direct runtime panicked while quiescing before artifact rollback",
@@ -1187,7 +973,7 @@ where
                 match r {
                     Ok(Ok(res)) if res.completed => {}
                     Ok(Ok(_)) => {
-                        rollback_restore_failure = Some(mk_failure(
+                        rollback_restore_failure = Some(LifecycleFailure::new(
                             spec,
                             Phase::RestoreOld,
                             "direct transition did not complete",
@@ -1196,12 +982,16 @@ where
                         restoration = crate::LifecycleRestorationStatus::Failed;
                     }
                     Ok(Err(e)) => {
-                        rollback_restore_failure =
-                            Some(mk_failure(spec, Phase::RestoreOld, e, Some(&before)));
+                        rollback_restore_failure = Some(LifecycleFailure::new(
+                            spec,
+                            Phase::RestoreOld,
+                            e,
+                            Some(&before),
+                        ));
                         restoration = crate::LifecycleRestorationStatus::Failed;
                     }
                     Err(_) => {
-                        rollback_restore_failure = Some(mk_failure(
+                        rollback_restore_failure = Some(LifecycleFailure::new(
                             spec,
                             Phase::RestoreOld,
                             "direct runtime panicked while restoring",
@@ -1218,7 +1008,7 @@ where
     }
     // Final manager observation is read-only and nonessential; direct final
     // state is caller-observed and not part of the neutral receipt.
-    let final_snapshot = match safe_manager_inspect(manager, spec, Phase::FinalInspect) {
+    let final_snapshot = match safe_inspect(manager, spec, Phase::FinalInspect) {
         Ok(s) => Some(s),
         Err(obs) => {
             return Ok(crate::LifecycleUpdateReceipt {
@@ -1231,6 +1021,7 @@ where
                 rollback_quiesce_failure,
                 rollback_restore_failure,
                 observation_failure: Some(obs),
+                engine_policy: engine,
             });
         }
     };
@@ -1244,6 +1035,7 @@ where
         rollback_quiesce_failure,
         rollback_restore_failure,
         observation_failure: None,
+        engine_policy: engine,
     })
 }
 
@@ -1255,7 +1047,7 @@ fn quiesce_direct_for_rollback<D: DirectRuntimeControl>(
     use crate::LifecycleUpdatePhase as Phase;
     let budget = remaining(deadline);
     if budget.is_zero() {
-        return Some(mk_failure(
+        return Some(LifecycleFailure::new(
             spec,
             Phase::QuiesceForRollback,
             "post-commit deadline exhausted before rollback quiescence",
@@ -1263,7 +1055,7 @@ fn quiesce_direct_for_rollback<D: DirectRuntimeControl>(
         ));
     }
     let Some(d) = direct else {
-        return Some(mk_failure(
+        return Some(LifecycleFailure::new(
             spec,
             Phase::QuiesceForRollback,
             "direct control missing before artifact rollback",
@@ -1280,7 +1072,7 @@ fn quiesce_direct_for_rollback<D: DirectRuntimeControl>(
                 return None;
             }
             if !obs.exact_ownership_proven {
-                return Some(mk_failure(
+                return Some(LifecycleFailure::new(
                     spec,
                     Phase::QuiesceForRollback,
                     "refusing to quiesce unproven direct runtime before rollback",
@@ -1289,7 +1081,7 @@ fn quiesce_direct_for_rollback<D: DirectRuntimeControl>(
             }
         }
         Err(e) => {
-            return Some(mk_failure(
+            return Some(LifecycleFailure::new(
                 spec,
                 Phase::QuiesceForRollback,
                 format!("refusing to quiesce unobservable direct runtime before rollback: {e}"),
@@ -1298,8 +1090,13 @@ fn quiesce_direct_for_rollback<D: DirectRuntimeControl>(
         }
     }
     match d.stop(budget) {
-        Err(e) => Some(mk_failure(spec, Phase::QuiesceForRollback, e, None)),
-        Ok(r) if !r.completed => Some(mk_failure(
+        Err(e) => Some(LifecycleFailure::new(
+            spec,
+            Phase::QuiesceForRollback,
+            e,
+            None,
+        )),
+        Ok(r) if !r.completed => Some(LifecycleFailure::new(
             spec,
             Phase::QuiesceForRollback,
             "direct stop did not complete before artifact rollback",
@@ -1312,6 +1109,7 @@ fn quiesce_direct_for_rollback<D: DirectRuntimeControl>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ManagerFailureKind;
     use crate::{
         NoPostInstallCheck, PostInstallCheckError, RestoreIntent, ServiceError, ServiceId,
         TestDoubleManager, TransitionResult,
@@ -1650,6 +1448,7 @@ mod tests {
             self.events.borrow_mut().push("direct-inspect");
             if self.fail_inspect {
                 return Err(ServiceError::manager(
+                    ManagerFailureKind::Protocol,
                     "injected unobservable direct runtime",
                 ));
             }
@@ -1659,7 +1458,10 @@ mod tests {
         fn stop(&mut self, _timeout: Duration) -> Result<TransitionResult, ServiceError> {
             self.events.borrow_mut().push("direct-stop");
             if self.fail_stop {
-                return Err(ServiceError::manager("injected direct stop failure"));
+                return Err(ServiceError::manager(
+                    ManagerFailureKind::Protocol,
+                    "injected direct stop failure",
+                ));
             }
             self.obs.state = DirectState::Stopped;
             if self.drift_after_stop {
@@ -1676,7 +1478,10 @@ mod tests {
         fn start(&mut self, _timeout: Duration) -> Result<TransitionResult, ServiceError> {
             self.events.borrow_mut().push("direct-start");
             if self.fail_start {
-                return Err(ServiceError::manager("injected direct start failure"));
+                return Err(ServiceError::manager(
+                    ManagerFailureKind::Protocol,
+                    "injected direct start failure",
+                ));
             }
             self.obs.state = DirectState::Running;
             self.obs.exact_ownership_proven = true;
@@ -1700,7 +1505,10 @@ mod tests {
     impl ServiceManager for UnobservableManager {
         fn inspect(&self, _spec: &ServiceSpec) -> Result<LifecycleSnapshot, ServiceError> {
             self.events.borrow_mut().push("inspect");
-            Err(ServiceError::manager("injected unobservable service"))
+            Err(ServiceError::manager(
+                ManagerFailureKind::Protocol,
+                "injected unobservable service",
+            ))
         }
 
         fn install(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
@@ -1787,12 +1595,9 @@ mod tests {
             events: events.clone(),
         };
 
-        let failure = quiesce_manager_for_rollback(
-            &mut manager,
-            &spec,
-            Instant::now() + Duration::from_secs(5),
-        )
-        .expect("an unobservable service must refuse to quiesce");
+        let failure =
+            quiesce_for_rollback(&mut manager, &spec, Instant::now() + Duration::from_secs(5))
+                .expect("an unobservable service must refuse to quiesce");
         assert_eq!(failure.phase, Phase::QuiesceForRollback);
         let events = events.borrow();
         assert!(

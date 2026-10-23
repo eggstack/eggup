@@ -27,22 +27,24 @@ One consequence worth planning around:
 - **`eggup-transport-footprint` cannot be depended on from crates.io.** It exists
   to measure footprint inside this workspace via a path dependency.
 
-`eggup-service` was published last (2026-10-05, Service Lifecycle M009). The
-shared `v0.1.2` tag still denotes the `eggup-core`/`eggup-archive` publication
-source; it was not moved to point at the service publication.
+`eggup-service` was published last (2026-10-09, Service Lifecycle M011, at
+`0.1.3`). The shared `v0.1.2` tag still denotes the `eggup-core`/`eggup-archive`
+publication source; it was not moved to point at the service publication.
 
 ## Pinning: the exact-pin cascade
 
 `eggup-eggpack` pins its Eggup dependencies with exact requirements
-(`=0.1.2`). Every other crate uses a caret requirement (`^0.1.0`).
+(`=0.1.3`). Every other crate uses a caret requirement (`^0.1.0`).
 
 The practical effect:
 
 - A fix published to a **caret** consumer (`eggup-curl`, `eggup-eggfetch`,
   `eggup-service`) reaches you on the next resolve, with no action.
-- The same fix **cannot** reach you through `eggup-eggpack 0.1.2`. That crate
-  resolves its own dependencies at exactly `0.1.2`, so it needs a separate
-  republication before it inherits a seam fix.
+- The same fix reaches you through `eggup-eggpack 0.1.3`, which resolves its own
+  dependencies at exactly `0.1.3` and therefore carries the `0.1.3` seam fixes.
+  A seam fix published after `0.1.3` still needs a separate adapter
+  republication before `eggup-eggpack` inherits it; `eggup-eggpack 0.1.2`,
+  which exact-pinned `=0.1.2`, never received them.
 
 So one seam fix can become two publication events. If you depend on
 `eggup-eggpack`, check the registry before assuming a published fix is in your
@@ -54,33 +56,33 @@ These are real properties of the versions you can resolve today, not roadmap
 items. Each is tracked upstream in
 [`plans/registry.md`](../plans/registry.md).
 
-- **Published `eggup-eggpack 0.1.2` contains a security fix that is not yet
-  published.** Archive members were bound positionally with no identity
-  cross-check, so a `BoundExtraction` from a different plan — or reused after
-  member reordering — could commit bytes under another member's declared
-  identity. That substitution is digest-invisible when two declared members
-  share identical content. Verified against the published source: `0.1.2`'s
-  `bind_archive_members` pairs members with `members.iter().zip(...)` and checks
-  only the count, while the working tree additionally compares each bound
-  member's `source_path`/`output_name` against the declared member and fails
-  closed with `AdapterError::MapMismatch`. The fix is implemented and green but
-  not released; see the `Unreleased` section of
+- **`eggup-eggpack 0.1.2` carries the positional-binding defect.** Archive members
+  were bound positionally with no identity cross-check, so a `BoundExtraction` from
+  a different plan — or reused after member reordering — could commit bytes under
+  another member's declared identity. That substitution is digest-invisible when
+  two declared members share identical content. Verified against the published
+  source: `0.1.2`'s `bind_archive_members` pairs members with
+  `members.iter().zip(...)` and checks only the count, while `0.1.3` additionally
+  compares each bound member's `source_path`/`output_name` against the declared
+  member and fails closed with `AdapterError::MapMismatch`. The fix shipped in
+  `eggup-eggpack 0.1.3`; see the `0.1.3` section of
   [`crates/eggup-eggpack/CHANGELOG.md`](../crates/eggup-eggpack/CHANGELOG.md).
 - **A composed fetch in `eggup-acquisition 0.1.2` can overrun the caller's
   deadline.** `ComposedTransport` handed the caller's *original* `FetchLimits` to
   a fallback adapter, so one composed fetch could run for roughly twice the
   documented `total_timeout`. The fix (`remaining_limits`, which subtracts
-  elapsed time and clamps `connect_timeout` to the remainder) is implemented and
-  green but not published; it is the payload of the open Acquisition M010
-  milestone (`eggup-acquisition 0.1.3`). `eggup-curl 0.1.2` and
-  `eggup-eggfetch 0.1.2` inherit it automatically once it lands.
-  Note that `FetchLimits::validate` *is* already enforced at every transport
-  boundary in the published `0.1.2` — the gap is the fallback budget, not
-  validation.
-- **Published `eggup-core 0.1.2` predates the `Error::Injected` addition.** That
-  variant is only in the unpublished working tree, so a downstream exhaustive
-  `match` on `Error` compiles against the published version without needing the
-  extra arm yet.
+  elapsed time and clamps `connect_timeout` to the remainder) shipped as
+  `eggup-acquisition 0.1.3` on 2026-10-06 (Acquisition Transport M010), and
+  `eggup-curl 0.1.2` and `eggup-eggfetch 0.1.2` inherit it automatically on the
+  next resolve. A consumer pinned to `eggup-acquisition 0.1.2` still carries the
+  overrun. Note that `FetchLimits::validate` *is* already enforced at every
+  transport boundary in the published `0.1.2` — the gap is the fallback budget,
+  not validation.
+- **`Error::Injected` exists in no packaged build.** The variant is compiled only
+  for the crate's own tests, so it is absent from every published `eggup-core`
+  version, `0.1.2` and `0.1.3` alike. Both publish exactly the same seven
+  `Error` variants, so a downstream exhaustive `match` on `Error` compiles
+  against either without needing an extra arm.
 
 ## Upgrading
 

@@ -17,12 +17,23 @@ the behavior**; drift is called out in [Known doc/code drift](#known-doccode-dri
 | File | Size | Role |
 |---|---|---|
 | [`src/lib.rs`](../crates/eggup-service/src/lib.rs) | ~4.5k lines | Neutral model, `CommandExecutor` / `SystemExecutor` / `FakeExecutor`, `atomic_write_definition`, systemd + launchd + cron adapters, host detection |
-| [`src/disposition.rs`](../crates/eggup-service/src/disposition.rs) | ~2.5k lines | M006 runtime-authority disposition, pure planners, `commit_with_disposition` |
-| [`src/lifecycle_update.rs`](../crates/eggup-service/src/lifecycle_update.rs) | ~1.5k lines | `commit_with_lifecycle`, policy/receipt/phase types |
+| [`src/commit_engine.rs`](../crates/eggup-service/src/commit_engine.rs) | ~0.7k lines | **The single commit-and-rollback engine**: transition, post-transition verification, rollback quiesce, panic-safe inspect/restore, deadline, detail truncation, and the two named policy inputs |
+| [`src/disposition.rs`](../crates/eggup-service/src/disposition.rs) | ~2.3k lines | M006 runtime-authority disposition, pure planners, `commit_with_disposition` |
+| [`src/lifecycle_update.rs`](../crates/eggup-service/src/lifecycle_update.rs) | ~1.1k lines | `commit_with_lifecycle`, policy/receipt/error types |
 | [`src/windows_scm.rs`](../crates/eggup-service/src/windows_scm.rs) | ~1.6k lines | Native Windows SCM adapter behind an injectable backend |
 
-The three submodules are private (`lib.rs:11-13`); everything is re-exported
+The four submodules are private (`lib.rs:11-14`); everything is re-exported
 flat from the crate root, so there is one public namespace.
+
+**There is one engine.** `commit_engine.rs` is the only implementation of the
+transition, post-transition verification, rollback-quiesce, panic-safe-inspect,
+panic-safe-restore, deadline, and detail-truncation mechanics. Both
+`commit_with_lifecycle` and `commit_with_disposition` reach it; neither keeps a
+private copy. Before M012 the crate carried two divergent copies of that
+engine — one in `disposition.rs`, one in `lifecycle_update.rs` — which had
+already drifted apart in safety-relevant ways. The dependency direction is
+acyclic: `commit_engine` depends only on the crate-root neutral model, and the
+two orchestrators depend on `commit_engine`.
 
 ## Purpose and ownership boundary
 
@@ -90,94 +101,137 @@ All items below are re-exported from the crate root (`lib.rs:14-27`).
 
 | Item | Kind | Role | Ref |
 |---|---|---|---|
-| `ServiceId` | struct | Validated opaque identity (unit name, launchd label, SCM name) | `lib.rs:37` |
-| `ServiceId::new` / `as_str` | fn | Rejects empty / >256 bytes / control chars | `lib.rs:41`, `lib.rs:52` |
-| `ServiceSpec` | struct | Desired registration: id + executable + critical args + optional config | `lib.rs:70` |
-| `ServiceSpec::new` | fn | Requires absolute executable and config, control-free args | `lib.rs:79` |
-| `ServiceSpec::{id,executable,args,config}` | accessors | Identity components participating in ownership | `lib.rs:110-127` |
-| `Ownership` | enum | `Absent \| Owned \| Foreign \| Unknown` | `lib.rs:132` |
-| `LifecycleState` | enum (`#[non_exhaustive]`) | `Stopped \| Running \| Transitioning \| Unknown` | `lib.rs:146` |
-| `HealthState` | enum (`#[non_exhaustive]`) | `Healthy \| Degraded \| Unknown` | `lib.rs:160` |
-| `RegistrationSnapshot` | struct | Manager-neutral registration observation | `lib.rs:171` |
-| `RegistrationSnapshot::absent` | fn | Canonical absent observation | `lib.rs:186` |
-| `RegistrationSnapshot::ownership` | fn | Classifies the observation against a spec | `lib.rs:197` |
-| `LifecycleSnapshot` | struct | Observation + `was_registered` / `was_running` intent | `lib.rs:216` |
-| `LifecycleSnapshot::restore_running` | fn | Restoration intent derived from the observation | `lib.rs:233` |
-| `RestoreIntent` | enum | `Preserve \| EnsureRunning \| EnsureStopped` | `lib.rs:240` |
-| `TransitionResult` | struct | Bounded outcome: `operation`, `completed`, `detail` | `lib.rs:251` |
-| `ServiceOperation` | enum (`#[non_exhaustive]`) | `Inspect \| Install \| Start \| Stop \| Restart \| Uninstall` | `lib.rs:270` |
-| `ServiceError` | enum (`#[non_exhaustive]`) | `InvalidInput \| OwnershipDenied \| Conflict \| Manager` | `lib.rs:289` |
-| `ServiceError::denied` | fn | Canonical `OwnershipDenied` construction | `lib.rs:323` |
-| `HealthProbe` | trait | Caller-supplied, read-only health check | `lib.rs:347` |
-| `NoProbe` | struct | Always `HealthState::Unknown` | `lib.rs:354` |
-| `ServiceManager` | trait | The six manager operations | `lib.rs:364` |
-| `require_owned` | fn | The single destructive-operation gate | `lib.rs:397` |
-| `TestDoubleManager` | struct | Deterministic in-memory manager | `lib.rs:408` |
-| `MAX_COMMAND_OUTPUT_BYTES` | const | `256 * 1024` per stdout/stderr stream | `lib.rs:608` |
-| `MAX_CRONTAB_BYTES` | const | `1024 * 1024` | `lib.rs:610` |
-| `MAX_DEFINITION_BYTES` | const | `1024 * 1024` | `lib.rs:612` |
-| `MAX_TRANSITION_TIMEOUT` | const | `Duration::from_secs(300)` | `lib.rs:614` |
-| `CommandOutput` | struct | `status: Option<i32>`, bounded `stdout` / `stderr` | `lib.rs:618` |
-| `CommandExecutor` | trait | Injectable runner: argv in, bounded output out | `lib.rs:645` |
-| `SystemExecutor` | struct | Production runner; cleared env, allowlisted paths | `lib.rs:668` |
-| `atomic_write_definition` | fn | Same-dir temp + fsync + no-replace/rename promotion | `lib.rs:1087` |
-| `FakeExecutor` / `FakeCall` | struct | Scripted argv expectations, call recording | `lib.rs:992`, `lib.rs:983` |
-| `SystemdScope` / `SystemdInstall` / `SystemdManager` | enum/struct/struct | systemd adapter, explicit scope, caller-owned unit bytes | `lib.rs:1237`, `1255`, `1327` |
-| `LaunchdDomain` / `LaunchdInstall` / `LaunchdManager` | enum/struct/struct | launchd adapter, explicit `gui/<uid>` vs `system` | `lib.rs:1925`, `1934`, `2025` |
-| `CronOwnership` | enum | `Absent \| Owned \| Foreign \| Unknown` for a marker block | `lib.rs:2523` |
-| `cron_classify` / `cron_merge` / `cron_remove` | fn | Pure block classification and edit | `lib.rs:2592`, `2620`, `2665` |
-| `CronManager` | struct | Managed `# BEGIN/# END` block in the user crontab | `lib.rs:2717` |
-| `CandidateManager` / `HostFacts` / `inspect_host` / `candidate_managers` | enum/struct/fn/fn | Detection facts separated from selection policy | `lib.rs:2992`, `3003`, `3018`, `3072` |
+| `ServiceId` | struct | Validated opaque identity (unit name, launchd label, SCM name) | `lib.rs:41` |
+| `ServiceId::new` / `as_str` | fn | Rejects empty / >256 bytes / control chars | `lib.rs:45`, `lib.rs:56` |
+| `ServiceSpec` | struct | Desired registration: id + executable + critical args + optional config | `lib.rs:74` |
+| `ServiceSpec::new` | fn | Requires absolute executable and config, control-free args | `lib.rs:83` |
+| `ServiceSpec::{id,executable,args,config}` | accessors | Identity components participating in ownership | `lib.rs:114-131` |
+| `Ownership` | **re-export** | `Absent \| Owned \| Foreign \| Unknown` — **the same type** as `eggup_core::Ownership` | `lib.rs:165` |
+| `LifecycleState` | enum (`#[non_exhaustive]`) | `Stopped \| Running \| Transitioning \| Unknown` | `lib.rs:170` |
+| `HealthState` | enum (`#[non_exhaustive]`) | `Healthy \| Degraded \| Unknown` | `lib.rs:184` |
+| `RegistrationSnapshot` | struct | Manager-neutral registration observation | `lib.rs:195` |
+| `RegistrationSnapshot::absent` | fn | Canonical absent observation | `lib.rs:210` |
+| `RegistrationSnapshot::ownership` | fn | Classifies the observation against a spec | `lib.rs:221` |
+| `LifecycleSnapshot` | struct | Observation + `was_registered` / `was_running` intent | `lib.rs:240` |
+| `LifecycleSnapshot::restore_running` | fn | Restoration intent derived from the observation | `lib.rs:257` |
+| `RestoreIntent` | enum | `Preserve \| EnsureRunning \| EnsureStopped` | `lib.rs:264` |
+| `TransitionResult` | struct | Bounded outcome: `operation`, `completed`, `detail` | `lib.rs:275` |
+| `ServiceOperation` | enum (`#[non_exhaustive]`) | `Inspect \| Install \| Start \| Stop \| Restart \| Uninstall` | `lib.rs:294` |
+| `ManagerFailureKind` | enum (`#[non_exhaustive]`) | `Spawn \| Timeout \| Permission \| NotFound \| Protocol \| LocalFilesystem` — the machine-readable manager failure classification | `lib.rs:339` |
+| `ManagerFailureKind::from_spawn_error` | fn | Pure `std::io::ErrorKind` → kind mapping (`NotFound` / `PermissionDenied` / other) | `lib.rs:363` |
+| `ManagerFailureKind::from_scm_os_code` | fn | Pure Win32/SCM code → kind mapping (`5` → `Permission`, `1060` → `NotFound`, other → `Protocol`); platform-independent | `lib.rs:378` |
+| `ServiceError` | enum (`#[non_exhaustive]`) | `InvalidInput \| OwnershipDenied \| Conflict \| Manager { kind, detail, os_code }` | `lib.rs:406` |
+| `ServiceError::denied` | fn | Canonical `OwnershipDenied` construction | `lib.rs:474` |
+| `ServiceError::manager` / `manager_with_os_code` | fn | Typed manager-failure construction; the detail is bounded at `MAX_DIAGNOSTIC_BYTES` | `lib.rs:448`, `461` |
+| `ServiceError::manager_kind` / `manager_os_code` | fn | Programmatic discriminators: the classified kind, and the platform OS code when one exists | `lib.rs:486`, `495` |
+| `HealthProbe` | trait | Caller-supplied, read-only health check | `lib.rs:372` |
+| `NoProbe` | struct | Always `HealthState::Unknown` | `lib.rs:379` |
+| `ServiceManager` | trait | The six manager operations | `lib.rs:389` |
+| `require_owned` | fn | The single destructive-operation gate | `lib.rs:426` |
+| `TestDoubleManager` | struct | Deterministic in-memory manager | `lib.rs:437` |
+| `MAX_COMMAND_OUTPUT_BYTES` | const | `256 * 1024` per stdout/stderr stream | `lib.rs:636` |
+| `MAX_CRONTAB_BYTES` | const | `1024 * 1024` | `lib.rs:638` |
+| `MAX_DEFINITION_BYTES` | const | `1024 * 1024` | `lib.rs:640` |
+| `MAX_TRANSITION_TIMEOUT` | const | `Duration::from_secs(300)` | `lib.rs:642` |
+| `MAX_DIAGNOSTIC_BYTES` | const | `512` — the **one** ceiling for manager-output diagnostic text | `lib.rs:912` |
+| `ManagerCommandOutput` | struct | `status: Option<i32>`, bounded `stdout` / `stderr` | `lib.rs:662` |
+| `CommandOutput` | **type alias** | Compatibility alias to `ManagerCommandOutput`; not deprecated | `lib.rs:694` |
+| `CommandExecutor` | trait | Injectable runner: argv in, bounded output out | `lib.rs:961` |
+| `SystemExecutor` | struct | Production runner; cleared env, allowlisted paths | `lib.rs:725` |
+| `atomic_write_definition` | fn | Same-dir temp + fsync + no-replace/rename promotion | `lib.rs:1489` |
+| `FakeExecutor` / `FakeCall` | struct | Scripted argv expectations, call recording | `lib.rs:1049`, `lib.rs:1040` |
+| `SystemdScope` / `SystemdInstall` / `SystemdManager` | enum/struct/struct | systemd adapter, explicit scope, caller-owned unit bytes | `lib.rs:1294`, `1312`, `1384` |
+| `LaunchdDomain` / `LaunchdInstall` / `LaunchdManager` | enum/struct/struct | launchd adapter, explicit `gui/<uid>` vs `system` | `lib.rs:2229`, `2238`, `2329` |
+| `CronOwnership` | **type alias** | Alias of the canonical `Ownership` for a marker block | `lib.rs:2837` |
+| `cron_classify` / `cron_merge` / `cron_remove` | fn | Pure block classification and edit | `lib.rs:2897`, `2925`, `2970` |
+| `CronManager` | struct | Managed `# BEGIN/# END` block in the user crontab | `lib.rs:3022` |
+| `CandidateManager` / `HostFacts` / `inspect_host` / `candidate_managers` | enum/struct/fn/fn | Detection facts separated from selection policy | `lib.rs:3297`, `3308`, `3323`, `3377` |
+
+### `commit_engine.rs` — the single commit-and-rollback engine
+
+Both orchestrators reach these mechanics; neither keeps a private copy. The
+two behavioural differences between the former engine copies are named,
+separately testable policy inputs on `CommitEnginePolicy`, both defaulting to
+the **stricter** of the two former behaviours.
+
+| Item | Kind | Role | Ref |
+|---|---|---|---|
+| `LifecycleUpdatePhase` | enum (`#[non_exhaustive]`) | `Inspect \| Quiesce \| Commit \| RestoreNew \| PostInstallCheck \| QuiesceForRollback \| RestoreOld \| FinalInspect` | `commit_engine.rs:52` |
+| `LifecycleFailure` | struct | Bounded service-side evidence: phase, id, detail, optional ownership/state | `:73` |
+| `PostInstallCheckError` | struct | Bounded, control-free failure detail | `:106` |
+| `PostInstallCheck` | trait | Caller check receiving the remaining shared budget | `:123` |
+| `NoPostInstallCheck` | struct | No-op check | `:138` |
+| `PostTransitionVerification` | enum (`#[non_exhaustive]`) | `Verify` (default) \| `TrustManagerReport` | `:159` |
+| `OwnershipLossTolerance` | enum (`#[non_exhaustive]`) | `Deny` (default) \| `TolerateAlreadyStopped` | `:180` |
+| `CommitEnginePolicy` | struct | The two named policy inputs | `:201` |
+| `remaining` | fn | The one deadline helper | `:228` |
+| `bounded_detail` | fn | The one detail-truncation rule (`MAX_DIAGNOSTIC_BYTES`) | `:236` |
+| `safe_inspect` | fn | The one panic-safe inspection | `:245` |
+| `transition_to` | fn | The one transition mechanic; validates the desired state **at the point of use** | `:293` |
+| `safe_transition_to` | fn | The one panic-safe transition | `:373` |
+| `validate_observed` | fn | Post-transition ownership/state validation | `:400` |
+| `quiesce_service` | fn | The one pre-commit quiesce | `:425` |
+| `quiesce_for_rollback` | fn | The one rollback quiesce (fail-closed on unobservable / non-owned) | `:478` |
+| `restore_and_check` | fn | The one post-commit restore + caller check composition | `:561` |
 
 ### `lifecycle_update.rs` — composition over Core
 
 | Item | Kind | Role | Ref |
 |---|---|---|---|
-| `LifecycleUpdatePhase` | enum (`#[non_exhaustive]`) | `Inspect \| Quiesce \| Commit \| RestoreNew \| PostInstallCheck \| QuiesceForRollback \| RestoreOld \| FinalInspect` | `lifecycle_update.rs:17` |
-| `LifecycleFailure` | struct | Bounded service-side evidence: phase, id, detail, optional ownership/state | `:38` |
-| `LifecycleRestorationStatus` | enum | `Restored \| Failed \| NotAttemptedRecoveryRequired` | `:70` |
-| `LifecycleUpdatePolicy` | struct | `restore`, `post_commit_failure`, three timeouts | `:81` |
-| `LifecycleUpdatePolicy::validate` | fn | Rejects zero / >`MAX_TRANSITION_TIMEOUT` before any mutation | `:96` |
-| `PostInstallCheckError` | struct | Bounded, control-free failure detail | `:112` |
-| `PostInstallCheck` | trait | Caller check receiving the remaining shared budget | `:134` |
-| `NoPostInstallCheck` | struct | No-op check | `:144` |
-| `LifecycleUpdateReceipt` | struct | `before`, `final_snapshot`, Core receipt, restoration, four failure slots | `:159` |
-| `LifecycleUpdateError` | enum (`#[non_exhaustive]`) | `InvalidPolicy \| Preflight \| Quiesce \| CoreBeforeReceipt` | `:205` |
-| `commit_with_lifecycle` | fn | Quiesce → Core commit → restore → post-install check | `:254` |
+| `LifecycleRestorationStatus` | enum | `Restored \| Failed \| NotAttemptedRecoveryRequired` | `lifecycle_update.rs:18` |
+| `LifecycleUpdatePolicy` | struct | `restore`, `post_commit_failure`, three timeouts | `:29` |
+| `LifecycleUpdatePolicy::validate` | fn | Rejects zero / >`MAX_TRANSITION_TIMEOUT` before any mutation | `:44` |
+| `LifecycleUpdateReceipt` | struct | `before`, `final_snapshot`, Core receipt, restoration, four failure slots, `engine_policy` | `:60` |
+| `LifecycleUpdateError` | enum (`#[non_exhaustive]`) | `InvalidPolicy \| Preflight \| Quiesce \| CoreBeforeReceipt` | `:112` |
+| `commit_with_lifecycle` | fn | Quiesce → Core commit → restore → post-install check, over the unified engine | `:166` |
+| `commit_with_lifecycle_with_engine_policy` | fn | The same, under an explicitly selected `CommitEnginePolicy` | `:192` |
 
 ### `disposition.rs` — M006 runtime authority
 
 | Item | Kind | Role | Ref |
 |---|---|---|---|
-| `UpdateRuntimeDisposition` | enum | `ManagedRunning \| ManagedStopped \| DirectRunning \| Stopped \| ForeignPreserved` | `disposition.rs:31` |
-| `KnownConfig` | enum | `Absent \| Present(PathBuf) \| Unknown` for registered config identity | `:46` |
-| `DirectState` | enum | `Running \| Stopped \| Unknown` | `:57` |
-| `DirectObservation` | struct | `state`, `exact_ownership_proven`, `executable`, `config` | `:68` |
-| `UnixPlannerInput` | struct | Manager ownership/state + registered/selected config + direct observation | `:81` |
-| `WindowsServiceState` | enum | `Running \| StartPending \| Stopped \| StopPending \| Unknown` | `:98` |
-| `WindowsPlannerInput` | struct | `installed`, `executable_known`, `ownership`, `state` | `:113` |
-| `plan_unix` | fn | Pure Unix decision matrix | `:125` |
-| `plan_windows` | fn | Pure Windows SCM decision matrix | `:224` |
-| `DirectRuntimeControl` | trait | Caller seam: `inspect`, `stop`, `start` | `:256` |
-| `DispositionBaseline` | struct | Authority/state observed after preparation | `:267` |
-| `commit_with_disposition` | fn | Barrier-enforcing orchestration over a `ValidatedTransaction` | `:321` |
+| `UpdateRuntimeDisposition` | enum | `ManagedRunning \| ManagedStopped \| DirectRunning \| Stopped \| ForeignPreserved` | `disposition.rs:35` |
+| `KnownConfig` | enum | `Absent \| Present(PathBuf) \| Unknown` for registered config identity | `:50` |
+| `DirectState` | enum | `Running \| Stopped \| Unknown` | `:61` |
+| `DirectObservation` | struct | `state`, `exact_ownership_proven`, `executable`, `config` | `:72` |
+| `UnixPlannerInput` | struct | Manager ownership/state + registered/selected config + direct observation | `:85` |
+| `WindowsServiceState` | enum | `Running \| StartPending \| Stopped \| StopPending \| Unknown` | `:102` |
+| `WindowsPlannerInput` | struct | `installed`, `executable_known`, `ownership`, `state` | `:117` |
+| `plan_unix` | fn | Pure Unix decision matrix | `:129` |
+| `plan_windows` | fn | Pure Windows SCM decision matrix | `:228` |
+| `DirectRuntimeControl` | trait | Caller seam: `inspect`, `stop`, `start` | `:260` |
+| `DispositionBaseline` | struct | Authority/state observed after preparation | `:271` |
+| `commit_with_disposition` | fn | Barrier-enforcing orchestration over a `ValidatedTransaction`, over the unified engine | `:289` |
+| `commit_with_disposition_with_engine_policy` | fn | The same, under an explicitly selected `CommitEnginePolicy` | `:328` |
 
 ### `windows_scm.rs` — native SCM adapter
 
 | Item | Kind | Role | Ref |
 |---|---|---|---|
-| `WindowsStartType` | enum | Caller-owned start type | `windows_scm.rs:21` |
-| `WindowsErrorControl` | enum | Caller-owned error control | `:32` |
-| `WindowsServiceDependency` | enum | `Service(name) \| Group(name)` | `:45` |
-| `WindowsScmInstall` | struct | Service id, display name, start/error control, account, dependencies, timeout | `:58` |
-| `WindowsScmInstall::{new,with_dependencies,with_transition_timeout}` | fn | Validating builders | `:70`, `:97`, `:107` |
-| `WindowsScmManager` | struct | `ServiceManager` over a boxed `ScmBackend` | `:232` |
-| `WindowsScmManager::new` | fn | `#[cfg(windows)]`; uses the local SCM | `:240` |
+| `WindowsStartType` | enum | Caller-owned start type | `windows_scm.rs:29` |
+| `WindowsErrorControl` | enum | Caller-owned error control | `:47` |
+| `WindowsServiceDependency` | enum | `Service(name) \| Group(name)` | `:67` |
+| `WindowsScmInstall` | struct | Service id, display name, start/error control, account, dependencies, timeout | `:90` |
+| `WindowsScmInstall::{new,with_dependencies,with_transition_timeout}` | fn | Validating builders | `:105`, `:144`, `:159` |
+| `WindowsScmManager` | struct | `ServiceManager` over a boxed `ScmBackend` | `:388` |
+| `WindowsScmManager::new` | fn | `#[cfg(windows)]`; uses the local SCM | `:404` |
 
 Internal bounds: `MAX_SCM_NAME_CHARS = 256`,
 `MAX_SCM_COMMAND_CHARS = 8192`, `DEFAULT_SCM_TIMEOUT = 30s`,
 `DEFAULT_POLL_INTERVAL = 50ms`, `MAX_POLL_INTERVAL = 500ms`
 (`windows_scm.rs:13-17`).
+
+Internal error plumbing (crate-private, `#[cfg(any(windows, test))]`):
+`OpenFailure` (`:299`) names the outcome of a service-handle open —
+`NotFound` (SCM `1060`), `MarkedForDelete` (SCM `1072`), or `Other(code)`
+carrying any other OS code verbatim; `classify_open_code` (`:315`) maps a raw
+code onto it; `unmapped_open_error` (`:336`) and `open_failure` (`:357`) turn
+it into the typed `ServiceError`. The two codes that carry a meaning about
+the registration keep their exact meanings, and every other code becomes a
+`ServiceError::Manager` that still carries the raw OS code. No new error
+variant and no new taxonomy is introduced: the existing
+`ServiceError::Manager` / `ServiceError::Conflict` constructors and the
+existing `ManagerFailureKind` set carry them.
 
 ## The neutral model
 
@@ -240,30 +294,94 @@ invariant.
 
 | Type | Fields | Semantics |
 |---|---|---|
-| `LifecycleSnapshot` (`lib.rs:216`) | `id`, `ownership`, `state`, `health`, `was_registered`, `was_running` | Point-in-time observation. `was_registered` / `was_running` are the *only* record of pre-update intent |
-| `LifecycleSnapshot::restore_running` (`lib.rs:233`) | — | Returns `was_running`. Distinguishes "was running" from "registered but stopped" |
-| `RestoreIntent` (`lib.rs:240`) | — | Caller policy for the **new** generation only: `Preserve` / `EnsureRunning` / `EnsureStopped` |
-| `TransitionResult` (`lib.rs:251`) | `operation`, `completed`, `detail` | `completed == false` is a *bounded outcome*, not an `Err`. Callers must branch on it |
-| `LifecycleRestorationStatus` (`lifecycle_update.rs:70`) | — | Terminal lifecycle verdict, independent of Core's artifact disposition |
+| `LifecycleSnapshot` (`lib.rs:240`) | `id`, `ownership`, `state`, `health`, `was_registered`, `was_running` | Point-in-time observation. `was_registered` / `was_running` are the *only* record of pre-update intent |
+| `LifecycleSnapshot::restore_running` (`lib.rs:257`) | — | Returns `was_running`. Distinguishes "was running" from "registered but stopped" |
+| `RestoreIntent` (`lib.rs:264`) | — | Caller policy for the **new** generation only: `Preserve` / `EnsureRunning` / `EnsureStopped` |
+| `TransitionResult` (`lib.rs:275`) | `operation`, `completed`, `detail` | `completed == false` is a *bounded outcome*, not an `Err`. Callers must branch on it |
+| `LifecycleRestorationStatus` (`lifecycle_update.rs:18`) | — | Terminal lifecycle verdict, independent of Core's artifact disposition |
 
 `RestoreIntent` deliberately does not govern the rollback path: after a
 successful artifact rollback, orchestration restores `before.state`
-regardless of intent (`lifecycle_update.rs:407-418`,
-`disposition.rs:748-764`). A caller asking for `EnsureRunning` on an update that
+regardless of intent (`lifecycle_update.rs:319-330`,
+`disposition.rs:743-786`). A caller asking for `EnsureRunning` on an update that
 rolled back gets the pre-update state, not a new start.
 
 ### `ServiceError`
 
-`InvalidInput`, `OwnershipDenied { id, ownership }`, `Conflict`, `Manager`
-(`lib.rs:289`). The crate's own constructors cap detail at **512 bytes on a UTF-8
-character boundary** (`ServiceError::invalid` / `bounded` at `lib.rs:306-320`;
-`truncate_utf8_bytes` at `lib.rs:1526`). Manager stderr excerpts are capped at
-**256 bytes** (`truncate`, `lib.rs:1537`) before being folded into a
-`Manager` error by `ensure_mutation_success` (`lib.rs:1558-1568`).
-`bound_detail` in the disposition path additionally strips control characters
-before truncating (`disposition.rs:291-294`).
+`InvalidInput`, `OwnershipDenied { id, ownership }`, `Conflict`, and
+`Manager { kind, detail, os_code }` (`lib.rs:406`). The `Manager` variant is a
+**struct** variant: it carries the machine-readable
+[`ManagerFailureKind`](#managerfailurekind), the bounded diagnostic detail, and
+the platform OS code when the platform supplied a structured one.
+
+There is **one** byte ceiling for manager-output diagnostic text:
+`MAX_DIAGNOSTIC_BYTES` = **512 bytes**, truncated on a UTF-8 character
+boundary (`lib.rs:912`). The crate's own constructors use it
+(`ServiceError::invalid` / `bounded` at `lib.rs:433-439`;
+`truncate_utf8_bytes` at `lib.rs:2224`), and the engine's failure-detail
+truncation uses it too (`bounded_detail`, `commit_engine.rs:236`), which also
+strips control characters. Manager stderr excerpts are folded into a `Manager`
+error by `ensure_mutation_success` (`lib.rs:2235`) and are bounded by that
+same ceiling — there is no second, smaller ceiling for the same data class.
+
+Before M012 this data class carried two caps: 256 bytes for the stderr excerpt
+and 512 bytes for the composed error, while the crate doc named only the 512.
+See `plans/closure/service-lifecycle/012-status.md`.
+
+Before M013 the `Manager` variant carried only free text, and the crate
+classified its **own** failures by substring-matching that text:
+`permission_hint` re-scanned the detail for `permission` / `denied` / `access`
+and appended a remediation hint, and `inspect_host` matched `contains("missing")`
+to decide "not installed". A consumer could not distinguish a timeout from a
+missing binary without parsing the message. `permission_hint` is **gone**
+(`lib.rs`), and the three `contains("missing")` sites now read the typed kind
+(`lib.rs:3822`, `3838`, `3853`). See
+`plans/closure/service-lifecycle/013-status.md`.
+
+### `ManagerFailureKind`
+
+`Spawn | Timeout | Permission | NotFound | Protocol | LocalFilesystem`
+(`lib.rs:339`). Every `ServiceError::Manager` construction site in the crate
+maps to exactly one kind; there is no "unclassified" fallback. The kind — not
+the text — is the carrier of meaning, and it is what a consumer matches on
+(`ServiceError::manager_kind`, `lib.rs:486`).
+
+The classification is decided where the platform's structured evidence is still
+available, by two **pure** mapping functions that need no real privilege
+failure, no real spawn, and no wall-clock sleep:
+
+| Mapping | Rule | Ref |
+|---|---|---|
+| `ManagerFailureKind::from_spawn_error` | `std::io::ErrorKind::NotFound` → `NotFound`; `PermissionDenied` → `Permission`; every other kind → `Spawn` | `lib.rs:363` |
+| `ManagerFailureKind::from_scm_os_code` | Win32 code `5` → `Permission`; `1060` → `NotFound`; every other code (and `None`) → `Protocol` | `lib.rs:378` |
+
+A manager that *runs* and reports an access denial in its own stderr is
+`Protocol`, because the platform supplied no structured denial. Only a
+structured platform denial is `Permission`.
+
+The Windows SCM mapping stays **lossless**: the raw OS code is carried in the
+error's `os_code` field and is reachable programmatically
+(`ServiceError::manager_os_code`, `lib.rs:495`), and it is also rendered into
+the bounded detail (`windows_scm.rs:215-224`). Service milestone `014` owns the
+Windows SCM *public-surface* rustdoc; M013 changed only the SCM mapping's code,
+not those doc lines.
 
 ## Ownership and authorization
+
+### One canonical ownership type
+
+`eggup_service::Ownership` **is** `eggup_core::Ownership`: the service crate
+re-exports the canonical type (`lib.rs:165`) rather than defining its own.
+`eggup_service::CronOwnership` is a public type alias of the same type
+(`lib.rs:2837`). Before M012 three structurally identical enums existed across
+two crates with no conversion between them.
+
+The re-export's rustdoc states the service-context meaning (core's wording is
+destination-oriented: in the service context "destination" is the registered
+unit, launchd label, or SCM service the caller's identity claims), points at
+core's canonical documentation, and states that `Owned` is never inferred and
+that `Foreign` / `Unknown` fail closed. The fail-closed rule is stated **once**,
+in the canonical type's own documentation.
 
 ### How `Ownership` is determined
 
@@ -281,7 +399,7 @@ Adapter-specific ownership rules:
 |---|---|---|
 | systemd | `LoadState` empty / `not-found` → `Absent`; `loaded` → parse; anything else → `Unknown`. Exactly one `ExecStart` required, else `Unknown` | `lib.rs:1639-1655` |
 | systemd | `ExecStart` with specifiers (`%`, `$`), embedded quotes, relative path, or a non-unique brace group → `Unknown` | `lib.rs:1581`, `1603`, `1608`, `1616` |
-| systemd | Non-zero `show` exit → `Unknown` / `Unknown` state, never `Absent` | `lib.rs:1676-1680` |
+| systemd | Non-zero `show` exit → `Unknown` / `Unknown` state, never `Absent` | `lib.rs:1447` |
 | systemd / launchd | Optional config identity must appear as **exactly one** occurrence in canonical argv; zero → left unset (→ `Foreign`); more than one on either side → `malformed` → `Unknown` | `lib.rs:1491-1524` |
 | launchd | Malformed plist → `malformed` → `Unknown`; a matching **label alone never proves ownership** | `lib.rs:2135`, `:2209`, test `launchd_no_label_only_ownership` (`lib.rs:4062`) |
 | cron | Ownership is over the managed block: exact desired content → `Owned`; same marker, different content → `Foreign`; multiple or unterminated markers → `Unknown` | `lib.rs:2592-2613` |
@@ -296,9 +414,9 @@ Three separate mechanisms make `Owned` unforgeable from inside the crate:
    (`lib.rs:209`).
 2. **Malformed is contagious upward** — an unparseable registration becomes
    `Unknown`, never `Absent` and never `Owned`. A manager that errors is
-   `Unknown`, not "nothing there" (`lib.rs:1676-1680`).
+   `Unknown`, not "nothing there" (`lib.rs:1447`).
 3. **The mutation gate is a single function** — `require_owned`
-   (`lib.rs:397-404`) accepts `Owned` and denies `Absent | Foreign | Unknown`
+   (`lib.rs:426-433`) accepts `Owned` and denies `Absent | Foreign | Unknown`
    with `ServiceError::denied`.
 
 Note the third denial case: `Absent` is denied by `require_owned` too. Creating
@@ -343,39 +461,76 @@ What an implementor must honor, in the order the crate itself checks them:
 1. **Ownership gate before any mutation.** Call `require_owned` (or the local
    equivalent) before touching the manager.
 2. **Deadline handling.** Reject a zero timeout. The reference implementation is
-   `OperationDeadline` (`lib.rs:1448-1485`): it rejects zero and
+   `OperationDeadline` (`lib.rs:2143-2183`): it rejects zero and
    `> MAX_TRANSITION_TIMEOUT`, and every subsequent command, state poll, and
    re-inspection draws from `remaining()` — the budget only ever shrinks. The
    systemd polling loop sleeps
-   `min(remaining, 100ms)` (`lib.rs:1438-1442`).
+   `min(remaining, 100ms)`.
+
+   **One deadline per operation.** Every adapter creates exactly *one*
+   `OperationDeadline` at the start of each public operation and threads it
+   through every manager invocation that operation makes
+   (`operation_deadline`: systemd `lib.rs:1796`, launchd `lib.rs:2757`, cron
+   `lib.rs:3484`). No invocation is granted a fresh full budget: the single
+   initial clamp (`bounded_timeout`, `lib.rs:2185`) happens at deadline
+   construction, and each call then receives the *remaining* budget.
+
+   The budget for `start` / `stop` / `restart` is the caller-supplied `timeout`
+   parameter. The budget for `install` / `uninstall` / `inspect`, which take no
+   timeout parameter, is the adapter descriptor's `transition_timeout` for the
+   **whole** operation. Before M013 the systemd adapter spent a fresh full
+   budget on each of `ownership_of`, the ownership recheck, `daemon-reload`, and
+   `enable`, so one systemd `install` could consume roughly 4-5x its declared
+   budget; after M013 the aggregate wall time of one operation is bounded by one
+   transition timeout.
 3. **Non-zero exit is not success.** `ensure_mutation_success` requires
-   `status == Some(0)` (`lib.rs:1558`). A `CommandOutput` with a non-zero status
-   is *returned* by `SystemExecutor` as `Ok` so the caller can classify it, and
-   it is the adapter's job to reject it.
+   `status == Some(0)` (`lib.rs:1859`). A `ManagerCommandOutput` with a
+   non-zero status is *returned* by `SystemExecutor` as `Ok` so the caller can
+   classify it, and it is the adapter's job to reject it.
 4. **Confirm the resulting state.** A `completed: true` claim must be backed by
    an observation of the end state, not by the absence of an error.
 5. **Bounded detail.** `TransitionResult::detail` goes through
-   `ServiceError::bounded` (512 bytes) in every in-crate implementation.
-6. **No elevation.** Access denial is a bounded hint, not an escalation
-   (`permission_hint`, `lib.rs:1541-1556`).
+   `ServiceError::bounded` (`MAX_DIAGNOSTIC_BYTES`, 512 bytes) in every in-crate
+   implementation.
+6. **No elevation.** Access denial is a classified failure, not an escalation.
+   A structured platform denial is `ManagerFailureKind::Permission`; no adapter
+   ever retries with elevated rights. The former text-matching remediation
+   hint (`permission_hint`) was removed in M013: the kind carries the meaning,
+   and the detail carries no re-derived advice.
 
 `TestDoubleManager` satisfies all six deterministically and is the reference for
 how the crate expects a test double to behave. It additionally treats
 "already running" / "already stopped" as `completed: true` idempotent outcomes
-(`lib.rs:523-528`, `547-552`) — a shape real adapters also implement
+(`lib.rs:550-560`, `574-584`) — a shape real adapters also implement
 (`windows_scm.rs` test `stop_of_already_stopped_registration_is_complete_without_a_control`).
 
 ## Process execution: `SystemExecutor`
 
-`CommandExecutor` (`lib.rs:645`) is the seam: argv in, `CommandOutput` out, with
-`stdin_data: None` meaning null stdin and `Some(bytes)` meaning bounded input
-(used only for `crontab -`). Missing binaries, timeouts, and output overflows
-are `Err(ServiceError::Manager)`; **non-zero exits are `Ok` with the observed
-status** (`lib.rs:648-651`).
+`CommandExecutor` (`lib.rs:961`) is the seam: argv in, `ManagerCommandOutput`
+out, with `stdin_data: None` meaning null stdin and `Some(bytes)` meaning
+bounded input (used only for `crontab -`). Missing binaries, timeouts, and
+output overflows are `Err(ServiceError::Manager)` — carrying the classified
+kind (`NotFound`, `Timeout`, `Spawn`, `Protocol`); **non-zero exits are `Ok`
+with the observed status** (`lib.rs:968-973`), and it is the adapter's job to
+classify them as `Protocol` (`ensure_mutation_success`, `lib.rs:2235`).
+
+The output type is named `ManagerCommandOutput` because it is the output of one
+*manager* command. `eggup_core` exports a different, unrelated `CommandOutput`;
+before M012 both crates exported a public type under the same name, so a
+consumer that glob-imported both crates and then named `CommandOutput`
+unqualified was ambiguous. The former spelling survives as a public type
+**alias** to `ManagerCommandOutput` (`lib.rs:694`), so existing explicit-path
+callers and existing `CommandExecutor` implementations keep compiling and
+still satisfy the trait. The alias is deliberately **not** marked
+`#[deprecated]`: deprecation is a publication-policy decision owned by a later
+republication milestone, and a deprecated alias would break downstream
+`-D warnings` builds. Its disposition is settled at the intentional 0.2/1.0 API
+boundary, alongside the already-registered `CleanupDisposition` finding in
+`plans/registry.md` § "Post-0.1.3 open findings" item 2.
 
 ### Executable allowlisting and path resolution
 
-`resolve_manager_program` (`lib.rs:876-901`) is the only path from a program name
+`resolve_manager_program` (`lib.rs:933-958`) is the only path from a program name
 to a binary:
 
 | Requested | Resolution |
@@ -387,7 +542,7 @@ to a binary:
 | Anything else | `Err(InvalidInput("manager program must be absolute or allowlisted"))` |
 
 There is **no `PATH` lookup at all**. `validate_executable_path`
-(`lib.rs:903-924`) additionally requires the path to be absolute, to exist, to
+(`lib.rs:960-981`) additionally requires the path to be absolute, to exist, to
 be a regular file (not a symlink-to-directory or device), and — under
 `#[cfg(unix)]` — to have at least one execute bit (`mode & 0o111 != 0`).
 All candidates failing validation yields `Manager("trusted manager binary missing")`.
@@ -485,10 +640,28 @@ data-loss window; the comment at `lib.rs:1198-1203` records why.
 
 ## Lifecycle composition: `commit_with_lifecycle`
 
-`commit_with_lifecycle` (`lifecycle_update.rs:254`) takes an **already
+`commit_with_lifecycle` (`lifecycle_update.rs:166`) takes an **already
 validated** `ValidatedTransaction` and wraps Core's
 `commit_with_post_commit` with service quiescence and restoration. It never
 installs or refreshes a registration.
+
+The orchestration below is a *policy* over the unified engine in
+`commit_engine.rs`: the mechanics it names — `safe_inspect`, the quiesce stop,
+the rollback quiesce, the panic-safe restore — have one implementation, and
+`commit_with_disposition` runs the same mechanics. The two behavioural inputs
+that used to differ between the two former engine copies are named policy
+inputs on `CommitEnginePolicy` (`commit_engine.rs:201`), both defaulting to the
+stricter behaviour:
+
+| Input | Default | Non-default input |
+|---|---|---|
+| `PostTransitionVerification` | `Verify` — re-inspect and validate ownership/state after every transition | `TrustManagerReport` — accept the manager's own completion report |
+| `OwnershipLossTolerance` | `Deny` — an ownership that is no longer `Owned` is always a typed failure | `TolerateAlreadyStopped` — tolerate it when the unit is already in the wanted stopped state |
+
+`commit_with_lifecycle` runs the engine under the default policy;
+`commit_with_lifecycle_with_engine_policy` (`lifecycle_update.rs:192`) selects
+the inputs explicitly, and the selection is observable in the receipt's
+`engine_policy` field.
 
 ```text
 policy.validate()                        InvalidPolicy   (before any manager call)
@@ -515,8 +688,8 @@ policy.validate()                        InvalidPolicy   (before any manager cal
 
 | Step | Failure | Observable outcome |
 |---|---|---|
-| `policy.validate()` | `LifecycleUpdateError::InvalidPolicy { field }` | One of the three timeouts is zero or `> MAX_TRANSITION_TIMEOUT` (`lifecycle_update.rs:96-107`) |
-| Inspect gate | `Preflight` | `Absent`, `Foreign`, `Unknown`, or `Transitioning`/`Unknown` state (`lifecycle_update.rs:265-279`) |
+| `policy.validate()` | `LifecycleUpdateError::InvalidPolicy { field }` | One of the three timeouts is zero or `> MAX_TRANSITION_TIMEOUT` (`lifecycle_update.rs:44-53`) |
+| Inspect gate | `Preflight` | `Absent`, `Foreign`, `Unknown`, or `Transitioning`/`Unknown` state (`lifecycle_update.rs:177-191`) |
 | Inspect | `Preflight` | A panicking manager is contained by `safe_inspect` and reported as a `LifecycleFailure` |
 | Quiesce stop | `Quiesce { failure, restore_failure }` | Manager error, panic, `completed == false`, or post-stop ownership/state drift. Restoration to `Running` is attempted and its failure is reported **separately** |
 | Post-commit work | `LifecycleFailure` + Core's `post_commit_failure` policy | `RestoreNew` or `PostInstallCheck` phase; on `RollBack` a `QuiesceForRollback` failure is recorded separately |
@@ -527,18 +700,18 @@ policy.validate()                        InvalidPolicy   (before any manager cal
 
 - `Committed`: the new generation is restored to `wanted` derived from
   `policy.restore`. If the failure phase was `RestoreNew`,
-  `restoration = Failed` (`lifecycle_update.rs:399-406`).
+  `restoration = Failed` (`lifecycle_update.rs:311-318`).
 - `RolledBack`: the **pre-update** state (`before.state`) is restored,
-  overriding `policy.restore` (`lifecycle_update.rs:407-418`).
+  overriding `policy.restore` (`lifecycle_update.rs:319-330`).
 - `RecoveryRequired`: `restoration = NotAttemptedRecoveryRequired` and **no
   start is attempted** — the artifacts are uncertain, so Eggup refuses to run
-  them (`lifecycle_update.rs:419-421`).
+  them (`lifecycle_update.rs:331-333`).
 
 The post-install check receives the *remaining* budget of the single
-`post_commit_timeout` deadline (`lifecycle_update.rs:342`, and the check call
+`post_commit_timeout` deadline (`commit_engine.rs:561`, and the check call
 site). `PostInstallCheck::check` documents that it must return within
 `remaining` and that it cannot be forcibly cancelled
-(`lifecycle_update.rs:130-139`). The existing `HealthProbe` trait has **no
+(`commit_engine.rs:123-135`). The existing `HealthProbe` trait has **no
 timeout contract** and therefore cannot satisfy this bound on its own; health
 semantics stay caller-owned.
 
@@ -547,7 +720,7 @@ each transition's panics at the phase actually executing, so the outer
 post-commit `catch_unwind` arm can only be reached by the check itself
 (CHANGELOG, Unreleased; test
 `panicking_restore_transition_is_recorded_as_restore_new_not_a_check`,
-`lifecycle_update.rs:1313`).
+`lifecycle_update.rs:1291`).
 
 ## Runtime disposition (M006) — the review focus
 
@@ -560,7 +733,7 @@ without loosening the safety posture.
 ### The central distinction
 
 > **Artifact commit authority and manager mutation authority are separate
-> facts.** (`disposition.rs:29`)
+> facts.** (`disposition.rs:35`)
 
 Core decides whether the artifact bytes may be committed. The disposition decides
 whether Eggup may call a service manager at all. `ForeignPreserved` commits
@@ -568,7 +741,7 @@ artifacts and performs **zero** manager mutation. `DirectRunning` mutates only
 through a caller-owned seam that Eggup does not interpret. Neither conclusion
 implies the other, and `LifecycleUpdateReceipt` keeps them apart:
 `artifact_disposition()` and `service_state_restored()` are separate accessors
-(`lifecycle_update.rs:182-199`).
+(`lifecycle_update.rs:177-191`).
 
 ### `UpdateRuntimeDisposition`
 
@@ -580,15 +753,15 @@ implies the other, and `LifecycleUpdateReceipt` keeps them apart:
 | `Stopped` | No running runtime | None | Yes, with no fabricated restart |
 | `ForeignPreserved` | Foreign manager | **None**, ever | Yes |
 
-`disposition.rs:31-42`.
+`disposition.rs:35-46`.
 
 ### `DirectRuntimeControl`
 
-`disposition.rs:256-263`. Three methods: `inspect`, `stop`, `start`. It is a
+`disposition.rs:260-267`. Three methods: `inspect`, `stop`, `start`. It is a
 **caller-supplied trait**, and the crate's own comments treat that as a
 responsibility transfer, not a delegation: there is no second ownership check
 inside `stop`, so Eggup performs every identity verification itself before
-calling it (`disposition.rs:1273-1277`). The seam carries no health-protocol
+calling it (`disposition.rs:1013-1050`). The seam carries no health-protocol
 content — `DirectObservation` is a state plus identity facts
 (`exact_ownership_proven`, `executable`, `config`), not a health channel.
 
@@ -601,7 +774,7 @@ committing anything.
 
 #### `plan_unix` decision table
 
-`disposition.rs:125-221`. First gate: if `manager_state_known == false`
+`disposition.rs:129-225`. First gate: if `manager_state_known == false`
 (manager transitioning or unknown), the result is `Stopped` only in the single
 narrow case `manager_ownership == Unknown && !manager_active &&
 direct.state == Stopped`; otherwise `Err`.
@@ -641,7 +814,7 @@ Two rows deserve a reviewer's attention:
 
 #### `plan_windows` decision table
 
-`disposition.rs:224-253`. The Windows matrix has no direct-runtime concept.
+`disposition.rs:228-257`. The Windows matrix has no direct-runtime concept.
 
 | `installed` | `executable_known` | `ownership` | `state` | Result |
 |---|---|---|---|---|
@@ -659,33 +832,33 @@ treated as running for quiesce purposes, a `StopPending` one as stopped.
 
 ### Where the revalidation barrier sits
 
-`commit_with_disposition` (`disposition.rs:321-593`) enforces three gates before
+`commit_with_disposition` (`disposition.rs:289-591`) enforces three gates before
 any mutation, in this order:
 
-1. **Policy validation** (`disposition.rs:338`) — same zero / over-ceiling rules
+1. **Policy validation** (`disposition.rs:346`) — same zero / over-ceiling rules
    as the lifecycle path.
-2. **Baseline coherence** (`disposition.rs:340-368`) — the `planned`
+2. **Baseline coherence** (`disposition.rs:372-377`) — the `planned`
    disposition must actually match the `DispositionBaseline` observed after
    preparation. `ManagedRunning` requires `Owned` + `Running`;
    `ManagedStopped` requires `Owned` + `Stopped`; `DirectRunning` requires a
    baseline direct observation that is `Running` with
    `exact_ownership_proven`; `ForeignPreserved` requires a non-`Owned` manager.
    `Stopped` is unconditionally coherent because it mutates nothing.
-3. **Fresh re-inspection** (`disposition.rs:370-383`) — the manager is
+3. **Fresh re-inspection** (`disposition.rs:378-392`) — the manager is
    re-inspected and both `ownership` **and** `state` must equal the baseline.
    Any change is `Preflight("lifecycle authority/state changed before mutation")`.
-4. **Direct revalidation** (`disposition.rs:386-438`), only when
+4. **Direct revalidation** (`disposition.rs:393-453`), only when
    `planned == DirectRunning` — `direct.inspect()` must return a value
    **equal** to the baseline observation, with `exact_ownership_proven` true and
    state `Running`. This catches an executable/config identity change, not just
    a state change.
 
 Only after all gates does the `match planned` dispatch run
-(`disposition.rs:446`). `ManagedRunning` and `DirectRunning` quiesce and then
+(`disposition.rs:455`). `ManagedRunning` and `DirectRunning` quiesce and then
 re-verify the stopped state before handing the transaction to Core;
 `ManagedStopped`, `Stopped`, and `ForeignPreserved` go straight to
 `commit_manager_path` with `pre_commit_quiesced = false`
-(`disposition.rs:579-591`).
+(`disposition.rs:557-591`).
 
 **This is the revalidation barrier, and it is the point of the module.** The
 planning phase happens before `prepare`; the baseline is captured after
@@ -696,9 +869,9 @@ not after.
 
 ### Post-commit and rollback behavior per disposition
 
-`commit_manager_path` (`disposition.rs:662-796`) drives
+`commit_manager_path` (`disposition.rs:593-741`) drives
 `transaction.commit_with_post_commit`. `restore_manager_success`
-(`disposition.rs:798-858`) resolves the target state:
+(`disposition.rs:743-786`) resolves the target state:
 
 | Planned | Target state |
 |---|---|
@@ -707,23 +880,23 @@ not after.
 | any other | `Preserve` → `before.state`; `EnsureRunning` → `Running`; `EnsureStopped` → `Stopped` |
 
 On `PostCommitFailurePolicy::RollBack`, `quiesce_manager_for_rollback`
-(`disposition.rs:955-1029`) runs before Core rolls the artifacts back. It fails
+(`commit_engine.rs:478-553`) runs before Core rolls the artifacts back. It fails
 closed in three ways worth naming: an **inspect error is treated as
-unobservable, not as "proceed"** (`disposition.rs:973-983`); a non-`Owned`
-service is refused (`disposition.rs:990-999`); and the stopped state is
+unobservable, not as "proceed"** (`commit_engine.rs:492-501`); a non-`Owned`
+service is refused (`commit_engine.rs:509-518`); and the stopped state is
 re-confirmed by a second `inspect` after the `stop`
-(`disposition.rs:1013-1027`). Tests
+(`commit_engine.rs:532-545`). Tests
 `unobservable_service_is_not_stopped_before_rollback` and
 `unobservable_direct_runtime_is_not_stopped_before_rollback`
 (`disposition.rs:1774`, `1745`) pin both.
 
-`commit_direct_path` (`disposition.rs:1032`) is the mirror image for
+`commit_direct_path` (`disposition.rs:788`) is the mirror image for
 `DirectRunning`, with one structural difference: the direct `start` is wrapped in
 a **nested** `catch_unwind` labelled `RestoreNew`, so the outer arm
 (`PostInstallCheck`) is reachable only by the check itself
-(`disposition.rs:1065-1113`). The check snapshot comes from a read-only manager
+(`disposition.rs:821-869`). The check snapshot comes from a read-only manager
 inspect, because direct state is caller-owned and is deliberately not part of
-`LifecycleSnapshot` (`disposition.rs:1097-1099`).
+`LifecycleSnapshot` (`disposition.rs:853-855`).
 
 Rollback disposition handling, both paths:
 
@@ -745,22 +918,22 @@ wants Eggup to update the artifact underneath it without touching the manager.
    `direct = { state: Stopped, exact_ownership_proven: true, .. }`.
 2. **Plan.** `plan_unix` takes the `Foreign` + active branch, finds the
    registered/selected config equal, and returns `ForeignPreserved`
-   (`disposition.rs:159-160`).
+   (`disposition.rs:163-164`).
 3. **Prepare.** The caller builds the `ValidatedTransaction` via
    `eggup-core`, then observes the baseline into `DispositionBaseline`:
    `manager_ownership = Foreign`, `manager_state = Running`,
    `direct = None`.
 4. **Enter `commit_with_disposition`.** `policy.validate()` passes. The baseline
-   gate accepts `Foreign` (`disposition.rs:354-357`). The fresh `inspect` must
+   gate accepts `Foreign` (`disposition.rs:380-383`). The fresh `inspect` must
    still report `Foreign` + `Running`. The direct revalidation block is skipped —
    `planned != DirectRunning`, so a missing `direct` handle is not an error.
 5. **Dispatch.** The `match planned` arm falls through to `commit_manager_path`
-   with `pre_commit_quiesced = false` (`disposition.rs:581-591`). **No `stop`,
+   with `pre_commit_quiesced = false` (`disposition.rs:557-591`). **No `stop`,
    no `start`, no definition write.** The test
    `foreign_preserved_performs_zero_manager_mutation`
-   (`disposition.rs:1995`) asserts exactly this.
+   (`disposition.rs:1979`) asserts exactly this.
 6. **Commit and restore.** Core commits the artifacts. `restore_manager_success`
-   short-circuits on `ForeignPreserved` (`disposition.rs:812`): one read-only
+   short-circuits on `ForeignPreserved` (`disposition.rs:758`): one read-only
    `inspect` and then the caller's `PostInstallCheck` with the remaining budget.
 7. **Receipt.** `restoration = Restored`, `pre_commit_quiesced = false`,
    `final_snapshot = Some(..)`, and `artifact_disposition() == Committed` if the
@@ -781,7 +954,7 @@ two facts are reported separately and neither is inferred from the other.
    *denial*, not a false permission.
 3. **`DirectRunning` requires a live `DirectRuntimeControl` handle** and an
    exact-identity `DirectObservation`. A `None` handle is a `Preflight` failure
-   (`disposition.rs:387-396`).
+   (`disposition.rs:393-402`).
 4. **The caller enforces post-commit rollback policy**, and the crate composes
    with Core's `KeepInstalled` / `RollBack` — it does not invent its own.
 5. **Application health stays caller-owned.** Disposition decides *authority*,
@@ -846,7 +1019,12 @@ return explicit `InvalidInput` errors rather than pretending success
 reports `LifecycleState::Stopped`.
 
 Ownership is over a managed `# BEGIN <marker>` / `# END <marker>` block with an
-exact desired body:
+exact desired body.
+
+**One rule, stated once.** `CronManager::cron_ownership` (`lib.rs:3499`) is the
+single statement of the rule, and `inspect`, `install`, and `uninstall` all use
+it. It delegates to `cron_classify` and nothing else: ownership is decided
+**only** by exact content identity of the managed block body.
 
 | `CronOwnership` | Condition | Behavior |
 |---|---|---|
@@ -855,18 +1033,32 @@ exact desired body:
 | `Foreign` | one block, different body | `ServiceError::denied` — never overwritten |
 | `Unknown` | multiple blocks, or an unterminated `BEGIN` | `ServiceError::Conflict` |
 
-`cron_classify` / `cron_merge` / `cron_remove` (`lib.rs:2592`, `2620`, `2665`)
-are pure and preserve unrelated bytes, including the trailing-newline
-convention. The command adapter re-reads the crontab immediately before a
-destructive write to surface races, and skips a redundant `crontab -` write when
-`changed == false` (test `lib.rs:4187`). The `Foreign` and `Unknown` errors are
-attributed to a **synthetic** `cron:<marker>` id, not to the caller's spec id,
-because the marker — not the spec — owns the block (`lib.rs:2650-2654`).
+**The executable-containment gate** (`require_consistent_request`,
+`lib.rs:3510`) is a separate, explicit check applied *before any listing or
+mutation*: the caller's managed block body must contain `spec.executable()`.
+If it does not, `inspect`, `install`, and `uninstall` all refuse with
+`ServiceError::InvalidInput`. The gate fails closed — it can only refuse, never
+widen.
 
-### Windows SCM (`WindowsScmManager`, `windows_scm.rs:232`)
+Before M013 the rule existed in **two** disagreeing copies: one used
+`current.contains(exe) || desired.contains(exe)` and the other used
+`text.contains(exe)` — whole-crontab containment, which an unrelated user
+crontab entry mentioning the executable path could satisfy. The
+whole-crontab containment test is gone: ownership is exact block identity
+only. Before M013 `inspect` also spawned `crontab -l` **twice** and discarded
+one result; it now lists exactly once (`lib.rs:3520`).
+
+`cron_classify` / `cron_merge` / `cron_remove` are pure and preserve unrelated
+bytes, including the trailing-newline convention. The command adapter re-reads
+the crontab immediately before a destructive write to surface races, and skips
+a redundant `crontab -` write when `changed == false`. The `Foreign` and
+`Unknown` errors are attributed to a **synthetic** `cron:<marker>` id, not to
+the caller's spec id, because the marker — not the spec — owns the block.
+
+### Windows SCM (`WindowsScmManager`, `windows_scm.rs:388`)
 
 Uses the safe `windows-service` wrapper behind a boxed `ScmBackend`
-(`windows_scm.rs:233`), which is how the adapter is tested deterministically off
+(`windows_scm.rs:389`), which is how the adapter is tested deterministically off
 Windows. No `sc.exe`, no shell, no ambient `PATH`, no elevation.
 
 - **Identity is the command line, not the key name.** `observe`
@@ -883,9 +1075,17 @@ Windows. No `sc.exe`, no shell, no ambient `PATH`, no elevation.
   `completed: false` until the SCM confirms absence (tests
   `windows_scm.rs:1547`, `1575`).
 - **Access denial is bounded remediation.** `scm_error_detail`
-  (`windows_scm.rs:215-224`) special-cases code `5` into a "run with an account
+  (`windows_scm.rs:279-288`) special-cases code `5` into a "run with an account
   authorized for this service operation" message; there is no elevation path
   (test `windows_scm.rs:1252`).
+- **Every SCM condition is a typed error; none panics.** The service-handle
+  open (`windows_scm.rs:1149`) classifies the SCM's failure codes through
+  `OpenFailure` (`windows_scm.rs:299`): `1060` (does not exist) and `1072`
+  (marked for deletion) keep their exact meanings — `Absent`,
+  `MarkedForDelete`, and the "the service disappeared before the operation"
+  conflict — and any other code becomes a `ServiceError::Manager` that still
+  carries the raw OS code. The five former `unreachable!()` arms are gone; the
+  lossless `1060`/`1072` mapping is unchanged.
 - **Refresh preserves what the adapter does not own** — service type,
   unspecified dependencies, account, load-order group, tag.
 - **Account selection is create-time only.** Custom passwords, descriptions, and
@@ -894,6 +1094,20 @@ Windows. No `sc.exe`, no shell, no ambient `PATH`, no elevation.
   match the install descriptor, the executable to be a Windows-absolute path
   representable as UTF-8, and the assembled command line to fit
   `MAX_SCM_COMMAND_CHARS` (8192 UTF-16 units).
+- **The native backend is exercised against the real SCM.** The fixture
+  `crates/eggup-service/tests/windows_scm_live.rs` is Windows-only
+  (`#![cfg(windows)]`) and registers a **disposable** service through the
+  crate's **public** API — `WindowsScmInstall` plus `WindowsScmManager::new`,
+  never a crate-internal back door — then drives install → inspect → ownership
+  → start → stop → uninstall against the genuine Service Control Manager. It
+  asserts the `windows-service` mapping layer explicitly (start type, error
+  control, service dependencies, and the `ServiceInfo` round-trip), removes
+  its own registrations on every exit path including a failing assertion,
+  never touches a pre-existing service, waits only under explicit deadlines
+  and fails with the observed state on timeout, and skips with a **recorded
+  reason** when the runner lacks the administrator rights a real registration
+  needs. On a non-Windows host the file is compiled out, so the fixture is
+  **not run** there and is never inferred from another platform.
 
 ### Behavioral differences, summarized
 
@@ -923,18 +1137,22 @@ mutates.
 |---|---|---|
 | Destructive operation on `Foreign` / `Unknown` / `Absent` | `Err(ServiceError::OwnershipDenied)`, no manager call | `require_owned`, `lib.rs:397` |
 | Malformed registration | `Ownership::Unknown` → denied | `RegistrationSnapshot::ownership`, `lib.rs:201`; `malformed_snapshot`, `lib.rs:2209` |
-| Manager command returns non-zero | `Err(ServiceError::Manager)` with bounded stderr | `ensure_mutation_success`, `lib.rs:1558` |
-| Manager command errors during inspect | Treated as `Unknown`, not `Absent` | `lib.rs:1676-1680`; rollback quiesce, `disposition.rs:973` |
+| Manager command returns non-zero | `Err(ServiceError::Manager { kind: Protocol, .. })` with bounded stderr | `ensure_mutation_success`, `lib.rs:2235` |
+| Manager command times out | `Err(ServiceError::Manager { kind: Timeout, .. })` | `OperationDeadline::command_timeout`, `lib.rs:2167` |
+| Manager binary or named manager resource is absent | `Err(ServiceError::Manager { kind: NotFound, .. })` | `resolve_manager_program` / `validate_executable_path`, `lib.rs:1227`, `1255` |
+| Platform reports an access denial | `Err(ServiceError::Manager { kind: Permission, .. })` | `ManagerFailureKind::from_spawn_error`, `lib.rs:363` |
+| Windows SCM failure | `Err(ServiceError::Manager { kind, detail, os_code })` — the raw OS code stays reachable | `ManagerFailureKind::from_scm_os_code`, `lib.rs:378` |
+| Manager command errors during inspect | Treated as `Unknown`, not `Absent` | `lib.rs:1447`; rollback quiesce, `commit_engine.rs:492` |
 | Output exceeds the bound | `Err(Manager("manager output exceeded bound"))` | `read_bounded_generic`, `lib.rs:949`; checked `lib.rs:838` |
 | Transition deadline expires | `Err(Manager("transition deadline exhausted before manager command"))` or `TransitionResult { completed: false }` | `OperationDeadline`, `lib.rs:1472`; `wait_for_state`, `windows_scm.rs:351` |
-| Zero or overlong policy timeout | `LifecycleUpdateError::InvalidPolicy { field }` before any mutation | `LifecycleUpdatePolicy::validate`, `lifecycle_update.rs:96` |
-| Post-install check fails | Core's `KeepInstalled` / `RollBack` policy applied; failure recorded with its phase | `lifecycle_update.rs:340-372` |
-| Core reports `RecoveryRequired` | `NotAttemptedRecoveryRequired`; no automatic start | `lifecycle_update.rs:419`; `disposition.rs:765`, `1215` |
-| Authority changes between planning and mutation | `Preflight` before the first destructive call | `disposition.rs:370-383` |
-| Direct identity changes before mutation | `Preflight` before the first destructive call | `disposition.rs:425-437` |
-| Planned disposition contradicts the baseline | `Preflight("planned disposition does not match baseline authority/state")` | `disposition.rs:359-368` |
-| `DirectRunning` with no `DirectRuntimeControl` handle | `Preflight` | `disposition.rs:387-396` |
-| Unobservable runtime before rollback quiesce | Refused; `QuiesceForRollback` failure recorded | `disposition.rs:973-983`, `1291-1299` |
+| Zero or overlong policy timeout | `LifecycleUpdateError::InvalidPolicy { field }` before any mutation | `LifecycleUpdatePolicy::validate`, `lifecycle_update.rs:44` |
+| Post-install check fails | Core's `KeepInstalled` / `RollBack` policy applied; failure recorded with its phase | `commit_engine.rs:561-604` |
+| Core reports `RecoveryRequired` | `NotAttemptedRecoveryRequired`; no automatic start | `lifecycle_update.rs:334`; `disposition.rs:735`, `1185` |
+| Authority changes between planning and mutation | `Preflight` before the first destructive call | `disposition.rs:378-392` |
+| Direct identity changes before mutation | `Preflight` before the first destructive call | `disposition.rs:432-444` |
+| Planned disposition contradicts the baseline | `Preflight("planned disposition does not match baseline authority/state")` | `disposition.rs:372-377` |
+| `DirectRunning` with no `DirectRuntimeControl` handle | `Preflight` | `disposition.rs:393-402` |
+| Unobservable runtime before rollback quiesce | Refused; `QuiesceForRollback` failure recorded | `commit_engine.rs:492-501`, `disposition.rs:1542` |
 | Manager or check panics | Contained at the executing phase, not the outer arm | `safe_inspect` / `safe_restore_state` / `safe_transition_owned_to` |
 | Definition parent missing or a symlink | `InvalidInput`; parents are never created | `atomic_write_definition`, `lib.rs:1100-1109` |
 | Definition destination exists, `allow_overwrite = false` | `Err(Conflict)`; no write | `lib.rs:1111`, `1225` |
@@ -945,9 +1163,12 @@ mutates.
 
 ## Testing approach
 
-104 `#[test]` functions across the four files. There is no `tests/` directory;
-everything is a unit test in-module (`Cargo.toml` excludes `tests/` and
-`benches/` from the package). The distribution:
+111 `#[test]` functions across the five source files, plus the integration
+test targets under `crates/eggup-service/tests/`. The unit tests are
+in-module; the integration targets are separate crates, and the package
+excludes `tests/` and `benches/` from the published artifact
+(`Cargo.toml` excludes `tests/` and `benches/` from the package). The
+distribution:
 
 | Area | Tests | Demonstrates |
 |---|---|---|
@@ -957,9 +1178,24 @@ everything is a unit test in-module (`Cargo.toml` excludes `tests/` and
 | launchd (`lib.rs:3851-4116`) | ~7 | Absent/exact/foreign/unknown, user-vs-system domain distinctness, malformed plist, bootstrap/bootout/kickstart, restart-after-incomplete-stop, label-only is not ownership, config reconciliation |
 | cron (`lib.rs:4117-4271`) | ~9 | Empty-to-absent-to-install, byte-for-byte preservation of unrelated entries, idempotence, duplicate marker, modified block is foreign, owned-only removal, no redundant write, timeout/missing binary, no start/stop semantics |
 | Definition + detection (`lib.rs:4271-4457`) | ~6 | Atomic private no-clobber write, missing parent rejected, unavailable vs failure distinguished, candidate policy order, native `systemctl` / `launchctl` / `crontab -l` smoke, consumer-specific constants rejected |
-| `lifecycle_update.rs` | 17 | Policy bounds, restore-intent matrix, preconditions, quiesce failures, `KeepInstalled` evidence retention, rollback quiesce-then-restore, caller-check panic, restore-phase panic attribution, `CoreBeforeReceipt` restore, post-rollback restore failure separation, `RecoveryRequired` suppression, single shared deadline, no hidden policy retry |
-| `disposition.rs` | 20 | Unix reference matrix, Windows reference matrix, unobservable-runtime refusal, ordering per disposition, zero mutation under `ForeignPreserved`, direct seam exclusivity, revalidation failure modes, `KeepInstalled` composition, `RecoveryRequired` suppression, no product terminology in public types, prepare-before-quiesce, rollback quiesce + old restore |
-| `windows_scm.rs` | 15 | Name/descriptor validation, access-denied remediation without escalation, Windows command-line parsing (quotes, backslashes, unicode) and its rejections, config-identity arity, explicit lifecycle mapping for every SCM state, absent/exact identity, spec validation, create/refresh, one-deadline transitions, restart safety, `MarkedForDelete` honesty, idempotent stop |
+| `lifecycle_update.rs` | 15 | Policy bounds, restore-intent matrix, preconditions, quiesce failures, `KeepInstalled` evidence retention, rollback quiesce-then-restore, caller-check panic, restore-phase panic attribution, `CoreBeforeReceipt` restore, post-rollback restore failure separation, `RecoveryRequired` suppression, single shared deadline, no hidden policy retry |
+| `disposition.rs` | 17 | Unix reference matrix, Windows reference matrix, unobservable-runtime refusal, ordering per disposition, zero mutation under `ForeignPreserved`, direct seam exclusivity, revalidation failure modes, `KeepInstalled` composition, `RecoveryRequired` suppression, no product terminology in public types, prepare-before-quiesce, rollback quiesce + old restore |
+| `commit_engine.rs` | 1 | The single engine's own unit coverage |
+| `windows_scm.rs` | 16 | Name/descriptor validation, access-denied remediation without escalation, Windows command-line parsing (quotes, backslashes, unicode) and its rejections, config-identity arity, explicit lifecycle mapping for every SCM state, absent/exact identity, spec validation, create/refresh, one-deadline transitions, restart safety, `MarkedForDelete` honesty, idempotent stop, and the typed-error contract for the five former panic sites |
+
+The integration test targets under `crates/eggup-service/tests/`:
+
+| Target | Tests | Demonstrates |
+|---|---|---|
+| `api_compatibility.rs` | 1 | The retained `LifecycleState` variant-pinning fixture. It is folded into `public_api_surface.rs` as a module, so it is compiled by both targets and is **not** deleted as redundant. |
+| `public_api_surface.rs` | 4 | The public-API surface guard: every public item is bound to an explicit type, so a removed item or a changed signature is a **compilation** error. It also asserts that the crate's own sources still declare exactly the pinned number of top-level public items and `pub use` re-exports, and that the committed snapshot `tests/public-api-surface.txt` names every one of them. The snapshot is maintained by hand — the only tool that can emit a machine-readable public surface from Rust sources needs a nightly compiler, so the pinning test is the enforcement and the snapshot is the review artifact. No new dependency. |
+| `windows_scm_live.rs` | 2 | The **real** Windows SCM backend: a disposable registration driven through install → inspect → ownership → start → stop → uninstall against the genuine Service Control Manager, with the `windows-service` mapping layer asserted explicitly. Windows-only (`#![cfg(windows)]`); **not run** on any other platform, and never inferred from one. |
+| `errors_doc_sections.rs` | 4 | The `# Errors` / `# Panics` doc sweep for `lib.rs`, `disposition.rs`, and `lifecycle_update.rs`. The Windows SCM surface is deliberately excluded: milestone `014` owns it. |
+| `manager_failure_kinds.rs` | 14 | The `ManagerFailureKind` taxonomy and its negative controls |
+| `cron_single_listing_and_gate.rs` | 8 | The cron single-listing rule and the executable-containment gate |
+| `commit_engine_policy.rs`, `commit_engine_parity.rs` | 7 | The single engine's policy inputs and the parity of the two orchestrators |
+| `manager_deadline_budget.rs`, `manager_detail_byte_cap.rs` | 4 | The one-deadline budget and the one byte ceiling |
+| `systemd_failed_service.rs` | 1 | A real systemd `failed` unit, stop, and quiescence |
 
 The three tests CI runs individually on Windows are pinned because they assert
 UTF-8 boundary behavior that a differently-configured default run would not
@@ -972,13 +1208,13 @@ cargo test -p eggup-service --lib lifecycle_failure_detail_is_utf8_safe_bounded_
 cargo test -p eggup-service --lib windows_scm::tests --locked
 ```
 
-The first two are in `lib.rs:3109` and `lib.rs:3129`; the third is
-`lifecycle_update.rs:710`. The fourth runs the whole SCM test module, whose
+The first two are in `lib.rs:3430` and `lib.rs:3450`; the third is
+`lifecycle_update.rs:420`. The fourth runs the whole SCM test module, whose
 platform-independent tests (parser, ownership, lifecycle mapping) run on every
 host — the `#[cfg(windows)]` backend is the only part that is Windows-only.
 
 Note the shape choice: `no_gregg_strings_in_public_types`
-(`disposition.rs:2243`) asserts that the M006 public types contain no reference
+(`disposition.rs:2008`) asserts that the M006 public types contain no reference
 to the behavioral oracle the milestone was qualified against, keeping the
 surface product-neutral. That is a real regression guard, not a naming
 preference.
@@ -990,6 +1226,8 @@ cargo test -p eggup-service --locked
 cargo test -p eggup-service --lib commit_with_disposition --locked
 cargo test -p eggup-service --lib commit_with_lifecycle --locked
 cargo test -p eggup-service --lib plan_ --locked
+cargo test -p eggup-service --test public_api_surface --locked
+cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture
 cargo clippy -p eggup-service --all-targets --locked -- -D warnings
 ```
 
@@ -1015,6 +1253,19 @@ The full gate is `./scripts/check-local.sh`; see
   comment at `lib.rs:1198-1203` matches the changelog entry; the current
   `allow_overwrite` path has a single `rename` and no destination-removal
   fallback.
+- **`ScmState::Unknown` is unreachable on every platform.** `windows-service`
+  0.8.1 exposes exactly seven `ServiceState` variants and the SCM backend maps
+  each of them, so no platform can produce `ScmState::Unknown`; the test
+  helpers construct it only. Its `allow(dead_code)` is therefore
+  unconditional, while every other `ScmState` and `ScmLookup` variant is
+  constructed by the `#[cfg(windows)]` backend and carries a
+  `#[cfg_attr(not(windows), allow(dead_code))]`. The variant sets are
+  unchanged; a variant added later is not covered by any allowance and is
+  reported.
+- **The real-SCM fixture is not run off Windows.** `tests/windows_scm_live.rs`
+  is `#![cfg(windows)]`, so on a non-Windows host the target compiles to zero
+  tests. Its result on a non-Windows lane is **not run**, never a pass and
+  never an inference from another platform.
 
 ## Cross-references
 

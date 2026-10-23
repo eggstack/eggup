@@ -55,7 +55,7 @@ dependency of one crate silently activate in another.
 `[workspace.package]` (`Cargo.toml:14-19`) declares exactly five keys:
 
 ```toml
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 rust-version = "1.89"
 license = "MIT"
@@ -115,9 +115,9 @@ silently break them:
   arrow is one-way, and the test fixtures are what need the transaction types.
 
 **Exact-pin asymmetry.** `eggup-eggpack` pins its in-workspace deps with exact
-requirements (`=0.1.2`) and takes `eggpack-manifest` as `=0.1.0` from the
+requirements (`=0.1.3`) and takes `eggpack-manifest` as `=0.1.0` from the
 registry. Every other crate uses a caret requirement — and several still carry
-the literal `"0.1.0"` even though the workspace version is now `0.1.2`
+the literal `"0.1.0"` even though the workspace version is now `0.1.3`
 (`eggup-eggfetch` → `eggup-acquisition`, `eggup-curl` → `eggup-acquisition`,
 `eggup-service` → `eggup-core`, and all three in
 `eggup-transport-footprint`). These resolve correctly through the path
@@ -201,7 +201,7 @@ rather than stating the rule as absolute.
 
 ## 4. The local gate
 
-`scripts/check-local.sh` is the whole gate — 9 lines including the shebang and a
+`scripts/check-local.sh` is the whole gate — 10 lines including the shebang and a
 trailing blank, 5 of them `cargo` commands, no conditionals, no argument
 handling, no per-crate specialization.
 
@@ -214,6 +214,7 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --all-features --locked
 cargo doc --workspace --no-deps --locked
 cargo tree --workspace --locked
+./scripts/check-docs-truth.sh
 ```
 
 | Line | Command | What it proves |
@@ -223,11 +224,36 @@ cargo tree --workspace --locked
 | 6 | `cargo test --workspace --all-targets --all-features --locked` | Tests pass with the full feature union; `--all-targets` includes doc-test targets |
 | 7 | `cargo doc --workspace --no-deps --locked` | `deny(missing_docs)` holds workspace-wide and rustdoc builds clean |
 | 8 | `cargo tree --workspace --locked` | Prints the resolved graph for human review |
+| 9 | `./scripts/check-docs-truth.sh` | The documentation agrees with itself, with the manifests, and with the planning registry |
 
 `set -euo pipefail` (line 2) means the script **is** a gate: the first failing
 command aborts the script, and a non-`cargo` failure in a pipeline propagates.
 
-### 4.1 The `cargo tree` caveat
+### 4.1 The documentation-truth check
+
+`scripts/check-docs-truth.sh` is the sixth gate command and the only one that
+does not invoke `cargo`. It is read-only, network-free, root-free, and asserts
+that the documentation surfaces agree with each other, with the crate manifests,
+and with `plans/registry.md`:
+
+| Assertion | What it checks |
+|---|---|
+| 1 | No `docs/`, `README.md`, or `AGENTS.md` version literal outside the known set |
+| 2 | No `docs/` file states the current version as `0.1.2`; the single legitimate `eggup-curl` occurrence is allowlisted |
+| 3 | No `docs/` file states a normative rule without linking the contract that owns it |
+| 4 | The root `CHANGELOG.md` `Unreleased` section does not contradict the `0.1.3` section |
+| 5 | No milestone carries two statuses in `plans/registry.md`, and the registry names its authoritative table |
+| 7 | (opt-in, `--baseline <ref>`) The milestone's change set touches no `crates/*/src/**` path, no `Cargo.lock`, and no crate manifest |
+
+Assertion 6 — the transport-footprint dependency counts 3 / 92 / 93 — is a
+`cargo tree` resolution check and is therefore **not** in the script; it is a
+milestone verification command. Assertion 7 is milestone-scoped by nature, so
+it runs only when a baseline ref is supplied; the gate invocation runs
+assertions 1-5. The script was added by planning C013 after the tracked drift
+was closed without re-verification; see
+`plans/closure/planning-closure-hygiene-corrective/013-status.md`.
+
+### 4.2 The `cargo tree` caveat
 
 `cargo tree` is a **review step, not an assertion**. It always exits 0 on a
 resolvable graph — it prints. Its only failure mode is an unresolvable
@@ -319,12 +345,13 @@ platform lane that a whole-workspace run would not guarantee.
 
 | Gap | Detail |
 |---|---|
-| No `cargo tree` anywhere in CI | The dependency-boundary review is local-only, and the local step is advisory (§4.1) |
+| No `cargo tree` anywhere in CI | The dependency-boundary review is local-only, and the local step is advisory (§4.2) |
 | No `cargo check` with `--all-features` on the MSRV lane | `msrv` uses `cargo check --workspace --all-targets --locked` (`ci.yml:30`) — no `--all-features`. Feature-gated code is not compiled at the 1.89 floor, so an MSRV break that only appears under a non-default feature passes |
 | No `cargo check` with `--all-features` on the Windows lane | `ci.yml:65-79` runs default-feature tests plus a packaged `eggup-service` check; it does not build the feature-gated footprint binaries on Windows |
 | Clippy and fmt run on Linux only | A `#[cfg(windows)]` or `#[cfg(target_os = "macos")]` clippy violation is not caught by any lane — the Windows and macOS jobs run `test`/`check`, never `clippy` |
 | `cargo doc` on Linux only | `deny(missing_docs)` is not re-verified per platform, which is acceptable since rustdoc is platform-independent |
 | No `cargo test` with `--all-features` on the Windows lane | The closing run is `cargo test --workspace --all-targets --locked`. Combined with the targeted steps, every crate's tests now execute on Windows — but only under default features, so the footprint binaries and any other feature-gated path remain unbuilt there |
+| The documentation-truth check runs in the local gate only | `./scripts/check-docs-truth.sh` (§4.1) is wired into `scripts/check-local.sh`, not into any CI lane. Its assertions are platform-independent text checks, so a single Linux or macOS run of the local gate covers them; the cost is that CI will not re-run them on a pull request until a lane is added |
 
 ### 5.3 Coverage gaps — the `--all-features` asymmetry, concretely
 
@@ -635,7 +662,7 @@ Ordered by how expensive a miss is.
 4. **ADR-0004 classification** — is this work that belongs to Eggup, or producer
    work that belongs to Eggpack? `distribution-bootstrap` stays archived.
 5. **Run `./scripts/check-local.sh`** and treat all 5 lines as gates, including
-   reading the `cargo tree` output rather than skimming past it (§4.1).
+   reading the `cargo tree` output rather than skimming past it (§4.2).
 6. **Feature-gated change?** If the change lives behind a feature flag, check
    which CI lane actually compiles it. Non-default features are built only by
    `stable` and `macos` (§5.3) — not by `msrv`, not on Windows.
@@ -656,7 +683,7 @@ Ordered by how expensive a miss is.
     transitions only; no plan detail duplicated. Roadmap status table reconciled.
 12. **If publishing** — confirm it is a tracked publication milestone, that
     `cargo package`/dry-run was qualified, that downstream exact pins
-    (`eggup-eggpack` → `=0.1.2`) are accounted for, and that CI still does not
+    (`eggup-eggpack` → `=0.1.3`) are accounted for, and that CI still does not
     publish. See the `release-workflow` skill.
 13. **Did the prose move with the code?** If the change touched an enum, a
     variant, a CI lane, a dependency edge, a command, or a publication status,
@@ -694,7 +721,7 @@ Ordered by how expensive a miss is.
 - [transport-footprint.md](transport-footprint.md) — the feature-gated binaries
   that `msrv` and `windows-check` do not build (§5.3).
 - [eggpack-adapter.md](eggpack-adapter.md) — the only crate allowed to depend
-  on `eggpack-manifest` and to pin `=0.1.2` exactly.
+  on `eggpack-manifest` and to pin `=0.1.3` exactly.
 - [ADR-0005](../plans/adrs/ADR-0005-local-archive-extraction-safety-contract.md) —
   the archive safety contract; the ADR to read before touching
   `eggup-archive` boundaries.
@@ -726,7 +753,7 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | Was | Resolution |
 |---|---|
 | `verify-workflow` + `AGENTS.md` described `windows-check` as `cargo check` / "compile-only" | Both now describe its nine `cargo test` steps plus packaged service verification, and the real Linux systemd service lane (§5) |
-| `AGENTS.md` gave `eggup-eggpack` a partial dependency list, omitting `sha2` | `sha2` added; the list now matches `crates/eggup-eggpack/Cargo.toml` |
+| `AGENTS.md` gave `eggup-eggpack` a partial dependency list, omitting `sha2` | `sha2` added; `AGENTS.md` no longer restates the list at all and now points at `crates/eggup-eggpack/Cargo.toml`, the owner of the exact set |
 | `AGENTS.md` stated "keep crate `README.md` + `CHANGELOG.md` current" as absolute | Now scoped to library crates, with `eggup-transport-footprint` named as the exception (§3.4) |
 | `core-transaction.md` listed a previous generation of `FailureCategory`, `FailurePhase`, `IntegrityRequirement`, `IntegrityStatus`, and `PermissionsIntent` | All five rows regenerated from source; the two `FailureCategory::Destination` references replaced with real variants |
 | `core-transaction.md` described an "empty validator set" gate escaped by `NotRequired` members | Inverted. `validate` requires **every** member to be `IntegrityStatus::Verified`; `NotRequired` always fails (§3) |
@@ -739,8 +766,8 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | `registry.md` "Planned / blocked work" declared 4 columns; 4 rows carried 5 | Cells merged; two rows that duplicated rows in the same table removed |
 | `planning-closure-hygiene-corrective/010` plan still read `Status: ready for handoff` | Set to closed, matching its closure record and C011/C012 |
 | Windows lane counted as "four `cargo test` invocations" in §5, §7.3, the Resolved table, `verify-workflow`, and `docs-hygiene` | It now has **nine** test steps at `ci.yml:66-79` — the three named `eggup-service` tests are three steps, not one bullet. All five locations and the count-step drift class were updated |
-| §4.1 attributed the quote "dependency-surface review, no gate" to `verify-workflow`, and "review-only, no gate" to `AGENTS.md` | Neither string exists in those files. Replaced with the actual sentences from each |
-| §4 described `scripts/check-local.sh` as "6 lines" | It is 9 lines (shebang + `set -euo pipefail` + 5 `cargo` commands + blank); the per-line table already used the correct `4`-`8` numbering |
+| §4.1 attributed the quote "dependency-surface review, no gate" to `verify-workflow`, and "review-only, no gate" to `AGENTS.md` | Neither string exists in those files. Replaced with the actual sentences from each (the section is now §4.2 after the documentation-truth check became §4.1) |
+| §4 described `scripts/check-local.sh` as "6 lines" | It is 10 lines (shebang + `set -euo pipefail` + 5 `cargo` commands + the documentation-truth check + blank); the per-line table uses the correct `4`-`9` numbering |
 | [overview.md](overview.md) claimed "Every crate carries `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]`" | Scoped to the 7 library crates; `eggup-transport-footprint` has no `lib.rs`, so `missing_docs` is not enforced there at all (§3.4) |
 | [overview.md](overview.md) listed crate-private `DirectoryGuard` as a public key capability | Marked internal; `struct DirectoryGuard` is not `pub` (`crates/eggup-archive/src/lib.rs:1307`) |
 | [overview.md](overview.md) acquisition error taxonomy omitted `InvalidInput` | Added; `AcquisitionError` has 7 variants, `InvalidInput` first (`crates/eggup-acquisition/src/lib.rs:254`) |
@@ -749,7 +776,7 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | `acquisition-transport/008` plan read `Status: implemented; hosted closure qualification pending` while its closure read `closed` (run `36222536670`) | Plan status set to closed with the run cited |
 | Three closure records used `Disposition:` instead of the `status:` field required by `plans/closure/README.md` (`consumer-adoption/006`, `eggpack/003`, `eggpack/004a`) | Renamed to `Status:`; text preserved. `eggpack/004a` also gained a pointer noting M004 has since closed |
 | `registry.md` "Existing simple consumers" listed eggsact at the superseded `576f4b0` | Now `65c916b` (current), with `576f4b0` named as the first adoption commit |
-| Root `Unreleased` omitted the unpublished bug-audit fixes present in per-crate changelogs, including a **security fix in published `eggup-eggpack`** | Added aggregation entries for eggpack, core (incl. the breaking `Error::Injected`), archive, eggfetch, and acquisition; the eggpack entry states that `0.1.2` consumers do not have the fix |
+| Root `Unreleased` omitted the unpublished bug-audit fixes present in per-crate changelogs, including a **security fix in published `eggup-eggpack`** | Added aggregation entries for eggpack, core (incl. the breaking `Error::Injected`), archive, eggfetch, and acquisition; the eggpack entry states that `0.1.2` consumers do not have the fix. Those entries were then removed again when the 0.1.3 train published the same work, and the root `Unreleased` header no longer claims an unpublished baseline: it now names the current published baseline (`0.1.3` for six crates, `0.1.2` for `eggup-curl`) and holds only genuinely unpublished work |
 | 4 library-crate `Unreleased` sections lacked the required no-publication/no-migration disclaimer (`eggup-core`, `eggup-archive`, `eggup-eggfetch`, `eggup-eggpack`) | Added; `eggup-core` flags the breaking `Error::Injected` match arm, `eggup-eggpack` flags that the published `0.1.2` carries the defect |
 | `docs/releases.md` published-state table was recorded from this document's §8 table and cross-checked only against the manifests, never against crates.io | Verified against the crates.io API on 2026-10-05: `eggup-core`/`eggup-acquisition`/`eggup-eggfetch` at `0.1.0`+`0.1.1`+`0.1.2`; `eggup-curl`/`eggup-archive`/`eggup-eggpack` at `0.1.2` only; `eggup-service` max `0.1.1`; `eggup-transport-footprint` returns "does not exist". No versions yanked. The document now records the verification date instead of calling itself a snapshot |
 | `docs/releases.md` and the root `CHANGELOG.md` both described the unpublished acquisition payload as "`FetchLimits` validation + post-link temp cleanup" | Wrong on both counts, and only because the claim was inferred from a changelog instead of checked. Diffing the published `0.1.2` source against the working tree shows the real payload is the `ComposedTransport` fallback budget (`remaining_limits`) plus part-file cleanup on a failed `set_permissions`. `validate()` is already enforced at 5 boundaries in published `0.1.2` |
@@ -764,9 +791,10 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 
 | Location | Drift | Why it is not fixed here |
 |---|---|---|
-| `crates/eggup-transport-footprint/Cargo.toml:16,24,29` | Pins `"0.1.0"` for `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` while `[workspace.package] version` is `0.1.2` | Resolves correctly via the caret requirement plus path dependencies, so the build is correct. Changing the literals is a `Cargo.lock` + publication-affecting change that belongs in a plan, not a docs pass. The pin style also differs per crate for no stated reason (§2.4), so it should be settled in one milestone rather than per-crate |
+| `crates/eggup-transport-footprint/Cargo.toml:16,24,29` | Pins `"0.1.0"` for `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` while `[workspace.package] version` is `0.1.3` | Resolves correctly via the caret requirement plus path dependencies, so the build is correct. Changing the literals is a `Cargo.lock` + publication-affecting change that belongs in a plan, not a docs pass. The pin style also differs per crate for no stated reason (§2.4), so it should be settled in one milestone rather than per-crate |
 | `plans/implementation/**` | 14 of 62 plans ship fewer than 16 sections and 17 omit a `Repository baseline:` line; `Primary class:` is frequently outside the template enum (only 2 of 62 use a single template value verbatim) | Historical records. The template is `plans/implementation/README.md`; conforming old plans is not worth rewriting evidence. New plans should follow the template exactly |
-| `crates/eggup-service/Cargo.toml:24` and the footprint manifest | Both require peers at caret `0.1.0` while the workspace is at `0.1.2`. They therefore do **not** participate in the exact-pin cascade that §8 describes for `eggup-eggpack` | Same resolution argument as the footprint row above, and the same remedy: one milestone that settles pin style workspace-wide, rather than per-crate edits |
-| `plans/registry.md:116-203` | The `Dependency-ready implementation work` and `Planned / blocked work` tables duplicate 16 `(subsystem, milestone)` rows, and `Eggpack M004` appears twice inside the first table. 40 of its 44 rows are closed records, so the table is largely a second copy of closure history | `plans/003-planning-process.md` §13 says the registry is the active control surface and plan detail does not belong there. Deduplicating changes what the control surface claims is active, so it wants an explicit decision and its own hygiene milestone rather than a docs pass |
+| `crates/eggup-service/Cargo.toml:24` and the footprint manifest | Both require peers at caret `0.1.0` while the workspace is at `0.1.3`. They therefore do **not** participate in the exact-pin cascade that §8 describes for `eggup-eggpack` | Same resolution argument as the footprint row above, and the same remedy: one milestone that settles pin style workspace-wide, rather than per-crate edits |
+| `architecture/transport-footprint.md` §"Testing approach" and the CI matrix in §5 | No CI job builds the isolated single-adapter configurations (`--no-default-features --features curl`, `--features eggfetch`): every lane that builds the bins builds only the dual configuration, so the claim "links no Eggfetch code" is never verified by CI. The crate also has no `plans/subsystems/` roadmap, so no roadmap row owns the gap | Building the isolated configurations is a CI change and creating the missing roadmap is a planning change; both want a milestone, not a docs pass. Recorded as open finding 12 and named as the follow-on of planning C013 at `plans/closure/planning-closure-hygiene-corrective/013-status.md`; its prerequisite is that the `plans/subsystems/transport-footprint-roadmap.md` be authored first |
+| `crates/eggup-core/Cargo.toml:15-19` (`exclude = ["docs/", …]`) | `crates/eggup-core/docs/{domain,verification,transaction}.md` — the crate's authoritative contract docs — are excluded from the published package, so a consumer on crates.io or docs.rs never receives the contract it is bound to | Removing `"docs/"` from `exclude` is a manifest change with no consumer effect until `eggup-core` is republished, and it makes every later contract edit publication-relevant. Owned by **Verified Update Core M016 — `eggup-core` contract-doc packaging** (`plans/subsystems/verified-update-core-roadmap.md`): it must remove `"docs/"` from `exclude`, qualify `cargo package -p eggup-core --list`, and authorize the republication that delivers the docs. Recorded as open finding 14 and named as the follow-on of planning C013 at `plans/closure/planning-closure-hygiene-corrective/013-status.md` |
 | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | Still asserts `git log 39ff626..HEAD -- crates/` **is empty**; it now returns 4 commits | Deliberate. The record is an immutable 2026-10-01 snapshot, and rewriting it would edit historical evidence. The `registry.md` line that made the same claim *as a live status statement* is corrected; the closure record is not |
 | `plans/archive/` | Holds only its own `README.md`; no superseded material has ever been moved there, though `plans/README.md` describes it as retained-for-traceability | A policy directory with no content is not wrong. Pruning it would remove a documented mechanism; populating it is a separate authoring decision |

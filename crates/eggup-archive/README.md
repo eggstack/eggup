@@ -31,10 +31,28 @@ only `fs_at` handle-relative operations (`read_dir`, `open_dir_at`,
 followed. No recursive operation traverses the replacement pathname, so a
 foreign directory, file, symlink, or reparse point installed after any handle
 operation cannot be recursively deleted. No object-bound root unlink exists
-on all supported platforms, so explicit cleanup empties only the owned tree
-and reports the now-empty directory as `CleanupFailed` residue instead of
-recursively touching the pathname; drop best-effort empties the same way and
-never falls back to `fs::remove_dir_all(path)`.
+on all supported platforms, so cleanup empties only the owned tree and never
+falls back to `fs::remove_dir_all(path)`.
+
+All four `cleanup()` entry points — `ExtractedArchive::cleanup`,
+`PersistedExtraction::cleanup`, `BoundExtraction::cleanup`, and
+`DeferredCleanup::cleanup` — share one contract:
+
+- `Ok(())` means the owned root object held no entries at the final
+  handle-relative listing: the owned tree was emptied.
+- `Err(..)` with `kind() == ExtractionErrorKind::CleanupFailed` means the
+  owned root could **not** be fully emptied. The residue may be partially
+  emptied and its emptiness is **not** guaranteed; `residue_path()` names the
+  recorded root path.
+
+The crate never removes the root directory itself, on any path, and offers no
+convenience that removes it by pathname. The residual empty directory is the
+caller's to remove: because `cleanup()` consumes the value, capture the
+residual path from `root()` **before** the cleanup call. The recorded root
+path is advisory — if the root was renamed or replaced by a third party, the
+crate emptied the owned object and left whatever occupies the recorded
+pathname untouched. Drop best-effort empties the same way and never falls
+back to `fs::remove_dir_all(path)`.
 
 `ExtractedArchive` and `PersistedExtraction` retain a `std::fs::File` handle
 and are therefore `Send` but not `Sync`. `BoundMember`, `BoundExtraction`,

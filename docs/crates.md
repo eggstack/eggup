@@ -1,7 +1,7 @@
 # Choosing a crate
 
-Eight crates, and you probably need one or two. All share the workspace version
-`0.1.2`; only their registry state differs.
+Eight crates, and you probably need one or two. The workspace version is `0.1.3`;
+only their registry state differs.
 
 ## The short version
 
@@ -22,7 +22,7 @@ candidate validation, destination-ownership revalidation, locking, replacement,
 rollback, and receipts.
 
 - **Dependencies:** `sha2` only.
-- **Status:** published at `0.1.2`.
+- **Status:** published at `0.1.3`.
 - **Boundary:** transport, service managers, and Eggpack types stay out. If you
   need those, take a separate crate.
 
@@ -36,7 +36,7 @@ tests) and `ComposedTransport` (try several transports in order).
 
 - **Dependencies:** **none** — not even `sha2`. This is what lets both adapters
   and the footprint fixtures depend on it without dragging in an HTTP stack.
-- **Status:** published at `0.1.2`.
+- **Status:** published at `0.1.3`.
 - **You need an adapter too.** The seam defines the trait; it does not speak
   HTTP.
 
@@ -47,7 +47,7 @@ system trust beyond the platform root store.
 
 - **Dependencies:** `eggup-acquisition`, `eggfetch-core`, `tokio`,
   `futures-util`.
-- **Status:** published at `0.1.2`.
+- **Status:** published at `0.1.3`.
 - **Trade-off:** the largest dependency footprint in the workspace — roughly 89
   transitive crates exist to provide TLS and async.
 
@@ -67,7 +67,7 @@ tar.gz or zip, into a private staging directory with finite decompression
 budgets and no-clobber writes. Never mutates a live installation.
 
 - **Dependencies:** `flate2`, `fs_at`, `sha2`, `tar`, `zip`.
-- **Status:** published at `0.1.2`.
+- **Status:** published at `0.1.3`.
 - **Boundary:** you still own the trust decision. This crate will not tell you
   an archive is *authentic*, only that it extracted as declared.
 
@@ -80,8 +80,9 @@ elevation.
 
 - **Dependencies:** `eggup-core`, `windows-args` (plus `windows-service` on
   Windows only).
-- **Status:** published at `0.1.2` — published later than the rest of the `0.1.2`
-  set, from a different source commit than the shared `v0.1.2` tag. Read
+- **Status:** published at `0.1.3` (2026-10-09) — published later than the rest
+  of the `0.1.3` set, from a different source commit than the shared `v0.1.3`
+  tag, which was likewise not moved. Read
   [`crates/eggup-service/CHANGELOG.md`](../crates/eggup-service/CHANGELOG.md)
   for what is and is not on the registry.
 
@@ -93,7 +94,7 @@ no Eggpack knowledge.
 
 - **Dependencies:** `eggup-core`, `eggup-archive`, `eggup-acquisition`, plus
   `eggpack-manifest` from the registry.
-- **Status:** published at `0.1.2`.
+- **Status:** published at `0.1.3`.
 - **Boundary:** archive manifests stop at "extraction required". Release
   discovery, install roots, ownership, permissions, and authenticity policy stay
   yours.
@@ -114,10 +115,12 @@ actually links, via three `required-features` binaries (`curl_only`,
 other. Composition belongs in the seam. Nothing enforces this automatically —
 `cargo tree --workspace` in review is the check.
 
-**`eggup-eggpack` pins its dependencies exactly** (`=0.1.2`). Every other crate
-uses a caret requirement. So a fix published to a caret consumer is inherited
-automatically, but the same fix cannot reach `eggup-eggpack 0.1.2` consumers
-without a separate adapter republication. See [releases.md](releases.md).
+**`eggup-eggpack` pins its dependencies exactly** (`=0.1.3`, per
+`crates/eggup-eggpack/Cargo.toml`). Every other crate uses a caret requirement.
+So a fix published to a caret consumer is inherited automatically, while
+`eggup-eggpack 0.1.3` — which is published — carries its own exact pins and
+needs a separate adapter republication to inherit a later seam fix. See
+[releases.md](releases.md).
 
 ## More
 

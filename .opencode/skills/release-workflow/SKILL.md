@@ -19,7 +19,7 @@ Do not publish because code changed. Publication requires its own plan under
 Precedent: Verified Core M009 (`eggup-core` → `eggup-archive` 0.1.2),
 Eggpack Interop M004 (`eggup-acquisition` → `eggup-eggfetch` → `eggup-eggpack`
 0.1.2), Acquisition M009 (`eggup-curl` 0.1.2), Acquisition M010
-(`eggup-acquisition` 0.1.3, the current open milestone).
+(`eggup-acquisition` 0.1.3, published 2026-10-06).
 
 ## Order matters: publish dependencies first
 
@@ -29,12 +29,12 @@ to ship in seam → adapter → leaf order.
 
 ## The exact-pin cascade
 
-`eggup-eggpack` pins its Eggup dependencies exactly (`=0.1.2`). Every other
+`eggup-eggpack` pins its Eggup dependencies exactly (`=0.1.3`). Every other
 crate uses a caret requirement. Consequence:
 
 - A fix published to a caret consumer (`eggup-curl`, `eggup-eggfetch`,
   `eggup-service`) is inherited automatically on the next resolve.
-- The same fix **cannot** reach `eggup-eggpack 0.1.2` consumers. The adapter
+- The same fix **cannot** reach `eggup-eggpack 0.1.3` consumers. The adapter
   needs a **separate republication** to inherit a seam fix.
 
 So a single seam fix can become a two-publication event. Name that follow-on
@@ -43,12 +43,13 @@ explicitly in the plan and in the registry, or it will be discovered late.
 ## Never
 
 - Do not re-publish a version that already exists on crates.io. A fix needs a new
-  version (`0.1.2` → `0.1.3`).
-- Do not move `v0.1.1` / `v0.1.2` tags. Extend release notes instead.
+  version (`0.1.3` → `0.1.4`).
+- Do not move `v0.1.1` / `v0.1.2` / `v0.1.3` tags. Extend release notes instead.
 - Do not publish `eggup-transport-footprint` — it is `publish = false`.
 - Do not publish `eggup-service` without explicit maintainer authorization for
-  Service M011. It is published through `0.1.2`; the M010 correction is the
-  unpublished `0.1.3` candidate.
+  the next service milestone. It is published through `0.1.3` (M011, published
+  2026-10-09); the unpublished work sits in the crate's `Unreleased` section and
+  needs a publication milestone of its own.
 - Do not add release CI. Manual publication is a recorded decision.
 
 ## Qualification before publishing

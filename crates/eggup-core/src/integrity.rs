@@ -62,6 +62,13 @@ impl IntegrityResult {
 }
 
 /// Streams a local file through SHA-256 without buffering the complete artifact.
+///
+/// # Errors
+///
+/// Returns [`Error::Io`] when the file cannot be opened or read.
+///
+/// The digest is integrity evidence only: it is not a publisher-trust or
+/// signature claim, and this crate contains no authenticity verifier.
 pub fn hash_file(path: &Path) -> Result<[u8; 32]> {
     let mut file =
         File::open(path).map_err(|source| Error::io("opening file for hashing", source))?;
@@ -80,6 +87,13 @@ pub fn hash_file(path: &Path) -> Result<[u8; 32]> {
 }
 
 /// Parses exactly one strict SHA-256 sidecar line.
+///
+/// # Errors
+///
+/// Returns [`Error::VerificationFailed`] when the sidecar does not contain
+/// exactly one non-empty entry, when the digest is not exactly 64
+/// hexadecimal characters, or when the filename is not one exact non-control
+/// filename.
 pub fn parse_sha256_sidecar(input: &str) -> Result<Sha256Manifest> {
     let lines = input
         .lines()
@@ -114,6 +128,14 @@ pub fn parse_sha256_sidecar(input: &str) -> Result<Sha256Manifest> {
 }
 
 /// Verifies a local file against a parsed SHA-256 declaration.
+///
+/// # Errors
+///
+/// Returns [`Error::VerificationFailed`] when the manifest's filename does
+/// not bind to `path`, and [`Error::Io`] when the file cannot be read.
+///
+/// A matching digest is integrity evidence only; it is never a publisher-trust
+/// or signature claim.
 pub fn verify_file(path: &Path, manifest: &Sha256Manifest) -> Result<[u8; 32]> {
     if let Some(expected_name) = manifest.filename() {
         let actual_name = path
@@ -168,6 +190,19 @@ pub struct VerifiedTransaction {
 
 impl PreparedTransaction {
     /// Applies every member's declared integrity requirement before candidate validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::VerificationFailed`] when a staged member is not a
+    /// regular file or when its bytes do not match the member's declared
+    /// SHA-256 digest, and [`Error::Io`] when a staged member cannot be read
+    /// or hashed.
+    ///
+    /// A member declared
+    /// [`IntegrityRequirement::None`](crate::IntegrityRequirement::None) is
+    /// observable here as `NotRequired` and is rejected later: validation
+    /// refuses it and the final staged-digest revalidation requires a verified
+    /// digest for every member. There is no escape hatch.
     pub fn verify_integrity(self) -> Result<VerifiedTransaction> {
         let members = self.artifacts().iter().cloned().collect::<Vec<_>>();
         let mut results = Vec::with_capacity(members.len());
@@ -229,6 +264,11 @@ impl VerifiedTransaction {
     }
 
     /// Returns a verified member's private staged path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnknownMember`] when `member` is not part of this
+    /// transaction's artifact set.
     pub fn staged_path(&self, member: &MemberId) -> Result<PathBuf> {
         self.prepared.staged_path(member)
     }

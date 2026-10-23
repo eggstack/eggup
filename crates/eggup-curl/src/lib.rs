@@ -251,7 +251,7 @@ impl AcquisitionTransport for CurlTransport {
                     return Err(AcquisitionError::Cancelled);
                 }
                 let bytes = fs::read(&tmp)
-                    .map_err(|e| AcquisitionError::Io(bound(format!("reading part file: {e}"))))?;
+                    .map_err(|e| AcquisitionError::__adapter_io("reading part file", e))?;
                 eggup_acquisition::__remove_owned_temp(&tmp);
                 guard.disarm = true;
                 if bytes.len() > max {
@@ -285,7 +285,7 @@ impl AcquisitionTransport for CurlTransport {
             AcquisitionError::InvalidInput(bound("destination has no parent".into()))
         })?;
         let parent_meta = fs::symlink_metadata(parent)
-            .map_err(|e| AcquisitionError::Io(bound(format!("reading artifact parent: {e}"))))?;
+            .map_err(|e| AcquisitionError::__adapter_io("reading artifact parent", e))?;
         if !parent_meta.is_dir() || parent_meta.file_type().is_symlink() {
             return Err(AcquisitionError::InvalidInput(bound(
                 "artifact parent must be an existing real directory".into(),
@@ -336,7 +336,7 @@ impl AcquisitionTransport for CurlTransport {
                     return Err(AcquisitionError::Cancelled);
                 }
                 let size = fs::metadata(&tmp)
-                    .map_err(|e| AcquisitionError::Io(bound(format!("reading part file: {e}"))))?
+                    .map_err(|e| AcquisitionError::__adapter_io("reading part file", e))?
                     .len();
                 if size > max_artifact {
                     eggup_acquisition::__remove_owned_temp(&tmp);
@@ -380,9 +380,8 @@ pub fn discover_curl_executable() -> Result<PathBuf, AcquisitionError> {
 }
 
 fn discover_in(path_var: Option<std::ffi::OsString>) -> Result<PathBuf, AcquisitionError> {
-    let path_var = path_var.ok_or_else(|| {
-        AcquisitionError::Unavailable(bound("curl not found: PATH is unset".to_string()))
-    })?;
+    let path_var = path_var
+        .ok_or_else(|| AcquisitionError::__adapter_unavailable("curl not found: PATH is unset"))?;
     #[cfg(windows)]
     let names = vec!["curl", "curl.exe"];
     #[cfg(not(windows))]
@@ -400,20 +399,19 @@ fn discover_in(path_var: Option<std::ffi::OsString>) -> Result<PathBuf, Acquisit
             }
         }
     }
-    Err(AcquisitionError::Unavailable(bound(
-        "curl not found on PATH".to_string(),
-    )))
+    Err(AcquisitionError::__adapter_unavailable(
+        "curl not found on PATH",
+    ))
 }
 
-fn bound(mut s: String) -> String {
-    if s.len() > 512 {
-        let mut end = 512;
-        while !s.is_char_boundary(end) {
-            end -= 1;
-        }
-        s.truncate(end);
-    }
-    s
+/// Bounds a diagnostic detail to 512 bytes, truncating only at a UTF-8
+/// character boundary.
+///
+/// The implementation lives in the seam (`eggup-acquisition`), which owns the
+/// bounded-detail rule. This adapter deliberately keeps no local copy of the
+/// truncation logic; it only delegates.
+fn bound(s: String) -> String {
+    eggup_acquisition::__adapter_bound_detail(s)
 }
 
 /// Serializes a positive Rust `Duration` as locale-independent decimal seconds
@@ -589,7 +587,7 @@ fn run_curl_to_file(
     let deadline = start + eff_total;
     let owned_file = output_file
         .try_clone()
-        .map_err(|e| AcquisitionError::Io(bound(format!("cloning owned output handle: {e}"))))?;
+        .map_err(|e| AcquisitionError::__adapter_io("cloning owned output handle", e))?;
 
     let mut cmd = Command::new(executable);
     cmd.args(&args)
@@ -601,7 +599,7 @@ fn run_curl_to_file(
         cmd.env(k, v);
     }
     let mut child = cmd.spawn().map_err(|_| {
-        AcquisitionError::Unavailable(bound(format!("curl spawn failed for {redacted}")))
+        AcquisitionError::__adapter_unavailable(format!("curl spawn failed for {redacted}"))
     })?;
     // Curl streams the body on stdout. A duplicate of Eggup's exclusive open
     // file handle is moved to the reader thread; no pathname is reopened.
@@ -681,28 +679,46 @@ fn run_curl_to_file(
                 let _ = body_reader.join();
                 let _ = status_reader.join();
                 eggup_acquisition::__remove_owned_temp(output);
-                return Err(AcquisitionError::Io(bound(format!(
-                    "waiting for curl: {e}"
-                ))));
+                return Err(AcquisitionError::__adapter_io("waiting for curl", e));
             }
         }
     };
     let _ = child.wait();
     let bytes_written = body_reader
         .join()
-        .map_err(|_| AcquisitionError::Io(bound("curl body reader failed".into())))?
-        .map_err(|_| AcquisitionError::Io(bound("writing curl body failed".into())))?;
+        .map_err(|_| {
+            AcquisitionError::__adapter_io(
+                "joining curl body reader",
+                std::io::Error::other("curl body reader failed"),
+            )
+        })?
+        .map_err(|_| {
+            AcquisitionError::__adapter_io(
+                "writing curl body",
+                std::io::Error::other("writing curl body failed"),
+            )
+        })?;
     if bytes_written > max_bytes {
         eggup_acquisition::__remove_owned_temp(output);
         return Err(AcquisitionError::TooLarge { limit: max_bytes });
     }
     output_file
         .flush()
-        .map_err(|e| AcquisitionError::Io(bound(format!("flushing owned output: {e}"))))?;
+        .map_err(|e| AcquisitionError::__adapter_io("flushing owned output", e))?;
     let code_bytes = status_reader
         .join()
-        .map_err(|_| AcquisitionError::Io(bound("curl status reader failed".into())))?
-        .map_err(|_| AcquisitionError::Io(bound("reading curl status failed".into())))?;
+        .map_err(|_| {
+            AcquisitionError::__adapter_io(
+                "joining curl status reader",
+                std::io::Error::other("curl status reader failed"),
+            )
+        })?
+        .map_err(|_| {
+            AcquisitionError::__adapter_io(
+                "reading curl status",
+                std::io::Error::other("reading curl status failed"),
+            )
+        })?;
     classify_curl_result(
         exit_code,
         &code_bytes,
@@ -799,6 +815,14 @@ mod tests {
     #[cfg(not(windows))]
     use std::thread;
 
+    // Platform gate note (M013, Defect A): the `#[cfg(not(windows))]` gate on
+    // the loopback-server tests below is a **known, deliberate** platform
+    // difference, not a silent coverage gap. Those tests drive a real `curl`
+    // subprocess against an in-process loopback HTTP server; the Windows lane
+    // exercises the same transport paths through the real `curl.exe`
+    // integration tests instead. The gate is recorded here, at the point of
+    // use, so a reader sees the exclusion and its reason.
+
     #[test]
     fn exit_28_is_labelled_total_when_connect_and_total_ceilings_coincide() {
         let dir = temp_dir("curl-phase");
@@ -881,10 +905,31 @@ mod tests {
         discover_curl_executable().ok()
     }
 
-    fn transport() -> Option<CurlTransport> {
-        real_curl().map(|exe| {
-            CurlTransport::with_executable(exe, CurlConfig::strict()).expect("curl transport")
-        })
+    /// Requires a discoverable system `curl` executable.
+    ///
+    /// M013, Defect A, treatment (a): the tests that use this helper drive the
+    /// **real** curl subprocess. There is no fixture or stub that can stand in
+    /// for it, so when no `curl` is discoverable the test must fail loudly with
+    /// the missing prerequisite and the remedy. It must never report a pass
+    /// while asserting nothing.
+    fn require_curl_executable() -> PathBuf {
+        match real_curl() {
+            Some(exe) => exe,
+            None => panic!(
+                "no `curl` executable was discoverable on PATH. This test drives the real curl \
+                 subprocess and has nothing to assert without one. Install curl (for example \
+                 `brew install curl`) or put a curl executable on PATH, then re-run \
+                 `cargo test -p eggup-curl`."
+            ),
+        }
+    }
+
+    /// Builds a strict transport over the discovered system `curl`, failing
+    /// loudly when no `curl` is discoverable (M013, Defect A, treatment (a)).
+    fn require_transport() -> CurlTransport {
+        let exe = require_curl_executable();
+        CurlTransport::with_executable(exe, CurlConfig::strict())
+            .expect("strict curl transport must build from a discovered curl executable")
     }
 
     #[cfg(not(windows))]
@@ -1033,7 +1078,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn metadata_success_not_found_and_server_error() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let base = ok_server(b"hello-curl-meta".to_vec());
         let out = t
             .fetch_metadata(&req(&format!("{base}/meta")), limits(), &CancelFlag::new())
@@ -1057,7 +1102,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn artifact_success_not_found_and_server_error() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let body: Vec<u8> = (0..4096).map(|i| (i % 251) as u8).collect();
         let base = ok_server(body.clone());
         let dir = temp_dir("curl-artifact");
@@ -1119,7 +1164,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn truncated_transfer_is_hard_failure_without_promotion() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let body = vec![5u8; 4096];
         let base = serve_once(
             200,
@@ -1146,7 +1191,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn metadata_and_artifact_size_overflow() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let big = vec![9u8; 128 * 1024];
         let base = ok_server(big);
         let err = t
@@ -1177,28 +1222,14 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// Total-phase timeout, proven end to end against a real `curl`.
+    ///
+    /// M013, Defect A, treatment (a): the fixture must exist, so a missing
+    /// `curl` fails loudly instead of reporting a vacuous pass.
     #[test]
     #[cfg(not(windows))]
-    fn connect_and_total_timeouts_are_typed() {
-        let Some(t) = transport() else { return };
-        // Unroutable connect with a short connect ceiling.
-        let short_connect = FetchLimits {
-            max_metadata_bytes: 64 * 1024,
-            max_artifact_bytes: 256 * 1024,
-            connect_timeout: Duration::from_millis(500),
-            total_timeout: Duration::from_secs(10),
-        };
-        let err = t
-            .fetch_metadata(
-                &req("http://10.255.255.1:81/unreachable"),
-                short_connect,
-                &CancelFlag::new(),
-            )
-            .unwrap_err();
-        assert!(
-            matches!(err, AcquisitionError::Timeout { .. }),
-            "expected timeout, got {err}"
-        );
+    fn total_phase_timeout_is_typed_end_to_end() {
+        let t = require_transport();
         // Slow body with a short total ceiling.
         let body = vec![2u8; 1024];
         let base = serve_once(
@@ -1221,7 +1252,114 @@ mod tests {
                 &CancelFlag::new(),
             )
             .unwrap_err();
-        assert!(matches!(err, AcquisitionError::Timeout { phase: "total" }));
+        assert!(
+            matches!(err, AcquisitionError::Timeout { phase: "total" }),
+            "expected a total-phase timeout, got {err}"
+        );
+    }
+
+    /// Connect-phase timeout, proven end to end — **environment-conditional**.
+    ///
+    /// M013, Defect A, treatment (b): this proof needs a host that blackholes
+    /// the route to the probe address so the connect ceiling expires. Most
+    /// hosts and CI runners reject the connection immediately with
+    /// `ENETUNREACH`/`EHOSTUNREACH`, which is an ordinary transport failure,
+    /// not a timeout. The test is therefore marked as ignored with a recorded
+    /// reason and is reported as *ignored*, never as *passed*, and it never
+    /// exits silently: when it is run explicitly it asserts the exact
+    /// connect-phase label. The connect/total **label** is proven
+    /// deterministically, with no subprocess and no network, by
+    /// `classify_curl_result_labels_connect_and_total_without_a_subprocess`.
+    #[test]
+    #[cfg(not(windows))]
+    #[ignore = "environment-conditional: needs a host that blackholes the route to 10.255.255.1:81 so the connect ceiling expires instead of failing fast with ENETUNREACH/EHOSTUNREACH; the connect/total label itself is proven without a network by classify_curl_result_labels_connect_and_total_without_a_subprocess"]
+    fn connect_phase_timeout_is_typed_end_to_end() {
+        let t = require_transport();
+        // Unroutable connect with a short connect ceiling.
+        let short_connect = FetchLimits {
+            max_metadata_bytes: 64 * 1024,
+            max_artifact_bytes: 256 * 1024,
+            connect_timeout: Duration::from_millis(500),
+            total_timeout: Duration::from_secs(10),
+        };
+        let err = t
+            .fetch_metadata(
+                &req("http://10.255.255.1:81/unreachable"),
+                short_connect,
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(
+            matches!(err, AcquisitionError::Timeout { phase: "connect" }),
+            "expected a connect-phase timeout, got {err}"
+        );
+    }
+
+    /// The connect/total timeout label, proven without a subprocess and
+    /// without a network.
+    ///
+    /// M013, Defect A: because the end-to-end connect-phase proof is
+    /// environment-conditional, the *label* is pinned here at the
+    /// `classify_curl_result` layer by injecting `start`. The injected
+    /// elapsed times are whole seconds, so the assertion never depends on a
+    /// sub-second wall-clock budget.
+    #[test]
+    fn classify_curl_result_labels_connect_and_total_without_a_subprocess() {
+        let dir = temp_dir("curl-phase-label");
+        let output = dir.join("body");
+        fs::write(&output, b"partial").unwrap();
+
+        let phase_for = |eff_connect: Duration, eff_total: Duration, elapsed: Duration| {
+            let start = Instant::now() - elapsed;
+            match classify_curl_result(
+                Some(28),
+                b"",
+                &output,
+                "https://example.com/app",
+                start,
+                eff_connect,
+                eff_total,
+                1024,
+            ) {
+                Err(AcquisitionError::Timeout { phase }) => phase,
+                other => panic!("expected a timeout, got {other:?}"),
+            }
+        };
+
+        // A strictly tighter connect ceiling that has expired labels the
+        // failure as a connect timeout.
+        assert_eq!(
+            phase_for(
+                Duration::from_secs(2),
+                Duration::from_secs(20),
+                Duration::from_secs(2),
+            ),
+            "connect",
+            "an expired, strictly tighter connect ceiling must label a connect timeout"
+        );
+        // The same ceilings with the elapsed time past the connect ceiling
+        // label the failure as a total timeout.
+        assert_eq!(
+            phase_for(
+                Duration::from_secs(2),
+                Duration::from_secs(20),
+                Duration::from_secs(5),
+            ),
+            "total",
+            "an elapsed time past the connect ceiling must label a total timeout"
+        );
+        // Coincident ceilings are indistinguishable, so the weaker total
+        // claim is the only honest one.
+        assert_eq!(
+            phase_for(
+                Duration::from_secs(2),
+                Duration::from_secs(2),
+                Duration::from_secs(5),
+            ),
+            "total",
+            "coincident ceilings must not label a total timeout as connect"
+        );
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1362,6 +1500,96 @@ mod tests {
         assert!(matches!(err, Err(AcquisitionError::InvalidInput(_))));
     }
 
+    /// M012 (§6.2): the deterministic half of the sub-second serialization
+    /// proof.
+    ///
+    /// A sub-second `--max-time` cannot be proven end-to-end, because the
+    /// parent's deadline *is* the effective total ceiling — proving it would
+    /// need a sub-second wall-clock budget. It is proven here instead, at the
+    /// layer where the rule lives: `build_curl_args`, with no subprocess, no
+    /// network, and no wall clock at all. This retains the coverage that
+    /// `build_curl_args_passes_sub_second_deadlines_to_fake_curl` had to give
+    /// up in order to become deterministic.
+    #[test]
+    fn sub_second_deadlines_serialize_truthfully_without_a_subprocess() {
+        let cfg = CurlConfig::strict();
+        let value_after = |args: &[String], flag: &str| -> String {
+            let idx = args.iter().position(|a| a == flag).expect("flag present");
+            args[idx + 1].clone()
+        };
+        let sub_second_pair = FetchLimits {
+            max_metadata_bytes: 64 * 1024,
+            max_artifact_bytes: 256 * 1024,
+            connect_timeout: Duration::from_millis(250),
+            total_timeout: Duration::from_millis(750),
+        };
+
+        // A sub-second connect *and* sub-second total pair serializes to
+        // truthful decimal seconds.
+        let (eff_connect, eff_total) = cfg.effective_timeouts(sub_second_pair);
+        assert_eq!(eff_connect, Duration::from_millis(250));
+        assert_eq!(eff_total, Duration::from_millis(750));
+        let args = build_curl_args(&cfg, "https://example.com/x", 1024, eff_connect, eff_total)
+            .expect("builds");
+        assert_eq!(value_after(&args, "--connect-timeout"), "0.25");
+        assert_eq!(value_after(&args, "--max-time"), "0.75");
+
+        // `--max-time` is the *effective* total ceiling, never the raw
+        // request, when the adapter ceiling is the lower of the two.
+        let capped =
+            CurlConfig::strict().timeouts(Duration::from_millis(100), Duration::from_millis(400));
+        let (capped_connect, capped_total) = capped.effective_timeouts(sub_second_pair);
+        assert_eq!(capped_connect, Duration::from_millis(100));
+        assert_eq!(capped_total, Duration::from_millis(400));
+        let capped_args = build_curl_args(
+            &capped,
+            "https://example.com/x",
+            1024,
+            capped_connect,
+            capped_total,
+        )
+        .expect("builds");
+        assert_eq!(value_after(&capped_args, "--connect-timeout"), "0.1");
+        assert_eq!(value_after(&capped_args, "--max-time"), "0.4");
+        assert_ne!(
+            value_after(&capped_args, "--max-time"),
+            "0.75",
+            "--max-time must be the effective ceiling, never the raw request"
+        );
+
+        // Sub-microsecond positive durations still fail validation rather
+        // than widen to a second.
+        let err = build_curl_args(
+            &cfg,
+            "https://example.com/x",
+            1024,
+            Duration::from_nanos(500),
+            Duration::from_millis(500),
+        );
+        assert!(matches!(err, Err(AcquisitionError::InvalidInput(_))));
+    }
+
+    /// M012 (§6.1): the *asserted* serialization is decoupled from the
+    /// *enforced* wall-clock budget.
+    ///
+    /// The invariant under test is that a sub-second `FetchLimits` deadline is
+    /// serialized truthfully into the spawned child's argv. The former
+    /// version also made those same sub-second values the live parent
+    /// deadline, so the assertion doubled as a claim about host scheduling
+    /// and failed whenever the host was loaded: the parent deadline was the
+    /// only enforcement (the fake child ignores `--connect-timeout` and
+    /// `--max-time`), so a busy host expired the deadline the test was
+    /// trying to succeed inside.
+    ///
+    /// Here the connect deadline stays sub-second and is still proven
+    /// end-to-end through a real spawn, while the total budget is generous,
+    /// so no host scheduling decision can expire it.
+    ///
+    /// A sub-second `--max-time` cannot be proven end-to-end at all: the
+    /// parent's deadline *is* the effective total ceiling, so proving it
+    /// would require a sub-second wall-clock budget. That half is proven
+    /// deterministically, with no subprocess and no wall clock, by
+    /// `sub_second_deadlines_serialize_truthfully_without_a_subprocess`.
     #[cfg(unix)]
     #[test]
     fn build_curl_args_passes_sub_second_deadlines_to_fake_curl() {
@@ -1372,26 +1600,26 @@ mod tests {
             max_metadata_bytes: 64 * 1024,
             max_artifact_bytes: 256 * 1024,
             connect_timeout: Duration::from_millis(250),
-            total_timeout: Duration::from_millis(750),
+            // Generous on purpose: the total budget is not the thing under
+            // test, and a sub-second value here would re-couple the
+            // assertion to the host's scheduler.
+            total_timeout: Duration::from_secs(30),
         };
         t.fetch_metadata(&req("https://example.com/x"), cfg, &CancelFlag::new())
-            .unwrap();
+            .expect("fake curl completes well inside the 30s budget");
         let argv = fs::read_to_string(dir.join("argv")).unwrap();
         assert!(
             argv.contains("--connect-timeout 0.25"),
             "argv missing 0.25: {argv}"
         );
-        assert!(
-            argv.contains("--max-time 0.75"),
-            "argv missing 0.75: {argv}"
-        );
+        assert!(argv.contains("--max-time 30"), "argv missing 30: {argv}");
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     #[cfg(not(windows))]
     fn sub_second_total_timeout_kills_child_promptly() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let body = vec![7u8; 8192];
         let base = serve_once(
             200,
@@ -1419,9 +1647,28 @@ mod tests {
             .unwrap_err();
         let elapsed = started.elapsed();
         assert!(matches!(err, AcquisitionError::Timeout { phase: "total" }));
-        // Far less than the 4-second body stall and well below the previous
-        // one-second truthfulness allowance.
-        assert!(elapsed < Duration::from_millis(750), "elapsed {elapsed:?}");
+
+        // M012 (§6.3): promptness is proven against the deadline and against
+        // the server's stall, not against an absolute wall-clock constant.
+        //
+        // The deadline was actually reached: the fetch did not succeed early.
+        // Without this half, an upper bound alone would also pass if the
+        // fetch failed immediately.
+        assert!(
+            elapsed >= short_total.total_timeout,
+            "elapsed {elapsed:?} is below the {:?} total deadline",
+            short_total.total_timeout
+        );
+
+        // The child was killed rather than left to stall: comfortably inside
+        // the server's 4000 ms body stall. This proves the deadline fired; it
+        // does not claim the OS reaped within a fixed number of
+        // milliseconds, and the headroom absorbs the kill/reap/join latency
+        // that the transport's deadline contract does not govern.
+        assert!(
+            elapsed < Duration::from_secs(2),
+            "elapsed {elapsed:?} is not below the 2 s bound"
+        );
         assert!(!dest.exists());
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
         let _ = fs::remove_dir_all(&dir);
@@ -1429,7 +1676,7 @@ mod tests {
 
     #[test]
     fn cancellation_before_spawn_cleans_temp() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let dir = temp_dir("curl-cancel");
         let dest = dir.join("app");
         let cancel = CancelFlag::new();
@@ -1451,7 +1698,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn cancellation_during_body_stream_kills_and_reaps_child() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let base = serve_once(
             200,
             vec![("Content-Length".into(), "65536".into())],
@@ -1482,7 +1729,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn redirect_follow_and_reject() {
-        let Some(_) = real_curl() else { return };
+        let curl_exe = require_curl_executable();
         let target_body = b"redirect-target".to_vec();
         let target = ok_server(target_body.clone());
         let redirect = serve_once(
@@ -1493,7 +1740,7 @@ mod tests {
             false,
         );
         let follow = CurlTransport::with_executable(
-            real_curl().unwrap(),
+            curl_exe.clone(),
             CurlConfig::strict()
                 .follow_redirects(true)
                 .max_redirects(10),
@@ -1504,11 +1751,9 @@ mod tests {
             .unwrap();
         assert_eq!(out.success().unwrap().bytes(), b"redirect-target");
 
-        let nofollow = CurlTransport::with_executable(
-            real_curl().unwrap(),
-            CurlConfig::strict().follow_redirects(false),
-        )
-        .unwrap();
+        let nofollow =
+            CurlTransport::with_executable(curl_exe, CurlConfig::strict().follow_redirects(false))
+                .unwrap();
         let err = nofollow
             .fetch_metadata(&req(&format!("{redirect}/r")), limits(), &CancelFlag::new())
             .unwrap_err();

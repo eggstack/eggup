@@ -8,18 +8,22 @@
 #![doc = "application health are separate. No privilege escalation, no updater or"]
 #![doc = "transport policy, and no shell interpolation live in this crate."]
 
+mod commit_engine;
 mod disposition;
 mod lifecycle_update;
 mod windows_scm;
+pub use commit_engine::{
+    CommitEnginePolicy, LifecycleFailure, LifecycleUpdatePhase, NoPostInstallCheck,
+    OwnershipLossTolerance, PostInstallCheck, PostInstallCheckError, PostTransitionVerification,
+};
 pub use disposition::{
-    commit_with_disposition, plan_unix, plan_windows, DirectObservation, DirectRuntimeControl,
-    DirectState, DispositionBaseline, KnownConfig, UnixPlannerInput, UpdateRuntimeDisposition,
-    WindowsPlannerInput, WindowsServiceState,
+    commit_with_disposition, commit_with_disposition_with_engine_policy, plan_unix, plan_windows,
+    DirectObservation, DirectRuntimeControl, DirectState, DispositionBaseline, KnownConfig,
+    UnixPlannerInput, UpdateRuntimeDisposition, WindowsPlannerInput, WindowsServiceState,
 };
 pub use lifecycle_update::{
-    commit_with_lifecycle, LifecycleFailure, LifecycleRestorationStatus, LifecycleUpdateError,
-    LifecycleUpdatePhase, LifecycleUpdatePolicy, LifecycleUpdateReceipt, NoPostInstallCheck,
-    PostInstallCheck, PostInstallCheckError,
+    commit_with_lifecycle, commit_with_lifecycle_with_engine_policy, LifecycleRestorationStatus,
+    LifecycleUpdateError, LifecycleUpdatePolicy, LifecycleUpdateReceipt,
 };
 pub use windows_scm::{
     WindowsErrorControl, WindowsScmInstall, WindowsScmManager, WindowsServiceDependency,
@@ -38,6 +42,11 @@ pub struct ServiceId(String);
 
 impl ServiceId {
     /// Creates an identifier, rejecting empty, overlong, or control-character input.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when the value is empty, longer than 256
+    /// bytes, or contains a control character.
     pub fn new(value: impl Into<String>) -> Result<Self, ServiceError> {
         let value = value.into();
         if value.is_empty() || value.len() > 256 || value.chars().any(char::is_control) {
@@ -76,6 +85,12 @@ pub struct ServiceSpec {
 
 impl ServiceSpec {
     /// Creates a spec, validating the id, absolute executable, and arg safety.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when the executable is not absolute or is
+    /// empty, when an argument contains a control character, or when the
+    /// optional config path is not absolute.
     pub fn new(
         id: ServiceId,
         executable: PathBuf,
@@ -127,18 +142,38 @@ impl ServiceSpec {
     }
 }
 
-/// Canonical ownership classification, shared with `eggup-core` vocabulary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Ownership {
-    /// No registration exists under this identity.
-    Absent,
-    /// The registration exactly matches this deployment and may be mutated.
-    Owned,
-    /// The registration belongs to another deployment and must not be mutated.
-    Foreign,
-    /// Ownership cannot be proven; mutation is denied.
-    Unknown,
-}
+/// Canonical ownership classification, re-exported from `eggup-core`.
+///
+/// This is **the same type** as [`eggup_core::Ownership`], not a copy of it:
+/// `eggup_service::Ownership` and `eggup_core::Ownership` denote one type, so
+/// no conversion between them exists or is needed anywhere in the workspace.
+///
+/// # Service-context meaning
+///
+/// `eggup-core` states this classification in *destination* terms, because it
+/// classifies a filesystem object. The service crate uses the same
+/// classification for a *manager registration*:
+///
+/// * `Absent` — no registration exists under this identity;
+/// * `Owned` — the registration exactly matches this deployment and may be
+///   mutated;
+/// * `Foreign` — the registration belongs to another deployment and must not
+///   be mutated;
+/// * `Unknown` — ownership cannot be proven, so mutation is denied.
+///
+/// The core wording must not be read unqualified here: in the service context
+/// "destination" means the registered service unit, launchd label, or SCM
+/// service that the caller's identity claims.
+///
+/// # Fail-closed rule
+///
+/// `Owned` is **never inferred**. It is returned only by a caller-proven
+/// ownership check — in the service crate, by the manager adapter's exact
+/// identity comparison against the requested spec. `Foreign` and `Unknown`
+/// always fail closed: they are never destructively mutated, and they never
+/// produce a successful mutation outcome. See [`eggup_core::Ownership`] for
+/// core's canonical statement of the same rule.
+pub use eggup_core::Ownership;
 
 /// Manager-neutral lifecycle state. Health is separate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -282,8 +317,90 @@ pub enum ServiceOperation {
     Uninstall,
 }
 
+/// Machine-readable classification of a manager failure.
+///
+/// The kind — not the detail text — is the carrier of meaning. A consumer
+/// distinguishes "the manager timed out" from "the manager binary is missing"
+/// from "you lack privileges" by matching this value; nothing in this crate
+/// classifies a failure by substring-matching its own error text.
+///
+/// Every [`ServiceError::Manager`] construction site in this crate maps to
+/// exactly one kind. There is no "unclassified" fallback.
+///
+/// # Known limitation
+///
+/// A manager that *runs* and reports an access denial in its own stderr is
+/// [`ManagerFailureKind::Protocol`], because the platform supplied no
+/// structured denial. Only a structured platform denial — a Unix
+/// [`std::io::ErrorKind::PermissionDenied`] from the spawn path, or a Windows
+/// SCM access-denied code — is [`ManagerFailureKind::Permission`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ManagerFailureKind {
+    /// The manager child could not be created or driven.
+    Spawn,
+    /// A deadline expired before or during a manager command.
+    Timeout,
+    /// The platform reported an access denial.
+    Permission,
+    /// The manager program, or a manager resource it names, does not exist.
+    NotFound,
+    /// The manager ran and produced a result this crate cannot accept: a
+    /// non-zero exit on a mutation, malformed manager output, or an output
+    /// bound violation.
+    Protocol,
+    /// A local filesystem operation failed (definition write, unit removal).
+    LocalFilesystem,
+}
+
+impl ManagerFailureKind {
+    /// Classifies a manager child-creation failure from an operating-system error.
+    ///
+    /// `NotFound` maps to [`ManagerFailureKind::NotFound`], `PermissionDenied`
+    /// maps to [`ManagerFailureKind::Permission`], and every other error kind
+    /// maps to [`ManagerFailureKind::Spawn`]. This is a pure function: it
+    /// never inspects a message and never needs a real privilege failure.
+    pub fn from_spawn_error(error: &std::io::Error) -> Self {
+        match error.kind() {
+            std::io::ErrorKind::NotFound => Self::NotFound,
+            std::io::ErrorKind::PermissionDenied => Self::Permission,
+            _ => Self::Spawn,
+        }
+    }
+
+    /// Classifies a Windows SCM (Win32) OS error code.
+    ///
+    /// `5` (access denied) maps to [`ManagerFailureKind::Permission`], `1060`
+    /// (the specified service does not exist) maps to
+    /// [`ManagerFailureKind::NotFound`], and every other code maps to
+    /// [`ManagerFailureKind::Protocol`]. This is a pure function and is
+    /// platform-independent, so it is assertable on every lane.
+    pub fn from_scm_os_code(code: Option<i32>) -> Self {
+        match code {
+            Some(5) => Self::Permission,
+            Some(1060) => Self::NotFound,
+            _ => Self::Protocol,
+        }
+    }
+}
+
+impl fmt::Display for ManagerFailureKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Spawn => "spawn",
+            Self::Timeout => "timeout",
+            Self::Permission => "permission",
+            Self::NotFound => "not-found",
+            Self::Protocol => "protocol",
+            Self::LocalFilesystem => "local-filesystem",
+        };
+        f.write_str(name)
+    }
+}
+
 /// Typed service errors. Destructive attempts on `Foreign`/`Unknown` fail here.
-/// Error strings produced by crate helpers are capped at 512 UTF-8-safe bytes.
+/// Error strings produced by crate helpers are capped at
+/// [`MAX_DIAGNOSTIC_BYTES`] UTF-8-safe bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ServiceError {
@@ -299,24 +416,58 @@ pub enum ServiceError {
     /// The manager reported a conflict (already exists, not found, transitioning).
     Conflict(String),
     /// A bounded manager call failed.
-    Manager(String),
+    Manager {
+        /// The machine-readable failure classification.
+        kind: ManagerFailureKind,
+        /// The bounded diagnostic detail: the manager's own bounded stderr
+        /// excerpt, or the crate's bounded description of the failure.
+        detail: String,
+        /// The platform error code, when the platform supplied a structured
+        /// one. Windows SCM failures keep their raw OS code here so the
+        /// mapping stays lossless.
+        os_code: Option<i32>,
+    },
 }
 
 impl ServiceError {
     pub(crate) fn invalid(detail: impl Into<String>) -> Self {
-        Self::InvalidInput(truncate_utf8_bytes(detail.into(), 512))
+        Self::InvalidInput(truncate_utf8_bytes(detail.into(), MAX_DIAGNOSTIC_BYTES))
     }
 
     pub(crate) fn bounded(detail: impl Into<String>) -> String {
-        truncate_utf8_bytes(detail.into(), 512)
+        truncate_utf8_bytes(detail.into(), MAX_DIAGNOSTIC_BYTES)
     }
 
     pub(crate) fn conflict(detail: impl Into<String>) -> Self {
         Self::Conflict(Self::bounded(detail))
     }
 
-    pub(crate) fn manager(detail: impl Into<String>) -> Self {
-        Self::Manager(Self::bounded(detail))
+    /// Builds a manager failure with the given classification.
+    ///
+    /// The detail is bounded at [`MAX_DIAGNOSTIC_BYTES`] UTF-8-safe bytes.
+    pub fn manager(kind: ManagerFailureKind, detail: impl Into<String>) -> Self {
+        Self::Manager {
+            kind,
+            detail: Self::bounded(detail),
+            os_code: None,
+        }
+    }
+
+    /// Builds a manager failure that carries a platform error code.
+    ///
+    /// The detail is bounded at [`MAX_DIAGNOSTIC_BYTES`] UTF-8-safe bytes. The
+    /// code stays reachable through [`ServiceError::manager_os_code`], so a
+    /// platform mapping never degrades into a rendered sentence.
+    pub fn manager_with_os_code(
+        kind: ManagerFailureKind,
+        detail: impl Into<String>,
+        os_code: Option<i32>,
+    ) -> Self {
+        Self::Manager {
+            kind,
+            detail: Self::bounded(detail),
+            os_code,
+        }
     }
 
     /// Reports an ownership denial.
@@ -324,6 +475,27 @@ impl ServiceError {
         Self::OwnershipDenied {
             id: id.as_str().to_string(),
             ownership,
+        }
+    }
+
+    /// Returns the manager failure kind, when this is a manager failure.
+    ///
+    /// This is the programmatic discriminator: a consumer matches on the
+    /// returned kind instead of inspecting [`ServiceError::Manager`]'s detail
+    /// text.
+    pub fn manager_kind(&self) -> Option<ManagerFailureKind> {
+        match self {
+            Self::Manager { kind, .. } => Some(*kind),
+            _ => None,
+        }
+    }
+
+    /// Returns the platform error code of a manager failure, when the platform
+    /// supplied a structured one.
+    pub fn manager_os_code(&self) -> Option<i32> {
+        match self {
+            Self::Manager { os_code, .. } => *os_code,
+            _ => None,
         }
     }
 }
@@ -336,7 +508,17 @@ impl fmt::Display for ServiceError {
                 write!(f, "service {id} ownership denies mutation ({ownership:?})")
             }
             Self::Conflict(d) => write!(f, "service conflict: {d}"),
-            Self::Manager(d) => write!(f, "service manager failed: {d}"),
+            Self::Manager {
+                kind,
+                detail,
+                os_code,
+            } => match os_code {
+                Some(code) => write!(
+                    f,
+                    "service manager failed ({kind}, os code {code}): {detail}"
+                ),
+                None => write!(f, "service manager failed ({kind}): {detail}"),
+            },
         }
     }
 }
@@ -363,12 +545,59 @@ impl HealthProbe for NoProbe {
 /// later milestones; `TestDoubleManager` implements it for tests.
 pub trait ServiceManager {
     /// Inspects registration and lifecycle state without mutating anything.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::Manager`] with a classified [`ManagerFailureKind`]:
+    /// `Timeout` when the operation's deadline expires, `NotFound` when the
+    /// manager binary or a named manager resource does not exist, `Permission`
+    /// when the platform reports an access denial, `Spawn` when the manager
+    /// child cannot be created or driven, and `Protocol` when the manager ran
+    /// and produced a result the adapter cannot accept.
+    ///
+    /// [`ServiceError::InvalidInput`] when the adapter cannot answer for the
+    /// given spec.
     fn inspect(&self, spec: &ServiceSpec) -> Result<LifecycleSnapshot, ServiceError>;
 
     /// Installs/registers. Allowed for `Absent` (creation) or `Owned` (refresh).
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::OwnershipDenied`] when the observed ownership is
+    /// `Foreign` or `Unknown`, or when a pre-write recheck no longer proves
+    /// `Owned`.
+    ///
+    /// [`ServiceError::Manager`] with a classified [`ManagerFailureKind`]:
+    /// `Timeout` when the operation's deadline expires, `NotFound` when the
+    /// manager binary or a named manager resource does not exist, `Permission`
+    /// when the platform reports an access denial, `Spawn` when the manager
+    /// child cannot be created or driven, `Protocol` when the manager ran and
+    /// produced a result the adapter cannot accept, and `LocalFilesystem` when
+    /// a local definition write or removal failed.
+    ///
+    /// [`ServiceError::InvalidInput`] when the request material is
+    /// inconsistent with the spec.
+    ///
+    /// [`ServiceError::Conflict`] when a no-replace write lost a race with a
+    /// concurrent creation.
     fn install(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError>;
 
     /// Starts an `Owned` stopped service within `timeout`.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::OwnershipDenied`] when the observed ownership is not
+    /// `Owned`.
+    ///
+    /// [`ServiceError::Manager`] with a classified [`ManagerFailureKind`]:
+    /// `Timeout` when the deadline expires, `NotFound` when the manager binary
+    /// or a named manager resource does not exist, `Permission` when the
+    /// platform reports an access denial, `Spawn` when the manager child
+    /// cannot be created or driven, and `Protocol` when the manager ran and
+    /// produced a result the adapter cannot accept.
+    ///
+    /// [`ServiceError::InvalidInput`] when `timeout` is out of range, or when
+    /// the adapter has no start semantics (a cron adapter).
     fn start(
         &mut self,
         spec: &ServiceSpec,
@@ -380,6 +609,21 @@ pub trait ServiceManager {
     /// An adapter may stop a recognized manager failure state only when exact
     /// ownership is revalidated and it can prove there is no remaining work.
     /// Other unknown states fail closed.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::OwnershipDenied`] when the observed ownership is not
+    /// `Owned`.
+    ///
+    /// [`ServiceError::Manager`] with a classified [`ManagerFailureKind`]:
+    /// `Timeout` when the deadline expires, `NotFound` when the manager binary
+    /// or a named manager resource does not exist, `Permission` when the
+    /// platform reports an access denial, `Spawn` when the manager child
+    /// cannot be created or driven, and `Protocol` when the manager ran and
+    /// produced a result the adapter cannot accept.
+    ///
+    /// [`ServiceError::InvalidInput`] when `timeout` is out of range, or when
+    /// the adapter has no stop semantics (a cron adapter).
     fn stop(
         &mut self,
         spec: &ServiceSpec,
@@ -387,6 +631,21 @@ pub trait ServiceManager {
     ) -> Result<TransitionResult, ServiceError>;
 
     /// Restarts an `Owned` service within `timeout`.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::OwnershipDenied`] when the observed ownership is not
+    /// `Owned`.
+    ///
+    /// [`ServiceError::Manager`] with a classified [`ManagerFailureKind`]:
+    /// `Timeout` when the deadline expires, `NotFound` when the manager binary
+    /// or a named manager resource does not exist, `Permission` when the
+    /// platform reports an access denial, `Spawn` when the manager child
+    /// cannot be created or driven, and `Protocol` when the manager ran and
+    /// produced a result the adapter cannot accept.
+    ///
+    /// [`ServiceError::InvalidInput`] when `timeout` is out of range, or when
+    /// the adapter has no restart semantics (a cron adapter).
     fn restart(
         &mut self,
         spec: &ServiceSpec,
@@ -394,10 +653,35 @@ pub trait ServiceManager {
     ) -> Result<TransitionResult, ServiceError>;
 
     /// Removes an `Owned` registration.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::OwnershipDenied`] when the observed ownership is not
+    /// `Owned`, or when a pre-write recheck no longer proves `Owned`.
+    ///
+    /// [`ServiceError::Manager`] with a classified [`ManagerFailureKind`]:
+    /// `Timeout` when the operation's deadline expires, `NotFound` when the
+    /// manager binary or a named manager resource does not exist, `Permission`
+    /// when the platform reports an access denial, `Spawn` when the manager
+    /// child cannot be created or driven, `Protocol` when the manager ran and
+    /// produced a result the adapter cannot accept, and `LocalFilesystem` when
+    /// a local definition removal failed.
+    ///
+    /// [`ServiceError::InvalidInput`] when the request material is
+    /// inconsistent with the spec.
+    ///
+    /// [`ServiceError::Conflict`] when the observed state changed under the
+    /// operation.
     fn uninstall(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError>;
 }
 
 /// Ownership guard shared by all destructive operations.
+///
+/// # Errors
+///
+/// [`ServiceError::OwnershipDenied`] when `ownership` is `Absent`, `Foreign`,
+/// or `Unknown`. `Owned` is the only accepted value; every other state fails
+/// closed.
 pub fn require_owned(id: &ServiceId, ownership: Ownership) -> Result<(), ServiceError> {
     match ownership {
         Ownership::Owned => Ok(()),
@@ -615,10 +899,26 @@ pub const MAX_CRONTAB_BYTES: usize = 1024 * 1024;
 pub const MAX_DEFINITION_BYTES: usize = 1024 * 1024;
 /// Upper bound for transition polling (callers supply smaller values).
 pub const MAX_TRANSITION_TIMEOUT: Duration = Duration::from_secs(300);
+/// The one byte ceiling for diagnostic text produced by this crate.
+///
+/// This governs **manager-output diagnostic text** — the bounded error and
+/// failure evidence the crate derives from a manager command or a manager
+/// observation — and it is the only declared ceiling for that data class.
+/// Every production truncation site for that class uses this value, including
+/// the failure-detail truncation in the unified commit engine.
+///
+/// This is *not* the capture bound for raw manager output
+/// ([`MAX_COMMAND_OUTPUT_BYTES`]), which is a different data class.
+pub const MAX_DIAGNOSTIC_BYTES: usize = 512;
 
-/// Bounded manager-command output.
+/// Bounded output of one manager command invocation.
+///
+/// The canonical service-side name states that this is a **manager** command
+/// output. The former `CommandOutput` spelling survives as the type alias
+/// [`CommandOutput`], so existing explicit-path callers and existing
+/// [`CommandExecutor`] implementations keep compiling.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommandOutput {
+pub struct ManagerCommandOutput {
     /// Process exit status code, when waited.
     pub status: Option<i32>,
     /// Captured stdout (bounded).
@@ -627,7 +927,7 @@ pub struct CommandOutput {
     pub stderr: Vec<u8>,
 }
 
-impl CommandOutput {
+impl ManagerCommandOutput {
     /// Stdout as lossy UTF-8 (manager output is ASCII/UTF-8 in practice).
     pub fn stdout_text(&self) -> String {
         String::from_utf8_lossy(&self.stdout).into_owned()
@@ -638,6 +938,19 @@ impl CommandOutput {
         String::from_utf8_lossy(&self.stderr).into_owned()
     }
 }
+
+/// Compatibility alias for the former [`CommandOutput`] name.
+///
+/// This is a **type alias** to [`ManagerCommandOutput`], so the two spellings
+/// denote one type: an existing [`CommandExecutor`] implementation written
+/// against either spelling still satisfies the trait, and a consumer naming
+/// `eggup_service::CommandOutput` in a type position keeps compiling.
+///
+/// The alias is deliberately **not** marked `#[deprecated]`: deprecation is a
+/// publication-policy decision owned by a later republication milestone, and a
+/// deprecated alias would break downstream `-D warnings` builds. Its
+/// disposition is therefore settled at the intentional 0.2/1.0 API boundary.
+pub type CommandOutput = ManagerCommandOutput;
 
 /// Injectable manager-command executor (literal argv, no shell).
 ///
@@ -657,7 +970,7 @@ pub trait CommandExecutor: fmt::Debug {
         argv: &[String],
         stdin_data: Option<&[u8]>,
         timeout: Duration,
-    ) -> Result<CommandOutput, ServiceError>;
+    ) -> Result<ManagerCommandOutput, ServiceError>;
 }
 
 /// Production bounded command runner (literal argv, no shell).
@@ -688,6 +1001,10 @@ impl SystemExecutor {
     }
 
     /// Creates a runner with an explicit per-stream bound.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when the bound is zero or above 16 MiB.
     pub fn with_max_output(max_output_bytes: usize) -> Result<Self, ServiceError> {
         if max_output_bytes == 0 || max_output_bytes > 16 * 1024 * 1024 {
             return Err(ServiceError::invalid("output bound out of range"));
@@ -702,7 +1019,7 @@ impl CommandExecutor for SystemExecutor {
         argv: &[String],
         stdin_data: Option<&[u8]>,
         timeout: Duration,
-    ) -> Result<CommandOutput, ServiceError> {
+    ) -> Result<ManagerCommandOutput, ServiceError> {
         if argv.is_empty() || argv[0].is_empty() {
             return Err(ServiceError::invalid("manager command has no program"));
         }
@@ -735,11 +1052,15 @@ impl CommandExecutor for SystemExecutor {
         }
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
-        let mut child = cmd.spawn().map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => {
-                ServiceError::manager(format!("manager binary missing: {program}"))
-            }
-            _ => ServiceError::manager(format!("manager spawn failed for {program}: {e}")),
+        let mut child = cmd.spawn().map_err(|e| {
+            // The classification is decided here, where the platform's error
+            // kind is still available. Nothing downstream inspects the text.
+            let kind = ManagerFailureKind::from_spawn_error(&e);
+            let detail = match kind {
+                ManagerFailureKind::NotFound => format!("manager binary missing: {program}"),
+                _ => format!("manager spawn failed for {program}: {e}"),
+            };
+            ServiceError::manager(kind, detail)
         })?;
         // Reader threads are attached before the stdin write, so a child that
         // fills stdout/stderr before draining stdin cannot deadlock both sides.
@@ -776,9 +1097,10 @@ impl CommandExecutor for SystemExecutor {
                 let Some(mut stdin) = child.stdin.take() else {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err(ServiceError::manager(format!(
-                        "manager stdin unavailable for {program}"
-                    )));
+                    return Err(ServiceError::manager(
+                        ManagerFailureKind::Spawn,
+                        format!("manager stdin unavailable for {program}"),
+                    ));
                 };
                 let (tx_in, rx_in) = std::sync::mpsc::channel();
                 // The writer thread needs owned bytes; the bound above keeps
@@ -801,9 +1123,10 @@ impl CommandExecutor for SystemExecutor {
                 if let Ok(Err(_)) = rx.try_recv() {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err(ServiceError::manager(format!(
-                        "manager stdin failed for {program}"
-                    )));
+                    return Err(ServiceError::manager(
+                        ManagerFailureKind::Spawn,
+                        format!("manager stdin failed for {program}"),
+                    ));
                 }
             }
             match child.try_wait() {
@@ -815,35 +1138,58 @@ impl CommandExecutor for SystemExecutor {
                         let remaining = command_deadline
                             .checked_duration_since(Instant::now())
                             .filter(|d| !d.is_zero())
-                            .ok_or_else(|| ServiceError::manager("manager command timed out"))?;
+                            .ok_or_else(|| {
+                                ServiceError::manager(
+                                    ManagerFailureKind::Timeout,
+                                    "manager command timed out",
+                                )
+                            })?;
                         if !matches!(rx.recv_timeout(remaining), Ok(Ok(()))) {
                             let _ = child.kill();
                             let _ = child.wait();
-                            return Err(ServiceError::manager(format!(
-                                "manager stdin failed for {program}"
-                            )));
+                            return Err(ServiceError::manager(
+                                ManagerFailureKind::Spawn,
+                                format!("manager stdin failed for {program}"),
+                            ));
                         }
                     }
                     let remaining = command_deadline
                         .checked_duration_since(Instant::now())
                         .filter(|d| !d.is_zero())
-                        .ok_or_else(|| ServiceError::manager("manager command timed out"))?;
+                        .ok_or_else(|| {
+                            ServiceError::manager(
+                                ManagerFailureKind::Timeout,
+                                "manager command timed out",
+                            )
+                        })?;
                     let (stdout, out_overflow) = rx_out.recv_timeout(remaining).map_err(|_| {
-                        ServiceError::manager("manager output collection timed out")
+                        ServiceError::manager(
+                            ManagerFailureKind::Timeout,
+                            "manager output collection timed out",
+                        )
                     })?;
                     let remaining = command_deadline
                         .checked_duration_since(Instant::now())
                         .filter(|d| !d.is_zero())
-                        .ok_or_else(|| ServiceError::manager("manager command timed out"))?;
+                        .ok_or_else(|| {
+                            ServiceError::manager(
+                                ManagerFailureKind::Timeout,
+                                "manager command timed out",
+                            )
+                        })?;
                     let (stderr, err_overflow) = rx_err.recv_timeout(remaining).map_err(|_| {
-                        ServiceError::manager("manager output collection timed out")
+                        ServiceError::manager(
+                            ManagerFailureKind::Timeout,
+                            "manager output collection timed out",
+                        )
                     })?;
                     if out_overflow || err_overflow {
-                        return Err(ServiceError::manager(format!(
-                            "manager output exceeded bound for {program}"
-                        )));
+                        return Err(ServiceError::manager(
+                            ManagerFailureKind::Protocol,
+                            format!("manager output exceeded bound for {program}"),
+                        ));
                     }
-                    return Ok(CommandOutput {
+                    return Ok(ManagerCommandOutput {
                         status: status.code(),
                         stdout,
                         stderr,
@@ -853,9 +1199,10 @@ impl CommandExecutor for SystemExecutor {
                     if Instant::now() >= command_deadline {
                         let _ = child.kill();
                         let _ = child.wait();
-                        return Err(ServiceError::manager(format!(
-                            "manager command timed out for {program}"
-                        )));
+                        return Err(ServiceError::manager(
+                            ManagerFailureKind::Timeout,
+                            format!("manager command timed out for {program}"),
+                        ));
                     }
                     std::thread::sleep(
                         command_deadline
@@ -867,9 +1214,10 @@ impl CommandExecutor for SystemExecutor {
                 Err(e) => {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err(ServiceError::manager(format!(
-                        "manager wait failed for {program}: {e}"
-                    )));
+                    return Err(ServiceError::manager(
+                        ManagerFailureKind::Spawn,
+                        format!("manager wait failed for {program}: {e}"),
+                    ));
                 }
             }
         }
@@ -898,9 +1246,10 @@ fn resolve_manager_program(program: &str) -> Result<PathBuf, ServiceError> {
         }
         return Ok(path.to_path_buf());
     }
-    Err(ServiceError::manager(format!(
-        "trusted manager binary missing: {program}"
-    )))
+    Err(ServiceError::manager(
+        ManagerFailureKind::NotFound,
+        format!("trusted manager binary missing: {program}"),
+    ))
 }
 
 fn validate_executable_path(path: &Path, display: &str) -> Result<PathBuf, ServiceError> {
@@ -909,8 +1258,12 @@ fn validate_executable_path(path: &Path, display: &str) -> Result<PathBuf, Servi
             "manager program override must be absolute",
         ));
     }
-    let metadata = std::fs::metadata(path)
-        .map_err(|_| ServiceError::manager(format!("manager binary missing: {display}")))?;
+    let metadata = std::fs::metadata(path).map_err(|_| {
+        ServiceError::manager(
+            ManagerFailureKind::NotFound,
+            format!("manager binary missing: {display}"),
+        )
+    })?;
     if !metadata.is_file() {
         return Err(ServiceError::invalid(
             "manager program is not a regular file",
@@ -978,7 +1331,7 @@ fn read_bounded_generic(
 #[derive(Debug, Clone)]
 struct FakeExpectation {
     expected_argv: Vec<String>,
-    result: Result<CommandOutput, ServiceError>,
+    result: Result<ManagerCommandOutput, ServiceError>,
 }
 
 /// One observed call for [`FakeExecutor`].
@@ -1004,7 +1357,12 @@ impl FakeExecutor {
     }
 
     /// Scripts a successful response for the next matching call.
-    pub fn expect(&self, argv: &[&str], output: CommandOutput) {
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal expectation lock is poisoned by a panic in
+    /// another thread that also used this executor.
+    pub fn expect(&self, argv: &[&str], output: ManagerCommandOutput) {
         self.expectations
             .lock()
             .expect("fake lock")
@@ -1015,6 +1373,11 @@ impl FakeExecutor {
     }
 
     /// Scripts a failure for the next matching call.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal expectation lock is poisoned by a panic in
+    /// another thread that also used this executor.
     pub fn expect_error(&self, argv: &[&str], err: ServiceError) {
         self.expectations
             .lock()
@@ -1026,16 +1389,31 @@ impl FakeExecutor {
     }
 
     /// Returns all observed calls in order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal call lock is poisoned by a panic in another
+    /// thread that also used this executor.
     pub fn calls(&self) -> Vec<FakeCall> {
         self.calls.lock().expect("fake lock").clone()
     }
 
     /// Returns the number of observed calls.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal call lock is poisoned by a panic in another
+    /// thread that also used this executor.
     pub fn call_count(&self) -> usize {
         self.calls.lock().expect("fake lock").len()
     }
 
     /// Returns true when all expectations were consumed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal expectation lock is poisoned by a panic in
+    /// another thread that also used this executor.
     pub fn is_exhausted(&self) -> bool {
         self.expectations.lock().expect("fake lock").is_empty()
     }
@@ -1047,20 +1425,26 @@ impl CommandExecutor for FakeExecutor {
         argv: &[String],
         stdin_data: Option<&[u8]>,
         _timeout: Duration,
-    ) -> Result<CommandOutput, ServiceError> {
+    ) -> Result<ManagerCommandOutput, ServiceError> {
         self.calls.lock().expect("fake lock").push(FakeCall {
             argv: argv.to_vec(),
             stdin: stdin_data.map(|b| b.to_vec()),
         });
         let mut queue = self.expectations.lock().expect("fake lock");
         let Some(exp) = queue.pop_front() else {
-            return Err(ServiceError::manager("unexpected manager command"));
+            return Err(ServiceError::manager(
+                ManagerFailureKind::Spawn,
+                "unexpected manager command",
+            ));
         };
         if exp.expected_argv != argv {
-            return Err(ServiceError::manager(format!(
-                "unexpected manager argv: got {:?}, want {:?}",
-                argv, exp.expected_argv
-            )));
+            return Err(ServiceError::manager(
+                ManagerFailureKind::Protocol,
+                format!(
+                    "unexpected manager argv: got {:?}, want {:?}",
+                    argv, exp.expected_argv
+                ),
+            ));
         }
         exp.result
     }
@@ -1072,7 +1456,7 @@ impl CommandExecutor for &FakeExecutor {
         argv: &[String],
         stdin_data: Option<&[u8]>,
         timeout: Duration,
-    ) -> Result<CommandOutput, ServiceError> {
+    ) -> Result<ManagerCommandOutput, ServiceError> {
         (*self).run(argv, stdin_data, timeout)
     }
 }
@@ -1087,6 +1471,21 @@ impl CommandExecutor for &FakeExecutor {
 /// uses no-replace promotion and fails with `Conflict` when `dest` exists;
 /// `true` replaces an owned destination via rename. Never creates missing
 /// parents and never changes parent permissions. Cleans only the owned temp.
+///
+/// # Errors
+///
+/// [`ServiceError::InvalidInput`] when the definition bytes are empty,
+/// overlong, or contain a NUL byte, when the destination has no parent
+/// directory, or when the destination exists and `allow_overwrite` is
+/// `false`.
+///
+/// [`ServiceError::Conflict`] when a no-replace promotion loses the race with
+/// a destination created concurrently.
+///
+/// [`ServiceError::Manager`] with [`ManagerFailureKind::LocalFilesystem`] when
+/// a local filesystem operation fails: reading the parent directory, creating
+/// the owner-private temp, writing, flushing, syncing, securing, or promoting
+/// it.
 pub fn atomic_write_definition(
     path: &Path,
     bytes: &[u8],
@@ -1103,8 +1502,12 @@ pub fn atomic_write_definition(
     let parent = path
         .parent()
         .ok_or_else(|| ServiceError::invalid("definition path has no parent"))?;
-    let parent_meta = std::fs::symlink_metadata(parent)
-        .map_err(|e| ServiceError::manager(format!("reading definition parent: {e}")))?;
+    let parent_meta = std::fs::symlink_metadata(parent).map_err(|e| {
+        ServiceError::manager(
+            ManagerFailureKind::LocalFilesystem,
+            format!("reading definition parent: {e}"),
+        )
+    })?;
     if !parent_meta.is_dir() || parent_meta.file_type().is_symlink() {
         return Err(ServiceError::invalid(
             "definition parent must be an existing real directory",
@@ -1157,14 +1560,19 @@ pub fn atomic_write_definition(
             }
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => {
-                return Err(ServiceError::manager(format!(
-                    "creating definition temp: {e}"
-                )));
+                return Err(ServiceError::manager(
+                    ManagerFailureKind::LocalFilesystem,
+                    format!("creating definition temp: {e}"),
+                ));
             }
         }
     }
-    let mut file = file
-        .ok_or_else(|| ServiceError::manager("definition temp collisions exhausted".to_string()))?;
+    let mut file = file.ok_or_else(|| {
+        ServiceError::manager(
+            ManagerFailureKind::LocalFilesystem,
+            "definition temp collisions exhausted".to_string(),
+        )
+    })?;
     struct Guard<'a> {
         path: &'a Path,
         disarm: bool,
@@ -1182,19 +1590,35 @@ pub fn atomic_write_definition(
     };
     {
         use std::io::Write;
-        file.write_all(bytes)
-            .map_err(|e| ServiceError::manager(format!("writing definition temp: {e}")))?;
-        file.flush()
-            .map_err(|e| ServiceError::manager(format!("flushing definition temp: {e}")))?;
-        file.sync_all()
-            .map_err(|e| ServiceError::manager(format!("syncing definition temp: {e}")))?;
+        file.write_all(bytes).map_err(|e| {
+            ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("writing definition temp: {e}"),
+            )
+        })?;
+        file.flush().map_err(|e| {
+            ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("flushing definition temp: {e}"),
+            )
+        })?;
+        file.sync_all().map_err(|e| {
+            ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("syncing definition temp: {e}"),
+            )
+        })?;
     }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let perms = std::fs::Permissions::from_mode(final_mode);
-        std::fs::set_permissions(&tmp, perms)
-            .map_err(|e| ServiceError::manager(format!("securing definition temp: {e}")))?;
+        std::fs::set_permissions(&tmp, perms).map_err(|e| {
+            ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("securing definition temp: {e}"),
+            )
+        })?;
     }
     drop(file);
     if allow_overwrite {
@@ -1213,7 +1637,10 @@ pub fn atomic_write_definition(
                 }
                 Ok(())
             }
-            Err(e) => Err(ServiceError::manager(format!("promoting definition: {e}"))),
+            Err(e) => Err(ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("promoting definition: {e}"),
+            )),
         }
     } else {
         match std::fs::hard_link(&tmp, path) {
@@ -1228,7 +1655,10 @@ pub fn atomic_write_definition(
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(ServiceError::conflict(
                 "definition already exists; refusing to overwrite",
             )),
-            Err(e) => Err(ServiceError::manager(format!("promoting definition: {e}"))),
+            Err(e) => Err(ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("promoting definition: {e}"),
+            )),
         }
     }
 }
@@ -1274,6 +1704,14 @@ pub struct SystemdInstall {
 
 impl SystemdInstall {
     /// Validates install material without touching the manager.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when the unit name is empty, overlong,
+    /// contains a control character, is not a bare `*.service` file name, when
+    /// the unit path is not absolute, when the definition bytes are empty,
+    /// overlong, or contain a NUL byte, or when the transition timeout is zero
+    /// or above [`MAX_TRANSITION_TIMEOUT`].
     pub fn new(
         unit_name: String,
         scope: SystemdScope,
@@ -1348,6 +1786,17 @@ impl<E: CommandExecutor> SystemdManager<E> {
         &self.executor
     }
 
+    /// Creates the single per-operation deadline for this adapter.
+    ///
+    /// `install`, `uninstall` and `inspect` take no timeout parameter: their
+    /// budget is `install.transition_timeout` for the *whole* operation. The
+    /// clamp is applied exactly once, here, at deadline construction. Every
+    /// manager invocation the operation makes draws from this one deadline, so
+    /// no invocation is ever granted a fresh full budget.
+    fn operation_deadline(&self) -> Result<OperationDeadline, ServiceError> {
+        OperationDeadline::new(bounded_timeout(self.install.transition_timeout))
+    }
+
     fn show_argv(&self) -> Vec<String> {
         vec![
             "systemctl".to_string(),
@@ -1371,16 +1820,6 @@ impl<E: CommandExecutor> SystemdManager<E> {
         ]
     }
 
-    fn ownership_of(
-        &self,
-        spec: &ServiceSpec,
-    ) -> Result<(Ownership, LifecycleState), ServiceError> {
-        self.ownership_until(
-            spec,
-            OperationDeadline::new(self.install.transition_timeout)?,
-        )
-    }
-
     fn ownership_until(
         &self,
         spec: &ServiceSpec,
@@ -1400,7 +1839,7 @@ impl<E: CommandExecutor> SystemdManager<E> {
         &self,
         verb: &str,
         deadline: OperationDeadline,
-    ) -> Result<CommandOutput, ServiceError> {
+    ) -> Result<ManagerCommandOutput, ServiceError> {
         let argv = vec![
             "systemctl".to_string(),
             self.install.scope.flag().to_string(),
@@ -1409,14 +1848,16 @@ impl<E: CommandExecutor> SystemdManager<E> {
         ];
         let out = self
             .executor
-            .run(&argv, None, deadline.command_timeout()?)
-            .map_err(permission_hint)?;
+            .run(&argv, None, deadline.command_timeout()?)?;
         if out.status != Some(0) {
-            return Err(permission_hint(ServiceError::manager(format!(
-                "systemctl {verb} exited {}: {}",
-                out.status.unwrap_or(-1),
-                truncate(&out.stderr_text()),
-            ))));
+            return Err(ServiceError::manager(
+                ManagerFailureKind::Protocol,
+                format!(
+                    "systemctl {verb} exited {}: {}",
+                    out.status.unwrap_or(-1),
+                    ServiceError::bounded(out.stderr_text()),
+                ),
+            ));
         }
         Ok(out)
     }
@@ -1435,8 +1876,7 @@ impl<E: CommandExecutor> SystemdManager<E> {
             ];
             let out = self
                 .executor
-                .run(&argv, None, deadline.command_timeout()?)
-                .map_err(permission_hint)?;
+                .run(&argv, None, deadline.command_timeout()?)?;
             let state = out.stdout_text().trim().to_string();
             let confirmed = if want_active {
                 state == "active" && out.status == Some(0)
@@ -1553,6 +1993,7 @@ impl<E: CommandExecutor> SystemdManager<E> {
         )?;
         if out.status != Some(0) {
             return Err(ServiceError::manager(
+                ManagerFailureKind::Protocol,
                 "systemd quiescence observation failed",
             ));
         }
@@ -1571,8 +2012,7 @@ impl<E: CommandExecutor> SystemdManager<E> {
         ];
         let out = self
             .executor
-            .run(&argv, None, deadline.command_timeout()?)
-            .map_err(permission_hint)?;
+            .run(&argv, None, deadline.command_timeout()?)?;
         Ok((out.stdout_text().trim().to_owned(), out.status))
     }
 }
@@ -1603,25 +2043,33 @@ fn parse_quiescence_observation(
     let mut properties = std::collections::HashMap::new();
     for line in text.lines() {
         let Some((key, value)) = line.split_once('=') else {
-            return Err(ServiceError::manager("malformed systemd observation"));
+            return Err(ServiceError::manager(
+                ManagerFailureKind::Protocol,
+                "malformed systemd observation",
+            ));
         };
         if properties.insert(key, value).is_some() {
-            return Err(ServiceError::manager("duplicate systemd observation field"));
+            return Err(ServiceError::manager(
+                ManagerFailureKind::Protocol,
+                "duplicate systemd observation field",
+            ));
         }
     }
     let property = |key| {
-        properties
-            .get(key)
-            .copied()
-            .ok_or_else(|| ServiceError::manager("incomplete systemd observation"))
+        properties.get(key).copied().ok_or_else(|| {
+            ServiceError::manager(
+                ManagerFailureKind::Protocol,
+                "incomplete systemd observation",
+            )
+        })
     };
     let (ownership, _, _) = systemd_ownership(text, spec)?;
-    let main_pid = property("MainPID")?
-        .parse()
-        .map_err(|_| ServiceError::manager("invalid systemd MainPID"))?;
-    let control_pid = property("ControlPID")?
-        .parse()
-        .map_err(|_| ServiceError::manager("invalid systemd ControlPID"))?;
+    let main_pid = property("MainPID")?.parse().map_err(|_| {
+        ServiceError::manager(ManagerFailureKind::Protocol, "invalid systemd MainPID")
+    })?;
+    let control_pid = property("ControlPID")?.parse().map_err(|_| {
+        ServiceError::manager(ManagerFailureKind::Protocol, "invalid systemd ControlPID")
+    })?;
     Ok(SystemdQuiescenceObservation {
         ownership,
         active_state: property("ActiveState")?.to_string(),
@@ -1722,7 +2170,10 @@ impl OperationDeadline {
 
     fn command_timeout_at(self, now: Instant) -> Result<Duration, ServiceError> {
         self.remaining_at(now).ok_or_else(|| {
-            ServiceError::manager("transition deadline exhausted before manager command")
+            ServiceError::manager(
+                ManagerFailureKind::Timeout,
+                "transition deadline exhausted before manager command",
+            )
         })
     }
 
@@ -1781,36 +2232,18 @@ fn truncate_utf8_bytes(mut text: String, max_bytes: usize) -> String {
     text
 }
 
-fn truncate(s: &str) -> String {
-    truncate_utf8_bytes(s.to_string(), 256)
-}
-
-fn permission_hint(e: ServiceError) -> ServiceError {
-    match e {
-        ServiceError::Manager(d) => {
-            let lower = d.to_lowercase();
-            if lower.contains("permission") || lower.contains("denied") || lower.contains("access")
-            {
-                const HINT: &str = " (permission denied; re-run with appropriate user/system scope; no automatic elevation)";
-                let detail = truncate_utf8_bytes(d, 512 - HINT.len());
-                ServiceError::Manager(format!("{detail}{HINT}"))
-            } else {
-                ServiceError::Manager(d)
-            }
-        }
-        other => other,
-    }
-}
-
-fn ensure_mutation_success(out: &CommandOutput, command: &str) -> Result<(), ServiceError> {
+fn ensure_mutation_success(out: &ManagerCommandOutput, command: &str) -> Result<(), ServiceError> {
     if out.status == Some(0) {
         Ok(())
     } else {
-        Err(permission_hint(ServiceError::manager(format!(
-            "{command} exited {}: {}",
-            out.status.unwrap_or(-1),
-            truncate(&out.stderr_text()),
-        ))))
+        Err(ServiceError::manager(
+            ManagerFailureKind::Protocol,
+            format!(
+                "{command} exited {}: {}",
+                out.status.unwrap_or(-1),
+                ServiceError::bounded(out.stderr_text()),
+            ),
+        ))
     }
 }
 
@@ -1915,11 +2348,10 @@ fn systemd_ownership(
 
 impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
     fn inspect(&self, spec: &ServiceSpec) -> Result<LifecycleSnapshot, ServiceError> {
-        let out = self.executor.run(
-            &self.show_argv(),
-            None,
-            bounded_timeout(self.install.transition_timeout),
-        )?;
+        let deadline = self.operation_deadline()?;
+        let out = self
+            .executor
+            .run(&self.show_argv(), None, deadline.command_timeout()?)?;
         let (ownership, state, present) = if out.status == Some(0) {
             systemd_ownership(&out.stdout_text(), spec)?
         } else {
@@ -1936,11 +2368,15 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
     }
 
     fn install(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
-        let (ownership, _) = self.ownership_of(spec)?;
+        // One deadline for the whole operation: the ownership probe, the
+        // pre-write recheck, and the post-write reload/enable all draw from
+        // it.
+        let deadline = self.operation_deadline()?;
+        let (ownership, _) = self.ownership_until(spec, deadline)?;
         match ownership {
             Ownership::Absent => {
                 atomic_write_definition(&self.install.unit_path, &self.install.definition, false)?;
-                self.post_write()?;
+                self.post_write(deadline)?;
                 Ok(TransitionResult {
                     operation: ServiceOperation::Install,
                     completed: true,
@@ -1949,12 +2385,12 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
             }
             Ownership::Owned => {
                 // Re-inspect before destructive overwrite (external changes).
-                let (recheck, _) = self.ownership_of(spec)?;
+                let (recheck, _) = self.ownership_until(spec, deadline)?;
                 if recheck != Ownership::Owned {
                     return Err(ServiceError::denied(spec.id(), recheck));
                 }
                 atomic_write_definition(&self.install.unit_path, &self.install.definition, true)?;
-                self.post_write()?;
+                self.post_write(deadline)?;
                 Ok(TransitionResult {
                     operation: ServiceOperation::Install,
                     completed: true,
@@ -2048,10 +2484,13 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
     }
 
     fn uninstall(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
-        let (ownership, _) = self.ownership_of(spec)?;
+        // One deadline for the whole operation: both ownership probes, the
+        // disable, and the daemon-reload all draw from it.
+        let deadline = self.operation_deadline()?;
+        let (ownership, _) = self.ownership_until(spec, deadline)?;
         require_owned(spec.id(), ownership)?;
         // Re-inspect before destructive removal.
-        let (recheck, _) = self.ownership_of(spec)?;
+        let (recheck, _) = self.ownership_until(spec, deadline)?;
         if recheck != Ownership::Owned {
             return Err(ServiceError::denied(spec.id(), recheck));
         }
@@ -2062,11 +2501,10 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
             "disable".to_string(),
             self.install.unit_name.clone(),
         ];
-        match self.executor.run(
-            &disable_argv,
-            None,
-            bounded_timeout(self.install.transition_timeout),
-        ) {
+        match self
+            .executor
+            .run(&disable_argv, None, deadline.command_timeout()?)
+        {
             Ok(out) if out.status == Some(0) => {}
             Ok(out) => {
                 return Ok(TransitionResult {
@@ -2086,19 +2524,22 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
                 });
             }
         }
-        std::fs::remove_file(&self.install.unit_path)
-            .map_err(|e| ServiceError::manager(format!("removing owned unit: {e}")))?;
+        std::fs::remove_file(&self.install.unit_path).map_err(|e| {
+            ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("removing owned unit: {e}"),
+            )
+        })?;
         if self.install.reload {
             let reload_argv = vec![
                 "systemctl".to_string(),
                 self.install.scope.flag().to_string(),
                 "daemon-reload".to_string(),
             ];
-            match self.executor.run(
-                &reload_argv,
-                None,
-                bounded_timeout(self.install.transition_timeout),
-            ) {
+            match self
+                .executor
+                .run(&reload_argv, None, deadline.command_timeout()?)
+            {
                 Ok(out) if out.status == Some(0) => {}
                 Ok(out) => {
                     return Ok(TransitionResult {
@@ -2130,7 +2571,7 @@ impl<E: CommandExecutor> ServiceManager for SystemdManager<E> {
 }
 
 impl<E: CommandExecutor> SystemdManager<E> {
-    fn post_write(&self) -> Result<(), ServiceError> {
+    fn post_write(&self, deadline: OperationDeadline) -> Result<(), ServiceError> {
         if self.install.reload {
             let argv = vec![
                 "systemctl".to_string(),
@@ -2139,12 +2580,7 @@ impl<E: CommandExecutor> SystemdManager<E> {
             ];
             let out = self
                 .executor
-                .run(
-                    &argv,
-                    None,
-                    bounded_timeout(self.install.transition_timeout),
-                )
-                .map_err(permission_hint)?;
+                .run(&argv, None, deadline.command_timeout()?)?;
             ensure_mutation_success(&out, "systemctl daemon-reload")?;
         }
         if self.install.enable {
@@ -2156,12 +2592,7 @@ impl<E: CommandExecutor> SystemdManager<E> {
             ];
             let out = self
                 .executor
-                .run(
-                    &argv,
-                    None,
-                    bounded_timeout(self.install.transition_timeout),
-                )
-                .map_err(permission_hint)?;
+                .run(&argv, None, deadline.command_timeout()?)?;
             ensure_mutation_success(&out, "systemctl enable")?;
         }
         Ok(())
@@ -2200,6 +2631,16 @@ pub struct LaunchdInstall {
 
 impl LaunchdInstall {
     /// Validates install material.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when the label or target is empty,
+    /// overlong, or contains a control character, when the domain and target
+    /// disagree (a user-agent target must look like `gui/<uid>`, a
+    /// system-daemon target must be `system`), when the plist path is not
+    /// absolute, when the definition bytes are empty, overlong, or contain a
+    /// NUL byte, or when the transition timeout is zero or above
+    /// [`MAX_TRANSITION_TIMEOUT`].
     pub fn new(
         label: String,
         domain: LaunchdDomain,
@@ -2299,8 +2740,22 @@ impl<E: CommandExecutor> LaunchdManager<E> {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 Ok(RegistrationSnapshot::absent())
             }
-            Err(e) => Err(ServiceError::manager(format!("reading plist: {e}"))),
+            Err(e) => Err(ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("reading plist: {e}"),
+            )),
         }
+    }
+
+    /// Creates the single per-operation deadline for this adapter.
+    ///
+    /// `install`, `uninstall` and `inspect` take no timeout parameter: their
+    /// budget is `install.transition_timeout` for the *whole* operation. The
+    /// clamp is applied exactly once, here, at deadline construction. Every
+    /// manager invocation the operation makes draws from this one deadline, so
+    /// no invocation is ever granted a fresh full budget.
+    fn operation_deadline(&self) -> Result<OperationDeadline, ServiceError> {
+        OperationDeadline::new(bounded_timeout(self.install.transition_timeout))
     }
 
     fn loaded_and_running(
@@ -2314,8 +2769,7 @@ impl<E: CommandExecutor> LaunchdManager<E> {
         ];
         let out = self
             .executor
-            .run(&argv, None, deadline.command_timeout()?)
-            .map_err(permission_hint)?;
+            .run(&argv, None, deadline.command_timeout()?)?;
         if out.status != Some(0) {
             return Ok((false, LifecycleState::Stopped));
         }
@@ -2341,16 +2795,6 @@ impl<E: CommandExecutor> LaunchdManager<E> {
         // Loaded (exit 0) but no PID line: conservatively Stopped, not Unknown,
         // because the file observation already gates ownership.
         Ok((true, LifecycleState::Stopped))
-    }
-
-    fn ownership_of(
-        &self,
-        spec: &ServiceSpec,
-    ) -> Result<(Ownership, LifecycleState, bool, bool), ServiceError> {
-        self.ownership_until(
-            spec,
-            OperationDeadline::new(self.install.transition_timeout)?,
-        )
     }
 
     fn ownership_until(
@@ -2494,7 +2938,8 @@ fn unescape_plist(v: &str) -> String {
 
 impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
     fn inspect(&self, spec: &ServiceSpec) -> Result<LifecycleSnapshot, ServiceError> {
-        let (ownership, state, present, loaded) = self.ownership_of(spec)?;
+        let deadline = self.operation_deadline()?;
+        let (ownership, state, present, loaded) = self.ownership_until(spec, deadline)?;
         Ok(LifecycleSnapshot {
             id: spec.id().clone(),
             ownership,
@@ -2506,13 +2951,16 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
     }
 
     fn install(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
-        let (ownership, _, present, _) = self.ownership_of(spec)?;
+        // One deadline for the whole operation: the ownership probe, the
+        // pre-write recheck, and the bootstrap all draw from it.
+        let deadline = self.operation_deadline()?;
+        let (ownership, _, present, _) = self.ownership_until(spec, deadline)?;
         match ownership {
             Ownership::Absent => {
                 let _ = present;
                 atomic_write_definition(&self.install.plist_path, &self.install.definition, false)?;
                 if self.install.bootstrap_on_install {
-                    self.bootstrap(OperationDeadline::new(self.install.transition_timeout)?)?;
+                    self.bootstrap(deadline)?;
                 }
                 Ok(TransitionResult {
                     operation: ServiceOperation::Install,
@@ -2521,13 +2969,13 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
                 })
             }
             Ownership::Owned => {
-                let (recheck, _, _, _) = self.ownership_of(spec)?;
+                let (recheck, _, _, _) = self.ownership_until(spec, deadline)?;
                 if recheck != Ownership::Owned {
                     return Err(ServiceError::denied(spec.id(), recheck));
                 }
                 atomic_write_definition(&self.install.plist_path, &self.install.definition, true)?;
                 if self.install.bootstrap_on_install {
-                    self.bootstrap(OperationDeadline::new(self.install.transition_timeout)?)?;
+                    self.bootstrap(deadline)?;
                 }
                 Ok(TransitionResult {
                     operation: ServiceOperation::Install,
@@ -2584,9 +3032,12 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
     }
 
     fn uninstall(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
-        let (ownership, _, _, loaded) = self.ownership_of(spec)?;
+        // One deadline for the whole operation: both ownership probes and the
+        // bootout all draw from it.
+        let deadline = self.operation_deadline()?;
+        let (ownership, _, _, loaded) = self.ownership_until(spec, deadline)?;
         require_owned(spec.id(), ownership)?;
-        let (recheck, _, _, _) = self.ownership_of(spec)?;
+        let (recheck, _, _, _) = self.ownership_until(spec, deadline)?;
         if recheck != Ownership::Owned {
             return Err(ServiceError::denied(spec.id(), recheck));
         }
@@ -2597,11 +3048,7 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
                 self.install.target.clone(),
                 self.install.plist_path.to_string_lossy().into_owned(),
             ];
-            match self.executor.run(
-                &argv,
-                None,
-                bounded_timeout(self.install.transition_timeout),
-            ) {
+            match self.executor.run(&argv, None, deadline.command_timeout()?) {
                 Ok(out) if out.status == Some(0) => {}
                 Ok(out) => {
                     return Ok(TransitionResult {
@@ -2622,8 +3069,12 @@ impl<E: CommandExecutor> ServiceManager for LaunchdManager<E> {
                 }
             }
         }
-        std::fs::remove_file(&self.install.plist_path)
-            .map_err(|e| ServiceError::manager(format!("removing owned plist: {e}")))?;
+        std::fs::remove_file(&self.install.plist_path).map_err(|e| {
+            ServiceError::manager(
+                ManagerFailureKind::LocalFilesystem,
+                format!("removing owned plist: {e}"),
+            )
+        })?;
         Ok(TransitionResult {
             operation: ServiceOperation::Uninstall,
             completed: true,
@@ -2684,8 +3135,7 @@ impl<E: CommandExecutor> LaunchdManager<E> {
         ];
         let out = self
             .executor
-            .run(&argv, None, deadline.command_timeout()?)
-            .map_err(permission_hint)?;
+            .run(&argv, None, deadline.command_timeout()?)?;
         ensure_mutation_success(&out, "launchctl stop")?;
         let completed = self.confirm_stopped(deadline)?;
         Ok(TransitionResult {
@@ -2708,8 +3158,7 @@ impl<E: CommandExecutor> LaunchdManager<E> {
         ];
         let out = self
             .executor
-            .run(&argv, None, deadline.command_timeout()?)
-            .map_err(permission_hint)?;
+            .run(&argv, None, deadline.command_timeout()?)?;
         ensure_mutation_success(&out, "launchctl bootstrap")
     }
 
@@ -2722,8 +3171,7 @@ impl<E: CommandExecutor> LaunchdManager<E> {
         ];
         let out = self
             .executor
-            .run(&argv, None, deadline.command_timeout()?)
-            .map_err(permission_hint)?;
+            .run(&argv, None, deadline.command_timeout()?)?;
         ensure_mutation_success(&out, "launchctl kickstart")
     }
 
@@ -2769,17 +3217,18 @@ impl<E: CommandExecutor> LaunchdManager<E> {
 // ---- cron adapter ----
 
 /// How a crontab relates to one managed block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CronOwnership {
-    /// No managed block is present.
-    Absent,
-    /// Exactly one block matches the desired content.
-    Owned,
-    /// Same marker with different content (another deployment). No overwrite.
-    Foreign,
-    /// Ambiguous (multiple markers, malformed). Fail closed.
-    Unknown,
-}
+///
+/// This is an **alias** of the canonical [`Ownership`] classification, not a
+/// distinct enum: `eggup_service::CronOwnership` and
+/// `eggup_core::Ownership` denote one type. `CronOwnership::Absent` and
+/// friends keep resolving, and [`cron_classify`] keeps its public return
+/// spelling.
+///
+/// The classification *logic* is unchanged: no managed block is `Absent`,
+/// exactly one block matching the desired content is `Owned`, the same marker
+/// with different content (another deployment) is `Foreign`, and an ambiguous
+/// or malformed crontab is `Unknown` and fails closed.
+pub type CronOwnership = Ownership;
 
 /// Validates a cron marker (unique, single-line, no shell).
 fn validate_marker(marker: &str) -> Result<(), ServiceError> {
@@ -2867,6 +3316,18 @@ pub fn cron_classify(crontab: &str, marker: &str, desired: &str) -> CronOwnershi
 /// Returns `(new_crontab, changed)`. Fails closed on duplicate markers or
 /// foreign content (no destructive overwrite). Appends with exactly one
 /// trailing newline when creating.
+///
+/// # Errors
+///
+/// [`ServiceError::InvalidInput`] when the marker is invalid, when the
+/// desired block is overlong or contains a NUL byte, or when the merged
+/// crontab would exceed the crontab bound.
+///
+/// [`ServiceError::OwnershipDenied`] when the managed block exists with
+/// different content (`Foreign`): the block is never overwritten.
+///
+/// [`ServiceError::Conflict`] when the crontab holds multiple or malformed
+/// managed blocks (`Unknown`).
 pub fn cron_merge(
     crontab: &str,
     marker: &str,
@@ -2912,6 +3373,16 @@ pub fn cron_merge(
 ///
 /// Returns `(new_crontab, changed)`. Only an exact `Owned` block is removed;
 /// `Absent` is a no-op without rewrite; `Foreign`/`Unknown` fail closed.
+///
+/// # Errors
+///
+/// [`ServiceError::InvalidInput`] when the marker is invalid.
+///
+/// [`ServiceError::OwnershipDenied`] when the managed block exists with
+/// different content (`Foreign`): the block is never removed.
+///
+/// [`ServiceError::Conflict`] when the crontab holds multiple or malformed
+/// managed blocks (`Unknown`).
 pub fn cron_remove(
     crontab: &str,
     marker: &str,
@@ -2973,6 +3444,13 @@ pub struct CronManager<E: CommandExecutor = SystemExecutor> {
 
 impl<E: CommandExecutor> CronManager<E> {
     /// Creates a cron adapter with a unique marker and exact desired block.
+    ///
+    /// # Errors
+    ///
+    /// [`ServiceError::InvalidInput`] when the marker is empty, overlong, or
+    /// contains a control character, when the desired block is overlong or
+    /// contains a NUL byte, or when the transition timeout is zero or above
+    /// [`MAX_TRANSITION_TIMEOUT`].
     pub fn new(
         executor: E,
         marker: String,
@@ -2997,17 +3475,59 @@ impl<E: CommandExecutor> CronManager<E> {
         &self.marker
     }
 
-    fn list_crontab(&self) -> Result<String, ServiceError> {
+    /// Creates the single per-operation deadline for this adapter.
+    ///
+    /// Cron's declared budget is `transition_timeout` for the *whole*
+    /// operation. The clamp is applied exactly once, here, at deadline
+    /// construction, so no manager invocation is ever granted a fresh full
+    /// budget.
+    fn operation_deadline(&self) -> Result<OperationDeadline, ServiceError> {
+        OperationDeadline::new(bounded_timeout(self.transition_timeout))
+    }
+
+    /// The single cron ownership rule.
+    ///
+    /// Ownership is decided **only** by [`cron_classify`]: exactly one block
+    /// with this marker whose body byte-equals `desired_block` is `Owned`; a
+    /// same-marker block with different content is `Foreign`; multiple or
+    /// unterminated blocks are `Unknown`; no block is `Absent`.
+    ///
+    /// The executable-containment gate
+    /// ([`CronManager::require_consistent_request`]) is a separate, explicit
+    /// check applied before any listing or mutation. It is not part of this
+    /// rule, and the rule never inspects the whole crontab.
+    fn cron_ownership(&self, crontab: &str) -> CronOwnership {
+        cron_classify(crontab, &self.marker, &self.desired_block)
+    }
+
+    /// The executable-containment gate for the cron request material.
+    ///
+    /// The managed block body is caller-supplied material. It must name the
+    /// spec executable; otherwise the request asks this adapter to manage a
+    /// block for a different binary. The gate fails closed: the request is
+    /// refused with [`ServiceError::InvalidInput`] before any listing or
+    /// mutation happens.
+    fn require_consistent_request(&self, spec: &ServiceSpec) -> Result<(), ServiceError> {
+        let exe = spec.executable().to_string_lossy().into_owned();
+        if !self.desired_block.contains(&exe) {
+            return Err(ServiceError::invalid(
+                "cron managed block body must contain the spec executable path",
+            ));
+        }
+        Ok(())
+    }
+
+    fn list_crontab(&self, deadline: OperationDeadline) -> Result<String, ServiceError> {
         let argv = vec!["crontab".to_string(), "-l".to_string()];
-        match self
-            .executor
-            .run(&argv, None, bounded_timeout(self.transition_timeout))
-        {
+        match self.executor.run(&argv, None, deadline.command_timeout()?) {
             Ok(out) => {
                 if out.status == Some(0) {
                     let text = out.stdout_text();
                     if text.len() > MAX_CRONTAB_BYTES {
-                        return Err(ServiceError::manager("crontab exceeds bound"));
+                        return Err(ServiceError::manager(
+                            ManagerFailureKind::Protocol,
+                            "crontab exceeds bound",
+                        ));
                     }
                     Ok(text)
                 } else {
@@ -3018,11 +3538,14 @@ impl<E: CommandExecutor> CronManager<E> {
                     if combined.contains("no crontab") {
                         Ok(String::new())
                     } else {
-                        Err(ServiceError::manager(format!(
-                            "crontab -l exited {}: {}",
-                            out.status.unwrap_or(-1),
-                            truncate(&out.stderr_text()),
-                        )))
+                        Err(ServiceError::manager(
+                            ManagerFailureKind::Protocol,
+                            format!(
+                                "crontab -l exited {}: {}",
+                                out.status.unwrap_or(-1),
+                                ServiceError::bounded(out.stderr_text()),
+                            ),
+                        ))
                     }
                 }
             }
@@ -3030,59 +3553,29 @@ impl<E: CommandExecutor> CronManager<E> {
         }
     }
 
-    fn write_crontab(&self, content: &str) -> Result<(), ServiceError> {
+    fn write_crontab(
+        &self,
+        content: &str,
+        deadline: OperationDeadline,
+    ) -> Result<(), ServiceError> {
         if content.len() > MAX_CRONTAB_BYTES {
             return Err(ServiceError::invalid("crontab content exceeds bound"));
         }
         let argv = vec!["crontab".to_string(), "-".to_string()];
-        let out = self.executor.run(
-            &argv,
-            Some(content.as_bytes()),
-            bounded_timeout(self.transition_timeout),
-        )?;
+        let out =
+            self.executor
+                .run(&argv, Some(content.as_bytes()), deadline.command_timeout()?)?;
         if out.status != Some(0) {
-            return Err(ServiceError::manager(format!(
-                "crontab - exited {}: {}",
-                out.status.unwrap_or(-1),
-                truncate(&out.stderr_text()),
-            )));
+            return Err(ServiceError::manager(
+                ManagerFailureKind::Protocol,
+                format!(
+                    "crontab - exited {}: {}",
+                    out.status.unwrap_or(-1),
+                    ServiceError::bounded(out.stderr_text()),
+                ),
+            ));
         }
         Ok(())
-    }
-
-    fn cron_ownership(
-        &self,
-        spec: &ServiceSpec,
-    ) -> Result<(Ownership, CronOwnership), ServiceError> {
-        // Cron ownership is about the managed block, not the ServiceSpec exe
-        // directly. The desired block is caller-owned material that must embed
-        // the exact executable/args; the spec gates destructive ops via the
-        // neutral rule using a synthetic observation:
-        //
-        // - Absent block → Absent (install allowed);
-        // - Owned block → Owned (mutation allowed);
-        // - Foreign/Unknown block → denied.
-        //
-        // Additionally, the block must contain the spec executable path;
-        // otherwise even an exact block for another binary would look Owned.
-        // Enforce: desired block must mention the executable, and the live
-        // block must too, else Foreign.
-        let current = self.list_crontab()?;
-        let block_state = cron_classify(&current, &self.marker, &self.desired_block);
-        let exe = spec.executable().to_string_lossy().into_owned();
-        let ownership = match block_state {
-            CronOwnership::Absent => Ownership::Absent,
-            CronOwnership::Owned => {
-                if current.contains(&exe) || self.desired_block.contains(&exe) {
-                    Ownership::Owned
-                } else {
-                    Ownership::Foreign
-                }
-            }
-            CronOwnership::Foreign => Ownership::Foreign,
-            CronOwnership::Unknown => Ownership::Unknown,
-        };
-        Ok((ownership, block_state))
     }
 }
 
@@ -3091,31 +3584,21 @@ impl<E: CommandExecutor> ServiceManager for CronManager<E> {
         // Cron has no running process semantics; state is Stopped when the
         // block exists (supervised externally) and Stopped when absent.
         // Health remains a separate consumer probe.
-        let (ownership, _) = self
-            .cron_ownership(spec)
-            .unwrap_or((Ownership::Unknown, CronOwnership::Unknown));
-        // If listing failed, report Unknown without mutating.
-        let current = self.list_crontab();
-        let (ownership, state, present) = match current {
+        //
+        // The executable-containment gate refuses an inconsistent request
+        // before any listing happens.
+        self.require_consistent_request(spec)?;
+        // Exactly one `crontab -l` for the whole inspection.
+        let deadline = self.operation_deadline()?;
+        let (ownership, state, present) = match self.list_crontab(deadline) {
             Ok(text) => {
-                let block_state = cron_classify(&text, &self.marker, &self.desired_block);
-                let ownership = match block_state {
-                    CronOwnership::Absent => Ownership::Absent,
-                    CronOwnership::Owned => {
-                        let exe = spec.executable().to_string_lossy().into_owned();
-                        if text.contains(&exe) {
-                            Ownership::Owned
-                        } else {
-                            Ownership::Foreign
-                        }
-                    }
-                    CronOwnership::Foreign => Ownership::Foreign,
-                    CronOwnership::Unknown => Ownership::Unknown,
-                };
-                let present = block_state != CronOwnership::Absent;
+                let ownership = self.cron_ownership(&text);
+                let present = ownership != CronOwnership::Absent;
                 (ownership, LifecycleState::Stopped, present)
             }
-            Err(_) => (ownership, LifecycleState::Unknown, false),
+            // A crontab that cannot be listed is Unknown, never Absent, and
+            // never permits a mutation.
+            Err(_) => (Ownership::Unknown, LifecycleState::Unknown, false),
         };
         Ok(LifecycleSnapshot {
             id: spec.id().clone(),
@@ -3127,17 +3610,25 @@ impl<E: CommandExecutor> ServiceManager for CronManager<E> {
         })
     }
 
-    fn install(&mut self, _spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
-        let current = self.list_crontab()?;
+    fn install(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
+        // The executable-containment gate refuses an inconsistent request
+        // before any listing happens.
+        self.require_consistent_request(spec)?;
+        let deadline = self.operation_deadline()?;
+        let current = self.list_crontab(deadline)?;
+        // The single ownership rule decides what may happen here.
+        if self.cron_ownership(&current) == CronOwnership::Owned {
+            return Ok(TransitionResult {
+                operation: ServiceOperation::Install,
+                completed: true,
+                detail: ServiceError::bounded("cron block already installed"),
+            });
+        }
         // Reuse pure merge (fail-closed on Foreign/Unknown, idempotent).
         //
-        // This is also the ownership gate. `cron_merge` classifies the same
-        // crontab with the same marker and desired block, so it already rejects
-        // `Foreign` and `Unknown` before returning. A separate classification
-        // gate here was unreachable, and it would have misattributed the
-        // failure: `cron_merge` reports `Foreign` against the synthetic
-        // `cron:{marker}` id that owns the block, while a second check could
-        // only report it against `spec.id()`.
+        // `cron_merge` applies the same rule, so it already rejects `Foreign`
+        // and `Unknown` before returning, and it reports `Foreign` against
+        // the synthetic `cron:{marker}` id that owns the block.
         let (merged, changed) = cron_merge(&current, &self.marker, &self.desired_block)?;
         if !changed {
             return Ok(TransitionResult {
@@ -3147,13 +3638,13 @@ impl<E: CommandExecutor> ServiceManager for CronManager<E> {
             });
         }
         // Re-list before destructive write (external crontab changes).
-        let fresh = self.list_crontab()?;
+        let fresh = self.list_crontab(deadline)?;
         if fresh != current {
             return Err(ServiceError::conflict(
                 "crontab changed during install; re-inspect before retry",
             ));
         }
-        self.write_crontab(&merged)?;
+        self.write_crontab(&merged, deadline)?;
         Ok(TransitionResult {
             operation: ServiceOperation::Install,
             completed: true,
@@ -3192,9 +3683,13 @@ impl<E: CommandExecutor> ServiceManager for CronManager<E> {
     }
 
     fn uninstall(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError> {
-        let current = self.list_crontab()?;
-        let block_state = cron_classify(&current, &self.marker, &self.desired_block);
-        match block_state {
+        // The executable-containment gate refuses an inconsistent request
+        // before any listing happens.
+        self.require_consistent_request(spec)?;
+        let deadline = self.operation_deadline()?;
+        let current = self.list_crontab(deadline)?;
+        // The single ownership rule decides what may happen here.
+        match self.cron_ownership(&current) {
             CronOwnership::Owned => {}
             CronOwnership::Absent => {
                 return Ok(TransitionResult {
@@ -3218,7 +3713,7 @@ impl<E: CommandExecutor> ServiceManager for CronManager<E> {
                 detail: ServiceError::bounded("cron block already absent"),
             });
         }
-        let fresh = self.list_crontab()?;
+        let fresh = self.list_crontab(deadline)?;
         if fresh != current {
             return Err(ServiceError::conflict(
                 "crontab changed during uninstall; re-inspect before retry",
@@ -3226,7 +3721,7 @@ impl<E: CommandExecutor> ServiceManager for CronManager<E> {
         }
         // Avoid a redundant write when nothing changes (handled above);
         // here a change is required, so write exactly once.
-        self.write_crontab(&removed)?;
+        self.write_crontab(&removed, deadline)?;
         Ok(TransitionResult {
             operation: ServiceOperation::Uninstall,
             completed: true,
@@ -3265,6 +3760,51 @@ pub struct HostFacts {
 ///
 /// Distinguishes detection failure (`Err`) from "not installed"
 /// (`Ok` with `*_available = false`). Never elevates or mutates.
+///
+/// # Errors
+///
+/// [`ServiceError::Manager`] with a classified [`ManagerFailureKind`] when a
+/// probe fails for a reason other than "the manager is not installed":
+/// `Timeout` when the probe exceeds its deadline, `NotFound` when the manager
+/// binary is absent, `Permission` when the platform reports an access
+/// denial, `Spawn` when the child cannot be created or driven, and
+/// `Protocol` when the manager ran and produced a result that cannot be
+/// interpreted.
+///
+/// The classification is read from the typed kind, never from the error
+/// text:
+///
+/// ```no_run
+/// use eggup_service::{inspect_host, ManagerFailureKind, SystemExecutor};
+///
+/// let facts = inspect_host(&SystemExecutor::new())?;
+/// # Ok::<(), eggup_service::ServiceError>(())
+/// ```
+///
+/// A consumer distinguishes two failure kinds by matching the kind, not by
+/// parsing the rendered message:
+///
+/// ```no_run
+/// use eggup_service::{inspect_host, ManagerFailureKind, SystemExecutor};
+///
+/// match inspect_host(&SystemExecutor::new()) {
+///     Ok(facts) => {
+///         let _ = facts.systemd_available;
+///     }
+///     Err(err) => match err.manager_kind() {
+///         Some(ManagerFailureKind::Timeout) => {
+///             // The manager probe exceeded its deadline: retry later.
+///         }
+///         Some(ManagerFailureKind::NotFound) => {
+///             // The manager is not installed on this host.
+///         }
+///         _ => {
+///             // Any other classified manager failure.
+///         }
+///     },
+/// }
+/// # Ok::<(), eggup_service::ServiceError>(())
+/// ```
 pub fn inspect_host(executor: &impl CommandExecutor) -> Result<HostFacts, ServiceError> {
     let os = std::env::consts::OS.to_string();
     // systemd: Linux only. Binary probe + well-known runtime dir.
@@ -3276,7 +3816,10 @@ pub fn inspect_host(executor: &impl CommandExecutor) -> Result<HostFacts, Servic
             Duration::from_secs(5),
         ) {
             Ok(out) => out.status == Some(0) && runtime_dir,
-            Err(ServiceError::Manager(d)) if d.contains("missing") => false,
+            // A missing manager binary is "not installed", not a failure.
+            // The classification is read from the typed kind, never from the
+            // error text.
+            Err(e) if e.manager_kind() == Some(ManagerFailureKind::NotFound) => false,
             Err(e) => return Err(e),
         }
     } else {
@@ -3289,7 +3832,10 @@ pub fn inspect_host(executor: &impl CommandExecutor) -> Result<HostFacts, Servic
             Duration::from_secs(5),
         ) {
             Ok(out) => out.status == Some(0),
-            Err(ServiceError::Manager(d)) if d.contains("missing") => false,
+            // A missing manager binary is "not installed", not a failure.
+            // The classification is read from the typed kind, never from the
+            // error text.
+            Err(e) if e.manager_kind() == Some(ManagerFailureKind::NotFound) => false,
             Err(e) => return Err(e),
         }
     } else {
@@ -3301,7 +3847,10 @@ pub fn inspect_host(executor: &impl CommandExecutor) -> Result<HostFacts, Servic
         Duration::from_secs(5),
     ) {
         Ok(_) => true,
-        Err(ServiceError::Manager(d)) if d.contains("missing") => false,
+        // A missing manager binary is "not installed", not a failure. The
+        // classification is read from the typed kind, never from the error
+        // text.
+        Err(e) if e.manager_kind() == Some(ManagerFailureKind::NotFound) => false,
         Err(e) => return Err(e),
     };
     Ok(HostFacts {
@@ -3394,22 +3943,65 @@ mod tests {
     #[test]
     fn service_errors_output_and_permission_remediation_stay_utf8_bounded() {
         let unicode = "🧡".repeat(200);
+        // One declared ceiling governs the manager-output diagnostic data
+        // class; every production truncation site for that class uses it.
+        assert_eq!(MAX_DIAGNOSTIC_BYTES, 512);
         let invalid = ServiceError::invalid(unicode.clone());
         assert!(
-            matches!(invalid, ServiceError::InvalidInput(text) if text.len() <= 512 && text.is_char_boundary(text.len()))
+            matches!(invalid, ServiceError::InvalidInput(text) if text.len() <= MAX_DIAGNOSTIC_BYTES && text.is_char_boundary(text.len()))
         );
-        assert!(ServiceError::bounded(unicode.clone()).len() <= 512);
-        assert!(truncate(&unicode).len() <= 256);
+        assert!(ServiceError::bounded(unicode.clone()).len() <= MAX_DIAGNOSTIC_BYTES);
+        assert!(ServiceError::bounded(&unicode).len() <= MAX_DIAGNOSTIC_BYTES);
 
-        let manager = ServiceError::manager(format!("manager failed: {unicode}"));
-        let remediated = permission_hint(ServiceError::manager(format!(
-            "permission denied: {unicode}"
-        )));
-        assert!(
-            matches!(manager, ServiceError::Manager(text) if text.len() <= 512 && text.is_char_boundary(text.len()))
+        let manager = ServiceError::manager(
+            ManagerFailureKind::Protocol,
+            format!("manager failed: {unicode}"),
         );
         assert!(
-            matches!(remediated, ServiceError::Manager(text) if text.len() <= 512 && text.is_char_boundary(text.len()) && text.contains("permission denied;"))
+            matches!(manager, ServiceError::Manager { detail, .. } if detail.len() <= MAX_DIAGNOSTIC_BYTES && detail.is_char_boundary(detail.len()))
+        );
+        // The crate declares exactly one ceiling for manager-derived text:
+        // `MAX_DIAGNOSTIC_BYTES`. There is no second, smaller re-cap and no
+        // text-derived reclassification.
+        let permission = ServiceError::manager(
+            ManagerFailureKind::Permission,
+            format!("permission denied: {unicode}"),
+        );
+        assert!(
+            matches!(permission, ServiceError::Manager { kind, detail, .. } if kind == ManagerFailureKind::Permission && detail.len() <= MAX_DIAGNOSTIC_BYTES && detail.is_char_boundary(detail.len()))
+        );
+    }
+
+    #[test]
+    fn manager_output_diagnostics_use_the_one_declared_ceiling() {
+        // The declared ceiling for manager-output diagnostic text.
+        const DECLARED: usize = MAX_DIAGNOSTIC_BYTES;
+        assert_eq!(DECLARED, 512);
+
+        let stderr = "e".repeat(DECLARED * 2);
+        let out = ManagerCommandOutput {
+            status: Some(1),
+            stdout: Vec::new(),
+            stderr: stderr.into_bytes(),
+        };
+        let error = ensure_mutation_success(&out, "systemctl stop")
+            .expect_err("a nonzero manager exit must be a typed failure");
+        let ServiceError::Manager { detail: text, .. } = error else {
+            panic!("a manager failure must be reported as a manager error");
+        };
+        // No diagnostic may exceed the declared ceiling.
+        assert!(
+            text.len() <= DECLARED,
+            "the diagnostic exceeded the ceiling"
+        );
+        assert!(text.is_char_boundary(text.len()));
+        // The manager's own output must be retained up to the declared
+        // ceiling. A second, smaller ceiling for the same data class would
+        // silently discard the manager's diagnostic text.
+        assert!(
+            text.len() >= DECLARED - 64,
+            "the manager output must be retained up to the declared ceiling, got {} bytes",
+            text.len()
         );
     }
 
@@ -3594,8 +4186,8 @@ mod unix_tests {
         p
     }
 
-    fn out(status: i32, stdout: &str) -> CommandOutput {
-        CommandOutput {
+    fn out(status: i32, stdout: &str) -> ManagerCommandOutput {
+        ManagerCommandOutput {
             status: Some(status),
             stdout: stdout.as_bytes().to_vec(),
             stderr: Vec::new(),
@@ -3621,8 +4213,8 @@ mod unix_tests {
                 Duration::from_millis(200),
             )
             .unwrap_err();
-        assert!(matches!(err, ServiceError::Manager(_)));
-        assert!(format!("{err}").contains("timed out"));
+        assert!(matches!(err, ServiceError::Manager { .. }));
+        assert_eq!(err.manager_kind(), Some(ManagerFailureKind::Timeout));
         assert!(start.elapsed() < Duration::from_secs(4));
     }
 
@@ -3638,8 +4230,8 @@ mod unix_tests {
                 Duration::from_secs(5),
             )
             .unwrap_err();
-        assert!(matches!(err, ServiceError::Manager(_)));
-        assert!(format!("{err}").contains("bound"));
+        assert!(matches!(err, ServiceError::Manager { .. }));
+        assert_eq!(err.manager_kind(), Some(ManagerFailureKind::Protocol));
     }
 
     #[test]
@@ -3685,8 +4277,8 @@ mod unix_tests {
                 Duration::from_secs(5),
             )
             .unwrap_err();
-        assert!(matches!(err, ServiceError::Manager(_)));
-        assert!(format!("{err}").contains("missing"));
+        assert!(matches!(err, ServiceError::Manager { .. }));
+        assert_eq!(err.manager_kind(), Some(ManagerFailureKind::NotFound));
     }
 
     #[test]
@@ -3718,8 +4310,9 @@ mod unix_tests {
                 assert_ne!(resolved, fake, "ambient PATH candidate must be ignored");
                 assert!(resolved.is_absolute());
             }
-            Err(ServiceError::Manager(message)) => {
-                assert!(message.contains("trusted manager binary missing"));
+            Err(ServiceError::Manager { kind, detail, .. }) => {
+                assert_eq!(kind, ManagerFailureKind::NotFound);
+                assert!(detail.contains("trusted manager binary missing"));
             }
             Err(other) => panic!("unexpected resolver error: {other}"),
         }
@@ -4246,13 +4839,14 @@ mod unix_tests {
         );
         fake.expect_error(
             &["systemctl", "--user", "start", "my-daemon.service"],
-            ServiceError::Manager("permission denied for unit".to_string()),
+            ServiceError::manager(ManagerFailureKind::Permission, "permission denied for unit"),
         );
         let dir = temp_dir("sysd-perm");
         let mut m = systemd_manager(fake, dir.join("my-daemon.service"));
         let s = spec("my-daemon.service", "/opt/app/bin", &["--serve"]);
-        let err = m.start(&s, Duration::from_secs(2)).unwrap_err().to_string();
-        assert!(err.contains("permission"));
+        let err = m.start(&s, Duration::from_secs(2)).unwrap_err();
+        assert_eq!(err.manager_kind(), Some(ManagerFailureKind::Permission));
+        let err = err.to_string();
         assert!(!err.to_lowercase().contains("sudo"));
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -4266,7 +4860,7 @@ mod unix_tests {
         let err = atomic_write_definition(&notdir.join("u.service"), b"data", false).unwrap_err();
         assert!(matches!(
             err,
-            ServiceError::InvalidInput(_) | ServiceError::Manager(_)
+            ServiceError::InvalidInput(_) | ServiceError::Manager { .. }
         ));
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -4509,7 +5103,7 @@ mod unix_tests {
                 argv: &[String],
                 _stdin: Option<&[u8]>,
                 timeout: Duration,
-            ) -> Result<CommandOutput, ServiceError> {
+            ) -> Result<ManagerCommandOutput, ServiceError> {
                 self.calls.lock().unwrap().push(argv.to_vec());
                 if argv.first().is_some_and(|arg| arg == "launchctl")
                     && argv.get(1).is_some_and(|arg| arg == "list")
@@ -4520,7 +5114,10 @@ mod unix_tests {
                 if argv.get(1).is_some_and(|arg| arg == "stop") {
                     return Ok(out(0, ""));
                 }
-                Err(ServiceError::manager("unexpected launchctl command"))
+                Err(ServiceError::manager(
+                    ManagerFailureKind::Protocol,
+                    "unexpected launchctl command",
+                ))
             }
         }
 
@@ -4545,8 +5142,7 @@ mod unix_tests {
         let result = manager.restart(&service, Duration::from_millis(35));
         assert!(match result {
             Ok(result) => !result.completed,
-            Err(ServiceError::Manager(message)) => message.contains("deadline exhausted"),
-            Err(_) => false,
+            Err(e) => e.manager_kind() == Some(ManagerFailureKind::Timeout),
         });
         assert!(started_at.elapsed() < Duration::from_millis(150));
         let calls = observed_calls.lock().unwrap();
@@ -4610,7 +5206,7 @@ mod unix_tests {
     fn mutation_status_requires_zero_exit() {
         assert!(ensure_mutation_success(&out(0, ""), "mutation").is_ok());
         let err = ensure_mutation_success(&out(7, ""), "mutation").unwrap_err();
-        assert!(matches!(err, ServiceError::Manager(_)));
+        assert!(matches!(err, ServiceError::Manager { .. }));
         assert!(err.to_string().contains("exited 7"));
     }
 
@@ -4724,7 +5320,10 @@ mod unix_tests {
         let fake = FakeExecutor::new();
         fake.expect_error(
             &["crontab", "-l"],
-            ServiceError::Manager("manager command timed out for crontab".to_string()),
+            ServiceError::manager(
+                ManagerFailureKind::Timeout,
+                "manager command timed out for crontab",
+            ),
         );
         let m = CronManager::new(
             fake,
@@ -4740,7 +5339,10 @@ mod unix_tests {
         let fake = FakeExecutor::new();
         fake.expect_error(
             &["crontab", "-l"],
-            ServiceError::Manager("manager binary missing: crontab".to_string()),
+            ServiceError::manager(
+                ManagerFailureKind::NotFound,
+                "manager binary missing: crontab",
+            ),
         );
         let m = CronManager::new(
             fake,
@@ -4803,7 +5405,7 @@ mod unix_tests {
         let err = atomic_write_definition(&dest, b"[Unit]\n", false).unwrap_err();
         assert!(matches!(
             err,
-            ServiceError::InvalidInput(_) | ServiceError::Manager(_)
+            ServiceError::InvalidInput(_) | ServiceError::Manager { .. }
         ));
         assert!(!dir.join("no-such-dir").exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -4834,7 +5436,10 @@ mod unix_tests {
         let fake = FakeExecutor::new();
         fake.expect_error(
             &["systemctl", "--version"],
-            ServiceError::Manager("manager command timed out for systemctl".to_string()),
+            ServiceError::manager(
+                ManagerFailureKind::Timeout,
+                "manager command timed out for systemctl",
+            ),
         );
         // On Linux this propagates as Err (detection failure, not "absent").
         // On macOS the systemctl probe is skipped (OS gate) so no error.
@@ -4920,7 +5525,7 @@ mod unix_tests {
         );
         match out {
             Ok(_) => {}
-            Err(e) if format!("{e}").contains("missing") => {
+            Err(e) if e.manager_kind() == Some(ManagerFailureKind::NotFound) => {
                 eprintln!("skipping: crontab not installed");
             }
             Err(_) => {}

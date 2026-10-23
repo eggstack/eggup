@@ -1,0 +1,250 @@
+eggup-service — public API surface snapshot
+============================================
+
+Milestone: service-lifecycle 014 (M014), work package WP3.
+Baseline reviewed: c4805411f74b85158e0ae5d0a219a32c4209d98e, plus the
+already-closed service milestones 012 and 013 that are uncommitted in the
+working tree.
+
+WHAT THIS FILE IS
+-----------------
+This is the *reviewable artifact* of the public-API surface guard. It lists
+every public item of `eggup-service` with its kind and, where meaningful, its
+signature, so that an intentional API change shows up as a diff here.
+
+It is NOT the enforcement. The enforcement is the compile-only
+signature-pinning test next to it, `tests/public_api_surface.rs`: a removed
+item or a changed signature is a *compilation* error there, which fails
+`cargo test --workspace --all-targets --all-features --locked` — the gate
+`scripts/check-local.sh` already runs.
+
+Regeneration (R-B8)
+-------------------
+The snapshot is maintained by hand. It is NOT auto-generated from the crate's
+build output: the only tool that can emit a machine-readable public surface
+from Rust sources is `cargo rustdoc -- -Z unstable-options --output-format
+json`, which needs a nightly compiler and is therefore not part of the
+stable/MSRV lanes this workspace gates on. No new dependency is added for it
+(R-B8 / plan §14). The snapshot is instead verified two ways:
+
+  1. by the enumeration command recorded below, and
+  2. by the pinning test compiling — every entry below is bound to an
+     explicit type there.
+
+Enumeration command (R-B5)
+--------------------------
+    grep -n "^pub \(fn\|struct\|enum\|trait\|const\|static\|type\|mod\)" \
+        crates/eggup-service/src/*.rs | wc -l
+
+At the reviewed baseline this yields 68 top-level public items and 3 `pub use`
+re-exports (plan §3.5). In the working tree that carries the already-closed
+milestones 012 and 013, it yields 75 top-level public items and 5 `pub use`
+re-exports. The guard covers *every* item that exists now; the counts differ
+from the plan's baseline figures only because 012 and 013 landed in between.
+
+Update process (R-B7)
+---------------------
+A change to this file, or to the pinning test, MUST be a deliberate,
+separately-reviewed edit that states in the closure which public item changed
+and why. A snapshot edit that is not accompanied by a stated API change is a
+defect.
+
+COVERAGE
+--------
+  75 top-level public items  (enumerated above)
+   5 `pub use` re-exports    (enumerated below)
+   0 public items are unlisted.
+
+TOP-LEVEL PUBLIC ITEMS
+-----------------------
+  #  kind   location                                   signature
+  1  enum    crates/eggup-service/src/commit_engine.rs:52  pub enum LifecycleUpdatePhase {
+  2  struct  crates/eggup-service/src/commit_engine.rs:73  pub struct LifecycleFailure {
+  3  struct  crates/eggup-service/src/commit_engine.rs:106  pub struct PostInstallCheckError(String);
+  4  trait   crates/eggup-service/src/commit_engine.rs:123  pub trait PostInstallCheck: fmt::Debug
+  5  struct  crates/eggup-service/src/commit_engine.rs:138  pub struct NoPostInstallCheck;
+  6  enum    crates/eggup-service/src/commit_engine.rs:159  pub enum PostTransitionVerification {
+  7  enum    crates/eggup-service/src/commit_engine.rs:180  pub enum OwnershipLossTolerance {
+  8  struct  crates/eggup-service/src/commit_engine.rs:201  pub struct CommitEnginePolicy {
+  9  enum    crates/eggup-service/src/disposition.rs:35  pub enum UpdateRuntimeDisposition {
+ 10  enum    crates/eggup-service/src/disposition.rs:50  pub enum KnownConfig {
+ 11  enum    crates/eggup-service/src/disposition.rs:61  pub enum DirectState {
+ 12  struct  crates/eggup-service/src/disposition.rs:72  pub struct DirectObservation {
+ 13  struct  crates/eggup-service/src/disposition.rs:85  pub struct UnixPlannerInput {
+ 14  enum    crates/eggup-service/src/disposition.rs:102  pub enum WindowsServiceState {
+ 15  struct  crates/eggup-service/src/disposition.rs:117  pub struct WindowsPlannerInput {
+ 16  fn      crates/eggup-service/src/disposition.rs:136  pub fn plan_unix(input: &UnixPlannerInput) -> Result<UpdateRuntimeDisposition, crate::ServiceError>
+ 17  fn      crates/eggup-service/src/disposition.rs:241  pub fn plan_windows(input: &WindowsPlannerInput) -> Result<UpdateRuntimeDisposition, crate::ServiceError>
+ 18  trait   crates/eggup-service/src/disposition.rs:273  pub trait DirectRuntimeControl: fmt::Debug
+ 19  struct  crates/eggup-service/src/disposition.rs:284  pub struct DispositionBaseline {
+ 20  fn      crates/eggup-service/src/disposition.rs:310  pub fn commit_with_disposition<M, D, C>(manager: &mut M, spec: &ServiceSpec, direct: Option<&mut D>, transaction: ValidatedTransaction, ownership: CommitOwnership<'_>, policy: LifecycleUpdatePolicy, check: &C, planned: UpdateRuntimeDisposition, baseline: &DispositionBaseline) -> Result<crate::LifecycleUpdateReceipt, crate::LifecycleUpdateError> where M: ServiceManager, D: DirectRuntimeControl, C: PostInstallCheck
+ 21  fn      crates/eggup-service/src/disposition.rs:357  pub fn commit_with_disposition_with_engine_policy<M, D, C>(manager: &mut M, spec: &ServiceSpec, direct: Option<&mut D>, transaction: ValidatedTransaction, ownership: CommitOwnership<'_>, policy: LifecycleUpdatePolicy, check: &C, planned: UpdateRuntimeDisposition, baseline: &DispositionBaseline, engine: CommitEnginePolicy) -> Result<crate::LifecycleUpdateReceipt, crate::LifecycleUpdateError> where M: ServiceManager, D: DirectRuntimeControl, C: PostInstallCheck
+ 22  struct  crates/eggup-service/src/lib.rs:41  pub struct ServiceId(String);
+ 23  struct  crates/eggup-service/src/lib.rs:79  pub struct ServiceSpec {
+ 24  enum    crates/eggup-service/src/lib.rs:181  pub enum LifecycleState {
+ 25  enum    crates/eggup-service/src/lib.rs:195  pub enum HealthState {
+ 26  struct  crates/eggup-service/src/lib.rs:206  pub struct RegistrationSnapshot {
+ 27  struct  crates/eggup-service/src/lib.rs:251  pub struct LifecycleSnapshot {
+ 28  enum    crates/eggup-service/src/lib.rs:275  pub enum RestoreIntent {
+ 29  struct  crates/eggup-service/src/lib.rs:286  pub struct TransitionResult {
+ 30  enum    crates/eggup-service/src/lib.rs:305  pub enum ServiceOperation {
+ 31  enum    crates/eggup-service/src/lib.rs:339  pub enum ManagerFailureKind {
+ 32  enum    crates/eggup-service/src/lib.rs:406  pub enum ServiceError {
+ 33  trait   crates/eggup-service/src/lib.rs:529  pub trait HealthProbe: fmt::Debug
+ 34  struct  crates/eggup-service/src/lib.rs:536  pub struct NoProbe;
+ 35  trait   crates/eggup-service/src/lib.rs:546  pub trait ServiceManager {
+ 36  fn      crates/eggup-service/src/lib.rs:685  pub fn require_owned(id: &ServiceId, ownership: Ownership) -> Result<(), ServiceError>
+ 37  struct  crates/eggup-service/src/lib.rs:696  pub struct TestDoubleManager {
+ 38  const   crates/eggup-service/src/lib.rs:895  pub const MAX_COMMAND_OUTPUT_BYTES: usize = 256 * 1024;
+ 39  const   crates/eggup-service/src/lib.rs:897  pub const MAX_CRONTAB_BYTES: usize = 1024 * 1024;
+ 40  const   crates/eggup-service/src/lib.rs:899  pub const MAX_DEFINITION_BYTES: usize = 1024 * 1024;
+ 41  const   crates/eggup-service/src/lib.rs:901  pub const MAX_TRANSITION_TIMEOUT: Duration = Duration::from_secs(300);
+ 42  const   crates/eggup-service/src/lib.rs:912  pub const MAX_DIAGNOSTIC_BYTES: usize = 512;
+ 43  struct  crates/eggup-service/src/lib.rs:921  pub struct ManagerCommandOutput {
+ 44  type    crates/eggup-service/src/lib.rs:953  pub type CommandOutput = ManagerCommandOutput;
+ 45  trait   crates/eggup-service/src/lib.rs:961  pub trait CommandExecutor: fmt::Debug
+ 46  struct  crates/eggup-service/src/lib.rs:984  pub struct SystemExecutor {
+ 47  struct  crates/eggup-service/src/lib.rs:1339  pub struct FakeCall {
+ 48  struct  crates/eggup-service/src/lib.rs:1348  pub struct FakeExecutor {
+ 49  fn      crates/eggup-service/src/lib.rs:1489  pub fn atomic_write_definition(path: &Path, bytes: &[u8], allow_overwrite: bool) -> Result<(), ServiceError>
+ 50  enum    crates/eggup-service/src/lib.rs:1670  pub enum SystemdScope {
+ 51  struct  crates/eggup-service/src/lib.rs:1688  pub struct SystemdInstall {
+ 52  struct  crates/eggup-service/src/lib.rs:1768  pub struct SystemdManager<E: CommandExecutor = SystemExecutor> {
+ 53  enum    crates/eggup-service/src/lib.rs:2606  pub enum LaunchdDomain {
+ 54  struct  crates/eggup-service/src/lib.rs:2615  pub struct LaunchdInstall {
+ 55  struct  crates/eggup-service/src/lib.rs:2716  pub struct LaunchdManager<E: CommandExecutor = SystemExecutor> {
+ 56  type    crates/eggup-service/src/lib.rs:3231  pub type CronOwnership = Ownership;
+ 57  fn      crates/eggup-service/src/lib.rs:3291  pub fn cron_classify(crontab: &str, marker: &str, desired: &str) -> CronOwnership
+ 58  fn      crates/eggup-service/src/lib.rs:3331  pub fn cron_merge(crontab: &str, marker: &str, desired: &str) -> Result<(String, bool), ServiceError>
+ 59  fn      crates/eggup-service/src/lib.rs:3386  pub fn cron_remove(crontab: &str, marker: &str, desired: &str) -> Result<(String, bool), ServiceError>
+ 60  struct  crates/eggup-service/src/lib.rs:3438  pub struct CronManager<E: CommandExecutor = SystemExecutor> {
+ 61  enum    crates/eggup-service/src/lib.rs:3737  pub enum CandidateManager {
+ 62  struct  crates/eggup-service/src/lib.rs:3748  pub struct HostFacts {
+ 63  fn      crates/eggup-service/src/lib.rs:3808  pub fn inspect_host(executor: &impl CommandExecutor) -> Result<HostFacts, ServiceError>
+ 64  fn      crates/eggup-service/src/lib.rs:3871  pub fn candidate_managers(facts: &HostFacts) -> Vec<CandidateManager>
+ 65  enum    crates/eggup-service/src/lifecycle_update.rs:18  pub enum LifecycleRestorationStatus {
+ 66  struct  crates/eggup-service/src/lifecycle_update.rs:29  pub struct LifecycleUpdatePolicy {
+ 67  struct  crates/eggup-service/src/lifecycle_update.rs:66  pub struct LifecycleUpdateReceipt {
+ 68  enum    crates/eggup-service/src/lifecycle_update.rs:118  pub enum LifecycleUpdateError {
+ 69  fn      crates/eggup-service/src/lifecycle_update.rs:180  pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(manager: &mut M, spec: &ServiceSpec, transaction: ValidatedTransaction, ownership: CommitOwnership<'_>, policy: LifecycleUpdatePolicy, check: &C) -> Result<LifecycleUpdateReceipt, LifecycleUpdateError>
+ 70  fn      crates/eggup-service/src/lifecycle_update.rs:214  pub fn commit_with_lifecycle_with_engine_policy<M: ServiceManager, C: PostInstallCheck>(manager: &mut M, spec: &ServiceSpec, transaction: ValidatedTransaction, ownership: CommitOwnership<'_>, policy: LifecycleUpdatePolicy, check: &C, engine: CommitEnginePolicy) -> Result<LifecycleUpdateReceipt, LifecycleUpdateError>
+ 71  enum    crates/eggup-service/src/windows_scm.rs:29  pub enum WindowsStartType {
+ 72  enum    crates/eggup-service/src/windows_scm.rs:47  pub enum WindowsErrorControl {
+ 73  enum    crates/eggup-service/src/windows_scm.rs:67  pub enum WindowsServiceDependency {
+ 74  struct  crates/eggup-service/src/windows_scm.rs:90  pub struct WindowsScmInstall {
+ 75  struct  crates/eggup-service/src/windows_scm.rs:388  pub struct WindowsScmManager {
+
+`pub use` RE-EXPORTS (crates/eggup-service/src/lib.rs)
+------------------------------------------------------
+ 76  re-export  crates/eggup-service/src/lib.rs:15  pub use commit_engine::{CommitEnginePolicy, LifecycleFailure, LifecycleUpdatePhase, NoPostInstallCheck, OwnershipLossTolerance, PostInstallCheck, PostInstallCheckError, PostTransitionVerification};
+ 77  re-export  crates/eggup-service/src/lib.rs:19  pub use disposition::{commit_with_disposition, commit_with_disposition_with_engine_policy, plan_unix, plan_windows, DirectObservation, DirectRuntimeControl, DirectState, DispositionBaseline, KnownConfig, UnixPlannerInput, UpdateRuntimeDisposition, WindowsPlannerInput, WindowsServiceState};
+ 78  re-export  crates/eggup-service/src/lib.rs:24  pub use lifecycle_update::{commit_with_lifecycle, commit_with_lifecycle_with_engine_policy, LifecycleRestorationStatus, LifecycleUpdateError, LifecycleUpdatePolicy, LifecycleUpdateReceipt};
+ 79  re-export  crates/eggup-service/src/lib.rs:28  pub use windows_scm::{WindowsErrorControl, WindowsScmInstall, WindowsScmManager, WindowsServiceDependency, WindowsStartType};
+ 80  re-export  crates/eggup-service/src/lib.rs:176  pub use eggup_core::Ownership;
+
+PUBLIC METHODS OF PUBLIC TYPES
+-------------------------------
+The item names above are pinned by the pinning test. Their public methods are
+pinned too, so a changed method signature is a compilation error as well.
+
+  ServiceId::new(value: impl Into<String>) -> Result<ServiceId, ServiceError>
+  ServiceId::as_str(&self) -> &str
+  ServiceSpec::new(id: ServiceId, executable: PathBuf, args: Vec<String>, config: Option<PathBuf>) -> Result<ServiceSpec, ServiceError>
+  ServiceSpec::id(&self) -> &ServiceId
+  ServiceSpec::executable(&self) -> &Path
+  ServiceSpec::args(&self) -> &[String]
+  ServiceSpec::config(&self) -> Option<&Path>
+  RegistrationSnapshot::absent() -> RegistrationSnapshot
+  RegistrationSnapshot::ownership(&self, spec: &ServiceSpec) -> Ownership
+  LifecycleSnapshot::restore_running(&self) -> bool
+  TransitionResult::completed(&self) -> bool
+  ManagerFailureKind::from_spawn_error(error: &std::io::Error) -> ManagerFailureKind
+  ManagerFailureKind::from_scm_os_code(code: Option<i32>) -> ManagerFailureKind
+  ServiceError::manager(kind: ManagerFailureKind, detail: impl Into<String>) -> ServiceError
+  ServiceError::manager_with_os_code(kind: ManagerFailureKind, detail: impl Into<String>, os_code: Option<i32>) -> ServiceError
+  ServiceError::denied(id: &ServiceId, ownership: Ownership) -> ServiceError
+  ServiceError::manager_kind(&self) -> Option<ManagerFailureKind>
+  ServiceError::manager_os_code(&self) -> Option<i32>
+  TestDoubleManager::new() -> TestDoubleManager
+  TestDoubleManager::put(&mut self, spec: ServiceSpec, state: LifecycleState)
+  TestDoubleManager::put_malformed(&mut self, id: ServiceId)
+  ManagerCommandOutput::stdout_text(&self) -> String
+  ManagerCommandOutput::stderr_text(&self) -> String
+  SystemExecutor::new() -> SystemExecutor
+  SystemExecutor::with_max_output(max_output_bytes: usize) -> Result<SystemExecutor, ServiceError>
+  FakeExecutor::new() -> FakeExecutor
+  FakeExecutor::expect(&self, argv: &[&str], output: ManagerCommandOutput)
+  FakeExecutor::expect_error(&self, argv: &[&str], err: ServiceError)
+  FakeExecutor::calls(&self) -> Vec<FakeCall>
+  FakeExecutor::call_count(&self) -> usize
+  FakeExecutor::is_exhausted(&self) -> bool
+  SystemdInstall::new(unit_name: String, scope: SystemdScope, unit_path: PathBuf, definition: Vec<u8>, enable: bool, reload: bool, transition_timeout: Duration) -> Result<SystemdInstall, ServiceError>
+  SystemdManager::new(executor: E, install: SystemdInstall) -> SystemdManager<E>
+  SystemdManager::install_config(&self) -> &SystemdInstall
+  SystemdManager::executor(&self) -> &E
+  LaunchdInstall::new(label: String, domain: LaunchdDomain, target: String, plist_path: PathBuf, definition: Vec<u8>, bootstrap_on_install: bool, transition_timeout: Duration) -> Result<LaunchdInstall, ServiceError>
+  LaunchdManager::new(executor: E, install: LaunchdInstall) -> LaunchdManager<E>
+  LaunchdManager::install_config(&self) -> &LaunchdInstall
+  LaunchdManager::executor(&self) -> &E
+  CronManager::new(executor: E, marker: String, desired_block: String, transition_timeout: Duration) -> Result<CronManager<E>, ServiceError>
+  CronManager::marker(&self) -> &str
+  PostInstallCheckError::new(detail: impl Into<String>) -> PostInstallCheckError
+  PostInstallCheck::check(&self, spec: &ServiceSpec, snapshot: &LifecycleSnapshot, remaining: Duration) -> Result<(), PostInstallCheckError>
+  NoPostInstallCheck::check(&self, spec: &ServiceSpec, snapshot: &LifecycleSnapshot, remaining: Duration) -> Result<(), PostInstallCheckError>
+  HealthProbe::check(&self, spec: &ServiceSpec) -> HealthState
+  NoProbe::check(&self, spec: &ServiceSpec) -> HealthState
+  ServiceManager::inspect(&self, spec: &ServiceSpec) -> Result<LifecycleSnapshot, ServiceError>
+  ServiceManager::install(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError>
+  ServiceManager::start(&mut self, spec: &ServiceSpec, timeout: Duration) -> Result<TransitionResult, ServiceError>
+  ServiceManager::stop(&mut self, spec: &ServiceSpec, timeout: Duration) -> Result<TransitionResult, ServiceError>
+  ServiceManager::restart(&mut self, spec: &ServiceSpec, timeout: Duration) -> Result<TransitionResult, ServiceError>
+  ServiceManager::uninstall(&mut self, spec: &ServiceSpec) -> Result<TransitionResult, ServiceError>
+  CommandExecutor::run(&self, argv: &[String], stdin_data: Option<&[u8]>, timeout: Duration) -> Result<ManagerCommandOutput, ServiceError>
+  DirectRuntimeControl::inspect(&self) -> Result<DirectObservation, crate::ServiceError>
+  LifecycleUpdatePolicy::validate(&self) -> Result<(), LifecycleUpdateError>
+  LifecycleUpdateReceipt::artifact_disposition(&self) -> TransactionDisposition
+  LifecycleUpdateReceipt::manual_artifact_recovery_required(&self) -> bool
+  LifecycleUpdateReceipt::new_generation_retained(&self) -> bool
+  LifecycleUpdateReceipt::service_state_restored(&self) -> bool
+  WindowsScmInstall::new(service_name: impl Into<String>, display_name: impl Into<String>, start_type: WindowsStartType, error_control: WindowsErrorControl, account_name: Option<String>) -> Result<WindowsScmInstall, ServiceError>
+  WindowsScmInstall::with_dependencies(self, dependencies: Vec<WindowsServiceDependency>) -> Result<WindowsScmInstall, ServiceError>
+  WindowsScmInstall::with_transition_timeout(self, timeout: Duration) -> Result<WindowsScmInstall, ServiceError>
+  WindowsScmInstall::service_id(&self) -> &ServiceId
+  WindowsScmInstall::display_name(&self) -> &str
+  WindowsScmInstall::start_type(&self) -> WindowsStartType
+  WindowsScmInstall::error_control(&self) -> WindowsErrorControl
+  WindowsScmInstall::account_name(&self) -> Option<&str>
+  WindowsScmInstall::dependencies(&self) -> Option<&[WindowsServiceDependency]>
+  WindowsScmInstall::transition_timeout(&self) -> Duration
+  WindowsScmManager::new(install: WindowsScmInstall) -> WindowsScmManager   [cfg(windows) only]
+  WindowsScmManager::install_config(&self) -> &WindowsScmInstall
+
+ENUM VARIANT SETS
+-----------------
+The pinning test matches every variant of every enum below, so an added or
+removed variant is a compilation error. `#[non_exhaustive]` enums cannot be
+matched exhaustively from outside the crate; for those the pinning test
+constructs each known variant instead, which pins the same names and payloads.
+
+  LifecycleUpdatePhase          Initial, Quiesce, Commit, RestoreNew, PostInstallCheck, QuiesceForRollback, RestoreOld, FinalInspect
+  PostTransitionVerification     Verify, TrustManagerReport
+  OwnershipLossTolerance         Deny, TolerateAlreadyStopped
+  UpdateRuntimeDisposition       ManagedRunning, ManagedStopped, DirectRunning, Stopped, ForeignPreserved
+  KnownConfig                    Absent, Present(PathBuf), Unknown
+  DirectState                    Running, Stopped, Unknown
+  WindowsServiceState            Running, StartPending, Stopped, StopPending, Unknown
+  LifecycleState                 Stopped, Running, Transitioning, Unknown
+  HealthState                    Healthy, Degraded, Unknown
+  RestoreIntent                  Preserve, EnsureRunning, EnsureStopped
+  ServiceOperation               Inspect, Install, Start, Stop, Restart, Uninstall
+  ManagerFailureKind             Spawn, Timeout, Permission, NotFound, Protocol, LocalFilesystem
+  ServiceError                   InvalidInput(String), OwnershipDenied { id, ownership }, Conflict(String), Manager { kind, detail, os_code }
+  SystemdScope                   System, User
+  LaunchdDomain                  UserAgent, SystemDaemon
+  CandidateManager               Systemd(SystemdScope), Launchd(LaunchdDomain), Cron
+  LifecycleRestorationStatus     Restored, Failed, NotAttemptedRecoveryRequired
+  LifecycleUpdateError           InvalidPolicy { field }, ... (non_exhaustive)
+  WindowsStartType               Automatic, Manual, Disabled
+  WindowsErrorControl            Ignore, Normal, Severe, Critical
+  WindowsServiceDependency       Service(String), Group(String)
+  Ownership (eggup_core)         Absent, Owned, Foreign, Unknown

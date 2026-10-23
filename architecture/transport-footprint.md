@@ -49,11 +49,16 @@ The optional-dependency features are declared in the conventional form
 separately exposed — the crate's *only* public feature surface is `curl`,
 `eggfetch`, and `default`.
 
-| Crate | Version | Note |
-|---|---|---|
-| `eggup-acquisition` | `0.1.2` (path) | The seam, and the only unconditional dependency |
-| `eggup-curl` | `0.1.2` (path, optional) | External-process adapter |
-| `eggup-eggfetch` | `0.1.2` (path, optional) | Native in-process HTTP/TLS adapter |
+| Crate | Manifest requirement | Resolved version | Note |
+|---|---|---|---|
+| `eggup-acquisition` | `"0.1.0"` (path) | `0.1.3` | The seam, and the only unconditional dependency |
+| `eggup-curl` | `"0.1.0"` (path, optional) | `0.1.3` | External-process adapter |
+| `eggup-eggfetch` | `"0.1.0"` (path, optional) | `0.1.3` | Native in-process HTTP/TLS adapter |
+
+The requirement literals above are the ones in
+[`crates/eggup-transport-footprint/Cargo.toml`](../crates/eggup-transport-footprint/Cargo.toml);
+the resolved versions are the current workspace version (`0.1.3`). The manifest
+is authoritative and is not changed by this document.
 
 It inherits the 5 shared workspace keys (`version`, `edition`, `rust-version`,
 `license`, `repository`) and sets `[lints] workspace = true`. Being binary-only,
@@ -91,7 +96,10 @@ until it lands in a consumer's dependency graph and binary size. These binaries
 are the fixture that makes the cost visible.
 
 Measured on this workspace at commit `ae9b47a` (macOS, `debug` profile, exact
-commands in [Verification](#verification)):
+commands in [Verification](#verification)). The workspace version advanced to
+`0.1.3` after that measurement; the counts below are the dated capture and are
+not re-derived — the commands in [Verification](#verification) reproduce them at
+the current baseline.
 
 | Configuration | Unique crates in the resolved tree | `curl_only` / `eggfetch_only` / `dual` binary size |
 |---|---|---|
@@ -166,7 +174,7 @@ seam's boundary holds:
 | Property | How the fixture demonstrates it |
 |---|---|
 | Adapters are interchangeable | The same two seam types are constructed and driven identically in `curl_only` and `eggfetch_only` |
-| Adapters do not know each other | `curl_only` links no Eggfetch code, and vice versa; the `required-features` split makes an accidental cross-link a build error, not a review finding |
+| Adapters do not know each other | `curl_only` links no Eggfetch code, and vice versa; `required-features` stops a binary from *building* when its adapter's feature is off. It does **not** stop a cross-link when both features are on, because an enabled optional dependency becomes available to every target in the package — so "links no Eggfetch code" is a meaningful claim only in the single-adapter configurations, and those are the ones CI never builds (see [Testing approach](#testing-approach)) |
 | Composition belongs to the seam | Only `dual` references `ComposedTransport`, and it gets it from `eggup-acquisition` |
 | URLs are redacted by the seam, not the adapter | Both single-adapter binaries print `request.redacted()`, exercising the seam's redaction rather than an adapter's |
 | Bounds are resolved by the seam | Both single-adapter binaries print `FetchLimits::default()`, locating the bound in the seam |
@@ -194,17 +202,28 @@ gap rather than a style preference. The relevant commands are:
 
 | Where | Command | Footprint bins built? |
 |---|---|---|
-| `scripts/check-local.sh` | `cargo clippy --workspace --all-targets --all-features --locked` | Yes |
-| CI `stable` | same as above | Yes |
+| `scripts/check-local.sh` | `cargo clippy --workspace --all-targets --all-features --locked` | Yes — but only the dual configuration |
+| CI `stable` | same as above | Yes — but only the dual configuration |
 | CI `msrv` | `cargo check --workspace --all-targets --locked` | No — no `--all-features` |
-| CI `macos` | `cargo test --workspace --all-targets --all-features --locked` | Yes |
+| CI `macos` | `cargo test --workspace --all-targets --all-features --locked` | Yes — but only the dual configuration |
 | CI `windows-check` | `cargo check --workspace --all-targets --locked` | No — no `--all-features` |
+| Any lane | `--no-default-features --features curl` or `--features eggfetch` | **No CI job builds the isolated single-adapter configurations** |
 
-The footprint binaries are therefore compiled on Linux (stable) and macOS, and
-skipped on the MSRV and Windows jobs. Since the bins are thin and platform-neutral
-by construction, this is low risk, but it does mean the fixtures are not
-exercised under the MSRV toolchain or on Windows. If a future change to the seam
-or either adapter made the fixtures platform-sensitive, neither job would notice.
+The last row is the gap this crate exists to close and it is still open: every
+lane that builds the binaries builds the **dual** configuration, so the
+single-adapter configurations — the crate's entire purpose — are never built by
+CI. The asymmetry above is a second, narrower gap on top of it: the bins are
+compiled on Linux (stable) and macOS, and skipped on the MSRV and Windows jobs.
+Since the bins are thin and platform-neutral by construction, that asymmetry is
+low risk, but it does mean the fixtures are not exercised under the MSRV
+toolchain or on Windows. If a future change to the seam or either adapter made
+the fixtures platform-sensitive, neither job would notice.
+
+This crate also has **no subsystem roadmap**: there is no
+`plans/subsystems/transport-footprint-roadmap.md`, so no roadmap row owns this
+gap. The CI-coverage gap is therefore recorded as an open finding owned by
+planning C013's follow-on milestone, and the isolated single-adapter
+configurations remain unbuilt by CI until that milestone lands.
 
 ## Verification
 

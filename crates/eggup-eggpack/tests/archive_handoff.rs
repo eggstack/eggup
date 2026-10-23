@@ -194,20 +194,27 @@ fn build_tar_gz(entries: &[(&str, &[u8])]) -> Vec<u8> {
     bytes
 }
 
-/// Drain deferred cleanup per the M001b/M001d residue contract.
+/// Drain deferred cleanup per the M001b/M001d residue contract, as corrected by
+/// Archive Extraction M005.
 ///
-/// Explicit cleanup empties the owned tree via the retained handle and then
-/// reports the now-empty directory as `CleanupFailed` residue (no portable
-/// object-bound root unlink exists). Accept `Ok` or that exact residue shape;
-/// anything else fails the test.
+/// Explicit cleanup empties the owned tree via the retained handle. It never
+/// removes the root directory itself and never traverses the root pathname
+/// (no portable object-bound root unlink exists), so the residual empty
+/// directory is the caller's to remove. `Ok` means the owned root was fully
+/// emptied; `Err(CleanupFailed)` means it could not be, and its emptiness is
+/// not guaranteed. Both outcomes leave the root directory in place, and the
+/// caller removes it.
 fn finish_cleanup(cleanup: DeferredCleanup, extraction_root: &Path) {
     match cleanup.cleanup() {
-        Ok(()) => assert!(!extraction_root.exists()),
+        Ok(()) => {
+            assert!(extraction_root.exists());
+            assert_eq!(fs::read_dir(extraction_root).unwrap().count(), 0);
+            fs::remove_dir(extraction_root).unwrap();
+        }
         Err(error) => {
             assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
             let residue = error.residue_path().map(|p| p.to_path_buf());
             assert_eq!(residue.as_deref(), Some(extraction_root));
-            assert_eq!(fs::read_dir(extraction_root).unwrap().count(), 0);
             fs::remove_dir(extraction_root).unwrap();
         }
     }

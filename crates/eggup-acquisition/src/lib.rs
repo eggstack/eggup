@@ -247,7 +247,13 @@ impl ArtifactEvidence {
 }
 
 /// Hard acquisition failure. Never used for `NotFound`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Only `Debug` is derived. The `Io` variant carries a [`std::io::Error`],
+/// which implements neither `Clone` nor `PartialEq`/`Eq`, so those derives are
+/// deliberately absent. This mirrors `eggup-core`'s published `Error`, which
+/// derives only `Debug` for the same reason. Match on the variant and its
+/// fields instead of comparing whole errors.
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum AcquisitionError {
     /// Caller input violates the seam contract.
@@ -268,7 +274,19 @@ pub enum AcquisitionError {
     /// Cooperative cancellation was observed.
     Cancelled,
     /// A transaction-owned filesystem operation failed.
-    Io(String),
+    ///
+    /// The variant is **typed**: `operation` names the filesystem operation
+    /// that failed and `source` preserves the underlying [`std::io::Error`].
+    /// A consumer can therefore match on [`std::io::ErrorKind`] and walk the
+    /// [`std::error::Error::source`] chain instead of parsing a flattened
+    /// string. `operation` is a stable label and never carries URL material;
+    /// the rendered detail is bounded exactly like every other variant.
+    Io {
+        /// The filesystem operation that failed.
+        operation: &'static str,
+        /// The underlying I/O error, preserved verbatim.
+        source: std::io::Error,
+    },
     /// The adapter could not attempt the request (missing executable, failed
     /// discovery, spawn failure). URL material is already redacted.
     ///
@@ -297,8 +315,19 @@ impl AcquisitionError {
         Self::Unavailable(bound_detail(detail.into()))
     }
 
+    /// Adapter-only constructor for a typed I/O failure.
+    ///
+    /// `#[doc(hidden)]`: not part of the consumer contract; allows verified
+    /// adapters (`eggup-curl`, `eggup-eggfetch`) to report a filesystem
+    /// failure with the underlying [`std::io::Error`] intact instead of
+    /// flattening it into a string.
+    #[doc(hidden)]
+    pub fn __adapter_io(operation: &'static str, source: std::io::Error) -> Self {
+        Self::Io { operation, source }
+    }
+
     pub(crate) fn io(operation: &'static str, source: std::io::Error) -> Self {
-        Self::Io(bound_detail(format!("{operation}: {source}")))
+        Self::Io { operation, source }
     }
 
     /// Returns true when the adapter was unavailable to attempt the request.
@@ -315,13 +344,38 @@ impl fmt::Display for AcquisitionError {
             Self::TooLarge { limit } => write!(f, "response exceeded bound ({limit} bytes)"),
             Self::Timeout { phase } => write!(f, "acquisition timed out ({phase})"),
             Self::Cancelled => write!(f, "acquisition cancelled"),
-            Self::Io(d) => write!(f, "acquisition I/O failed: {d}"),
+            Self::Io { operation, source } => {
+                let detail = bound_detail(format!("{operation}: {source}"));
+                write!(f, "acquisition I/O failed: {detail}")
+            }
             Self::Unavailable(d) => write!(f, "acquisition transport unavailable: {d}"),
         }
     }
 }
 
-impl std::error::Error for AcquisitionError {}
+impl std::error::Error for AcquisitionError {
+    /// Returns the underlying I/O error for the `Io` variant.
+    ///
+    /// Every other variant is a seam-level category with no underlying cause,
+    /// so it reports `None`.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
+
+/// Bounds an adapter-supplied diagnostic detail to 512 bytes, truncating only
+/// at a UTF-8 character boundary.
+///
+/// `#[doc(hidden)]`: adapter-facing. This is the **single** implementation of
+/// the seam's bounded-detail rule; adapters must call it instead of keeping a
+/// local copy of the truncation logic.
+#[doc(hidden)]
+pub fn __adapter_bound_detail(detail: impl Into<String>) -> String {
+    bound_detail(detail.into())
+}
 
 fn bound_detail(s: String) -> String {
     truncate_utf8_bytes(s, 512)
@@ -367,12 +421,11 @@ pub fn redact_url(url: &str) -> String {
         out.truncate(q);
         out.push_str("?<redacted>");
     }
-    if out.len() > 256 {
-        let mut end = 256;
-        while !out.is_char_boundary(end) {
-            end -= 1;
-        }
-        out.truncate(end);
+    // Single UTF-8-safe truncation implementation: `truncate_utf8_bytes` is the
+    // seam's only primitive, so the cap cannot drift from the shared rule.
+    let truncated = out.len() > 256;
+    out = truncate_utf8_bytes(out, 256);
+    if truncated {
         out.push('…');
     }
     out
@@ -427,14 +480,8 @@ pub fn __scrub_upstream_text(text: &str) -> String {
             out.push_str("?<redacted>");
         }
     }
-    if out.len() > 512 {
-        let mut end = 512;
-        while !out.is_char_boundary(end) {
-            end -= 1;
-        }
-        out.truncate(end);
-    }
-    out
+    // Single UTF-8-safe truncation implementation (512-byte cap, no ellipsis).
+    truncate_utf8_bytes(out, 512)
 }
 
 /// Maximum exclusive-temp creation attempts before bounded failure.
@@ -1418,7 +1465,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             err,
-            AcquisitionError::InvalidInput(_) | AcquisitionError::Io(_)
+            AcquisitionError::InvalidInput(_) | AcquisitionError::Io { .. }
         ));
         assert!(!dir.join("no-such-dir").exists());
         let _ = fs::remove_dir_all(&dir);
@@ -1518,7 +1565,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             err,
-            AcquisitionError::InvalidInput(_) | AcquisitionError::Io(_)
+            AcquisitionError::InvalidInput(_) | AcquisitionError::Io { .. }
         ));
         // Foreign destination bytes are preserved verbatim.
         assert_eq!(fs::read(&dest).unwrap(), b"FOREIGN-BYTES");
@@ -1566,7 +1613,7 @@ mod tests {
         let err = __promote_no_clobber(&tmp, &dest).unwrap_err();
         assert!(matches!(
             err,
-            AcquisitionError::InvalidInput(_) | AcquisitionError::Io(_)
+            AcquisitionError::InvalidInput(_) | AcquisitionError::Io { .. }
         ));
         assert_eq!(fs::read(&dest).unwrap(), b"RACED-FOREIGN");
         // Owned temp still exists for caller cleanup; remove it explicitly.

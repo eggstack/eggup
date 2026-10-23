@@ -18,12 +18,20 @@ are authoritative; deep dive is
 # + cargo test --workspace --all-targets --all-features --locked
 # + cargo doc --workspace --no-deps --locked
 # + cargo tree --workspace --locked  # review step, not a gate
+# + ./scripts/check-docs-truth.sh  # documentation agrees with itself, the manifests, and the registry
 ```
 
 `cargo tree` always exits 0 on a resolvable graph. Read its output: the
 dependency-boundary rules (core has only `sha2`; acquisition has zero deps;
 the two adapters never reference each other) are enforced by **human review
 only** — nothing in the script or CI fails when a boundary is crossed.
+
+`scripts/check-docs-truth.sh` is the only gate command that does not invoke
+`cargo`. It is read-only and network-free, and it asserts that the version and
+status claims in `docs/`, `README.md`, `AGENTS.md`, the root `CHANGELOG.md`, and
+`plans/registry.md` agree with each other and with the crate manifests. It is
+wired into the local gate only — no CI lane runs it — so a pull request is not
+checked for documentation drift until a lane is added.
 
 ## Focused runs
 

@@ -14,7 +14,11 @@ static NEXT_BACKUP_NONCE: AtomicU64 = AtomicU64::new(0);
 /// The terminal disposition of a commit attempt.
 ///
 /// A rolled-back or recovery-required result is never equivalent to success;
-/// see `examples/receipts.rs`.
+/// see `examples/receipts.rs`. The disposition says whether the live state is
+/// coherent, not why the attempt ended: the reason is carried by
+/// [`TransactionReceipt::failure`], [`TransactionReceipt::rollback_failure`],
+/// and [`TransactionReceipt::post_commit_failure`], each of which reports a
+/// [`FailureCategory`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransactionDisposition {
     /// Every member was installed and the live set is coherent.
@@ -30,6 +34,11 @@ pub enum TransactionDisposition {
 /// This describes transaction-owned temporary evidence. The separate
 /// [`PostCommitFailurePolicy`] selects what to do when a post-commit check
 /// fails.
+///
+/// [`RetainedForRecovery`](Self::RetainedForRecovery) is the disposition that
+/// carries retained evidence, and the real path is in
+/// [`TransactionReceipt::recovery_path`]. Retained evidence is never expressed
+/// as a [`FailureCategory`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CleanupDisposition {
     /// Owned temporary state was cleaned up.
@@ -58,7 +67,9 @@ pub enum PostCommitFailurePolicy {
 
 /// The transaction phase that produced a failure.
 ///
-/// Phases are ordered by first occurrence in a commit attempt.
+/// Phases are ordered by first occurrence in a commit attempt. A phase
+/// classifies *where* a failure happened; the [`FailureCategory`] classifies
+/// *what kind* of failure it was.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FailurePhase {
@@ -96,30 +107,73 @@ impl FailurePhase {
     }
 }
 
-/// A stable machine-readable failure category.
+/// A stable machine-readable classification of a *produced* transaction
+/// failure.
+///
+/// Every member of this enum describes a failure that can actually occur. Six
+/// of them are produced by the crate's internal error-to-category mapping, and
+/// [`PostCommitCheck`](Self::PostCommitCheck) is produced directly when a
+/// caller-supplied post-commit check fails or panics.
+/// [`Injected`](Self::Injected) is produced only by this crate's own test
+/// fault harness and never by a shipped build.
+///
+/// The enum is `#[non_exhaustive]`, so a downstream matcher must already
+/// carry a wildcard arm; a category added later therefore reaches consumers
+/// without breaking their compilation. The [`as_str`](Self::as_str) string is
+/// the only stable identifier a consumer may persist or aggregate, because a
+/// downstream crate cannot enumerate the categories itself.
+///
+/// Retained evidence is deliberately **not** a category. It is reported as a
+/// [`TransactionDisposition::RecoveryRequired`] disposition together with
+/// [`CleanupDisposition::RetainedForRecovery`] and a real
+/// [`TransactionReceipt::recovery_path`], never as a failure category.
+///
+/// See `architecture/core-transaction.md` §8 "Failure semantics" and
+/// `crates/eggup-core/docs/transaction.md` for the authoritative rules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FailureCategory {
     /// Another transaction or ambiguous lock owns the domain.
+    ///
+    /// Produced from [`Error::UpdateInProgress`].
     LockContention,
     /// A destination is foreign, unknown, or violates containment/parent rules.
+    ///
+    /// Produced from [`Error::DestinationConflict`].
     OwnershipConflict,
     /// Staged bytes changed, are unreadable, or lack required integrity evidence.
+    ///
+    /// Produced from [`Error::VerificationFailed`] and
+    /// [`Error::CandidateExecution`].
     Verification,
     /// A live filesystem mutation failed.
+    ///
+    /// Produced from [`Error::Io`].
     Filesystem,
     /// Caller input or transaction configuration is invalid.
+    ///
+    /// Produced from [`Error::InvalidInput`] and [`Error::UnknownMember`].
     InvalidInput,
     /// The failure was injected by the test fault harness.
+    ///
+    /// Produced only by this crate's own test builds, from the
+    /// `#[cfg(test)]`-only `Error::Injected`. A shipped `eggup-core` build
+    /// never produces this category.
     Injected,
-    /// Transaction-owned evidence was retained and manual recovery is required.
-    RetainedEvidence,
     /// A caller-supplied post-commit check failed or panicked.
+    ///
+    /// Produced directly by the commit path, not through the
+    /// error-to-category mapping.
     PostCommitCheck,
 }
 
 impl FailureCategory {
     /// Returns the stable category name.
+    ///
+    /// The returned string is the only stable identifier a consumer may
+    /// persist or aggregate: a downstream crate cannot enumerate the members
+    /// of a `#[non_exhaustive]` enum. The strings are a published contract
+    /// and do not change.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::LockContention => "lock-contention",
@@ -128,13 +182,21 @@ impl FailureCategory {
             Self::Filesystem => "filesystem",
             Self::InvalidInput => "invalid-input",
             Self::Injected => "injected",
-            Self::RetainedEvidence => "retained-evidence",
             Self::PostCommitCheck => "post-commit-check",
         }
     }
 }
 
 /// A bounded structured report describing one transaction failure.
+///
+/// A report is *evidence*, not a disposition: it names the phase, the
+/// affected member, the stable [`FailureCategory`], and a bounded
+/// human-readable detail string. A report never carries a retained-evidence
+/// path; those are reported through [`TransactionReceipt::recovery_path`].
+///
+/// Reports are produced by the crate's internal error-to-category mapping and
+/// by the post-commit check path. See `crates/eggup-core/docs/transaction.md`
+/// for the authoritative rules.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FailureReport {
     phase: FailurePhase,
@@ -219,6 +281,17 @@ pub(crate) fn report_for_error(
 }
 
 /// Evidence describing the terminal result of a transaction attempt.
+///
+/// A receipt — not an `Err` — is how the outcome of a post-lock attempt is
+/// reported. Only lock contention and setup failures return `Err`; every
+/// outcome reached once the mutation lock is held — an ownership conflict, a
+/// staged-digest mismatch, a failed rename, a failed rollback, a failed
+/// post-commit check — is reported through this type. Read
+/// [`disposition`](Self::disposition) first: `RolledBack` and
+/// `RecoveryRequired` are never equivalent to success.
+///
+/// See `architecture/core-transaction.md` §8 "Failure semantics" and
+/// `crates/eggup-core/docs/transaction.md` for the authoritative rules.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionReceipt {
     product: crate::domain::ProductId,

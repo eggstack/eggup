@@ -61,12 +61,26 @@ impl CommandSpec {
     }
 
     /// Sets the maximum wall-clock execution time.
+    ///
+    /// The value is an unconditional maximum bound on the whole bounded
+    /// execution: it is evaluated whether or not the direct child has already
+    /// exited, so [`run_bounded`] always returns. The deadline starts once the
+    /// spawn has returned, so a blocking spawn is not covered by it.
+    ///
+    /// [`run_bounded`] states the exact bound, the teardown allowance, and
+    /// what a caller observes.
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
-    /// Sets the combined per-stream output bound.
+    /// Sets the per-stream output bound.
+    ///
+    /// The bound applies to each stream separately: stdout and stderr are
+    /// captured independently, so one run may capture up to twice the
+    /// configured value in total. A stream that exceeds the bound is reported
+    /// through [`CommandOutput::output_limited`] and its captured bytes are
+    /// discarded, so that stream is reported as empty.
     pub fn max_output_bytes(mut self, limit: usize) -> Self {
         self.max_output_bytes = limit;
         self
@@ -105,7 +119,13 @@ impl CommandOutput {
         &self.stderr
     }
 
-    /// Returns whether the child was killed because its deadline elapsed.
+    /// Returns whether the deadline was reached before the bounded execution completed.
+    ///
+    /// The direct child is killed only when it was still running. When it had
+    /// already exited — for example because a descendant still held the output
+    /// pipe open — the flag still reports that the deadline was reached and
+    /// the bounded execution did not complete, and the direct child's exit
+    /// code stays observable through [`Self::exit_code`].
     pub fn timed_out(&self) -> bool {
         self.timed_out
     }
@@ -122,6 +142,53 @@ impl CommandOutput {
 }
 
 /// Executes a command with cleared environment, null stdin, bounded output, and kill/reap.
+///
+/// The wall-clock deadline set by [`CommandSpec::timeout`] is an unconditional
+/// maximum bound on the whole bounded execution. It is evaluated on every poll
+/// whether or not the direct child has already exited, so this call always
+/// returns. The deadline starts once the spawn has returned, so a blocking
+/// spawn is not covered by it.
+///
+/// A descendant of the direct child can inherit the stdout or stderr pipe and
+/// hold it open after the direct child has exited. Core terminates only the
+/// direct child it spawned, so such a descendant is never killed: the call
+/// returns at the deadline, the result reports `timed_out` together with the
+/// direct child's exit code, and the stream the descendant still holds
+/// contributes no bytes, because they were never captured.
+///
+/// The only work that may extend past the deadline is the kill and reap of a
+/// direct child that is still running. That allowance is bounded by the
+/// child's own termination; it is not a second, larger deadline.
+///
+/// A reader thread that delivered its result is joined, which is bounded
+/// because a reader only has to return after its send. A reader that was still
+/// blocked in `read()` when the bound was reached cannot be joined without
+/// waiting past the deadline, and core cannot terminate a descendant it does
+/// not own: it has no process-group or job-object dependency and `unsafe` is
+/// denied. Such a reader is abandoned explicitly, and it ends when the pipe
+/// reaches EOF, that is, when the holding descendant exits or closes the pipe.
+///
+/// The caller observes four distinguishable outcomes:
+///
+/// - the child ran to completion: `Ok`, with the exit code, and `timed_out`
+///   and `output_limited` both `false`;
+/// - the deadline was reached: `Ok`, with `timed_out` set; the direct child
+///   is killed only if it was still running;
+/// - a stream exceeded `max_output_bytes`: `Ok`, with `output_limited` set and
+///   that stream's captured bytes discarded;
+/// - the command could not be spawned or polled: `Err`.
+///
+/// # Errors
+///
+/// Returns [`Error::Io`] when the command cannot be spawned or when polling
+/// the child fails, and [`Error::CandidateExecution`] when the spawned child's
+/// stdout or stderr pipe is missing.
+///
+/// A command that ran to completion, that reached the deadline, or that
+/// exceeded its output bound is **not** an error: those outcomes are reported
+/// through [`CommandOutput::timed_out`], [`CommandOutput::output_limited`],
+/// and [`CommandOutput::exit_code`] on an `Ok` result. A reader error is
+/// surfaced as `output_limited`, never as an `Err`.
 pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     let mut command = Command::new(&spec.program);
     command
@@ -163,18 +230,14 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     let mut status = None;
     let mut stdout_result = None;
     let mut stderr_result = None;
+    let mut stdout_finished = false;
+    let mut stderr_finished = false;
     loop {
-        if stdout_result.is_none() {
-            if let Ok(result) = stdout_rx.try_recv() {
-                output_limited |= result.is_err();
-                stdout_result = Some(result.unwrap_or_default());
-            }
+        if !stdout_finished {
+            stdout_finished = poll_reader(&stdout_rx, &mut stdout_result, &mut output_limited);
         }
-        if stderr_result.is_none() {
-            if let Ok(result) = stderr_rx.try_recv() {
-                output_limited |= result.is_err();
-                stderr_result = Some(result.unwrap_or_default());
-            }
+        if !stderr_finished {
+            stderr_finished = poll_reader(&stderr_rx, &mut stderr_result, &mut output_limited);
         }
         if status.is_none() {
             status = child
@@ -182,31 +245,79 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
                 .map_err(|source| Error::io("polling bounded candidate", source))?;
         }
         if output_limited {
-            let _ = child.kill();
-            status = child.wait().ok();
-        } else if status.is_none() && Instant::now() >= deadline {
-            timed_out = true;
-            let _ = child.kill();
-            status = child.wait().ok();
+            // The output bound decides the outcome: the child is killed and
+            // reaped, and the streams are no longer waited for.
+            if status.is_none() {
+                let _ = child.kill();
+                status = child.wait().ok();
+            }
+            break;
         }
-        if ((timed_out || output_limited) && status.is_some())
-            || (status.is_some() && stdout_result.is_some() && stderr_result.is_some())
-        {
+        if status.is_some() && stdout_result.is_some() && stderr_result.is_some() {
+            // The bounded execution completed: the child exited and both pipes
+            // reached EOF.
+            break;
+        }
+        // The deadline is unconditional: it is evaluated whether or not the
+        // direct child has already exited, and the loop leaves without waiting
+        // for pipe EOF.
+        if Instant::now() >= deadline {
+            timed_out = true;
+            if status.is_none() {
+                let _ = child.kill();
+                status = child.wait().ok();
+            }
             break;
         }
         thread::sleep(Duration::from_millis(2));
     }
-    if !timed_out && !output_limited {
+    // One last non-blocking drain, so a result that arrived at the bound is
+    // reported rather than lost.
+    stdout_finished = poll_reader(&stdout_rx, &mut stdout_result, &mut output_limited);
+    stderr_finished = poll_reader(&stderr_rx, &mut stderr_result, &mut output_limited);
+    if stdout_finished || stdout_thread.is_finished() {
+        // The reader delivered its result, or it has already ended, so it only
+        // has to return: the join is bounded.
         let _ = stdout_thread.join();
+    }
+    if stderr_finished || stderr_thread.is_finished() {
         let _ = stderr_thread.join();
     }
     Ok(CommandOutput {
         exit_code: status.and_then(|status| status.code()),
-        stdout: stdout_result.unwrap_or_default(),
-        stderr: stderr_result.unwrap_or_default(),
+        stdout: stdout_result
+            .and_then(|result| result.ok())
+            .unwrap_or_default(),
+        stderr: stderr_result
+            .and_then(|result| result.ok())
+            .unwrap_or_default(),
         timed_out,
         output_limited,
     })
+}
+
+/// Drains one reader result if it has already arrived.
+///
+/// Returns `true` when the reader thread is known to have ended, that is, when
+/// it delivered its result or ended without one, and `false` while the reader
+/// is still blocked in `read()`.
+fn poll_reader(
+    receiver: &mpsc::Receiver<io::Result<Vec<u8>>>,
+    slot: &mut Option<io::Result<Vec<u8>>>,
+    output_limited: &mut bool,
+) -> bool {
+    if slot.is_some() {
+        return true;
+    }
+    match receiver.try_recv() {
+        Ok(result) => {
+            *output_limited |= result.is_err();
+            *slot = Some(result);
+            true
+        }
+        Err(mpsc::TryRecvError::Disconnected) => true,
+        Err(mpsc::TryRecvError::Empty) => false,
+    }
 }
 
 fn read_limited(mut reader: impl Read, limit: usize) -> io::Result<Vec<u8>> {
@@ -227,6 +338,14 @@ fn read_limited(mut reader: impl Read, limit: usize) -> io::Result<Vec<u8>> {
 /// A candidate validator supplied by a consumer or by eggup-core helpers.
 pub trait CandidateValidator {
     /// Validates all candidates in an integrity-verified transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns whatever the validator returns. The validators this crate
+    /// provides return [`Error::UnknownMember`] when a configured member is
+    /// not part of the transaction, [`Error::Io`] when a staged member cannot
+    /// be spawned or polled, and [`Error::CandidateExecution`] when a bounded
+    /// execution does not produce the expected identity.
     fn validate(&self, transaction: &VerifiedTransaction) -> Result<()>;
 }
 
@@ -409,6 +528,14 @@ pub struct ValidatedTransaction {
 
 impl VerifiedTransaction {
     /// Runs a consumer-supplied validator before exposing the commit operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::VerificationFailed`] when any member of the
+    /// transaction does not carry verified integrity evidence. A member
+    /// declared [`IntegrityRequirement::None`](crate::IntegrityRequirement::None)
+    /// is never verified, so it is always rejected here: there is no escape
+    /// hatch. Otherwise the error is the validator's own.
     pub fn validate(self, validator: &dyn CandidateValidator) -> Result<ValidatedTransaction> {
         if self.artifacts().iter().any(|member| {
             self.integrity(member.id())
@@ -434,6 +561,11 @@ impl ValidatedTransaction {
     /// Exposed so consumers and tests can inspect staged bytes; mutating the
     /// staged copy after validation causes the final digest revalidation in
     /// [`Self::commit`] to fail before any live mutation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnknownMember`] when `member` is not part of this
+    /// transaction's artifact set.
     pub fn staged_path(&self, member: &MemberId) -> Result<std::path::PathBuf> {
         self.verified.staged_path(member)
     }
@@ -446,6 +578,24 @@ impl ValidatedTransaction {
     /// time before any live destination is mutated. `NotRequired` integrity
     /// state can never reach this path: validation rejects it, and the final
     /// revalidation requires a verified digest for every member.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` only for lock contention ([`Error::UpdateInProgress`])
+    /// and for setup failures such as [`Error::Io`] that occur while the
+    /// mutation lock is being taken. Every failure reached once the lock is
+    /// held — an ownership conflict, a staged-digest mismatch, a failed
+    /// rename, a failed rollback — is reported through the returned
+    /// [`TransactionReceipt`], whose disposition is `RolledBack` or
+    /// `RecoveryRequired`, and never through `Err`.
+    ///
+    /// The direction is fail-closed: `Owned` is never inferred, and a
+    /// verifier's ambiguity is `Unknown`, which denies mutation. Every member
+    /// must carry verified SHA-256 evidence, so a member declared `None` can
+    /// never reach this call. SHA-256 is integrity evidence only, never a
+    /// publisher-trust or signature claim.
+    ///
+    /// See `architecture/core-transaction.md` §8 "Failure semantics".
     pub fn commit(self, ownership: CommitOwnership<'_>) -> Result<TransactionReceipt> {
         let digests = self.verified.verified_digests();
         self.verified
@@ -463,6 +613,17 @@ impl ValidatedTransaction {
     /// failed check, so `RollBack` still restores the prior generation during
     /// unwinding. The callback must itself bound its work; core invents no
     /// timeout. Process termination or power loss is outside this guarantee.
+    ///
+    /// # Errors
+    ///
+    /// The same as [`commit`](Self::commit): only lock contention and setup
+    /// failures return `Err`. A failing post-commit check is **not** an
+    /// error — it is reported in the receipt's
+    /// [`post_commit_failure`](TransactionReceipt::post_commit_failure). With
+    /// [`PostCommitFailurePolicy::KeepInstalled`] the disposition stays
+    /// `Committed`; with [`PostCommitFailurePolicy::RollBack`] the previous
+    /// generation is restored and the disposition becomes `RolledBack`. A
+    /// panic in the callback is caught and reported the same way.
     pub fn commit_with_post_commit<F, E>(
         self,
         ownership: CommitOwnership<'_>,
@@ -491,6 +652,24 @@ impl ValidatedTransaction {
     ///
     /// Core never decides staleness from PID liveness, record age, executable
     /// name, or service state; that evidence belongs to the caller.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RecoveryError::Core`](crate::RecoveryError::Core) carrying
+    /// [`Error::UpdateInProgress`] when the lock is contended, when the
+    /// caller's verifier does not return
+    /// [`StaleLockDecision::ProvenStale`](crate::lock::StaleLockDecision::ProvenStale)
+    /// for the exact record core observed, or when another writer wins the
+    /// race after a claim; and carrying a setup failure such as
+    /// [`Error::Io`] otherwise.
+    ///
+    /// Returns [`RecoveryError::RecoveryRequired`](crate::RecoveryError::RecoveryRequired)
+    /// when a stale record was displaced but could not be resolved
+    /// automatically; the real retained evidence path is in
+    /// [`RecoveryError::evidence`](crate::RecoveryError::evidence).
+    ///
+    /// Every failure reached once the lock is held is reported through the
+    /// returned [`TransactionReceipt`], never through `Err`.
     pub fn commit_with_stale_lock_recovery(
         self,
         ownership: CommitOwnership<'_>,
@@ -504,6 +683,18 @@ impl ValidatedTransaction {
 
     /// Commits with a caller post-commit check and caller-authorized stale-lock
     /// recovery, combining both opt-in policies.
+    ///
+    /// # Errors
+    ///
+    /// The union of [`commit_with_post_commit`](Self::commit_with_post_commit)
+    /// and
+    /// [`commit_with_stale_lock_recovery`](Self::commit_with_stale_lock_recovery):
+    /// only lock contention and setup failures return `Err`, a failing
+    /// post-commit check is reported in the receipt's
+    /// [`post_commit_failure`](TransactionReceipt::post_commit_failure), and
+    /// displaced stale evidence that could not be resolved is reported as
+    /// [`RecoveryError::RecoveryRequired`](crate::RecoveryError::RecoveryRequired)
+    /// with its real retained path.
     pub fn commit_with_post_commit_and_stale_lock_recovery<F, E>(
         self,
         ownership: CommitOwnership<'_>,
