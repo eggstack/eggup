@@ -1,6 +1,6 @@
 # Archive Extraction Milestone 005 — cleanup contract truthfulness and member-write deduplication corrective
 
-Status: conditionally closed 2026-10-23; implemented and green on the native macOS lane. Closure record: `plans/closure/archive-extraction/005-status.md`. The remaining condition is the outstanding hosted qualification: Linux, Windows, and the hosted CI lanes were **not run**.
+Status: closed 2026-10-23; implemented and green on the native macOS lane and hosted-qualified on Stable/MSRV/macOS/Windows/systemd, run `40008039843`, which discharged the outstanding hosted qualification. Closure record: `plans/closure/archive-extraction/005-status.md` — the published `eggup-archive 0.1.3` still carries the defect this milestone fixed, and the `eggup-eggpack` `=0.1.3` pin still blocks propagation.
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

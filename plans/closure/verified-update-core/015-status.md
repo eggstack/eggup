@@ -64,9 +64,9 @@ and the ownership contract are untouched, and no dependency was added.
 | 13 | The crate-local doc-accuracy check is enabled and reports zero missing sections (§6.4, §13.4) | pass | `crates/eggup-core/src/lib.rs:8`; probe below shows the lint fires when a section is removed |
 | 14 | `eggup-core` dependency surface unchanged; no other crate changed (§13.10) | pass | `cargo tree -p eggup-core --locked --offline` → `sha2` only; `--target x86_64-pc-windows-msvc` → `sha2` + `self-replace`; no `Cargo.toml`/`Cargo.lock` edit |
 | 15 | Whole `eggup-core` suite green, no weakened assertion (§13.9) | pass (crate scope) | `cargo test -p eggup-core --locked --offline` → 93 tests, 0 failed |
-| 16 | Whole workspace suite green (§13.9) | **not run** | Deliberately out of this stage's scope (parent session runs the full workspace gate). Recorded as **not run**. |
-| 17 | `./scripts/check-local.sh` green (§13.11) | **not run** | Deliberately out of this stage's scope; `cargo fmt --all -- --check` currently fails on `crates/eggup-service/` files owned by a concurrent agent. Recorded as **not run**. |
-| 18 | Linux / macOS / Windows results separated; unrun lanes marked "not run" (§13.12) | pass | Platform section below |
+| 16 | Whole workspace suite green (§13.9) | pass | Run by the parent session: `cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast` → 483 passed, 0 failed, 44 test binaries. See § "Parent-session verification addendum (2026-10-23, hosted qualification)". |
+| 17 | `./scripts/check-local.sh` green (§13.11) | pass | Run by the parent session on the same tree → exit 0. See § "Parent-session verification addendum (2026-10-23, hosted qualification)". |
+| 18 | Linux / macOS / Windows results separated; unrun lanes marked "not run" (§13.12) | pass | Platform section below; every lane has since run, so no lane remains unrun. |
 | 19 | Changelog entry stating the removal, the unchanged strings, the no-migration statement, and the unpublished status (§12) | pass | `crates/eggup-core/CHANGELOG.md` — `## Unreleased`, M015 entry |
 | 20 | Architecture deep dive reflects the post-M015 taxonomy and carries no stale description of the removed variant (§12) | pass | `architecture/core-transaction.md:141` (public-surface table) and the new §5 subsection "The published failure taxonomy" |
 
@@ -336,19 +336,19 @@ attribute and the `#[cfg(test)] mod failure_taxonomy_tests;` declaration).
 | `cargo doc -p eggup-core --no-deps --locked --offline` | platform-independent | **run — clean, 32 rendered `# Errors` sections** |
 | Pre-M015 baseline failure proof (`git worktree`) | macOS (darwin arm64), native | **run — EXIT=101, runtime failure with the recorded diagnostic** |
 | `cargo tree` dependency review | macOS + `x86_64-pc-windows-msvc` target | **run — `sha2` (+ Windows-only `self-replace`)** |
-| Linux | — | **NOT RUN** — no Linux host is reachable from this machine |
-| Windows | — | **NOT RUN** — no Windows host is reachable from this machine |
-| Hosted CI `stable` | — | **NOT RUN** — no hosted runner is reachable from this machine |
-| Hosted CI `msrv` | — | **NOT RUN** — no hosted runner is reachable from this machine |
-| Hosted CI `macos` | — | **NOT RUN** — no hosted runner is reachable from this machine |
-| Hosted CI `windows-check` | — | **NOT RUN** — no hosted runner is reachable from this machine |
-| Hosted CI `service-systemd` | — | **NOT RUN** — no hosted runner is reachable from this machine |
-| `cargo test --workspace` | — | **NOT RUN** — out of this stage's scope by instruction; the parent session runs the full workspace gate |
-| `./scripts/check-local.sh` | — | **NOT RUN** — out of this stage's scope by instruction; `cargo fmt --all -- --check` currently fails on `crates/eggup-service/` files owned by a concurrent agent |
+| Linux | — | **PASS** — hosted run `40008039843`: the `Stable checks` lane (ubuntu-latest), the `MSRV check` lane (Rust 1.89.0), and the `Linux systemd service qualification` lane. See the addendum at the end of this record. |
+| Windows | — | **PASS** — hosted run `40008039843`: the `Windows archive, acquisition, and service tests and check` lane (windows-latest) — 598 passed, 0 failed, 0 ignored, 63 test binaries. See the addendum at the end of this record. |
+| Hosted CI `stable` | — | **PASS** — hosted run `40008039843`. See the addendum at the end of this record. |
+| Hosted CI `msrv` | — | **PASS** — hosted run `40008039843`. See the addendum at the end of this record. |
+| Hosted CI `macos` | — | **PASS** — hosted run `40008039843`. See the addendum at the end of this record. |
+| Hosted CI `windows-check` | — | **PASS** — hosted run `40008039843`. See the addendum at the end of this record. |
+| Hosted CI `service-systemd` | — | **PASS** — hosted run `40008039843`. See the addendum at the end of this record. |
+| `cargo test --workspace` | — | **PASS** — run by the parent session: 483 passed, 0 failed, 44 test binaries. See the addendum at the end of this record. |
+| `./scripts/check-local.sh` | — | **PASS** — run by the parent session on the same tree → exit 0. See the addendum at the end of this record. |
 
 No result on one platform was inferred from another. The change is
-documentation-and-taxonomy-shape only and contains no platform-conditional code,
-but the Windows and Linux lanes remain genuinely unverified until CI runs them.
+documentation-and-taxonomy-shape only and contains no platform-conditional code;
+the Linux, macOS, and Windows lanes have now all run and all passed.
 
 ## Invariant review
 
@@ -656,6 +656,117 @@ cargo test --workspace --all-targets --all-features --locked --offline --no-fail
 The crate-local `clippy::missing_errors_doc` attribute is therefore exercised by
 the workspace gate's `-D warnings` clippy run, and the crate still builds clean.
 
-**Still not run:** Linux, Windows, and every hosted CI lane (`stable`, `msrv`,
-`service-systemd`, `macos`, `windows-check`). No hosted runner is reachable from
-this machine, so this milestone is qualified on the native macOS lane only.
+**Superseded:** the "still not run" statement this section made about Linux,
+Windows, and every hosted CI lane was true when it was written and is **no longer
+true** — all of them have since run. The whole-tree figures above (449 passed /
+36 test binaries) are also superseded by the later gate on the same tree, which
+reports 483 passed / 44 test binaries after further milestones landed. See
+§ "Parent-session verification addendum (2026-10-23, hosted qualification)" at the
+end of this record.
+
+---
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+**What this supersedes.** This record previously made three claims that a hosted
+runner has now overtaken. Each is superseded by the qualification recorded below,
+not merely contradicted by it:
+
+1. § "Requirement-to-evidence matrix" rows 16 and 17 — the whole-workspace suite
+   and `./scripts/check-local.sh` were both recorded as **not run**, "Deliberately
+   out of this stage's scope".
+2. § "Platform evidence" — the `Linux` and `Windows` rows, the five hosted-lane
+   rows, and the two whole-tree rows, each **NOT RUN** with the reason "no hosted
+   runner is reachable from this machine"; and the sentence beneath the table
+   stating that "the Windows and Linux lanes remain genuinely unverified until CI
+   runs them".
+3. § "Parent-session verification addendum (2026-10-23)" — its "still not run"
+   statement for Linux, Windows, and the hosted lanes, and its whole-tree figure
+   of *449 passed / 36 test binaries*, which was the state of the tree when that
+   gate ran. The later gate on the same tree reports *483 passed / 44 test
+   binaries*, because further milestones have landed since. Both gates exited 0.
+
+**No numbered open finding in this record was conditional on the unrun
+qualification.** The record's single finding, **U1 (low)**, is a documentation-only
+gap — the type-level rustdoc for `Error`, `RecoveryError`, `RecoveryResult`, and
+the `Result` alias in `crates/eggup-core/src/error.rs`, a file outside this
+milestone's ownership grant. **U1 remains open**: no platform result can settle
+it, and the hosted run neither closes nor worsens it. The milestone's own closure
+status is therefore unchanged on U1's account — "conditionally closed" on that
+finding alone, with the hosted qualification no longer among the open conditions.
+The finding text and its severity are retained above unchanged.
+
+### Hosted evidence — CI run `40008039843`
+
+Workflow `CI` (`.github/workflows/ci.yml`), branch `plans/corrective-batch-2026-10-23`,
+commit `0cb2c53`, push-triggered. **All five hosted lanes are green.**
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries**; `cargo doc --workspace --no-deps --locked`; `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0, plus the packaged-service verification |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The single ignored test in the Stable and macOS lanes is the pre-existing,
+environment-conditional curl connect-timeout test; its skip reason is recorded in
+the test source. It is **not** a new ignore introduced by this batch.
+
+The `Stable checks` lane is the one that exercises this milestone's load-bearing
+lint: it runs the workspace clippy with `-D warnings`, so the crate-local
+`clippy::missing_errors_doc` attribute in `crates/eggup-core/src/lib.rs:8` is
+enforced there, and the lane is green.
+
+**Why the Windows aggregate is larger.** The Windows lane runs nine separate
+`cargo test` steps — acquisition/archive/curl, eggpack, three named `eggup-service`
+diagnostics, the SCM unit tests, core's `current_executable` and
+`stale_lock_recovery` fixtures, and then the whole workspace with `--no-fail-fast`
+— whereas the Linux and macOS lanes run the whole workspace in a single step, so
+the Windows aggregate counts the targeted steps' tests again. The documented
+`#[cfg(not(windows))]` exclusion applies in the opposite direction: the curl
+loopback-server tests are excluded on Windows and run on Linux and macOS. **Neither
+difference is a coverage gap** — it is lane shape plus a documented platform
+exclusion, and every workspace test target runs on all three platforms.
+
+### Per-platform results
+
+Reported separately. No platform result is inferred from another.
+
+| Platform | Result | Evidence |
+|---|---|---|
+| **Linux** | **PASS** | Hosted run `40008039843`: the `Stable checks` lane (ubuntu-latest) — fmt, clippy with `-D warnings`, `cargo test --workspace --all-targets --all-features --locked` (**483 passed, 0 failed, 1 ignored, 44 test binaries**), `cargo doc --workspace --no-deps --locked`, `cargo package -p eggup-service --locked`; the `MSRV check` lane on Rust 1.89.0 — `cargo check --workspace --all-targets --locked` plus the packaged-service verification; and the `Linux systemd service qualification` lane — **9 passed, 0 failed, 0 ignored, 7 test binaries**. |
+| **macOS** | **PASS** | Hosted run `40008039843`: the `macOS tests` lane — **483 passed, 0 failed, 1 ignored, 44 test binaries**. The native macOS evidence recorded in this record — the 93-test crate suite, the 32 rendered `# Errors` sections, the lint-fires probe, the pre-M015 baseline-failure proof, and the baseline documentation count — is unchanged and remains valid. |
+| **Windows** | **PASS** | Hosted run `40008039843`: the `Windows archive, acquisition, and service tests and check` lane (windows-latest) — **598 passed, 0 failed, 0 ignored, 63 test binaries**. The lane's workspace step (`cargo test --workspace --all-targets --locked --no-fail-fast`) includes `crates/eggup-core/src/failure_taxonomy_tests.rs` through the crate's unit-test target, so the taxonomy fixtures executed natively on Windows. |
+
+After this addendum the milestone is qualified across **all three** platforms:
+Linux, macOS, and Windows.
+
+### Local whole-tree gate
+
+Run by the parent session on the same tree:
+
+```sh
+./scripts/check-local.sh
+# → exit 0
+cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast
+# → 483 passed; 0 failed; 44 test binaries
+```
+
+`./scripts/check-local.sh` runs `cargo fmt --all -- --check`, the workspace clippy
+with `-D warnings`, the workspace test suite, `cargo doc --workspace --no-deps
+--locked`, `cargo tree --workspace --locked`, and `./scripts/check-docs-truth.sh`.
+All of them are clean; the gate exits 0. The clippy run in that gate is the one
+that enforces `clippy::missing_errors_doc` on `eggup-core`.
+
+### Compatibility consequence
+
+This milestone published nothing and moved no tag. The published `eggup-core
+0.1.3` on crates.io still carries **every defect this milestone fixed** — the
+unproducible `FailureCategory::RetainedEvidence` variant and the public `Result`
+surface that documented no failure modes. `eggup-eggpack`'s
+`eggup-core = "=0.1.3"` pin blocks propagation to that adapter, so reaching it
+needs a separate core publication and a separate adapter republication with the
+exact-pin cascade. Neither is authorized by this milestone, and this addendum
+changes nothing about that: the hosted qualification qualifies the **working
+tree**, not the published crate.

@@ -1,6 +1,10 @@
 # Planning / Closure Hygiene Corrective C013 — Closure and Verification Record
 
-Status: closed
+Status: closed 2026-10-23 — a **documentation-only** milestone: no platform lane applies
+to the change itself (no production source, manifest, lockfile, dependency, or feature
+changed). The whole-tree local gate (`./scripts/check-local.sh` → exit 0) and hosted run
+`40008039843` are green. See *Parent-session verification addendum* at the end of this
+record.
 
 Source plan: `plans/implementation/planning-closure-hygiene-corrective/013-post-audit-documentation-truth-reconciliation.md`
 
@@ -357,18 +361,18 @@ The root `CHANGELOG.md` no longer tells a consumer that five published crates ar
 
 ## Per-platform results
 
-This milestone is **documentation-only**. It changes no code, no manifest, no lockfile, no dependency, and no feature, so no platform lane applies to the change itself. No platform result is inferred from another.
+This milestone is **documentation-only**. It changes no code, no manifest, no lockfile, no dependency, and no feature, so **no platform lane applies to the change itself**. No platform result is inferred from another.
 
 | Lane | Result | Note |
 |---|---|---|
-| Linux (`stable`, `msrv`, `service-systemd`) | **not run** | no hosted runner is reachable from this machine |
-| macOS (`macos`) | **not run** | the implementation machine is macOS, but the milestone adds no runtime behavior and the plan's §11 commands for this change are text checks, which were run here |
-| Windows (`windows-check`) | **not run** | as above |
-| Local whole-tree gate `./scripts/check-local.sh` | **not run** | owned by the parent session; the tree is mid-flight with five other milestones' concurrent source changes, so the whole-tree gate would fail for reasons unrelated to this milestone. This milestone's own gate command was run: `./scripts/check-docs-truth.sh` → exit 0 |
+| Linux (`stable`, `msrv`, `service-systemd`) | **superseded** | the hosted lanes are green — see *Parent-session verification addendum* |
+| macOS (`macos`) | **superseded** | the hosted lane is green — see *Parent-session verification addendum*; the plan's §11 commands for this change are text checks, which were run on the milestone session's machine |
+| Windows (`windows-check`) | **superseded** | the hosted lane is green — see *Parent-session verification addendum* |
+| Local whole-tree gate `./scripts/check-local.sh` | **passed** | run by the parent session → **exit 0**; this milestone's own gate command `./scripts/check-docs-truth.sh` reports `documentation-truth checks passed` |
 | `cargo tree` transport-footprint counts | **passed** | 3 / 92 / 93, platform-independent resolution counts, run on macOS |
 | `cargo package -p eggup-core --list` | **passed** | no `docs/` entry, as at the baseline |
 
-Assertions 1–5 and 7 of the new script are platform-independent text checks and are recorded once, not per platform. A lane not run is recorded as **not run**, never omitted and never inferred.
+Assertions 1–5 and 7 of the new script are platform-independent text checks and are recorded once, not per platform. Every lane now carries its own result, and no lane's result is inferred from another.
 
 ## Roadmap disposition
 
@@ -387,3 +391,102 @@ Assertions 1–5 and 7 of the new script are platform-independent text checks an
 Closed. C013 reconciles Eggup's documentation with `plans/registry.md` and with what is actually published on crates.io, and leaves the repository with a sixth local gate command that fails when that agreement breaks.
 
 The change publishes nothing, changes no production source, and adds no dependency. The two medium findings that this milestone could not close by a documentation edit — Finding G and the transport-footprint CI-coverage gap — are recorded as open drift rows with named owners, exactly as the plan's §6.6 and §6.7 require.
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+### What this addendum supersedes
+
+The *Per-platform results* table above, whose Linux, macOS, and Windows rows each
+recorded that the lane had no result, and whose local whole-tree gate row likewise
+recorded no result — together with that table's closing sentence about how a lane
+without a result is to be recorded. Those rows described the reach of the milestone
+session only; the hosted qualification and the whole-tree gate have since been run by
+the parent session, and this addendum records their results.
+
+No finding, severity, or open item in this record changes. **G** (the deferred
+`eggup-core` contract-doc packaging, owned by Verified Update Core M016), **F-CI** (the
+transport-footprint CI-coverage gap), **PIN** (the caret pins against the `0.1.3`
+workspace), **C013-S1**, and **C013-S2** all stand exactly as filed.
+
+### Scope: no platform lane applies to the change itself
+
+C013 is a **documentation-only** milestone. It changed no production source, no
+manifest, no lockfile, no dependency, and no feature, so **no platform lane applies to
+the change itself**. The hosted lanes below are recorded as evidence that the
+documentation reconciliation did not disturb the tree — **not** as evidence of any
+platform behavior change, because none is claimed and none occurred. No platform result
+is inferred from another.
+
+### Hosted qualification
+
+Hosted CI run **`40008039843`**, branch `plans/corrective-batch-2026-10-23`, commit
+**`0cb2c53`** — **all five hosted lanes green**.
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | fmt + clippy `-D warnings` + workspace test → **483 passed, 0 failed, 1 ignored, 44 test binaries**; doc; `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0 |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The single ignored test in the `Stable checks` and `macOS tests` lanes is the
+pre-existing, environment-conditional curl connect-timeout test, whose reason is
+recorded in the test source. It is not a new ignore.
+
+### Local whole-tree gate
+
+`./scripts/check-local.sh` → **exit 0** (fmt, clippy `-D warnings`, workspace test, doc,
+`cargo tree --workspace --locked`, and `./scripts/check-docs-truth.sh`).
+
+`cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast`
+→ **483 passed, 0 failed, 44 test binaries**.
+
+This milestone's own gate command, `scripts/check-docs-truth.sh`, runs as part of
+`./scripts/check-local.sh` (`scripts/check-local.sh:9` — the sixth command in the gate,
+after the five `cargo` commands) and reports **`documentation-truth checks passed`**. The
+check runs in the local gate only; the hosted lanes above do not execute it, which is
+the coverage gap already recorded in `architecture/tooling-governance.md` §5.2.
+
+### Per-platform results (hosted)
+
+Each platform is recorded from the lane that ran on it. No platform result is inferred
+from another.
+
+| Platform | Result |
+|---|---|
+| **Linux** | **PASS** — hosted run `40008039843`: `Stable checks` (ubuntu-latest) **success** (483 passed, 0 failed, 1 ignored, 44 test binaries; clippy `-D warnings` clean; doc clean; `cargo package -p eggup-service --locked` succeeded); `MSRV check` (Rust 1.89.0) **success**; `Linux systemd service qualification` **success** (9 passed, 0 failed, 0 ignored, 7 test binaries). C013's own assertions are platform-independent text checks, verified by the local gate. |
+| **macOS** | **PASS** — hosted run `40008039843`, `macOS tests` lane: **success** — **483 passed, 0 failed, 1 ignored, 44 test binaries**. The milestone session's own macOS text checks (the §13 "Command" column) stand unchanged. |
+| **Windows** | **PASS** — hosted run `40008039843`, `Windows archive, acquisition, and service tests and check` lane: **success** — **598 passed, 0 failed, 0 ignored, 63 test binaries**. |
+
+The Windows lane's larger totals (598 tests / 63 binaries against 483 / 44) are a
+**platform-set difference, not a coverage gap**: the `#[cfg(not(windows))]` curl tests
+are excluded on the Windows lane, while the Windows-only SCM tests do not exist on the
+Unix lanes.
+
+### Findings as recorded
+
+The hosted qualification and the whole-tree gate change no finding in this record. The
+findings stand as this closure record states them:
+
+- **A** — the root `CHANGELOG.md` contradicted itself; corrected.
+- **B** — the stale `0.1.2` / `=0.1.2` version claims across `docs/crates.md`,
+  `docs/quickstart.md`, `docs/releases.md`, `README.md`, `AGENTS.md`,
+  `architecture/overview.md`, `architecture/tooling-governance.md`, and the two skill
+  files; corrected.
+- **C** — the registry's contradictory live status rows; each milestone now resolves to
+  exactly one status class.
+- **D** — the "Planned / blocked work" table was 95 % closure history; narrowed to three
+  open rows, with the duplicated `(subsystem, milestone)` keys removed.
+- **E** — the registry was not scannable; the 4,000-character cell and the other long
+  cells are gone, and the registry's longest line is now **481 bytes**.
+- **F** — `architecture/transport-footprint.md` overstated what the build CI proves;
+  the accurate statement and the "No CI job builds the isolated single-adapter
+  configurations" row are in place, and the measured counts 3 / 92 / 93 are unchanged.
+- **G** — `eggup-core`'s contract docs are excluded from the published crate;
+  **deferred** to Verified Update Core M016 and recorded as an open drift row, with no
+  `crates/*/Cargo.toml` touched.
+
+**No platform behavior changed.** The hosted lanes confirm a green tree; they do not
+certify any runtime behavior, because this milestone introduced none. C013 remains
+closed.

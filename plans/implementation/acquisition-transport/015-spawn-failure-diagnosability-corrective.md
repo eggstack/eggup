@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 015 — spawn-failure diagnosability corrective
 
-Status: conditionally closed 2026-10-23; implemented and green on the native macOS lane, with the new diagnostic assertion proven to fail against the pre-M015 baseline. Closure record: `plans/closure/acquisition-transport/015-status.md`. The remaining condition is the outstanding qualification: the Linux, Windows, and hosted CI lanes and the whole-tree gate were **not run**. This milestone **narrows** registry finding 1 rather than closing it.
+Status: closed 2026-10-23; the spawn cause is now attributable — the `Unavailable` detail names the `ErrorKind` and the raw OS code — with the new diagnostic assertion proven to fail against the pre-M015 baseline, and hosted-qualified on Linux, macOS, and Windows by CI run `40008039843` (commit `0cb2c53`, all five lanes green; local whole-tree gate exit 0). Closure record: `plans/closure/acquisition-transport/015-status.md`. Registry finding 1 stays **open and narrowed** by M012 and M015 rather than closed, and the published `eggup-curl 0.1.2` still carries the cause-free detail.
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

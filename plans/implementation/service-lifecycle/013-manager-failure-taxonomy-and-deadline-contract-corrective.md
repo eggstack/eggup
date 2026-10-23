@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 013 — manager failure taxonomy and deadline contract corrective
 
-Status: conditionally closed 2026-10-23; implemented and green on the native macOS lane. Closure record: `plans/closure/service-lifecycle/013-status.md`. The remaining condition is the outstanding hosted qualification: Linux, Windows, and the hosted CI lanes were **not run**.
+Status: closed; see `plans/closure/service-lifecycle/013-status.md` (implemented and green on the native macOS lane; the hosted qualification condition is discharged — hosted-qualified on Linux, macOS, and Windows, run `40008039843`)
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

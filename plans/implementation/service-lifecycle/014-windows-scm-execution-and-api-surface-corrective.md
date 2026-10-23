@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 014 — Windows SCM execution coverage and published API surface corrective
 
-Status: implemented 2026-10-23; green on the native macOS lane, but **not closed** — the hosted Windows run of the real SCM fixture is outstanding. Closure record: `plans/closure/service-lifecycle/014-status.md`. The Windows lane (`cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture`) was **not run**; it is the parent session's to run and record. The finding of record stays open until that run lands.
+Status: closed; see `plans/closure/service-lifecycle/014-status.md` (the real Windows SCM fixture ran green on the hosted Windows lane, run `40008039843`; hosted-qualified on Linux, macOS, and Windows)
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

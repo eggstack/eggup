@@ -838,3 +838,144 @@ parent session must apply.
 `crates/eggup-service/**`, `crates/eggup-eggpack/**`,
 `crates/eggup-transport-footprint/**`, `docs/**`, `plans/registry.md`,
 `plans/subsystems/**`, the root `CHANGELOG.md`, and every other crate.
+
+---
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+**What this addendum supersedes.** Six statements earlier in this record are
+overtaken by the evidence below. They are left in place only as the record of the
+state at the time of writing; the section each one lives in is named so that no
+two contradictory statements remain in this file.
+
+1. § "Status" — "the **Linux** and **Windows** lanes and the hosted CI matrix
+   were **not run** at this stage, and the parent session owns the whole-tree
+   gate. Everything not run is recorded as **not run**, never inferred from the
+   macOS lane." The hosted lanes **have now run** and the whole-tree gate **has
+   now run**. That condition is **discharged**. The macOS lane's result is still
+   never inferred from another lane.
+2. § "Exact commands run and results" → § "Commands deliberately NOT run at this
+   stage" — `cargo test --workspace --all-targets --all-features --locked`,
+   `cargo tree --workspace --locked`,
+   `cargo +1.89.0 check --workspace --all-targets --locked`, and
+   `./scripts/check-local.sh`, each recorded as **not run** (see UF-2), "not as
+   passing". All four are **discharged** by the hosted run and the local
+   whole-tree gate recorded below.
+3. § "Platform evidence" — the **Linux** row (**not run**), the **Windows** row
+   (**not run**, including its note that `cancellation_before_spawn_cleans_temp`
+   "would run on Windows" and that "its Windows result is **not run** and is
+   **not** claimed"), and the **Hosted CI matrix** row (**not run**, "the hosted
+   `stable` / `msrv` / `service-systemd` / `macos` / `windows-check` lanes were
+   not triggered by this session"). All three are replaced by the per-platform
+   results below.
+4. § "Unresolved findings" → **UF-2** ("The whole-tree gate and the non-macOS
+   lanes were not run — **low**"), and the matching **UF-2** bullet in
+   § "Status" ("`cargo test --workspace --all-targets --all-features --locked`
+   and `./scripts/check-local.sh` were **not run**"). Their condition was exactly
+   that those commands and those lanes were unrun; that condition is **now
+   discharged**. UF-2's text and its **low** severity are retained above
+   unchanged and are **not** rewritten — only the satisfaction of its condition
+   is recorded here.
+5. § "Roadmap disposition" item **1** — "mark the acquisition-transport M013 row
+   **closed (conditionally)**". The milestone is now **closed**; the parent must
+   record the row as closed, with this record as the pointer. Items 3 and 4
+   (leave the parity finding open; record the separate-republication
+   requirement) are unchanged and are restated below.
+6. § "Source plan and roadmap" — "The plan file's `Status:` header was updated
+   from `ready for handoff` to `conditionally closed` and now points at this
+   record." The plan header now reads **closed 2026-10-23** and still points at
+   this record; that header change is what discharged the condition above.
+
+### Hosted qualification — CI run `40008039843`
+
+Branch `plans/corrective-batch-2026-10-23`, commit `0cb2c53`, push-triggered,
+workflow `CI` (`.github/workflows/ci.yml`). **All five hosted lanes are green.**
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | fmt + clippy `-D warnings` + `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries** + `cargo doc --workspace --no-deps --locked` + `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0 |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The one ignored test in the `Stable checks` and `macOS tests` lanes is the
+pre-existing, environment-conditional curl connect-timeout test, with its skip
+reason recorded in the test source. It is **not** a new ignore introduced by this
+batch.
+
+The Windows lane's larger totals (**598 passed / 63 test binaries**, against
+**483 / 44** on Linux and macOS) are the documented **platform-set difference**,
+not a coverage gap: the `#[cfg(not(windows))]` curl tests are excluded on the
+Windows lane, while the Windows-only SCM tests do not exist on the Unix lanes.
+The Windows lane therefore runs a **different set**, and this addendum makes no
+claim that the excluded `#[cfg(not(windows))]` curl fixtures ran there.
+
+### Local whole-tree gate
+
+Run by the parent session on the same tree:
+
+```sh
+./scripts/check-local.sh
+# → exit 0
+cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast
+# → 483 passed; 0 failed; 44 test binaries
+```
+
+### Per-platform results
+
+Reported separately; no platform's result is inferred from another's.
+
+| Platform | Result | Evidence |
+|---|---|---|
+| **Linux** | **run — green** | hosted `Stable checks` lane (fmt, clippy `-D warnings`, workspace test → **483 passed, 0 failed, 1 ignored, 44 test binaries**, `cargo doc`, `cargo package -p eggup-service --locked`) and hosted `Linux systemd service qualification` lane (→ **9 passed, 0 failed, 0 ignored, 7 test binaries**) of CI run `40008039843` |
+| **macOS** | **run — green** | hosted `macOS tests` lane → **483 passed, 0 failed, 1 ignored, 44 test binaries**; plus this record's own native macOS lane (three crates' suites green, baseline-failure proofs fired) and the local whole-tree gate above |
+| **Windows** | **run — green** | hosted `Windows archive, acquisition, and service tests and check` lane → **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+
+**The nine formerly-vacuous `eggup-curl` tests and the typed I/O failure surface
+are now qualified on all three platforms.** The fail-loudly treatment is
+enforced by the guard suite in all three acquisition crates
+(`crate_sources_have_no_vacuous_early_exit`, `every_ignored_test_records_a_reason`,
+`required_behaviors_have_named_asserting_tests`), and the typed
+`Io { operation, source }` surface compiles and passes on Linux, macOS, and
+Windows.
+
+### Findings that remain open
+
+The hosted run qualifies the platform lanes; it does not settle a design
+question. These findings are **unchanged** by this addendum and stay open at the
+severities already recorded — the finding texts and severities above are
+retained, not rewritten:
+
+- **UF-1 (medium) — the adapter-capability-parity finding is deferred, not
+  closed.** `eggup-eggfetch` exposes a caller-settable `User-Agent`;
+  `eggup-curl` exposes none. The hosted run **does not discharge** it. It is
+  **named and open** as **acquisition M014** — "adapter capability parity
+  (`User-Agent` and the `CurlConfig` public-field API boundary)" — which the
+  registry records as `ready for handoff; not yet authored`. It must remain
+  visible with its owner.
+- **UF-3 (low) — the service-side truncation pair is not pinned by an M013
+  test.** It remains owned by `service-lifecycle/012`; the hosted run does not
+  discharge it.
+
+### Compatibility consequence — the source break is carried forward honestly
+
+**The change is source-breaking, and it is still unpublished.**
+
+- `AcquisitionError::Io(String)` became `Io { operation, source }`. Consumers
+  must write `AcquisitionError::Io { .. }`.
+- `AcquisitionError` now derives **`Debug` only**. `Clone`, `PartialEq`, and
+  `Eq` are **removed**, because `std::io::Error` implements none of them — the
+  same trade-off `eggup-core`'s published `Error` makes for the same reason.
+- **The next publication of `eggup-acquisition` is therefore `0.2.0`** (or the
+  0.2/1.0 boundary release), **not** a `0.1.4`.
+- `eggup-acquisition` **stays published at `0.1.3`** and still carries the old
+  `Io(String)` shape; `eggup-curl` **stays published at `0.1.2`** and still
+  carries the cause-free spawn detail that acquisition M015 fixed. **None of
+  these milestones published, none moved a tag**, and the published crates still
+  carry every defect the milestone fixed. The hosted qualification proves the
+  **source** line, not the published crates.
+- The `eggup-eggpack` `=0.1.3` pin consequence is unchanged: the typed I/O
+  surface cannot reach `eggup-eggpack` — through the tree-local path or through
+  any publication — until `eggup-acquisition` is republished at a version the
+  pin accepts. **A separate adapter-republication milestone is required.**

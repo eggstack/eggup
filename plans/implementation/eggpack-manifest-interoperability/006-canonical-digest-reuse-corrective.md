@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 006 — canonical digest reuse corrective
 
-Status: conditionally closed 2026-10-23; implemented and green on the native macOS lane. Closure record: `plans/closure/eggpack-manifest-interoperability/006-status.md`. The remaining condition is the outstanding hosted qualification: Linux, Windows, the hosted CI lanes, and the full-workspace local gate were **not run**.
+Status: closed 2026-10-23; see `plans/closure/eggpack-manifest-interoperability/006-status.md` (hosted-qualified on Stable/MSRV/macOS/Windows/systemd, run `40008039843`, commit `0cb2c53` — the qualification condition recorded as F-1 is discharged)
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

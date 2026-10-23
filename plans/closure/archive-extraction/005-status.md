@@ -1,11 +1,12 @@
 # Archive Extraction M005 — Closure and Verification Record
 
-Status: **conditionally closed** — the milestone's own scope is complete and green,
-and the one **medium** downstream finding (F-1, the `eggup-eggpack` test-helper
-migration) has since been applied by the parent session, so the
-`eggup-eggpack` test lane is green again. The remaining condition is the
-outstanding **hosted** qualification (F-5): Linux, Windows, and the hosted CI
-matrix were not run from this machine.
+Status: **closed** — the milestone's own scope is complete and green, the one
+**medium** downstream finding (F-1, the `eggup-eggpack` test-helper migration) was
+applied by the parent session and the `eggup-eggpack` test lane is green again,
+and the outstanding **hosted** qualification (F-5) is discharged by hosted run
+`40008039843` (Linux, macOS, and Windows all green). See § "Parent-session
+verification addendum (2026-10-23, hosted qualification)" at the end of this
+record.
 
 Source plan: `plans/implementation/archive-extraction/005-cleanup-contract-and-member-write-corrective.md`
 
@@ -78,7 +79,7 @@ keeping only their own per-format parsing.
 | 5 | Single-write-path guard: exactly one call site each of the member creation primitive, the bounded copy with output, and the expected-value validation | `member_write_path_exists_exactly_once_in_non_test_code` | `tests/m005_member_write_parity.rs`; helper `lib.rs:916-966`, call sites `940`, `947`, `951` | pass |
 | 6 | Windows device-alias regression guard (exempt from red-first) | `windows_device_aliases_are_rejected_and_near_misses_remain_usable` | `tests/m005_member_write_parity.rs` | pass (also passes at baseline) |
 | 7 | Red-first proof against the pre-M005 baseline | both new files | see *Red-first proof* below | pass |
-| 8 | All 51 existing inline tests green after being updated to the contract; no foreign-preservation assertion weakened | 50 inline tests run on macOS (49 baseline + 1 new); 2 `#[cfg(windows)]` not run here | `lib.rs` test module from `lib.rs:1512` | pass — see *Foreign-preservation review* |
+| 8 | All 51 existing inline tests green after being updated to the contract; no foreign-preservation assertion weakened | 50 inline tests run on macOS (49 baseline + 1 new); the 2 `#[cfg(windows)]` tests did not execute in that macOS run and did execute in hosted run `40008039843`'s Windows lane | `lib.rs` test module from `lib.rs:1512` | pass — see *Foreign-preservation review* |
 
 ## Production implementation evidence
 
@@ -235,13 +236,17 @@ Commands **not run** at this stage, by the session's explicit instruction (the
 parent runs the full workspace gate once at the end):
 `cargo test --workspace`, `cargo test --workspace --all-features`,
 `./scripts/check-local.sh`, `cargo tree --workspace --locked`,
-`cargo test -p eggup-core --locked`.
+`cargo test -p eggup-core --locked`. These have since been run by the parent
+session on the same tree; see § "Parent-session verification addendum (2026-10-23,
+hosted qualification)" at the end of this record.
 
-`cargo fmt --all -- --check` **was** run and currently fails, but **not** on any
-file this milestone owns: every reported diff is in `crates/eggup-core/` and
-`crates/eggup-service/`, which two concurrent agents are editing. The
+`cargo fmt --all -- --check` **was** run at this stage and failed then, but **not**
+on any file this milestone owns: every reported diff was in `crates/eggup-core/`
+and `crates/eggup-service/`, which two concurrent agents were editing. The
 `eggup-archive` package is fmt-clean (`cargo fmt -p eggup-archive -- --check`
-is silent).
+is silent), and the parent session's later whole-tree gate —
+`./scripts/check-local.sh` → exit 0 — confirms that the workspace-wide formatting
+check is now clean as well (finding F-6 below).
 
 ### §11 command that fails — `cargo test -p eggup-eggpack`
 
@@ -358,11 +363,12 @@ passes at the baseline, as plan §10.6 requires.
 | Platform | Result |
 |---|---|
 | **macOS (darwin arm64, this machine)** | **RUN** — native. `cargo test -p eggup-archive --locked --offline`: 50 inline + 4 + 3 integration = **57 tests passed, 0 failed**. Clippy (with and without `--all-features`), `cargo doc`, and `cargo fmt -p eggup-archive -- --check` are clean. |
-| **Linux** | **NOT RUN** — no Linux host is reachable from this machine. |
-| **Windows** | **NOT RUN** — no Windows host is reachable from this machine. The 2 `#[cfg(windows)]` inline tests (`lib.rs:2764`, `lib.rs:3072`) and the `#[cfg(unix)]` integration fixture therefore did **not** execute here. |
-| **Hosted CI lanes (Stable / MSRV / macOS / Windows)** | **NOT RUN** — no hosted runner is reachable from this machine. |
+| **Linux** | **PASS** — hosted run `40008039843`: the `Stable checks` lane (ubuntu-latest), the `MSRV check` lane (Rust 1.89.0), and the `Linux systemd service qualification` lane. See the addendum at the end of this record. |
+| **Windows** | **PASS** — hosted run `40008039843`: the `Windows archive, acquisition, and service tests and check` lane (windows-latest) — 598 passed, 0 failed, 0 ignored, 63 test binaries. The archive tests executed there, including the 2 `#[cfg(windows)]` inline tests (`lib.rs:2764`, `lib.rs:3072`) that did not execute in the macOS run. See the addendum at the end of this record. |
+| **Hosted CI lanes (Stable / MSRV / macOS / Windows)** | **PASS** — all five lanes green in hosted run `40008039843`. See the addendum at the end of this record. |
 
-No platform result is inferred from another platform.
+No platform result is inferred from another; each platform's result is reported
+from the lane that ran on it.
 
 ## Invariant review (§4, item by item)
 
@@ -546,6 +552,16 @@ the crate's inline `#[cfg(windows)]` test at `lib.rs:3072`, which was **not run
 here** (no Windows host). The Windows lane must therefore execute the archive
 tests on a hosted runner before this milestone is signed off.
 
+**Sign-off condition discharged 2026-10-23; the finding itself remains open.**
+Hosted run `40008039843`'s Windows lane (windows-latest) executed the archive
+tests — 598 passed, 0 failed, 0 ignored, 63 test binaries — so the condition this
+finding set ("the Windows lane must execute the archive tests on a hosted runner
+before this milestone is signed off") is now met. What remains open is the
+**permanent platform limitation**, not the qualification: the external
+foreign-replacement fixture stays `#[cfg(unix)]` because Windows refuses to rename
+a directory while its handle is held, and no platform result can settle that. The
+finding text and its severity are retained above unchanged.
+
 ### F-4 — the `lib.rs` module decomposition is deferred (WP5)
 
 **Severity: low.** The decomposition of `crates/eggup-archive/src/lib.rs` into
@@ -557,7 +573,7 @@ dropped**. Named follow-up: **Archive Extraction M006 — `eggup-archive` module
 decomposition**. The decision, the reason, and the follow-up name are recorded
 here and are to be carried into the roadmap status table.
 
-### F-5 — hosted platform qualification is outstanding
+### F-5 — hosted platform qualification is outstanding — **condition discharged 2026-10-23**
 
 **Severity: medium.** Only macOS was run. Linux, Windows, and the hosted
 Stable/MSRV/macOS/Windows matrix were **not run** — no hosted runner is
@@ -566,21 +582,33 @@ the new fixtures" as a stop condition, and a platform-sensitive cleanup
 contract must be qualified on Windows. The Windows lane must **execute** the
 archive tests (not merely compile them) before M005 is closed.
 
-### F-6 — `cargo fmt --all -- --check` currently fails on other crates
+**Condition discharged 2026-10-23** by hosted run `40008039843`: all five hosted
+lanes are green, and the Windows lane (windows-latest) **executed** the archive
+tests — 598 passed, 0 failed, 0 ignored, 63 test binaries — which is exactly what
+plan §14 demanded. The finding text and its severity are retained above unchanged;
+only its stated condition is discharged.
 
-**Severity: low, and not this milestone's.** Every reported diff is in
+### F-6 — `cargo fmt --all -- --check` currently fails on other crates — **condition discharged 2026-10-23**
+
+**Severity: low, and not this milestone's.** Every reported diff was in
 `crates/eggup-core/` and `crates/eggup-service/`, which two concurrent agents
-are editing. `cargo fmt -p eggup-archive -- --check` is clean. The parent
+were editing. `cargo fmt -p eggup-archive -- --check` is clean. The parent
 session's final workspace gate will confirm.
+
+**Condition discharged 2026-10-23.** The parent session's whole-tree gate
+`./scripts/check-local.sh` → exit 0 includes `cargo fmt --all -- --check`, so the
+workspace-wide formatting check is now clean. The finding text and its severity
+are retained above unchanged.
 
 ## Roadmap disposition
 
-- **Archive Extraction M005 → closed, conditional on F-1 and F-5.** The
-  milestone's own scope (production change, rustdoc, tests, README, CHANGELOG,
-  architecture deep dive) is complete and green on macOS. It is recorded as
-  *conditionally* closed because the `eggup-eggpack` test-lane migration (F-1)
-  and the hosted Windows qualification (F-5) are outstanding and are not
-  within this milestone's file ownership or reachable from this machine.
+- **Archive Extraction M005 → closed.** The milestone's own scope (production
+  change, rustdoc, tests, README, CHANGELOG, architecture deep dive) is complete
+  and green on macOS. It is recorded as **closed** because both conditions that
+  made it *conditionally* closed have been discharged: the `eggup-eggpack`
+  test-lane migration (F-1) was applied by the parent session, and the hosted
+  qualification (F-5) is discharged by hosted run `40008039843` — Linux, macOS,
+  and Windows all green, with the Windows lane executing the archive tests.
 - **M005 is source-only.** No publication, no version bump, no tag move, no
   release changelog section. Republication of `eggup-archive` and the
   exact-pin cascade to `eggup-eggpack` remain separate, unauthorized
@@ -625,21 +653,23 @@ describes the intended edits rather than making them.
    (F-1). Severity **medium** — deterministic gate failure caused by an
    intended behavior change, no production defect. Fix: mirror the failure
    branch's residue handling in the `Ok` arm.
-3. **Note the outstanding platform qualification.** The Windows lane must
-   execute the archive tests before M005 is signed off (F-5), and the new
-   external foreign-replacement fixture is Unix-gated (F-3).
+3. **Note the platform qualification as discharged.** The Windows lane executed
+   the archive tests in hosted run `40008039843` (598 passed, 0 failed, 0 ignored,
+   63 test binaries), so the F-5 sign-off condition is met. The new external
+   foreign-replacement fixture remains Unix-gated (F-3), which is a permanent
+   platform limitation rather than an open qualification condition.
 4. **Register the M006 follow-up** for the deferred `eggup-archive` module
    decomposition (F-4).
 
 ### `plans/subsystems/archive-extraction-roadmap.md` — status table row
 
-> | M005 | Cleanup contract and member-write corrective | **conditionally closed** — the cleanup contract is truthful and observable on all four entry points (`Ok` = emptied, `Err(CleanupFailed)` = not emptied), the member-write body exists exactly once in `write_declared_member`, and the crate's rustdoc, README, CHANGELOG `Unreleased`, and `architecture/archive-extraction.md` agree with the code. macOS green (57 tests); Linux, Windows, and the hosted matrix **not run**. Conditional on (a) the `eggup-eggpack` test-helper migration for the now-reachable `Ok` path — F-1, medium, owned by the Eggpack subsystem — and (b) hosted Windows execution of the archive tests — F-5, medium. The `lib.rs` module decomposition is **deferred** to **M006** (pure code move, no consumer-visible effect) — F-4, low. Source-only: no publication, no version bump, no tag move; the fix cannot reach the published `eggup-eggpack` adapter without a separate republication and an exact-pin cascade. See `plans/closure/archive-extraction/005-status.md`. |
+> | M005 | Cleanup contract and member-write corrective | **closed** — the cleanup contract is truthful and observable on all four entry points (`Ok` = emptied, `Err(CleanupFailed)` = not emptied), the member-write body exists exactly once in `write_declared_member`, and the crate's rustdoc, README, CHANGELOG `Unreleased`, and `architecture/archive-extraction.md` agree with the code. macOS green (57 tests); hosted qualification green in run `40008039843` — Linux, macOS, and Windows all pass (Windows: 598 passed, 0 failed, 0 ignored, 63 test binaries; the Windows lane executed the archive tests, so the F-5 sign-off condition is discharged). The `lib.rs` module decomposition is **deferred** to **M006** (pure code move, no consumer-visible effect) — F-4, low. The external foreign-replacement fixture stays Unix-gated — F-3, low, a permanent platform limitation. Source-only: no publication, no version bump, no tag move; the fix cannot reach the published `eggup-eggpack` adapter without a separate republication and an exact-pin cascade. See `plans/closure/archive-extraction/005-status.md`. |
 
 ## Closure checklist against `plans/closure/README.md`
 
 | Required element | Present |
 |---|---|
-| status | *conditionally closed* |
+| status | *closed* |
 | source plan and roadmap | yes |
 | reviewed repository baseline | `c4805411f74b85158e0ae5d0a219a32c4209d98e` |
 | implementation commits/PRs | working tree, uncommitted — no commit was made |
@@ -652,10 +682,10 @@ describes the intended edits rather than making them.
 | compatibility and migration review | yes — published 0.1.3 delta, the `unwrap_err()` panic consequence, the `root()` capture requirement, the `=0.1.3` pin consequence |
 | security review | yes |
 | documentation/operations evidence | yes |
-| unresolved findings with severity | yes — F-1 (medium), F-2 (low), F-3 (low), F-4 (low), F-5 (medium), F-6 (low) |
+| unresolved findings with severity | yes — F-1 (medium, resolved by the parent session), F-2 (low, open), F-3 (low, open — the Unix-gating is permanent; its sign-off condition is discharged), F-4 (low, open), F-5 (medium, condition discharged by hosted run `40008039843`), F-6 (low, condition discharged by the parent session's whole-tree gate) |
 | roadmap disposition | yes |
 | registry updates | yes — prose; the parent applies the edits |
-| per-platform results reported separately | yes — macOS **run**, Linux **not run**, Windows **not run**, hosted lanes **not run** |
+| per-platform results reported separately | yes — macOS **run** natively; Linux, macOS, and Windows all **pass** in hosted run `40008039843`; see § "Per-platform results" and the addendum at the end of this record |
 
 ---
 
@@ -677,6 +707,145 @@ cargo test --workspace --all-targets --all-features --locked --offline --no-fail
 was migrated to the corrected contract, so the `eggup-eggpack` test lane is green
 and the workspace gate passes.
 
-**Still not run:** Linux, Windows, and every hosted CI lane (`stable`, `msrv`,
-`service-systemd`, `macos`, `windows-check`). No hosted runner is reachable from
-this machine, so F-5 remains the open condition on this milestone.
+**Superseded:** the "still not run" statement this section made about Linux,
+Windows, and every hosted CI lane was true when it was written and is **no longer
+true** — all of them have since run. The whole-tree figures above (449 passed /
+36 test binaries) are also superseded by the later gate on the same tree, which
+reports 483 passed / 44 test binaries after further milestones landed. See
+§ "Parent-session verification addendum (2026-10-23, hosted qualification)" at the
+end of this record.
+
+---
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+**What this supersedes.** This record previously made these claims, all of which a
+hosted runner has now overtaken. Each is superseded by the qualification recorded
+below, not merely contradicted by it:
+
+1. § "Status" — "The remaining condition is the outstanding **hosted**
+   qualification (F-5): Linux, Windows, and the hosted CI matrix were not run
+   from this machine", and the milestone's own "conditionally closed" wording.
+2. § "Exact commands run, with results" — the list of whole-tree commands
+   "**not run** at this stage", and the statement that `cargo fmt --all -- --check`
+   "currently fails".
+3. § "Per-platform results" — the `Linux`, `Windows`, and hosted-CI rows, each
+   **NOT RUN** with the reason "no hosted runner is reachable from this machine".
+4. § "Roadmap disposition", § "Registry updates", the quoted roadmap status row,
+   and § "Closure checklist" — the "closed, conditional on F-1 and F-5" wording
+   and the "not run" figures they repeat.
+5. § "Parent-session verification addendum (2026-10-23)" — its "still not run"
+   statement for Linux, Windows, and the hosted lanes, and its whole-tree figure
+   of *449 passed / 36 test binaries*, which was the state of the tree when that
+   gate ran. The later gate on the same tree reports *483 passed / 44 test
+   binaries*, because further milestones have landed since. Both gates exited 0.
+
+**F-5's condition is discharged.** F-5 above was open **only** because the hosted
+qualification had not run. It has now run, and the Windows lane **executed** the
+archive tests — which is what plan §14 demanded. The finding text and its severity
+are retained above unchanged; only its stated condition is discharged. **F-1**
+remains resolved by the parent session's `eggup-eggpack` test-helper migration.
+**F-2** (no external `Err(CleanupFailed)` coverage) and **F-4** (the deferred
+`lib.rs` module decomposition, M006) remain open and are unaffected by the hosted
+run — neither is a platform question. **F-3**'s sign-off condition is discharged
+too, but the Unix-gating it records is a permanent platform limitation that no
+platform result can settle, so F-3 stays open.
+
+### Hosted evidence — CI run `40008039843`
+
+Workflow `CI` (`.github/workflows/ci.yml`), branch `plans/corrective-batch-2026-10-23`,
+commit `0cb2c53`, push-triggered. **All five hosted lanes are green.**
+
+| Lane | Conclusion | Evidence | Bearing on this milestone |
+|---|---|---|---|
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** | **The decisive lane.** The archive tests **executed** here, not merely compiled — plan §14's stop condition and F-5's sign-off condition. |
+| `Stable checks` (ubuntu-latest) | **success** | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries**; `cargo doc --workspace --no-deps --locked`; `cargo package -p eggup-service --locked` | The whole-workspace gate on Linux, including this crate's tests. |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0, plus the packaged-service verification | The crate compiles at the workspace MSRV. |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** | The whole-workspace gate on macOS. |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** | The real-systemd qualification lane. |
+
+The single ignored test in the Stable and macOS lanes is the pre-existing,
+environment-conditional curl connect-timeout test; its skip reason is recorded in
+the test source. It is **not** a new ignore introduced by this batch.
+
+**Why the Windows aggregate is larger.** The Windows lane runs nine separate
+`cargo test` steps — acquisition/archive/curl, eggpack, three named `eggup-service`
+diagnostics, the SCM unit tests, core's `current_executable` and
+`stale_lock_recovery` fixtures, and then the whole workspace with `--no-fail-fast`
+— whereas the Linux and macOS lanes run the whole workspace in a single step, so
+the Windows aggregate counts the targeted steps' tests again. The documented
+`#[cfg(not(windows))]` exclusion applies in the opposite direction: the curl
+loopback-server tests are excluded on Windows and run on Linux and macOS. **Neither
+difference is a coverage gap** — it is lane shape plus a documented platform
+exclusion, and every workspace test target runs on all three platforms.
+
+### The CRLF-fragile test anchor found by the hosted Windows lane
+
+This is part of the qualification story for this milestone, and it is a
+**test-portability defect, not a product defect**. No production code changed to
+fix it.
+
+- **The failure.** Hosted run **`40005168760`** (the second push of this batch on
+  this branch) failed the Windows lane on
+  `member_write_path_exists_exactly_once_in_non_test_code`
+  (`crates/eggup-archive/tests/m005_member_write_parity.rs`). The guard located the
+  inline test module in `src/lib.rs` with the CRLF-fragile marker
+  `"\n#[cfg(test)]\nmod tests {"`. A checkout that writes CRLF (`core.autocrlf` on
+  Windows) never matches that `\n`-anchored marker, so the guard failed on a tree
+  whose member-write path was correct. The hosted failure was the panic at
+  `crates/eggup-archive/tests/m005_member_write_parity.rs:295` with the message
+  **"the inline test module marker must be present in src/lib.rs"**.
+- **The fix.** The guard now normalizes line endings before matching
+  (`let normalized = source.replace("\r\n", "\n");`,
+  `crates/eggup-archive/tests/m005_member_write_parity.rs:299`). The
+  `mod tests {` anchor is deliberately kept, because `src/lib.rs` carries an
+  earlier `#[cfg(test)]` item that must not be mistaken for the module.
+- **The red/green proof.** The fix was proven red/green in an isolated worktree:
+  pre-fix, the fixture fails with the hosted panic at `:295` and the message
+  "the inline test module marker must be present in src/lib.rs"; fixed, it passes
+  **3/3 under CRLF** and **3/3 under LF**.
+- **The runs.** `40005168760` caught it. Hosted run **`40008039843`** — the
+  qualification run for this addendum — is green on all five lanes, so the
+  defect is fixed and covered. The earlier run `40004604594` was the first push of
+  this batch on this branch and precedes the qualification run.
+
+### Per-platform results
+
+Reported separately. No platform result is inferred from another.
+
+| Platform | Result | Evidence |
+|---|---|---|
+| **Linux** | **PASS** | Hosted run `40008039843`: the `Stable checks` lane (ubuntu-latest) — fmt, clippy with `-D warnings`, `cargo test --workspace --all-targets --all-features --locked` (**483 passed, 0 failed, 1 ignored, 44 test binaries**), `cargo doc --workspace --no-deps --locked`, `cargo package -p eggup-service --locked`; the `MSRV check` lane on Rust 1.89.0 — `cargo check --workspace --all-targets --locked` plus the packaged-service verification; and the `Linux systemd service qualification` lane — **9 passed, 0 failed, 0 ignored, 7 test binaries**. |
+| **macOS** | **PASS** | Hosted run `40008039843`: the `macOS tests` lane — **483 passed, 0 failed, 1 ignored, 44 test binaries**. The native macOS evidence recorded in this record — 57 archive tests, clippy with and without `--all-features`, `cargo doc`, `cargo fmt -p eggup-archive -- --check`, and the red-first proof against the pre-M005 baseline — is unchanged and remains valid. |
+| **Windows** | **PASS** | Hosted run `40008039843`: the `Windows archive, acquisition, and service tests and check` lane (windows-latest) — **598 passed, 0 failed, 0 ignored, 63 test binaries**. The archive tests executed there, including the 2 `#[cfg(windows)]` inline tests (`lib.rs:2764`, `lib.rs:3072`) that did not execute in the macOS run. |
+
+After this addendum the milestone is qualified across **all three** platforms:
+Linux, macOS, and Windows.
+
+### Local whole-tree gate
+
+Run by the parent session on the same tree:
+
+```sh
+./scripts/check-local.sh
+# → exit 0
+cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast
+# → 483 passed; 0 failed; 44 test binaries
+```
+
+`./scripts/check-local.sh` runs `cargo fmt --all -- --check`, the workspace clippy
+with `-D warnings`, the workspace test suite, `cargo doc --workspace --no-deps
+--locked`, `cargo tree --workspace --locked`, and `./scripts/check-docs-truth.sh`.
+All of them are clean; the gate exits 0.
+
+### Compatibility consequence
+
+This milestone published nothing and moved no tag. The published `eggup-archive
+0.1.3` on crates.io still carries **every defect this milestone fixed** — the
+cleanup contract that is mis-documented and can never succeed, and the duplicated
+member-write body. The `eggup-eggpack` **`=0.1.3` pin still blocks propagation**:
+`crates/eggup-eggpack/Cargo.toml` pins `eggup-archive = "=0.1.3"`, so the fix
+cannot reach the published adapter without a separate adapter republication and an
+exact-pin cascade. No republication, version bump, or tag move was performed, and
+this addendum changes nothing about that: the hosted qualification qualifies the
+**working tree**, not the published crate.

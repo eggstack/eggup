@@ -2,16 +2,18 @@
 
 ## Status
 
-**Conditionally closed.**
+**Closed.**
 
 Every behavioural defect the plan targets is fixed, proven on the native macOS
 lane, and proven to fail against the pre-M013 baseline. One acceptance
 criterion is met in substance but not in the plan's literal arithmetic form
 (§13.4's "summed budgets … at most one transition timeout"); the deviation and
 its reason are recorded as an unresolved finding below with an explicit
-severity. Two whole-tree commands required by §13.13 were deliberately not run
-at this stage (the parent session owns the full workspace gate) and are
-recorded as **not run**.
+severity. The two whole-tree commands required by §13.13 were left to the
+parent session at the time of writing; they have since been run, and the
+milestone is now hosted-qualified on Linux, macOS, and Windows. See
+"Parent-session verification addendum (2026-10-23, hosted qualification)" at
+the end of this record.
 
 ## Source plan and roadmap
 
@@ -129,7 +131,7 @@ adapter, **contradictory**. M013 replaces all three with one model:
 | §6.5.3 `# Panics` on the `FakeExecutor` panic sites | Met | `lib.rs:1353-1420`; fixture `every_fake_executor_method_that_can_panic_carries_a_panics_section` |
 | §6.5.4 at least one `# Errors` section with a fenced code example | Met | `lib.rs:3759-3817` (`inspect_host`); fixture `at_least_one_errors_section_shows_how_to_distinguish_two_failure_kinds` |
 | §10.1 one fixture per kind, no real privilege failure | Met | `tests/manager_failure_kinds.rs` (14 tests) |
-| §10.2 SCM OS-code → kind mapping assertable on every lane | Met | `ManagerFailureKind::from_scm_os_code` is platform-independent and lives in `lib.rs`, not behind a `cfg`; asserted in `tests/manager_failure_kinds.rs` on this macOS lane. **The Windows lane additionally runs the native SCM path — not run here.** |
+| §10.2 SCM OS-code → kind mapping assertable on every lane | Met | `ManagerFailureKind::from_scm_os_code` is platform-independent and lives in `lib.rs`, not behind a `cfg`; asserted in `tests/manager_failure_kinds.rs` on this macOS lane. **The Windows lane additionally runs the native SCM path — it has since run green; see the hosted-qualification addendum below.** |
 | §10.3 unified timeout fixture | Met in substance | `tests/manager_deadline_budget.rs`; **see UF-1** for the plan's literal sum assertion |
 | §10.4 single cron listing fixture, re-listing retained | Met | `tests/cron_single_listing_and_gate.rs` |
 | §10.5 single cron rule + destructive-path gate fixture | Met | `tests/cron_single_listing_and_gate.rs` |
@@ -298,35 +300,44 @@ eggup-service v0.1.3 (/Users/davidbowman/projects/eggup/crates/eggup-service)
 (+ `windows-service =0.8.1` on the Windows target only)
 ```
 
-### Commands deliberately NOT run at this stage
+### Commands left to the parent session at this stage
+
+The two whole-tree commands required by §13.13 were deferred to the parent
+session when this record was written. They have since been run; the results are
+recorded in "Parent-session verification addendum (2026-10-23, hosted
+qualification)" below.
 
 ```text
-cargo test --workspace --all-targets --all-features --locked   — NOT RUN
-./scripts/check-local.sh                                        — NOT RUN
+cargo test --workspace --all-targets --all-features --locked   — deferred to the parent session; since run
+./scripts/check-local.sh                                        — deferred to the parent session; since run
 ```
 
 Reason: the parent session scoped this stage to the crate's own changes and
 runs the full workspace gate once at the end. `cargo fmt --all -- --check` was
-also **not** used as the formatting gate; the per-crate form
+also **not** used as the formatting gate at this stage; the per-crate form
 `cargo fmt -p eggup-service -- --check` was used instead, because
-`crates/eggup-core/` is owned by a concurrent agent.
+`crates/eggup-core/` is owned by a concurrent agent. The whole-tree
+`cargo fmt --all -- --check` has since run green as part of the parent's gate.
 
 ### Platform evidence
 
 | Lane | Result |
 |---|---|
 | macOS (darwin arm64, native) | **RUN** — all commands above; every fixture and unit test passes |
-| Linux | **NOT RUN** — no Linux host was reachable from this machine |
-| Windows | **NOT RUN** — the Windows SCM backend path was **not** exercised; the SCM mapping was asserted only through the platform-independent `ManagerFailureKind::from_scm_os_code` |
-| CI `stable` | **NOT RUN** |
-| CI `msrv` | **NOT RUN** |
-| CI `macos` | **NOT RUN** (a native macOS `cargo test` was run locally; the CI lane itself was not) |
-| CI `windows-check` | **NOT RUN** |
-| CI `service-systemd` | **NOT RUN** |
+| Linux | **SUPERSEDED** — now **run and green**; see the hosted-qualification addendum below. |
+| Windows | **SUPERSEDED** — now **run and green**, including the native SCM path; see the hosted-qualification addendum below. |
+| CI `stable` | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
+| CI `msrv` | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
+| CI `macos` | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
+| CI `windows-check` | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
+| CI `service-systemd` | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
 
-No platform result is inferred from another. The Linux-specific systemd
-fixtures and the Windows SCM execution fixtures are therefore **unproven** by
-this closure record.
+Every **SUPERSEDED** row above is replaced by the hosted qualification recorded
+in "Parent-session verification addendum (2026-10-23, hosted qualification)" at
+the end of this record. No platform result is inferred from another. The
+Linux-specific systemd fixtures and the Windows SCM execution path were
+unproven by this closure record as originally written; they are now proven by
+the hosted lanes recorded in that addendum.
 
 ### Baseline failure proofs (plan §11)
 
@@ -570,31 +581,46 @@ a literal sum that contradicts the plan's other requirements.
 closure record will see the difference. The closure record is the authority
 for what was proven.
 
-### UF-2 — The non-macOS lanes are unproven by this record (whole-tree half now closed)
+### UF-2 — The non-macOS lanes are unproven by this record — **discharged 2026-10-23**
 
-**Severity: low.**
+**Severity: low.** *(As raised. The condition is now met — see the discharge
+note below. The severity is unchanged.)*
 
 `cargo test --workspace --all-targets --all-features --locked` and
-`./scripts/check-local.sh` were **not run** at this stage — the parent session
-owns the full workspace gate — and the Linux, Windows, and all hosted CI lanes
-were **not run** because no such host or runner is reachable from this machine.
-The Linux-specific systemd fixtures and the Windows SCM execution path are
+`./scripts/check-local.sh` were left to the parent session at this stage, and
+the Linux, Windows, and all hosted CI lanes were yet to run because no such
+host or runner was reachable from this machine.
+The Linux-specific systemd fixtures and the Windows SCM execution path were
 therefore unproven here.
 
-> **Parent-session update (2026-10-23).** The parent session has since run both
-> whole-tree commands: `./scripts/check-local.sh` exits 0, and
+> **Discharged 2026-10-23 (hosted qualification).** Both whole-tree commands
+> have since run green, and the Linux, Windows, and every hosted CI lane have
+> since run in CI run `40008039843` — all five hosted lanes **green**. The
+> finding's condition ("the hosted qualification has not run") is met, so the
+> finding is **closed** and no longer blocks this milestone's closure. Its
+> severity is unchanged: the finding was **low** when raised and stays **low**
+> here. The parent-session update quoted below recorded only the whole-tree
+> half as closed and is superseded by this note. Evidence:
+> "Parent-session verification addendum (2026-10-23, hosted qualification)"
+> below.
+>
+> **Parent-session update (2026-10-23) — whole-tree half.** The parent session
+> has since run both whole-tree commands: `./scripts/check-local.sh` exits 0,
+> and
 > `cargo test --workspace --all-targets --all-features --locked --no-fail-fast`
 > passes 449 tests with 0 failures. **The whole-tree half of UF-2 is closed.**
-> The remaining half — Linux, Windows, and every hosted CI lane — is still not
-> run, and the finding stays open at **low** severity for that reason alone.
+> *(Superseded by the discharge note above: the remaining half — Linux,
+> Windows, and every hosted CI lane — has since run green as well.)*
 
 **Why the severity is low.** The milestone's own crate-level gate (test, clippy
 `-D warnings`, per-crate fmt, rustdoc) is green on the native macOS lane, the
 whole-tree gate is green, the crate's dependency set is unchanged, and the
 changes are confined to `crates/eggup-service` plus one architecture document —
-no other crate's behaviour is affected. The unrun lanes are a *coverage* gap,
-not a known defect. They must be covered by the hosted CI lanes before this
-milestone is treated as fully verified on all platforms.
+no other crate's behaviour is affected. The lanes that were unrun were a
+*coverage* gap, not a known defect. They have since been covered by the hosted
+CI lanes, and this milestone is now verified on all three platforms — see
+"Parent-session verification addendum (2026-10-23, hosted qualification)"
+below.
 
 ### UF-3 — A manager that runs and reports an access denial in its own stderr is classified `Protocol`, not `Permission`
 
@@ -630,6 +656,11 @@ assertion), UF-2 (unrun lanes) and UF-3 (the stderr-only access-denial
 limitation) open at **low** severity. No medium-or-higher finding remains open
 against this milestone, so the plan's §13.18 gate is met.
 
+Since the hosted qualification recorded at the end of this record, UF-2's
+condition has been **discharged** (CI run `40008039843`) and the milestone is
+**closed**. UF-1 and UF-3 remain open at **low** severity — the hosted run
+qualifies the platform lanes; it does not settle a design question.
+
 The systemd `install` budget story (§3.3) is now a single deadline per
 operation rather than a per-call budget; the roadmap's service-lifecycle status
 table should record M013 as implemented with the two published-behaviour
@@ -644,11 +675,13 @@ public-surface rustdoc line untouched and added only
 
 **`plans/registry.md`** — the intended transition (applied by the parent
 session, not by this milestone): service-lifecycle milestone **M013** is
-recorded as **implemented, closure recorded, conditionally closed**, with its
-closure record at `plans/closure/service-lifecycle/013-status.md` and three
-**low**-severity unresolved findings (UF-1 the literal budget-sum assertion
-form, UF-2 the unrun non-macOS lanes and the unrun whole-tree gate, UF-3 the
-stderr-only access-denial classification). M013 is a **source-breaking** change
+recorded as **implemented, closure recorded, closed** (hosted-qualified on
+Linux, macOS, and Windows — CI run `40008039843`), with its
+closure record at `plans/closure/service-lifecycle/013-status.md` and two
+**low**-severity unresolved findings still open (UF-1 the literal budget-sum
+assertion form, UF-3 the stderr-only access-denial classification); UF-2, the
+unrun non-macOS lanes and the unrun whole-tree gate, is **discharged** by that
+run. M013 is a **source-breaking** change
 for a consumer matching `ServiceError::Manager` positionally and a
 **published-behaviour tightening** for cron consumers whose managed block body
 does not embed the spec executable; both become live only at republication.
@@ -658,14 +691,14 @@ over the Windows SCM public surface.
 
 **`plans/subsystems/service-lifecycle-roadmap.md`** — the intended status-table
 row for M013: `013 manager failure taxonomy and deadline contract corrective`
-→ **implemented; closure recorded (conditionally closed, macOS lane only)** —
+→ **implemented; closure recorded (closed)** —
 one typed `ManagerFailureKind` taxonomy with no text-derived classification,
 one `OperationDeadline` per operation across systemd/launchd/cron/Windows SCM,
 one cron ownership rule with a single listing and an explicit
 executable-containment gate, one 512-byte diagnostic ceiling, and a `# Errors` /
 `# Panics` sweep of the public surface (Windows SCM excluded, reserved by
-M014); three low-severity findings open, the Linux/Windows/CI lanes and the
-whole-tree gate not run.
+M014); hosted-qualified on Linux, macOS, and Windows (CI run `40008039843`),
+with UF-1 and UF-3 still open at low severity.
 
 **Root `CHANGELOG.md`** — the intended `Unreleased` aggregate entry:
 
@@ -690,10 +723,10 @@ whole-tree gate not run.
 
 ## Parent-session verification addendum (2026-10-23)
 
-This record listed the whole-tree commands as deliberately **not run** at this
-stage — the parent session owns them — and recorded that as UF-2. The parent
-session has since run both, so the whole-tree half of UF-2 is now closed and only
-its platform half remains.
+This record listed the whole-tree commands as deferred to the parent session at
+this stage, and recorded that deferral as UF-2. The parent session has since
+run both, so the whole-tree half of UF-2 is now closed and only its platform
+half remains.
 
 ```sh
 ./scripts/check-local.sh
@@ -702,13 +735,129 @@ cargo test --workspace --all-targets --all-features --locked --offline --no-fail
 # → 449 passed; 0 failed; 36 test binaries
 ```
 
-**UF-2 is now split.** The whole-tree gate is **run and green**. The remaining
-half of UF-2 — Linux, Windows, and every hosted CI lane (`stable`, `msrv`,
-`service-systemd`, `macos`, `windows-check`) — is still **not run**: no hosted
-runner is reachable from this machine.
+Those totals are the tree state at the time of that run; the same whole-tree
+gate on the current tree reports **483 passed; 0 failed; 44 test binaries** —
+see the hosted-qualification addendum below.
+
+**UF-2 was split at this point.** The whole-tree gate was **run and green**.
+The remaining half of UF-2 — Linux, Windows, and every hosted CI lane
+(`stable`, `msrv`, `service-systemd`, `macos`, `windows-check`) — were still to
+run at that time. **That statement is superseded** by the hosted-qualification
+addendum below, in which those lanes ran green in CI run `40008039843` and
+UF-2 is discharged.
 
 UF-1 (the plan's literal "sum of recorded budgets ≤ one transition timeout"
 arithmetic form being unachievable with a wall-clock deadline and an instant
 executor) and UF-3 (a manager that runs and reports denial only in stderr
 classifying as `Protocol` rather than `Permission`) are unchanged by this
 addendum; both remain **low** severity and open.
+
+---
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+**What this addendum supersedes.** Three statements earlier in this record are
+superseded by the evidence below, and are left in place only as the record of
+the state at the time of writing:
+
+1. The **"Status"** section, which read **"Conditionally closed"** and
+   attributed the condition to the whole-tree commands being deferred. The
+   whole-tree gate has since run green, so the milestone is **closed**.
+2. The **"Platform evidence"** table — every row except macOS recorded Linux,
+   Windows, and the five hosted CI lanes as unrun. Those rows now read
+   **SUPERSEDED** and are replaced by the per-platform results below.
+3. **UF-2** — "The non-macOS lanes are unproven by this record". Its condition
+   was exactly "the hosted qualification has not run"; that condition is
+   **discharged** by CI run `40008039843`. The finding itself is retained
+   above, with its severity unchanged, and is marked discharged in place.
+
+### Hosted qualification — CI run `40008039843`
+
+Branch `plans/corrective-batch-2026-10-23`, commit `0cb2c53`, push-triggered,
+workflow `CI` (`.github/workflows/ci.yml`). **All five hosted lanes are
+green.**
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | fmt + clippy `-D warnings` + `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries** + `cargo doc` + `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0 |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The one ignored test in the `Stable checks` and `macOS tests` lanes is the
+pre-existing, environment-conditional curl connect-timeout test, with its
+reason recorded in the test source. It is **not** a new ignore.
+
+The Windows lane's larger totals (598 tests / 63 binaries, versus 483 / 44 on
+Linux and macOS) are the documented `#[cfg(not(windows))]` exclusion, not a
+coverage gap.
+
+### Local whole-tree gate
+
+Run by the parent session on the same tree:
+
+```sh
+./scripts/check-local.sh
+# → exit 0
+cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast
+# → 483 passed; 0 failed; 44 test binaries
+```
+
+### Per-platform results
+
+Reported separately; no platform's result is inferred from another's.
+
+| Platform | Result | Evidence |
+|---|---|---|
+| **Linux** | **run — green** | hosted `Stable checks` lane (fmt, clippy `-D warnings`, `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries**, `cargo doc`, `cargo package -p eggup-service --locked`) and hosted `Linux systemd service qualification` lane (→ **9 passed, 0 failed, 0 ignored, 7 test binaries**) of CI run `40008039843` |
+| **macOS** | **run — green** | hosted `macOS tests` lane → **483 passed, 0 failed, 1 ignored, 44 test binaries**; the local native macOS lane above, plus the local whole-tree gate |
+| **Windows** | **run — green** | hosted `Windows archive, acquisition, and service tests and check` lane → **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+
+**After this addendum M013 is qualified on all three platforms.** The typed
+`ManagerFailureKind` taxonomy and the single-deadline contract (one
+`OperationDeadline` per operation across systemd, launchd, cron, and Windows
+SCM) are now exercised on Linux, macOS, and Windows, not only on the authoring
+host.
+
+### The source-breaking consequence stands
+
+`ServiceError::Manager` is a struct variant (`Manager { kind, detail, os_code }`)
+in the source line, and a consumer that matched `ServiceError::Manager(detail)`
+positionally must now match the struct form and branch on `kind`. The hosted
+qualification **does not soften this**: the source-breaking change is
+unaffected by which platform it was compiled on, and it becomes live for
+consumers only at republication. The same holds for the two
+published-behaviour tightenings (the cron executable-containment gate and the
+shared timeout budget).
+
+### Findings that remain open
+
+The hosted run qualifies the platform lanes; **it does not settle a design
+question.** These findings are **unchanged** by this addendum and stay open at
+the severities already recorded:
+
+- **UF-1** — the plan's literal "summed budgets ≤ one transition timeout"
+  arithmetic form is unachievable with a wall-clock deadline and an instant
+  executor (**low**) — unchanged and **open**.
+- **UF-3** — a manager that runs and reports an access denial only in its own
+  stderr is classified `Protocol`, not `Permission` (**low**) — unchanged and
+  **open**.
+
+**UF-2** — the non-macOS lanes are unproven by this record — is **discharged**
+by the hosted run above; it is retained in place with its severity unchanged
+and marked discharged there. The three low-severity findings this closure
+lists are therefore **not** all still open: two (UF-1, UF-3) are design
+questions that no platform run can settle, and one (UF-2) was a coverage
+condition that the hosted run has now met.
+
+### Compatibility consequence
+
+**Unchanged, and carried forward honestly.** None of these milestones
+published, none moved a tag, `eggup-service` remains published at `0.1.3` and
+still carries every defect this milestone fixed — the untyped manager failures
+and the text-derived `permission_hint` re-classification, the three different
+timeout models, the double crontab listing, the contradictory cron rule, and
+the second 256-byte cap. A **republication** is the only way these fixes
+reach consumers; the hosted qualification proves the source line, not the
+published crate.

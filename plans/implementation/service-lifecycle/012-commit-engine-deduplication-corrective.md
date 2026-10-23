@@ -1,6 +1,6 @@
 # Service Lifecycle Milestone 012 — commit-engine deduplication and ownership-type unification corrective
 
-Status: closed 2026-10-23; implemented and green on the native macOS lane. Closure record: `plans/closure/service-lifecycle/012-status.md`. Linux, Windows, and the hosted CI lanes were **not run**.
+Status: closed; see `plans/closure/service-lifecycle/012-status.md` (implemented and green on the native macOS lane; hosted-qualified on Linux, macOS, and Windows, run `40008039843`)
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

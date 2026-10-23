@@ -1,6 +1,6 @@
 # Planning/Closure Hygiene Corrective 013 — post-audit documentation truth reconciliation
 
-Status: closed; see `plans/closure/planning-closure-hygiene-corrective/013-status.md`
+Status: closed 2026-10-23; see `plans/closure/planning-closure-hygiene-corrective/013-status.md` (documentation-only — no platform lane applies to the change itself; the whole-tree local gate and hosted run `40008039843` are green)
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

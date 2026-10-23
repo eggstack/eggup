@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 015 — public API contract truthfulness corrective
 
-Status: closed 2026-10-23; implemented and green on the native macOS lane. Closure record: `plans/closure/verified-update-core/015-status.md`. Linux, Windows, and the hosted CI lanes were **not run**.
+Status: closed 2026-10-23; implemented and green on the native macOS lane and hosted-qualified on Stable/MSRV/macOS/Windows/systemd, run `40008039843`. Closure record: `plans/closure/verified-update-core/015-status.md` — one low-severity documentation residual (U1) remains open, and the published `eggup-core 0.1.3` still carries the defect this milestone fixed.
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

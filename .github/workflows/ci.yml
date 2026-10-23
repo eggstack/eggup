@@ -73,6 +73,13 @@ jobs:
       - run: cargo test -p eggup-service --lib service_errors_output_and_permission_remediation_stay_utf8_bounded --locked
       - run: cargo test -p eggup-service --lib lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free --locked
       - run: cargo test -p eggup-service --lib windows_scm::tests --locked
+      # The real Windows SCM fixture registers a disposable service through the
+      # crate's public API and drives it against the genuine Service Control
+      # Manager. It needs a hosted Windows runner with administrator rights,
+      # and it records a skip reason on stdout when those rights are absent --
+      # so it runs with --nocapture, and the reason is never swallowed by the
+      # test harness's output capture.
+      - run: cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture
       # Core self-update and stale-lock fixtures exercise real running-image and
       # filesystem-race behaviour, so they run natively here rather than only
       # being compiled.

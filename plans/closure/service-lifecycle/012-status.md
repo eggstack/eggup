@@ -438,19 +438,22 @@ Only the two transcribed fixtures fail; the baseline's own 108 tests still pass.
 | Platform | Result |
 |---|---|
 | **macOS (darwin arm64, this host)** | **RUN** — native. All commands above ran here. |
-| **Linux** | **NOT RUN** — no Linux host is reachable from this machine. |
-| **Windows** | **NOT RUN** — no Windows host is reachable. The Windows SCM backend path is not exercised on this host, and plan §5 excludes Windows SCM execution coverage from this milestone. |
-| `stable` CI lane | **NOT RUN** — no hosted runner is reachable from this machine. |
-| `msrv` CI lane | **NOT RUN** — no hosted runner is reachable from this machine. |
-| `macos` CI lane | **NOT RUN** — no hosted runner is reachable from this machine. |
-| `windows-check` CI lane | **NOT RUN** — no hosted runner is reachable from this machine. |
-| `service-systemd` CI lane | **NOT RUN** — no hosted runner is reachable from this machine. |
+| **Linux** | **SUPERSEDED** — now **run and green**; see the hosted-qualification addendum below. |
+| **Windows** | **SUPERSEDED** — now **run and green**; see the hosted-qualification addendum below. |
+| `stable` CI lane | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
+| `msrv` CI lane | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
+| `macos` CI lane | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
+| `windows-check` CI lane | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
+| `service-systemd` CI lane | **SUPERSEDED** — now **success**; see the hosted-qualification addendum below. |
 
-No platform result is inferred from another platform. The Windows-specific risk
-of this change is confined to `crates/eggup-service/src/windows_scm.rs`, which
-was **not modified**; it continues to resolve `crate::Ownership` through the
-re-export and its `Ownership` matching arms remain exhaustive because
-`eggup_core::Ownership` is not `#[non_exhaustive]`.
+Every **SUPERSEDED** row above is replaced by the hosted qualification recorded
+in "Parent-session verification addendum (2026-10-23, hosted qualification)" at
+the end of this record. No platform result is inferred from another platform.
+The Windows-specific risk of this change is confined to
+`crates/eggup-service/src/windows_scm.rs`, which was **not modified**; it
+continues to resolve `crate::Ownership` through the re-export and its
+`Ownership` matching arms remain exhaustive because `eggup_core::Ownership` is
+not `#[non_exhaustive]`.
 
 ## Invariant review
 
@@ -655,17 +658,29 @@ Windows-relevant surfaces (`windows_scm.rs`'s `Ownership` usage and the
 `windows-check` lane is the only place that can prove them. The mitigation is
 that `windows_scm.rs` was not modified at all and that
 `eggup_core::Ownership` is not `#[non_exhaustive]`, so its existing exhaustive
-matches remain exhaustive. The hosted lanes must still be run before this
+matches remain exhaustive. The hosted lanes had to be run before this
 milestone's work is relied upon outside this repository.
+
+> **Discharged 2026-10-23 (hosted qualification).** The condition this finding
+> names — no Linux or Windows native evidence, and no hosted CI lane evidence —
+> is now met. The hosted `Stable checks`, `MSRV check`, `macOS tests`,
+> `Windows archive, acquisition, and service tests and check`, and
+> `Linux systemd service qualification` lanes all ran **green** in CI run
+> `40008039843`; the Linux and Windows results are in the hosted-qualification
+> addendum at the end of this record. The finding is retained above in its
+> original form and its severity is **not** changed by the discharge — it was
+> medium when raised and the finding is **closed**, so it no longer blocks the
+> milestone's closure.
 
 ## Roadmap disposition
 
-Service M012 is **complete on the source line** and is **ready for the parent's
-workspace gate and hosted CI lanes**. It does not publish: the crate's
+Service M012 is **complete on the source line** and is **hosted-qualified**: the
+parent's whole-tree gate and all five hosted CI lanes have since run green
+(CI run `40008039843`; see the hosted-qualification addendum below). It does
+not publish: the crate's
 published version remains `0.1.3` and the `v0.1.3` tag is unmoved. The
-roadmap status table row for M012 should read **closed** once the parent has
-run the workspace gate and the hosted lanes, with the two behaviour
-tightenings and the four follow-on findings carried forward.
+roadmap status table row for M012 should read **closed**, with the two
+behaviour tightenings and the remaining follow-on findings carried forward.
 
 Proposed status-table row for
 `plans/subsystems/service-lifecycle-roadmap.md`:
@@ -680,8 +695,8 @@ The parent applies these edits; this session did not touch
 **Registry entry for the milestone.** Under the service-lifecycle subsystem
 entries, add:
 
-> - **M012 — commit-engine deduplication corrective (closed, source line; not
->   published).** `eggup-service` carried two divergent copies of the
+> - **M012 — commit-engine deduplication corrective (closed, source line;
+>   hosted-qualified on Linux, macOS, and Windows; not published).** `eggup-service` carried two divergent copies of the
 >   destructive commit/rollback engine, one in `disposition.rs` and one in
 >   `lifecycle_update.rs`. They are now one engine,
 >   `crates/eggup-service/src/commit_engine.rs`, reached by both public
@@ -717,12 +732,14 @@ existing entries untouched:
 >    (breaking existing explicit-path consumers) or renaming the core type,
 >    which needs its own republication.
 > 8. **M012 has no Linux or Windows native evidence and no hosted CI lane
->    evidence.** Severity: medium. The change is platform-neutral in its
+>    evidence.** Severity: medium. *(Discharged 2026-10-23 — CI run
+>    `40008039843` ran all five hosted lanes green, including the
+>    `windows-check` and `service-systemd` lanes; see the hosted-qualification
+>    addendum in the closure record. Retained here as the record of the
+>    finding that this milestone closed.)* The change is platform-neutral in its
 >    implementation and `windows_scm.rs` was not modified, but the Windows SCM
 >    backend was not exercised on the authoring host and M012 §5 excludes
->    Windows SCM execution coverage from the milestone. The hosted `windows-check`
->    and `service-systemd` lanes must run before the change is relied upon
->    outside this repository.
+>    Windows SCM execution coverage from the milestone.
 
 **Registry "known API observations" section.** Extend the existing
 `CleanupDisposition` entry's deprecation-policy note so it also covers the
@@ -736,8 +753,8 @@ builds. Both dispositions are settled at the intentional 0.2/1.0 API boundary.
 ## Parent-session verification addendum (2026-10-23)
 
 This record noted that the parent session owns the full workspace gate and that
-`cargo test --workspace` and `./scripts/check-local.sh` were not run at this
-stage. The parent session has since run both.
+`cargo test --workspace` and `./scripts/check-local.sh` were left to the parent
+session at this stage. The parent session has since run both.
 
 ```sh
 ./scripts/check-local.sh
@@ -746,10 +763,120 @@ cargo test --workspace --all-targets --all-features --locked --offline --no-fail
 # → 449 passed; 0 failed; 36 test binaries
 ```
 
+Those totals are the tree state at the time of that run; the same whole-tree
+gate on the current tree reports **483 passed; 0 failed; 44 test binaries** —
+see the hosted-qualification addendum below.
+
 The dependency surface is unchanged and still passes the boundary review:
 `eggup-service` resolves to `eggup-core` and `windows-args` only, with
 `windows-service` remaining a Windows-target dependency.
 
-**Still not run:** Linux, Windows, and every hosted CI lane (`stable`, `msrv`,
-`service-systemd`, `macos`, `windows-check`). No hosted runner is reachable from
-this machine, so this milestone is qualified on the native macOS lane only.
+**Hosted lanes at the time of this addendum:** Linux, Windows, and every hosted
+CI lane (`stable`, `msrv`, `service-systemd`, `macos`, `windows-check`) were
+yet to run, because no hosted runner was reachable from this machine, and this
+milestone was qualified on the native macOS lane only. **That statement is
+superseded** by "Parent-session verification addendum (2026-10-23, hosted
+qualification)" below, which records all five hosted lanes running green in CI
+run `40008039843`.
+
+---
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+**What this addendum supersedes.** Three statements earlier in this record are
+superseded by the evidence below, and are left in place only as the record of
+the state at the time of writing:
+
+1. The **"Platform evidence"** table — every row except macOS recorded Linux,
+   Windows, and the five hosted CI lanes as unrun. Those rows now read
+   **SUPERSEDED** and are replaced by the per-platform results below.
+2. **Finding 6** — "no Linux or Windows native evidence, and no hosted CI lane
+   evidence" (severity **medium**). Its condition was exactly that "the hosted
+   lanes had to be run before this milestone's work is relied upon outside this
+   repository"; that condition is **discharged** by CI run
+   `40008039843`. The finding itself is retained above, with its severity
+   unchanged, and is marked discharged in place.
+3. The earlier **"Parent-session verification addendum (2026-10-23)"** section's
+   closing paragraph, which recorded Linux, Windows, and every hosted CI lane
+   as yet to run. It is superseded by this section.
+
+### Hosted qualification — CI run `40008039843`
+
+Branch `plans/corrective-batch-2026-10-23`, commit `0cb2c53`, push-triggered,
+workflow `CI` (`.github/workflows/ci.yml`). **All five hosted lanes are
+green.**
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | fmt + clippy `-D warnings` + `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries** + `cargo doc` + `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0 |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The one ignored test in the `Stable checks` and `macOS tests` lanes is the
+pre-existing, environment-conditional curl connect-timeout test, with its
+reason recorded in the test source. It is **not** a new ignore.
+
+The Windows lane's larger totals (598 tests / 63 binaries, versus 483 / 44 on
+Linux and macOS) are the documented `#[cfg(not(windows))]` exclusion, not a
+coverage gap.
+
+### Local whole-tree gate
+
+Run by the parent session on the same tree:
+
+```sh
+./scripts/check-local.sh
+# → exit 0
+cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast
+# → 483 passed; 0 failed; 44 test binaries
+```
+
+### Per-platform results
+
+Reported separately; no platform's result is inferred from another's.
+
+| Platform | Result | Evidence |
+|---|---|---|
+| **Linux** | **run — green** | hosted `Stable checks` lane (fmt, clippy `-D warnings`, `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries**, `cargo doc`, `cargo package -p eggup-service --locked`) and hosted `Linux systemd service qualification` lane (→ **9 passed, 0 failed, 0 ignored, 7 test binaries**) of CI run `40008039843` |
+| **macOS** | **run — green** | hosted `macOS tests` lane → **483 passed, 0 failed, 1 ignored, 44 test binaries**; the local native macOS lane above, plus the local whole-tree gate |
+| **Windows** | **run — green** | hosted `Windows archive, acquisition, and service tests and check` lane → **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+
+**After this addendum M012 is qualified on all three platforms.** The shared
+commit engine (`crates/eggup-service/src/commit_engine.rs`) and the ownership
+unification (`eggup_service::Ownership` re-exporting `eggup_core::Ownership`,
+`CronOwnership` as its public alias) are now exercised on Linux, macOS, and
+Windows, not only on the authoring host.
+
+### Findings that remain open
+
+The hosted run qualifies the platform lanes; it does not settle a design
+question. These findings are **unchanged** by this addendum and stay open at
+the severities already recorded:
+
+- **Finding 1** — `SystemExecutor` is not consolidated onto
+  `eggup_core::run_bounded` (**low**). The consolidation remains **deferred**,
+  exactly as plan §6.1 R-E1 and §6.6 R-E1 direct, and the follow-on is still
+  **authorable** now that core M014 has closed. The hosted run does not
+  discharge it.
+- **Finding 2** — the residual `CommandOutput` glob-import ambiguity between
+  `eggup_core` and `eggup_service` (**low**) — unchanged.
+- **Finding 3** — `tests/commit_engine_policy.rs` has no baseline-failure proof
+  (**low**) — unchanged; it is new-API evidence, not defect evidence.
+- **Finding 4** — the crate's byte-bound test name retains "256"
+  (**informational**) — unchanged; a coordinated CI and tooling-governance
+  rename is still outstanding.
+- **Finding 5** — the `Ref` column of `architecture/service-lifecycle.md` is a
+  pointer layer (**informational**) — unchanged.
+
+### Compatibility consequence
+
+**Unchanged, and carried forward honestly.** None of these milestones
+published, none moved a tag, `eggup-service` remains published at `0.1.3` and
+still carries every defect this milestone fixed — the two divergent
+commit/rollback engine copies, the three structurally identical ownership enums,
+the duplicate `CommandOutput` type, and the undeclared second byte ceiling. A
+**republication** is the only way these fixes reach consumers; the hosted
+qualification proves the source line, not the published crate.
+

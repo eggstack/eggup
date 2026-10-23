@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 012 — sub-second deadline test determinism corrective
 
-Status: conditionally closed 2026-10-23; implemented and green on the native macOS lane, with the discriminating **loaded** re-run showing 0 failures where the pre-M012 tree fails, and every new assertion proven to fire against a mutated control. Closure record: `plans/closure/acquisition-transport/012-status.md`. The remaining condition is the outstanding qualification: the Linux, Windows, and hosted CI lanes and the whole-tree gate were **not run**.
+Status: conditionally closed 2026-10-23; implemented and green on the native macOS lane, with the discriminating **loaded** re-run showing 0 failures where the pre-M012 tree fails. Hosted qualification ran and is green — CI run `40008039843` (commit `0cb2c53`, all five lanes) and the local whole-tree gate at exit 0 — but the hosted `Stable` lane re-observed registry finding 1 in the **spawn** mode in run `40005168760`, so finding 1 stays **open and narrowed** and the milestone is **not** closed. Closure record: `plans/closure/acquisition-transport/012-status.md`.
 
 Repository baseline: `93267304f96bb4de50128080769f3c77dd03892c`
 

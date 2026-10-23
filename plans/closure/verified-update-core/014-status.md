@@ -6,11 +6,12 @@
 
 The defect is corrected in the working tree, the discriminating fixture is proven to
 fail against the pre-M014 baseline and to pass against the corrected tree, and every
-invariant of the source plan's §4 holds. Four findings remain open; none is
-medium-or-higher, and each is recorded below with its severity and the reason for
-that severity. Hosted CI lanes and the Linux and Windows platforms were **not run**
-from this machine, so the milestone's hosted qualification is still outstanding and
-is recorded as such rather than inferred.
+invariant of the source plan's §4 holds. The findings recorded below are listed with
+their severity and the reason for that severity. Hosted CI lanes and the Linux and
+Windows platforms were **not run** from this machine when this record was written;
+that statement is **superseded** by the hosted qualification recorded in
+§ "Parent-session verification addendum (2026-10-23, hosted qualification)", which
+qualifies this milestone on Linux, macOS, and Windows.
 
 ## Source plan and roadmap
 
@@ -413,7 +414,7 @@ defect exactly as the plan's §3.2 describes it, and it is why the baseline's
 | Core never creates a live destination parent; candidate execution never mutates a live destination; validation runs before the mutation lock | **Holds** | `ValidatedTransaction::validate` (`candidate.rs:511-522`) is unchanged and still runs before any lock is taken. A deadline expiry produces `Err(Error::CandidateExecution(...))` — never a receipt, never a success. |
 | `run_bounded` keeps clearing the inherited environment and passing null stdin | **Holds** | `candidate.rs:184-186` — `env_clear()` and `Stdio::null()` are unchanged. |
 | `eggup-core` keeps its dependency surface | **Holds** | `cargo tree` above: `sha2` only on this platform. No new dependency, no `build.rs`, no FFI, no `unsafe` (`#![forbid(unsafe_code)]` is untouched and the build is clean). |
-| Rust 1.89 MSRV; `missing_docs` satisfied | **Holds** | Built and tested with the 1.89.0 toolchain; `cargo doc` is clean. `JoinHandle::is_finished` has been stable since 1.61, so the MSRV is unaffected. The hosted `msrv` lane was **not run** (see the platform matrix). |
+| Rust 1.89 MSRV; `missing_docs` satisfied | **Holds** | Built and tested with the 1.89.0 toolchain; `cargo doc` is clean. `JoinHandle::is_finished` has been stable since 1.61, so the MSRV is unaffected. The hosted `msrv` lane is green in hosted run `40008039843` (see the addendum at the end of this record). |
 
 ## Failure / rollback / recovery review
 
@@ -554,25 +555,28 @@ descendant's lifetime.
 | Platform | Result | How |
 |---|---|---|
 | macOS 25.6.0 arm64 (darwin) | **PASS** — 12/12 new fixtures green, 90/90 crate tests green, clippy clean, rustdoc clean, 10/10 stability runs green | Native run on this machine |
-| Linux | **NOT RUN** | No Linux host is reachable from this machine. Not inferred from macOS. |
-| Windows | **NOT RUN** | No Windows host is reachable from this machine. Not inferred from macOS. |
-| Hosted `stable` lane | **NOT RUN** | No hosted runner is reachable from this machine. |
-| Hosted `msrv` lane | **NOT RUN** | No hosted runner is reachable from this machine. |
-| Hosted `macos` lane | **NOT RUN** | No hosted runner is reachable from this machine. |
-| Hosted `windows-check` lane | **NOT RUN** | No hosted runner is reachable from this machine. |
-| Hosted `service-systemd` lane | **NOT RUN** | No hosted runner is reachable from this machine. |
+| Linux | **PASS** | Hosted run `40008039843`: the `Stable checks` lane (ubuntu-latest) and the `MSRV check` lane (Rust 1.89.0) are green. See the addendum at the end of this record. |
+| Windows | **PASS** | Hosted run `40008039843`: the `Windows archive, acquisition, and service tests and check` lane (windows-latest) is green — 598 passed, 0 failed, 0 ignored, 63 test binaries. The new `candidate_deadline` fixtures are not `#[cfg]`-gated and executed natively there. See the addendum at the end of this record. |
+| Hosted `stable` lane | **PASS** | Hosted run `40008039843` — success. See the addendum at the end of this record. |
+| Hosted `msrv` lane | **PASS** | Hosted run `40008039843` — success. See the addendum at the end of this record. |
+| Hosted `macos` lane | **PASS** | Hosted run `40008039843` — success. See the addendum at the end of this record. |
+| Hosted `windows-check` lane | **PASS** | Hosted run `40008039843` — success. See the addendum at the end of this record. |
+| Hosted `service-systemd` lane | **PASS** | Hosted run `40008039843` — success. See the addendum at the end of this record. |
 
 The plan's §11.2 hosted qualification, including the requirement that the
-`windows-check` lane be confirmed to have executed the new test file, is therefore
-**still outstanding**. The fixture is written to satisfy it: it uses no feature gate
-(the `windows-check` lane runs without `--all-features`), no shell, and no external
-tool, and it selects its helper roles from argv rather than from the environment
-because `run_bounded` clears the environment.
+`windows-check` lane be confirmed to have executed the new test file, is now
+**satisfied** by hosted run `40008039843`. The fixture is written to satisfy it: it
+uses no feature gate (the `windows-check` lane runs without `--all-features`), no
+shell, and no external tool, and it selects its helper roles from argv rather than
+from the environment because `run_bounded` clears the environment.
 
 ## Unresolved findings with severity
 
 **F1 — Hosted qualification and the Linux / Windows platforms are not run. Severity:
-medium.** The reason for the severity: the *implementation* is platform-neutral
+medium.** **Condition discharged 2026-10-23** by hosted run `40008039843`; the
+finding text and its severity are retained unchanged. See § "Parent-session
+verification addendum (2026-10-23, hosted qualification)" at the end of this
+record. The reason for the severity: the *implementation* is platform-neutral
 Rust with no platform-specific code, and the fixture is designed to be
 platform-neutral (argv-selected helper roles, no shell, no external tool, no
 platform-specific thread counter). But "designed to be portable" is not "observed to
@@ -733,6 +737,111 @@ cargo test --workspace --all-targets --all-features --locked --offline --no-fail
 `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`,
 and `cargo doc --workspace --no-deps --locked` are all clean as part of the gate.
 
-**Still not run:** Linux, Windows, and every hosted CI lane (`stable`, `msrv`,
-`service-systemd`, `macos`, `windows-check`). No hosted runner is reachable from
-this machine, so this milestone is qualified on the native macOS lane only.
+**Superseded:** the "still not run" statement this section made about Linux,
+Windows, and every hosted CI lane was true when it was written and is **no longer
+true** — all of them have since run. The whole-tree figures above (449 passed /
+36 test binaries) are also superseded by the later gate on the same tree, which
+reports 483 passed / 44 test binaries after further milestones landed. See
+§ "Parent-session verification addendum (2026-10-23, hosted qualification)" at the
+end of this record.
+
+---
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+**What this supersedes.** This record previously made three claims that a hosted
+runner has now overtaken. Each is superseded by the qualification recorded below,
+not merely contradicted by it:
+
+1. § "Status" — "Hosted CI lanes and the Linux and Windows platforms were **not
+   run** from this machine, so the milestone's hosted qualification is still
+   outstanding".
+2. § "Platform results" — the `Linux` and `Windows` rows and all five hosted-lane
+   rows, each **NOT RUN** with the reason "No hosted runner is reachable from this
+   machine", and the paragraph beneath the table stating that the plan's §11.2
+   hosted qualification is "**still outstanding**".
+3. § "Invariant review" (MSRV row) — "The hosted `msrv` lane was **not run**".
+
+The earlier § "Parent-session verification addendum (2026-10-23)" is superseded on
+two points as well: its "still not run" statement for Linux, Windows, and the
+hosted lanes, and its whole-tree figure of *449 passed / 36 test binaries*, which
+was the state of the tree when that gate ran. The later gate on the same tree
+reports *483 passed / 44 test binaries*, because further milestones have landed
+since. Both gates exited 0.
+
+**F1's condition is discharged.** F1 above — "Hosted qualification and the Linux /
+Windows platforms are not run. Severity: medium" — was open **only** because the
+qualification had not run. It has now run, on every lane the plan's §11.2 names,
+and the Windows lane executed the new fixtures natively. F1's condition is
+discharged; the finding text and its severity are retained above unchanged.
+**F2–F8 are unaffected by the hosted run and remain open**: they are behavioural,
+classification, bound, and residual items, and no platform result can settle them.
+None of them was a hosted-qualification condition.
+
+### Hosted evidence — CI run `40008039843`
+
+Workflow `CI` (`.github/workflows/ci.yml`), branch `plans/corrective-batch-2026-10-23`,
+commit `0cb2c53`, push-triggered. **All five hosted lanes are green.**
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries**; `cargo doc --workspace --no-deps --locked`; `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0, plus the packaged-service verification |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The single ignored test in the Stable and macOS lanes is the pre-existing,
+environment-conditional curl connect-timeout test; its skip reason is recorded in
+the test source. It is **not** a new ignore introduced by this batch.
+
+**Why the Windows aggregate is larger.** The Windows lane runs nine separate
+`cargo test` steps — acquisition/archive/curl, eggpack, three named `eggup-service`
+diagnostics, the SCM unit tests, core's `current_executable` and
+`stale_lock_recovery` fixtures, and then the whole workspace with `--no-fail-fast`
+— whereas the Linux and macOS lanes run the whole workspace in a single step, so
+the Windows aggregate counts the targeted steps' tests again. The documented
+`#[cfg(not(windows))]` exclusion applies in the opposite direction: the curl
+loopback-server tests are excluded on Windows and run on Linux and macOS. **Neither
+difference is a coverage gap** — it is lane shape plus a documented platform
+exclusion, and every workspace test target runs on all three platforms.
+
+### Per-platform results
+
+Reported separately. No platform result is inferred from another.
+
+| Platform | Result | Evidence |
+|---|---|---|
+| **Linux** | **PASS** | Hosted run `40008039843`: the `Stable checks` lane (ubuntu-latest) — fmt, clippy with `-D warnings`, `cargo test --workspace --all-targets --all-features --locked` (**483 passed, 0 failed, 1 ignored, 44 test binaries**), `cargo doc --workspace --no-deps --locked`, `cargo package -p eggup-service --locked`; the `MSRV check` lane on Rust 1.89.0 — `cargo check --workspace --all-targets --locked` plus the packaged-service verification; and the `Linux systemd service qualification` lane — **9 passed, 0 failed, 0 ignored, 7 test binaries**. |
+| **macOS** | **PASS** | Hosted run `40008039843`: the `macOS tests` lane — **483 passed, 0 failed, 1 ignored, 44 test binaries**. The native macOS evidence recorded in this record — the 12 new deadline fixtures, the 90-test crate suite, the 10/10 stability runs, clippy, rustdoc, and the baseline-failure proof — is unchanged and remains valid. |
+| **Windows** | **PASS** | Hosted run `40008039843`: the `Windows archive, acquisition, and service tests and check` lane (windows-latest) — **598 passed, 0 failed, 0 ignored, 63 test binaries**. The lane's workspace step (`cargo test --workspace --all-targets --locked --no-fail-fast`) includes `crates/eggup-core/tests/candidate_deadline.rs`, which is not `#[cfg]`-gated, so the new fixtures executed natively on Windows — the specific evidence F1 and the plan's §11.2 required. |
+
+After this addendum the milestone is qualified across **all three** platforms:
+Linux, macOS, and Windows.
+
+### Local whole-tree gate
+
+Run by the parent session on the same tree:
+
+```sh
+./scripts/check-local.sh
+# → exit 0
+cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast
+# → 483 passed; 0 failed; 44 test binaries
+```
+
+`./scripts/check-local.sh` runs `cargo fmt --all -- --check`, the workspace clippy
+with `-D warnings`, the workspace test suite, `cargo doc --workspace --no-deps
+--locked`, `cargo tree --workspace --locked`, and `./scripts/check-docs-truth.sh`.
+All of them are clean; the gate exits 0.
+
+### Compatibility consequence
+
+This milestone published nothing and moved no tag. The published `eggup-core
+0.1.3` on crates.io still carries **every defect this milestone fixed** — the
+bounded candidate execution that can exceed its documented wall-clock deadline —
+and a consumer resolving `0.1.3` can still hang. `eggup-eggpack`'s
+`eggup-core = "=0.1.3"` pin blocks propagation to that adapter, so reaching it
+needs a separate core publication and a separate adapter republication. Neither is
+authorized by this milestone, and this addendum changes nothing about that: the
+hosted qualification qualifies the **working tree**, not the published crate.

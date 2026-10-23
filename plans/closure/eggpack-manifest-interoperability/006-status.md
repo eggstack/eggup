@@ -1,12 +1,14 @@
 # Eggpack Manifest Interoperability M006 — Closure and Verification Record
 
-Status: **conditionally closed** — the milestone's own scope is complete and green on
-macOS, and every requirement in the plan's §§6, 10, and 13 is either implemented and
-evidenced or explicitly recorded below as deferred with a reason. The remaining
-conditions are **outstanding qualification** (F-1): the hosted Linux and Windows lanes
-and the full-workspace local gate were not run from this host, and `cargo fmt --all
--- --check` currently fails on a file owned by a concurrent writer (F-2), not on any
-file this milestone owns.
+Status: **closed** — the milestone's own scope is complete, and every requirement in the
+plan's §§6, 10, and 13 is either implemented and evidenced or explicitly recorded below
+as deferred with a reason. The milestone session could qualify on its native macOS lane
+only; the **parent session has since run the whole-tree local gate and the hosted CI
+lanes** (hosted run `40008039843`, branch `plans/corrective-batch-2026-10-23`, commit
+`0cb2c53` — all five lanes green), which **discharges the qualification condition
+recorded below as F-1** and supersedes the workspace `cargo fmt --all -- --check`
+failure attributed to F-2. See *Parent-session verification addendum* at the end of this
+record for the hosted and local evidence.
 
 Source plan: `plans/implementation/eggpack-manifest-interoperability/006-canonical-digest-reuse-corrective.md`
 
@@ -17,7 +19,12 @@ Reviewed repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 SHA, so the baseline worktree used for the red-first proof is the committed
 pre-M006 state of this crate)
 
-Implementation commit(s): **working tree, uncommitted — no commit was made.** The
+Implementation commit(s): **the milestone session made no commit** — the changes were in
+the working tree when this record was written. The parent session has since committed
+the batch on branch `plans/corrective-batch-2026-10-23`; the hosted qualification run
+`40008039843` qualified commit **`0cb2c53`**, which carries M006's delegated digest
+(`crates/eggup-eggpack/src/lib.rs:522` calls `eggup_core::hash_file`), the runtime
+manifest with no `sha2`, and `crates/eggup-eggpack/tests/digest_reuse.rs`. The
 changes are in `crates/eggup-eggpack/src/lib.rs`,
 `crates/eggup-eggpack/Cargo.toml`, `crates/eggup-eggpack/tests/digest_reuse.rs`
 (new), `crates/eggup-eggpack/README.md`, `crates/eggup-eggpack/CHANGELOG.md`,
@@ -79,8 +86,8 @@ not change either: `sha2 v0.10.9` remains in the graph through `eggup-core` and
 | 12 | The adapter's policy surface is unchanged | no URL/origin, install-root, ownership, permission, release-selection, service, or authenticity code touched; the diff is confined to one function body | pass |
 | 13 | `eggup-eggpack` remains the only crate with an `eggpack-manifest` edge | `cargo tree --workspace --locked --offline -i eggpack-manifest` → `eggpack-manifest v0.1.0 └── eggup-eggpack v0.1.3` only; `cargo tree -p <crate>` for `eggup-core`, `eggup-acquisition`, `eggup-service`, `eggup-archive`, `eggup-eggfetch`, `eggup-curl` shows **no** eggpack edge | pass |
 | 14 | `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, workspace `unsafe_code = "deny"`, clippy `all = warn` with `-D warnings` | crate attributes untouched (`lib.rs:1-2`); clippy clean with and without `--all-features`; `cargo doc -p eggup-eggpack --no-deps --locked --offline` builds with no warnings | pass |
-| 15 | `./scripts/check-local.sh` green on the local machine | **NOT RUN** by this session — the session's instruction scoped testing to the adapter package, and the full workspace gate is the parent session's. The adapter-scoped equivalent is green (see *Exact commands run*). See F-1. | **not run** |
-| 16 | Hosted lanes `stable`, `msrv`, `service-systemd`, `macos`, `windows-check` recorded individually | see *Per-platform results* — **all not run** from this host. | **not run** |
+| 15 | `./scripts/check-local.sh` green on the local machine | **superseded** — the parent session ran the whole-tree gate: `./scripts/check-local.sh` → **exit 0** (fmt, clippy `-D warnings`, workspace test, doc, `cargo tree --workspace --locked`, `./scripts/check-docs-truth.sh`). The adapter-scoped equivalent recorded in *Exact commands run* stays green. See *Parent-session verification addendum* and F-1. | **pass** |
+| 16 | Hosted lanes `stable`, `msrv`, `service-systemd`, `macos`, `windows-check` recorded individually | **superseded** — hosted run `40008039843` (branch `plans/corrective-batch-2026-10-23`, commit `0cb2c53`): **all five lanes green**, each recorded individually in *Parent-session verification addendum*. | **pass** |
 | 17 | Nothing published; the `v0.1.3` tag not moved | no `cargo publish`, no `git tag`, no version bump; `crates/eggup-eggpack/Cargo.toml` still `version.workspace = true` (`0.1.3`); `cargo package` produced a local artifact only | pass |
 
 ### §6 required production changes
@@ -383,22 +390,31 @@ session's first inspection (which showed all three clean). The set is a moving
 target, because those writers are still working. The `eggup-eggpack` package is
 fmt-clean (`cargo fmt -p eggup-eggpack -- --check` is silent). Recorded as F-2;
 **not fixed here**, because those files are outside this milestone's ownership.
+**Superseded:** the parent session's whole-tree gate is green, and its first command is
+`cargo fmt --all -- --check` (`scripts/check-local.sh:4`), so the workspace fmt failure
+no longer exists. See *Parent-session verification addendum*.
 
-Commands from §11 **not run** by this session, and why:
+Commands from §11 that fell outside the milestone session's scope — **all of them have
+since been run by the parent session**; see *Parent-session verification addendum* for
+the exact invocations and results:
 
-- `cargo test --workspace --all-targets --all-features --locked` — **not run.** The
-  session's instruction scoped testing to the adapter package and forbade attempting
-  the whole workspace suite; the parent session runs the full gate once at the end.
+- `cargo test --workspace --all-targets --all-features --locked` — outside the
+  milestone session's scope: its instruction scoped testing to the adapter package and
+  forbade attempting the whole workspace suite; the parent session owns the full gate.
   The adapter's own suite is green (71/71), and no crate outside
   `crates/eggup-eggpack/` was modified by this milestone, so no cross-crate
-  regression is possible from these edits.
-- `./scripts/check-local.sh` — **not run**, same reason (see F-1). Its adapter-relevant
-  components (fmt for this package, clippy `-D warnings`, tests, doc) were run
-  individually and are green, except the workspace fmt, which fails only in
-  `crates/eggup-curl` (F-2).
-- `cargo tree --workspace --locked` — not run in full; the per-crate trees the plan
-  names (`-p eggup-eggpack`, and `-i sha2`) were run, plus `-p` trees for the six
-  other crates to prove no Eggpack edge leaked.
+  regression is possible from these edits. **The parent session has since run the
+  whole-workspace suite: 483 passed, 0 failed, 44 test binaries.**
+- `./scripts/check-local.sh` — outside the milestone session's scope for the same
+  reason (see F-1). Its adapter-relevant components (fmt for this package, clippy
+  `-D warnings`, tests, doc) were run individually and are green, except the workspace
+  fmt, which failed only in `crates/eggup-curl` (F-2). **The parent session has since
+  run the whole gate: exit 0.**
+- `cargo tree --workspace --locked` — the milestone session left the whole workspace
+  tree unexecuted; the per-crate trees the plan names (`-p eggup-eggpack`, and `-i
+  sha2`) were run, plus `-p` trees for the six other crates to prove no Eggpack edge
+  leaked. **The parent session's whole-tree gate includes this command as its review
+  step (`scripts/check-local.sh:8`) and exited 0.**
 
 ## Red-first proof against the pre-M006 baseline
 
@@ -452,15 +468,19 @@ red-first, and this record does not claim otherwise.
 
 ## Per-platform results
 
+The milestone session's own native result is recorded first. The **hosted**
+qualification run by the parent session is recorded in *Parent-session verification
+addendum* at the end of this record and **supersedes** the hosted-lane row below.
+
 | Platform | Result |
 |---|---|
 | **macOS (darwin arm64, this machine)** | **RUN** — native. `cargo test -p eggup-eggpack --all-targets --all-features --locked --offline`: 7 inline + 13 + 15 + 8 + 28 integration = **71 tests passed, 0 failed**. Clippy (with and without `--all-features`) clean under `-D warnings`; `cargo doc` clean; `cargo fmt -p eggup-eggpack -- --check` clean; `cargo package` succeeded. The Unix-only fixtures — symlink rejection, FIFO ordering, and the mode-`000` open-failure mapping — **executed** here (the open-failure fixture ran, it did not take its skip branch; the test runner's uid is 503, non-root). |
-| **Linux** | **NOT RUN** — no Linux host is reachable from this machine. |
-| **Windows** | **NOT RUN** — no Windows host is reachable from this machine. The three Unix-only fixtures (`symlinked_acquired_archive_is_rejected_even_when_the_target_matches`, `symlink_guard_precedes_the_open_so_a_fifo_target_never_blocks`, `digest_open_failure_is_mapped_to_invalid_acquired_file`) are `#[cfg(unix)]` and therefore **not run** there. |
-| **Hosted CI lanes** (`stable`, `msrv`, `service-systemd`, `macos`, `windows-check`) | **NOT RUN** — no hosted runner is reachable from this machine. Each lane is recorded individually as not run: `stable` **not run**; `msrv` **not run**; `service-systemd` **not run**; `macos` **not run**; `windows-check` **not run**. |
+| **Linux** | **SUPERSEDED** — no Linux host was reachable from the milestone session's machine. The hosted `Stable checks`, `MSRV check`, and `Linux systemd service qualification` lanes are green; see *Parent-session verification addendum*. |
+| **Windows** | **SUPERSEDED** — no Windows host was reachable from the milestone session's machine. The hosted Windows lane is green; the three Unix-only fixtures (`symlinked_acquired_archive_is_rejected_even_when_the_target_matches`, `symlink_guard_precedes_the_open_so_a_fifo_target_never_blocks`, `digest_open_failure_is_mapped_to_invalid_acquired_file`) are `#[cfg(unix)]` and are therefore **absent** from that lane. See *Parent-session verification addendum*. |
+| **Hosted CI lanes** (`stable`, `msrv`, `service-systemd`, `macos`, `windows-check`) | **SUPERSEDED** — hosted run `40008039843` (branch `plans/corrective-batch-2026-10-23`, commit `0cb2c53`): **all five lanes green**. Each lane's conclusion and evidence is in *Parent-session verification addendum*. |
 
 No platform result is inferred from another platform. The Unix-only fixtures are
-recorded as **not run** on the Windows lane, as the plan requires.
+recorded as **absent** on the Windows lane, as the plan requires.
 
 ## Invariant review (§4, item by item)
 
@@ -642,16 +662,17 @@ adapter asserts no authenticity.
 
 | ID | Finding | Severity | Reason / disposition |
 |---|---|---|---|
-| F-1 | The hosted Linux and Windows lanes (`stable`, `msrv`, `service-systemd`, `macos`, `windows-check`) and the full-workspace local gate (`./scripts/check-local.sh`, `cargo test --workspace`) were **not run** from this host | **medium** (qualification gap, not a defect) | No Linux/Windows host and no hosted runner is reachable from this machine, and the session's instruction scoped testing to the adapter package. The adapter-scoped suite (71/71), clippy `-D warnings`, doc, fmt, and `cargo package` are all green. The parent session owns the full gate. **This is the reason the milestone is conditionally closed.** |
-| F-2 | `cargo fmt --all -- --check` fails on `crates/eggup-curl/src/lib.rs`, `crates/eggup-acquisition/tests/typed_io_contract.rs`, and `crates/eggup-eggfetch/tests/typed_io_contract.rs` | **low** (not caused by M006) | All three files are owned by other concurrent writers and were already modified in the working tree by those writers; they were clean at this session's first inspection. `cargo fmt -p eggup-eggpack -- --check` is silent. Not fixed here — outside this milestone's ownership. |
+| F-1 | Qualification gap as filed when the milestone session closed: the hosted Linux and Windows lanes (`stable`, `msrv`, `service-systemd`, `macos`, `windows-check`) and the full-workspace local gate (`./scripts/check-local.sh`, `cargo test --workspace`) had not been exercised from that host | **medium** (qualification gap, not a defect) | **Condition discharged.** The parent session ran the whole-tree gate (`./scripts/check-local.sh` → exit 0) and hosted run `40008039843` (commit `0cb2c53`), where all five lanes are green. The gap was never a defect in the change; the qualification it asked for now exists, and the milestone is closed on that basis. Evidence: *Parent-session verification addendum*. |
+| F-2 | `cargo fmt --all -- --check` reported diffs in `crates/eggup-curl/src/lib.rs`, `crates/eggup-acquisition/tests/typed_io_contract.rs`, and `crates/eggup-eggfetch/tests/typed_io_contract.rs` | **low** (not caused by M006) | All three files are owned by other concurrent writers and were already modified in the working tree by those writers; they were clean at this session's first inspection. `cargo fmt -p eggup-eggpack -- --check` is silent. Not fixed here — outside this milestone's ownership. **Superseded:** the parent session's whole-tree gate is green and its first command is `cargo fmt --all -- --check`, so the workspace fmt failure no longer exists. See *Parent-session verification addendum*. |
 | F-3 | The TOCTOU window between the `symlink_metadata` guard and the open inside `hash_file` | **low** (carried forward, unchanged from the baseline) | Pre-existing and unchanged by M006. Closing it needs `O_NOFOLLOW`-style handle-relative opening, which `eggup-core` does not expose on this path. A separate milestone with its own design. Recorded in `architecture/eggpack-adapter.md`. |
 | F-4 | The digest step's open and read failures are not distinguishable from a digest mismatch in the returned error | **low** (deliberate, documented) | Preserved deliberately per §6.2 to keep M006 a zero-observable-change refactor on a published crate. `AdapterError` carries only the artifact name and has no `source()` chain, so the underlying `io::Error` could not be surfaced through the adapter's error type even by adding a variant. Narrowing is a candidate for the intentional 0.2/1.0 API boundary and must not ride along with a republication. |
 | F-5 | `docs/crates.md:117` still carries `=0.1.2` for the Eggup pins, and `architecture/overview.md`'s `849 / 63` test figure is now `855 / 71` | **low** (pre-existing / adjacent drift) | `docs/` is non-normative and outside this milestone's ownership; `architecture/overview.md` is owned by another writer. Both are recorded in `architecture/eggpack-adapter.md` § "Known doc/code drift" for the owning workstreams. |
 | F-6 | The `sha2` dev-dependency remains | **none** (a recorded observation, not a defect) | The plan's §6.5 keeps it: the integration fixtures compute digests independently of the crate under test, which is deliberate test design rather than the runtime redundancy that was removed. A dev-dependency creates no runtime supply-chain edge. Removing it would require the fixtures to obtain digests another way — a separate decision with its own evidence, not authorized here. |
 
-No **medium-or-higher** finding remains open **in M006's own scope**. F-1 is a
-qualification gap that the parent session closes with the full workspace gate and the
-hosted lanes.
+No **medium-or-higher** finding remains open **in M006's own scope**. F-1 was a
+qualification gap, and the parent session has closed it with the full workspace gate and
+the hosted lanes (run `40008039843`); it is retained above as a discharged finding, not
+as an open one.
 
 ## Roadmap disposition and registry updates
 
@@ -672,8 +693,8 @@ closing parent session's files. The updates that the parent session should apply
    0.2/1.0 API boundary and must not ride along with a republication.
 3. `plans/subsystems/eggpack-manifest-interoperability-roadmap.md` — the status table
    gains a row for **M006** ("canonical digest reuse corrective"), status
-   **closed** (or **conditionally closed** if the parent session prefers that wording
-   until the hosted lanes are green), with a link to
+   **closed** — the hosted lanes are green (run `40008039843`), so the conditional
+   wording this item previously offered no longer applies — with a link to
    `plans/closure/eggpack-manifest-interoperability/006-status.md`.
 4. No root `CHANGELOG.md` entry — M006 publishes nothing.
 
@@ -701,3 +722,110 @@ closing parent session's files. The updates that the parent session should apply
   destination, ownership, permission, release-selection, or service change in the
   adapter; no change to the extraction handoff; no fix for the TOCTOU observation
   (F-3); and no edits to `plans/registry.md` or the subsystem roadmap.
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+### What this addendum supersedes
+
+Every statement below was accurate when the milestone session wrote it, and each is
+superseded by the hosted qualification and the whole-tree gate that the parent session
+has since run:
+
+- The opening `Status:` block, which read *conditionally closed* and named the
+  qualification condition — the hosted Linux and Windows lanes and the full-workspace
+  local gate had not been exercised from the milestone session's host — together with
+  the `cargo fmt --all -- --check` failure it attributed to F-2.
+- §13 acceptance-criteria rows **15** (`./scripts/check-local.sh` green) and **16**
+  (hosted lanes `stable`, `msrv`, `service-systemd`, `macos`, `windows-check` recorded
+  individually), both of which were recorded as unexecuted.
+- The section now titled *Commands from §11 that fell outside the milestone session's
+  scope*, which recorded the whole-workspace test suite, `./scripts/check-local.sh`, and
+  the whole-workspace `cargo tree` as unexecuted.
+- The *Per-platform results* table, whose Linux, Windows, and hosted-CI rows carried no
+  result.
+- Finding **F-1** in *Unresolved findings, with severity*: its condition — that the
+  hosted qualification had not been exercised — is **discharged**. The finding row is
+  retained, with its severity unchanged.
+
+No other finding changes. **F-2** (the workspace `fmt` failure on files owned by
+concurrent writers) is superseded on its own terms by the same green whole-tree gate.
+**F-3** (the TOCTOU window between the symlink guard and the open), **F-4** (the
+collapsed digest-step error surface), **F-5** (adjacent doc drift), and **F-6** (the
+retained `sha2` dev-dependency) are untouched and stand exactly as filed.
+
+### Hosted qualification
+
+Hosted CI run **`40008039843`**, branch `plans/corrective-batch-2026-10-23`, commit
+**`0cb2c53`** — **all five hosted lanes green**.
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | fmt + clippy `-D warnings` + workspace test → **483 passed, 0 failed, 1 ignored, 44 test binaries**; doc; `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0 |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The single ignored test in the `Stable checks` and `macOS tests` lanes is the
+pre-existing, environment-conditional curl connect-timeout test, whose reason is
+recorded in the test source. It is not a new ignore, and it is not a gap introduced by
+M006.
+
+### Local whole-tree gate
+
+`./scripts/check-local.sh` → **exit 0** (fmt, clippy `-D warnings`, workspace test, doc,
+`cargo tree --workspace --locked`, and `./scripts/check-docs-truth.sh`).
+
+`cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast`
+→ **483 passed, 0 failed, 44 test binaries**.
+
+### Per-platform results (hosted)
+
+Each platform is recorded from the lane that ran on it. No platform result is inferred
+from another.
+
+| Platform | Result |
+|---|---|
+| **Linux** | **PASS** — hosted run `40008039843`: `Stable checks` (ubuntu-latest) **success** (483 passed, 0 failed, 1 ignored, 44 test binaries; clippy `-D warnings` clean; doc clean; `cargo package -p eggup-service --locked` succeeded); `MSRV check` (Rust 1.89.0) **success**; `Linux systemd service qualification` **success** (9 passed, 0 failed, 0 ignored, 7 test binaries). The three Unix-only adapter fixtures are `#[cfg(unix)]` and therefore executed on this lane. |
+| **macOS** | **PASS** — hosted run `40008039843`, `macOS tests` lane: **success** — **483 passed, 0 failed, 1 ignored, 44 test binaries**. The milestone session's own native macOS result stands unchanged alongside it: `cargo test -p eggup-eggpack --all-targets --all-features --locked --offline` → **71 passed, 0 failed**, with the three Unix-only fixtures executed. |
+| **Windows** | **PASS** — hosted run `40008039843`, `Windows archive, acquisition, and service tests and check` lane: **success** — **598 passed, 0 failed, 0 ignored, 63 test binaries**. The three Unix-only adapter fixtures are `#[cfg(unix)]` and are therefore absent from this lane. |
+
+The Windows lane's larger totals (598 tests / 63 binaries against 483 / 44) are a
+**platform-set difference, not a coverage gap**: the `#[cfg(not(windows))]` curl tests
+are excluded on the Windows lane, while the Windows-only SCM tests do not exist on the
+Unix lanes.
+
+### What this qualification covers for M006
+
+- The **delegated digest** is now qualified on all three platforms. The adapter
+  computes the acquired archive's SHA-256 through `eggup_core::hash_file`; the digest
+  value, the error variant, and the error payload are unchanged on every platform.
+- The **preserved symlink rejection and exact-size ordering** are qualified on all
+  three platforms. The `symlink_metadata` guard still precedes the digest call, and the
+  FIFO-ordering fixture and the size-mismatch fixture are green on the Unix lanes
+  (Linux and macOS).
+- The **removed direct `sha2` runtime edge** is qualified on all three platforms. The
+  adapter's `[dependencies]` table carries no `sha2`, and the manifest fixture
+  (`the_adapter_manifest_carries_no_direct_runtime_sha2_dependency`) is green on every
+  lane.
+- **`Cargo.lock` is unchanged.** The resolved `sha2` version is still `0.10.9`, because
+  `sha2` remains a dev-dependency of the adapter and the merged dependency array is
+  identical to the baseline's. No lockfile regeneration was needed, no package entered
+  or left the graph, and **no pin cascade was required**: `eggup_core::hash_file` is
+  exported by the already-pinned `eggup-core 0.1.3`, so the `=0.1.3` / `=0.1.0` pins
+  remain valid and no core republication is forced.
+- **`eggup-eggpack` remains published at `0.1.3`**, and the published crate still
+  carries the duplicate digest implementation and the direct `sha2` runtime edge.
+
+### Compatibility consequence carried forward
+
+This qualification published nothing, moved no tag, and changed no version. The
+published `eggup-eggpack 0.1.3` artifact on crates.io still carries the inline digest
+loop and the direct `sha2` dependency — the defect M006 corrects is fixed in the
+committed tree only, and registry consumers inherit the corrected adapter only at the
+next adapter republication. That republication is a separate milestone with its own
+evidence requirements (see *Handoff notes for the next milestone*); it must not move
+the `v0.1.3` tag.
+
+With F-1 discharged and F-2 superseded by the same green whole-tree gate, **M006 is
+closed**.

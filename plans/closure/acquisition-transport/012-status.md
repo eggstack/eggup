@@ -557,3 +557,188 @@ parent session must apply.
 `crates/eggup-eggpack/**`, `crates/eggup-transport-footprint/**`,
 `architecture/**`, `docs/**`, `plans/registry.md`, `plans/subsystems/**`,
 `plans/adrs/**`, the root `CHANGELOG.md`, and every other crate.
+
+---
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+**What this addendum supersedes.** Seven statements earlier in this record are
+overtaken by the evidence below. They are left in place only as the record of the
+state at the time of writing; the section each one lives in is named so that no
+two contradictory statements remain in this file.
+
+1. § "Status" — "the **Linux** and **Windows** lanes and the hosted CI matrix
+   were **not run** at this stage, and the parent session owns the whole-tree
+   gate. Everything not run is recorded as **not run**, never inferred from the
+   macOS lane." The hosted lanes **have now run** and the whole-tree gate **has
+   now run**. That condition is **discharged**. The macOS lane's result is still
+   never inferred from another lane.
+2. § "Exact commands run and results" → § "Plan §11 commands — status" — the
+   rows for `cargo clippy --workspace --all-targets --all-features --locked --
+   -D warnings`, `cargo test --workspace --all-targets --all-features
+   --locked`, `cargo doc --workspace --no-deps --locked`,
+   `cargo +1.89.0 check --workspace --all-targets --locked`, and "Hosted Stable
+   / MSRV / macOS / Windows matrix", each recorded as **not run** "parent session
+   (UF-2)" / "no hosted run was triggered by this milestone (UF-2)". All five
+   are **discharged** by the hosted run and the local whole-tree gate recorded
+   below.
+3. § "Per-platform results" — the **Linux** row (**not run**, "no Linux host,
+   container, or hosted lane was available in this session") and the **Windows**
+   row (**not run**, "no Windows host or hosted lane was available in this
+   session"). Both are replaced by the per-platform results below.
+4. § "Unresolved findings" → **UF-2** ("the whole-tree gate and the non-macOS
+   lanes were not run — **low**"). Its condition was exactly that those commands
+   and those lanes were unrun; that condition is **now discharged**. UF-2's text
+   and its **low** severity are retained above unchanged and are **not**
+   rewritten — only the satisfaction of its condition is recorded here.
+5. § "Unresolved findings" → **UF-4** ("`cargo fmt --all -- --check` fails on
+   three service-lifecycle files — **low**"). Its condition was that the
+   workspace was not fmt-clean and that "the parent session's whole-tree gate
+   owns this". The whole-tree gate ran and **exited 0**, and
+   `cargo fmt --all -- --check` is its first step, so the condition is **now
+   discharged**. UF-4's text and its **low** severity are retained above
+   unchanged. The three files were outside this milestone's ownership and were
+   never edited by it; the parent session's own work made them clean.
+6. § "Roadmap disposition" item **2** — "mark the 'Post-0.1.3 open findings'
+   entry **1** (the two sub-second wall-clock deadline tests) as **closed**".
+   That instruction is **superseded**: registry finding **1** must be recorded as
+   **open and partially addressed**, not closed. See
+   *The hosted re-observation of registry finding 1* below. Its severity is
+   unchanged.
+7. § "Unresolved findings" → **UF-3** ("`architecture/curl-adapter.md` carries
+   the pre-M012 test table — **low**"). Its condition was that the deep dive's
+   test table still described the pre-M012 assertions. The table now carries the
+   post-M012 wording and a row for the new deterministic test, so the condition
+   is **now discharged**: `build_curl_args_passes_sub_second_deadlines_to_fake_curl`
+   reads "argv carries `--connect-timeout 0.25`; the total budget is decoupled
+   from the enforced ceiling (30 s) so the assertion cannot expire for
+   scheduling reasons",
+   `sub_second_total_timeout_kills_child_promptly` reads "250 ms total vs 4 s
+   stall; elapsed `>=` the short total timeout and `<` 2 s, dir empty",
+   `sub_second_deadlines_serialize_truthfully_without_a_subprocess` has its own
+   row, and the table's line anchors are refreshed
+   (`architecture/curl-adapter.md:740-742`). UF-3's text and its **low**
+   severity are retained above unchanged.
+
+### Hosted qualification — CI run `40008039843`
+
+Branch `plans/corrective-batch-2026-10-23`, commit `0cb2c53`, push-triggered,
+workflow `CI` (`.github/workflows/ci.yml`). **All five hosted lanes are green.**
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | fmt + clippy `-D warnings` + `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries** + `cargo doc --workspace --no-deps --locked` + `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0 |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The one ignored test in the `Stable checks` and `macOS tests` lanes is the
+pre-existing, environment-conditional curl connect-timeout test, with its skip
+reason recorded in the test source. It is **not** a new ignore introduced by this
+batch.
+
+The Windows lane's larger totals (**598 passed / 63 test binaries**, against
+**483 / 44** on Linux and macOS) are the documented **platform-set difference**,
+not a coverage gap: the `#[cfg(not(windows))]` curl tests are excluded on the
+Windows lane, while the Windows-only SCM tests do not exist on the Unix lanes.
+
+### Local whole-tree gate
+
+Run by the parent session on the same tree:
+
+```sh
+./scripts/check-local.sh
+# → exit 0
+cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast
+# → 483 passed; 0 failed; 44 test binaries
+```
+
+### Per-platform results
+
+Reported separately; no platform's result is inferred from another's.
+
+| Platform | Result | Evidence |
+|---|---|---|
+| **Linux** | **run — green** | hosted `Stable checks` lane (fmt, clippy `-D warnings`, workspace test → **483 passed, 0 failed, 1 ignored, 44 test binaries**, `cargo doc`, `cargo package -p eggup-service --locked`) and hosted `Linux systemd service qualification` lane (→ **9 passed, 0 failed, 0 ignored, 7 test binaries**) of CI run `40008039843` |
+| **macOS** | **run — green** | hosted `macOS tests` lane → **483 passed, 0 failed, 1 ignored, 44 test binaries**; plus this record's own native macOS lane (loaded **120/120** at load average **337–366**, 8 negative controls fired) and the local whole-tree gate above |
+| **Windows** | **run — green** | hosted `Windows archive, acquisition, and service tests and check` lane → **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+
+The retained limitations recorded above are unchanged by this addendum: the
+Windows lane still carries no live HTTP/curl result (the `#[cfg(not(windows))]`
+curl tests remain excluded there), and the end-to-end sub-second `--max-time`
+proof still does not exist.
+
+### The hosted re-observation of registry finding 1 — why M012 is still conditionally closed
+
+The hosted lanes were **not** straightforwardly green on the way to run
+`40008039843`, and the intermediate evidence is load-bearing for this
+milestone's status.
+
+- **Run `40004604594`** (first push of this batch): the **Windows** lane failed
+  on a CRLF-fragile test anchor in
+  `crates/eggup-archive/tests/m005_member_write_parity.rs`. The **Stable** lane
+  **passed**.
+- **Run `40005168760`** (second push): the **Windows** lane failed on 13
+  Unix-shaped fixtures in `crates/eggup-service/tests/` plus one CRLF-fragile
+  rustdoc anchor in `crates/eggup-service/tests/errors_doc_sections.rs`. All
+  were fixed. The **Stable** lane then failed with exactly one test:
+
+  ```text
+  test tests::build_curl_args_passes_sub_second_deadlines_to_fake_curl ... FAILED
+  thread '...' panicked at crates/eggup-curl/src/lib.rs:1609:14:
+  fake curl completes well inside the 30s budget: Unavailable("curl spawn failed for https://example.com/x")
+  ```
+
+  That is the test this subsystem's registry finding 1 tracks. The failure was a
+  **spawn** failure, not a timeout, and it was **intermittent** — identical code
+  passed the same lane in run `40004604594`.
+- **Run `40008039843`** (third push): green on every lane, including the
+  `Stable` lane that had just failed.
+
+**Consequence for this milestone.** M012's substantive change — decoupling the
+deadline under test from the enforced budget, with the sub-second serialization
+proven without a subprocess — **is** implemented and verified, and this record's
+own loaded re-run (**120/120** at load average **337–366** on macOS) stands. But
+the hosted `Stable` lane **re-observed the flake in the same test, in the spawn
+mode**: the decoupling removed the *timeout-coupling* mode of the flake, and the
+mode that remained is a *spawn* failure, which M012 does not address and which
+M012 was never scoped to address. **M012 is therefore still conditionally
+closed, not closed.** Its outstanding condition is that hosted re-observation of
+registry finding 1.
+
+**Registry finding 1 stays open and narrowed — it is not closed.** It is
+narrowed by M012 (the timeout-coupling mode) and by acquisition M015 (the cause
+is now attributable — see `plans/closure/acquisition-transport/015-status.md`),
+and it remains **open and partially addressed**. Its severity is unchanged: the
+registry assesses "Findings 1 and 2 are low-severity and block nothing", so
+finding 1 is **low**.
+
+### Findings that remain open
+
+The hosted run qualifies the platform lanes; it does not settle everything this
+record listed. These are **unchanged** by this addendum, at the severities
+already recorded:
+
+- **Registry finding 1** — **open and partially addressed** (**low**). This is
+  the milestone's outstanding condition; see
+  *The hosted re-observation of registry finding 1* above.
+- **UF-1 (low)** — the pre-change test B absolute ceiling was never observed to
+  fail on this host. The record's own disposition stands as its implementer
+  wrote it; the hosted run neither strengthens nor weakens it.
+- **UF-5 (informational)** — the historical closure records `008-status.md` /
+  `010-status.md` describe the pre-M012 assertions and are deliberately not
+  rewritten. That remains the case.
+
+### Compatibility consequence
+
+**Unchanged, and carried forward honestly.** None of these milestones published,
+none moved a tag, and the published crates still carry every defect these
+milestones fixed. M012 itself changed only `#[cfg(test)]` code, so `eggup-curl`
+(published at **`0.1.2`**) has nothing to republish on account of M012; the
+published `eggup-acquisition 0.1.3` still carries the flattened
+`AcquisitionError::Io(String)` shape that acquisition M013 fixed, and the
+published `eggup-curl 0.1.2` still carries the cause-free spawn detail that
+acquisition M015 fixed. The hosted qualification proves the **source** line, not
+the published crates; a republication milestone is the only way those fixes
+reach consumers.

@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 013 — adapter assertion strength and failure typing corrective
 
-Status: conditionally closed 2026-10-23; implemented and green on the native macOS lane, with every new fixture proven to fail against the pre-M013 baseline. Closure record: `plans/closure/acquisition-transport/013-status.md`. The remaining condition is the outstanding qualification: the Linux, Windows, and hosted CI lanes and the whole-tree gate were **not run**, and the adapter-capability-parity finding is **deferred to a named follow-up milestone**, not closed.
+Status: closed 2026-10-23; implemented and green on the native macOS lane, with every new fixture proven to fail against the pre-M013 baseline, and hosted-qualified on Linux, macOS, and Windows by CI run `40008039843` (commit `0cb2c53`, all five lanes green; local whole-tree gate exit 0). Closure record: `plans/closure/acquisition-transport/013-status.md`. The adapter-capability-parity finding M013 deferred stays **open** as acquisition M014, and the source-breaking `AcquisitionError::Io { operation, source }` retype (derives `Debug` only) still awaits a `0.2.0` republication of `eggup-acquisition`.
 
 Repository baseline: `c4805411f74b85158e0ae5d0a219a32c4209d98e`
 

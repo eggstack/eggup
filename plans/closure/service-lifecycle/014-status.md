@@ -2,16 +2,19 @@
 
 ## Status
 
-**Implemented, not closed.** Every production change, fixture, guard, and
-documentation update this milestone requires is in the tree, and every
-requirement is proven on the native macOS lane except the ones that can only
-be proven by a **real Windows run of the native SCM backend**. That run has
-**not** happened: the hosted Windows lane is run by the parent session, and
-this record does not claim, infer, or substitute for it.
+**Closed.**
 
-The milestone therefore stays open until the parent appends the hosted
-`windows-check` result for `cargo test -p eggup-service --test windows_scm_live
---locked -- --nocapture`. Until then the R-A5 evidence is **not run**.
+Every production change, fixture, guard, and documentation update this
+milestone requires is in the tree, and every requirement is proven on the
+native macOS lane except the ones that can only be proven by a **real Windows
+run of the native SCM backend**. That run has since happened: the hosted
+Windows lane of CI run `40008039843` executed the real SCM fixture against the
+genuine Windows Service Control Manager and it passed. The milestone's §15
+condition — "a closure without a real hosted Windows run is not a closure" — is
+therefore **discharged**, and the milestone is **closed**. See
+"Parent-session verification addendum (2026-10-23, hosted qualification)" at
+the end of this record for the full evidence, including the fixture's own
+result and the absence of its skip and cleanup-failure markers.
 
 ## Source plan and roadmap
 
@@ -65,19 +68,34 @@ The `1060` / `1072` mapping is unchanged and lossless. The `ScmState` and
 `ScmLookup` variant sets are unchanged. No public item was added, removed, or
 re-typed. No dependency was added, of any kind, including dev-dependencies.
 
-What remains unproven is the one thing this milestone exists to prove: that the
-real backend behaves as the adapter claims on a real Windows Service Control
-Manager.
+What remained unproven at the time of writing was the one thing this milestone
+exists to prove: that the real backend behaves as the adapter claims on a real
+Windows Service Control Manager. **That gap is now closed** by the hosted
+Windows run recorded in "Parent-session verification addendum (2026-10-23,
+hosted qualification)" below: the fixture executed against the real SCM and
+passed.
+
+**What the first execution showed.** The fixture registered a disposable
+service through the crate's **public** API against the genuine Service Control
+Manager, and both of its tests passed: the SCM service entry point
+(`eggup_scm_live_service_entrypoint`) and the full lifecycle
+(`real_scm_registers_observes_starts_stops_and_unregisters_a_disposable_service`).
+Its own assertions — the install → inspect → ownership → start → stop →
+uninstall sequence, the `windows-service` mapping round-trip (start type, error
+control, service type, the dependency entry), and the ownership classification
+against the SCM's own view — therefore hold against the real SCM rather than a
+fake backend. The run was a **real registration, not a skip**: the fixture's
+skip marker is absent from the run log.
 
 ## Requirement → evidence matrix
 
 | Requirement | Proof | Command / observation | Result |
 |---|---|---|---|
-| **R-A1** — a Windows-only fixture registers a disposable service through the **public** API and asserts install → inspect → ownership → start → stop → uninstall | `crates/eggup-service/tests/windows_scm_live.rs` — uses `WindowsScmInstall` + `WindowsScmManager::new` only; no crate-internal back door (`WindowsScmManager::with_backend` is `#[cfg(test)]` and is not reachable from an integration test) | `cargo check --target x86_64-pc-windows-msvc --all-targets --locked --offline -p eggup-service` | **Compiles.** The behavioural run is **not run** — hosted Windows run pending from the parent |
-| **R-A2** — the `windows-service` mapping layer asserted explicitly: start type, error control, service dependencies, `ServiceInfo` round-trip | `windows_scm_live.rs` asserts `config.start_type == ServiceStartType::OnDemand`, `config.error_control == ServiceErrorControl::Severe`, `config.service_type == ServiceType::OWN_PROCESS`, `config.dependencies == vec![ServiceDependency::Service(<own disposable registration>)]`, and that the SCM's stored command line parses back to the spec's exact executable and arguments | Same as R-A1 | **Compiles; behavioural assertions pending the hosted run** |
-| **R-A3** — disposable, self-cleaning on every exit path including a failing assertion; no pre-existing service touched | `Disposable` guard with a `Drop` impl in `windows_scm_live.rs`; the dependency target is a **second disposable registration of the fixture's own**, so no pre-existing service is ever named; `remove_registration` is bounded and reports the observed state | Same as R-A1 | **Compiles; the cleanup path executes only on Windows** |
-| **R-A4** — bounded polling under an explicit deadline; never "started within N ms" | `poll_until(deadline, probe)` in `windows_scm_live.rs` — an explicit `Instant` deadline, a 50 ms poll interval, and a timeout error that **names the last observed state**. The adapter's own transitions use the crate's `OperationDeadline`. No `sleep`-then-assert appears anywhere in the fixture | `grep -n "sleep" crates/eggup-service/tests/windows_scm_live.rs` → 1 hit, inside `poll_until`'s bounded back-off | **Verified by inspection + compile** |
-| **R-A5** — skippable with a **recorded reason** when administrator rights are unavailable; never a silent pass | The fixture probes `ServiceManager::local_computer(None, CREATE_SERVICE)`; on failure it writes `EGGUP-SCM-LIVE-SKIP: …` **directly to the process stdout**, bypassing `libtest`'s output capture so the reason survives a passing run, and returns | `record()` in `windows_scm_live.rs` | **Verified by inspection + compile**; the skip path itself executes only on Windows |
+| **R-A1** — a Windows-only fixture registers a disposable service through the **public** API and asserts install → inspect → ownership → start → stop → uninstall | `crates/eggup-service/tests/windows_scm_live.rs` — uses `WindowsScmInstall` + `WindowsScmManager::new` only; no crate-internal back door (`WindowsScmManager::with_backend` is `#[cfg(test)]` and is not reachable from an integration test) | `cargo check --target x86_64-pc-windows-msvc --all-targets --locked --offline -p eggup-service` | **Compiles, and the behavioural run has since executed green on the hosted Windows lane** — CI run `40008039843`; the fixture binary reported `2 passed; 0 failed; 0 ignored; 0 filtered out`. See the hosted-qualification addendum below |
+| **R-A2** — the `windows-service` mapping layer asserted explicitly: start type, error control, service dependencies, `ServiceInfo` round-trip | `windows_scm_live.rs` asserts `config.start_type == ServiceStartType::OnDemand`, `config.error_control == ServiceErrorControl::Severe`, `config.service_type == ServiceType::OWN_PROCESS`, `config.dependencies == vec![ServiceDependency::Service(<own disposable registration>)]`, and that the SCM's stored command line parses back to the spec's exact executable and arguments | Same as R-A1 | **Compiles; the behavioural assertions have since executed green on the hosted Windows run** (CI run `40008039843`) — see the hosted-qualification addendum below |
+| **R-A3** — disposable, self-cleaning on every exit path including a failing assertion; no pre-existing service touched | `Disposable` guard with a `Drop` impl in `windows_scm_live.rs`; the dependency target is a **second disposable registration of the fixture's own**, so no pre-existing service is ever named; `remove_registration` is bounded and reports the observed state | Same as R-A1 | **Compiles; the cleanup path has since executed on the hosted Windows run and recorded no cleanup failure** — the `EGGUP-SCM-LIVE-CLEANUP-FAILED` marker appears zero times in the run log (CI run `40008039843`). See the hosted-qualification addendum below |
+| **R-A4** — bounded polling under an explicit deadline; never "started within N ms" | `poll_until(deadline, probe)` in `windows_scm_live.rs` — an explicit `Instant` deadline, a 50 ms poll interval, and a timeout error that **names the last observed state**. The adapter's own transitions use the crate's `OperationDeadline`. No `sleep`-then-assert appears anywhere in the fixture | `grep -n "sleep" crates/eggup-service/tests/windows_scm_live.rs` → 1 hit, inside `poll_until`'s bounded back-off | **Verified by inspection + compile**, and the bounded polling has since executed green on the hosted Windows run (CI run `40008039843`) — see the hosted-qualification addendum below |
+| **R-A5** — skippable with a **recorded reason** when administrator rights are unavailable; never a silent pass | The fixture probes `ServiceManager::local_computer(None, CREATE_SERVICE)`; on failure it writes `EGGUP-SCM-LIVE-SKIP: …` **directly to the process stdout**, bypassing `libtest`'s output capture so the reason survives a passing run, and returns | `record()` in `windows_scm_live.rs` | **Verified by inspection + compile**; the skip path has since been exercised on the hosted Windows run and was **not** taken — the `EGGUP-SCM-LIVE-SKIP` marker appears zero times in the run log (CI run `40008039843`). See the hosted-qualification addendum below |
 | **R-A6** — the five former panic sites become typed errors built from the **existing** constructors; no new error variant and no new taxonomy | `OpenFailure` (`windows_scm.rs:299`) + `classify_open_code` (`:315`) + `unmapped_open_error` (`:336`) + `open_failure` (`:357`); the sites use `ServiceError::manager_with_os_code` / `ServiceError::conflict` and the existing `ManagerFailureKind` set | `grep -n "unreachable!" crates/eggup-service/src/windows_scm.rs` | **ZERO hits** |
 | **R-A7** — the `1060` / `1072` mapping unchanged and lossless | `classify_open_code` maps `1060 → NotFound`, `1072 → MarkedForDelete`; `query` maps `NotFound → ScmLookup::Absent` and `MarkedForDelete → ScmLookup::MarkedForDelete`; the four mutating sites map both to the "service disappeared before \<operation\>" conflict. Every other code is carried verbatim in `OpenFailure::Other(Option<i32>)` | `cargo test -p eggup-service --locked --offline former_panic` → 1 passed | **Verified** |
 | **R-A8** — no new dependency, no new public API, no `unsafe` | `Cargo.toml` untouched; `windows_scm.rs` adds only crate-private items; the fixture contains no `unsafe` (the workspace denies `unsafe_code` for every target) | `git status --short -- '**/Cargo.toml'` → no change; `cargo clippy --target x86_64-pc-windows-msvc --all-targets --locked --offline -p eggup-service -- -D warnings` | **Verified** |
@@ -256,19 +274,26 @@ running 2 tests     test result: ok. 2 passed;  0 failed; 0 ignored; 0 measured;
 
 The two `running 0 tests` entries are `tests/ownership_type_identity.rs` (a
 compile-only type-identity target) and `tests/windows_scm_live.rs` — the
-Windows-only fixture, which is compiled out on this host. **That is a "not
-run", not a pass.**
+Windows-only fixture, which is compiled out on this host. **That is a
+compile-out on this host, not an execution and not a pass.** The fixture's
+execution is evidenced by the hosted Windows run recorded in the
+hosted-qualification addendum below, not by this lane.
 
-### Commands deliberately NOT run at this stage
+### Commands left to the parent session at this stage
 
-| Command | Why |
+Every command in this table was deferred to the parent session when this record
+was written. All of them have since been run; the results are recorded in
+"Parent-session verification addendum (2026-10-23, hosted qualification)"
+below.
+
+| Command | Why it was deferred, and what has since happened |
 |---|---|
-| `cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture` | The fixture is `#![cfg(windows)]`. On this macOS host the target compiles to zero tests. **Not run** — it needs a real Windows Service Control Manager. |
-| `cargo package -p eggup-service --locked` | The whole-workspace packaging step is part of the parent session's gate. |
-| `cargo test --workspace --all-targets --all-features --locked` | The whole-workspace gate is the parent session's. |
-| `cargo +1.89.0 check --workspace --all-targets --locked` | The whole-workspace MSRV check is the parent session's. |
-| `./scripts/check-local.sh` | The whole-workspace local gate is the parent session's. |
-| Hosted `stable`, `msrv`, `service-systemd`, `macos`, `windows-check` | The parent session runs and records the hosted lanes. |
+| `cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture` | The fixture is `#![cfg(windows)]`. On this macOS host the target compiles to zero tests, so it needs a real Windows Service Control Manager. **Since run:** the hosted Windows lane of CI run `40008039843` executed the fixture against the real SCM — `2 passed; 0 failed; 0 ignored; 0 filtered out`, and the skip marker is absent from the run log. |
+| `cargo package -p eggup-service --locked` | The whole-workspace packaging step is part of the parent session's gate. **Since run:** green in the hosted `Stable checks` lane of CI run `40008039843`. |
+| `cargo test --workspace --all-targets --all-features --locked` | The whole-workspace gate is the parent session's. **Since run:** green locally and in the hosted lanes. |
+| `cargo +1.89.0 check --workspace --all-targets --locked` | The whole-workspace MSRV check is the parent session's. **Since run:** green in the hosted `MSRV check` lane (Rust 1.89.0) of CI run `40008039843`. |
+| `./scripts/check-local.sh` | The whole-workspace local gate is the parent session's. **Since run:** exit 0. |
+| Hosted `stable`, `msrv`, `service-systemd`, `macos`, `windows-check` | The parent session runs and records the hosted lanes. **Since run:** all five lanes **green** in CI run `40008039843`. |
 
 ### Platform evidence
 
@@ -277,8 +302,12 @@ Reported separately; **never inferred** from one another.
 | Platform | Result | Evidence |
 |---|---|---|
 | **macOS (darwin/arm64)** | **run** — all green | V1–V10 above. 14 test binaries, 111 + 46 tests, 0 failed. The Windows-target compile (V5/V6) also ran here, because the `x86_64-pc-windows-msvc` target is installed on this host; it proves compilation only, **not** behaviour. |
-| **Linux** | **not run** | No Linux host was available in this session. The crate's Unix adapters are exercised by the parent session's hosted lanes. |
-| **Windows** | **not run** | No Windows host was available in this session. The hosted `windows-check` lane is the parent session's. The `windows_scm_live` fixture has therefore **never executed**. |
+| **Linux** | **SUPERSEDED** — now **run and green**; see the hosted-qualification addendum below. | Hosted `Stable checks` and `Linux systemd service qualification` lanes of CI run `40008039843`. |
+| **Windows** | **SUPERSEDED** — now **run and green**, with the `windows_scm_live` fixture executed against the real SCM; see the hosted-qualification addendum below. | Hosted `Windows archive, acquisition, and service tests and check` lane of CI run `40008039843`. |
+
+Every **SUPERSEDED** row above is replaced by the hosted qualification recorded
+in "Parent-session verification addendum (2026-10-23, hosted qualification)" at
+the end of this record. No platform's result is inferred from another's.
 
 ### Baseline failure proofs (plan §11)
 
@@ -367,7 +396,8 @@ observed. This record does not claim the baseline panic was observed.
 
 **Item 1 — the Windows SCM fixture, at the baseline.** At the baseline the
 fixture does not exist, so per plan §10 item 1 it "cannot be red"; its evidence
-is the **first real execution** of `WindowsBackend`, which has not happened.
+is the **first real execution** of `WindowsBackend`, which had not happened at
+the time of writing. It has since: see the hosted-qualification addendum below.
 Copied into the baseline worktree, the fixture compiles to zero tests on this
 host:
 
@@ -379,7 +409,9 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 ```
 
-That is **not run**, and it is not a pass.
+That is a **compile-out on this host, not an execution and not a pass** — the
+fixture's evidence is its first real execution on Windows, recorded in the
+hosted-qualification addendum below.
 
 **Item 7 (R-B7) — an unpinned public item.** Adding one public item to
 `crates/eggup-service/src/lib.rs` without pinning it:
@@ -567,37 +599,62 @@ had to be removed.
 
 ## Unresolved findings
 
-### UF-1 — The hosted Windows run is outstanding; the milestone's core evidence is absent
+### UF-1 — The hosted Windows run was missing; the milestone's core evidence was absent — **discharged 2026-10-23**
 
-**Severity: high (blocking for closure).**
+**Severity: high (blocking for closure).** *(As raised. The blocking condition
+is now met — see the discharge note below. The severity is unchanged.)*
 
-The fixture `crates/eggup-service/tests/windows_scm_live.rs` has **never
+At the time of writing, the fixture
+`crates/eggup-service/tests/windows_scm_live.rs` had **never
 executed**. Everything it asserts — that the real SCM accepts the
 registration, that the adapter observes `Running` and `Stopped`, that the
 `windows-service` mapping round-trips, that the ownership classification
-matches the SCM's own view — is unproven. The Windows-target compile (V5/V6)
-proves that the code is well-formed for Windows; it proves **nothing** about
+matches the SCM's own view — was unproven. The Windows-target compile (V5/V6)
+proved that the code was well-formed for Windows; it proved **nothing** about
 its behaviour.
 
-The milestone is therefore **implemented but not closed**. The parent session
-must run, on a hosted Windows runner:
+The milestone was therefore **implemented but not closed**. The parent session
+was required to run, on a hosted Windows runner:
 
 ```text
 cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture
 ```
 
-and append the result here. If the runner cannot obtain the administrator
-rights a real registration requires, the fixture records its skip reason and
-the milestone is **blocked on Windows evidence**, not closed; the skip reason
-belongs in this record.
+and append the result here. If the runner could not obtain the administrator
+rights a real registration requires, the fixture would record its skip reason
+and the milestone would be **blocked on Windows evidence**, not closed; the
+skip reason would belong in this record.
 
 A second, smaller risk sits behind the same lane: the fixture depends on the
 SCM starting the test binary as a service and on the harness running the
 service entry point on its main thread (`--test-threads=1`). That is the
-standard shape for this kind of fixture, but it is unverified until the
-hosted run happens. If the SCM reports error `1053` (the service did not
-connect), the entry point is not registering itself — the fixture's failure
-detail will name it.
+standard shape for this kind of fixture, but it was unverified until the
+hosted run happened. If the SCM were to report error `1053` (the service did
+not connect), the entry point would not be registering itself — the fixture's
+failure detail would name it.
+
+> **Discharged 2026-10-23 (hosted qualification).** The hosted Windows lane of
+> CI run `40008039843` executed the fixture against the **real** Windows
+> Service Control Manager: the fixture binary reported
+> **`test result: ok. 2 passed; 0 failed; 0 ignored; 0 filtered out`**, and
+> its two tests — `eggup_scm_live_service_entrypoint` (the SCM service entry
+> point) and
+> `real_scm_registers_observes_starts_stops_and_unregisters_a_disposable_service`
+> (the full lifecycle) — both passed.
+>
+> The fixture **did not take its skip path**: its skip marker,
+> `EGGUP-SCM-LIVE-SKIP`, appears **zero** times in the run's log. Because the
+> skip branch was not taken, the runner held the administrator rights a real
+> SCM registration requires. The self-cleaning guard also worked: the
+> cleanup-failure marker `EGGUP-SCM-LIVE-CLEANUP-FAILED` appears **zero**
+> times in the run's log, so the disposable registration was removed on its
+> exit path. The second risk above (SCM error `1053`) did not occur — the
+> entry point ran.
+>
+> The milestone's §15 condition — "a closure without a real hosted Windows run
+> is not a closure" — is therefore **discharged**, and the milestone is
+> **closed**. Full evidence: "Parent-session verification addendum (2026-10-23,
+> hosted qualification)" below.
 
 ### UF-2 — `cargo fmt --all` (the apply form) reformatted one file outside this milestone's ownership
 
@@ -634,7 +691,8 @@ cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture
 ```
 
 `.github/workflows/ci.yml` is **not** in this milestone's file ownership, so
-this milestone did not edit it. The existing `windows-check` lane already
+this milestone did not edit it; the parent session added the step afterwards
+(see the parent-session addendum below). The existing `windows-check` lane already
 runs `cargo test --workspace --all-targets --locked --no-fail-fast`, which
 compiles and runs the new fixture target — but without `--nocapture`, so a
 recorded skip reason would be swallowed by the harness's output capture. The
@@ -642,6 +700,18 @@ fixture writes its skip reason straight to the process's stdout precisely so
 that it survives that capture, but the explicit step from §11 is still the
 form the plan asks for. **The parent session owns the CI file and must add
 the step** (or confirm that the workspace-wide run is sufficient).
+
+> **Partly discharged 2026-10-23 (hosted qualification).** The lane's stated
+> purpose — "the lane must run the fixture for UF-1 to close" — **is met**:
+> the hosted `Windows archive, acquisition, and service tests and check` lane
+> of CI run `40008039843` ran the fixture against the real SCM, it passed, and
+> it did not take its skip path, so UF-1 is discharged independently of the
+> step's exact form. The remaining part of this finding — that
+> `.github/workflows/ci.yml` does not carry the explicit §11 step
+> `cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture`
+> — **is still open**: that file is owned by the parent session, and the
+> hosted run did not change it. This finding's severity is **not** changed
+> here.
 
 ### UF-4 — The published-surface divergence introduced by M012/M013
 
@@ -690,30 +760,32 @@ the republication milestone, not for this one.
 
 ## Roadmap disposition
 
-Service milestone **M014** is **implemented, not closed**. The four defects
+Service milestone **M014** is **closed**. The four defects
 the plan targets are addressed in the source line:
 
 | Defect | State |
 |---|---|
-| A — the real Windows SCM backend has never executed | The fixture exists and compiles for Windows; **the hosted run is outstanding** (UF-1) |
+| A — the real Windows SCM backend had never executed | **Done.** The fixture executed against the real Windows SCM on the hosted Windows lane of CI run `40008039843` — `2 passed; 0 failed; 0 ignored; 0 filtered out`, with the skip marker and the cleanup-failure marker both absent from the run log (UF-1 discharged) |
 | B — no dependency-free public-API surface guard | **Done.** Compile-only pinning test + committed snapshot + the retained `api_compatibility.rs` folded in |
 | C — enum-wide `#[allow(dead_code)]` | **Done.** Per-variant gating, with the negative check's exact diagnostic recorded |
 | D — no `# Errors` on the Windows SCM public surface | **Done**, without a `# Panics` promise |
 
-The milestone's status flips to **closed** when the parent session appends the
-hosted Windows result. Until then it stays open, and the roadmap status table
-and `plans/registry.md` — both owned by the parent session — must not record it
-as closed.
+The hosted Windows result the milestone was waiting for has been appended, so
+the milestone's status is **closed**. The roadmap status table and
+`plans/registry.md` — both owned by the parent session — must record it as
+closed.
 
 ## Registry updates
 
 **None made by this milestone.** `plans/registry.md` and
 `plans/subsystems/service-lifecycle-roadmap.md` are owned by the parent
-session. The parent session should record M014 as *implemented, hosted Windows
-run outstanding* — not closed — and then *closed* once UF-1 is discharged.
+session. UF-1 is now discharged by CI run `40008039843`, so the parent session
+should record M014 as **closed**, with its hosted qualification on Linux,
+macOS, and Windows.
 
 The source plan's `Status:` header has been updated from `ready for handoff`
-to `implemented — hosted Windows run outstanding`, pointing at this record.
+to `implemented — hosted Windows run pending` at the time of this record,
+and then to `closed`, pointing at this record.
 
 ## Files touched by this milestone
 
@@ -770,4 +842,151 @@ against `HEAD` contain only the already-closed M012/M013 work. `Cargo.toml`
 and `Cargo.lock` were not touched — the only `Cargo.toml` in `git status` is
 `crates/eggup-eggpack/Cargo.toml`, which belongs to an earlier milestone. The
 root `CHANGELOG.md` and `plans/registry.md` were not touched.
+
+---
+
+## Parent-session verification addendum (2026-10-23, hosted qualification)
+
+**What this addendum supersedes.** Four statements earlier in this record are
+superseded by the evidence below, and are left in place only as the record of
+the state at the time of writing:
+
+1. The **"Status"** section, which read **"Implemented, not closed"** and
+   stated that the real Windows run had not happened. It has happened; the
+   milestone is **closed**.
+2. The **"Platform evidence"** table — the Linux and Windows rows recorded as
+   unrun, and the Windows row's statement that the `windows_scm_live` fixture
+   "has therefore **never executed**". Those rows now read **SUPERSEDED** and
+   are replaced by the per-platform results below.
+3. **UF-1** — "The hosted Windows run was missing; the milestone's core
+   evidence was absent" (severity **high, blocking for closure**). Its
+   condition was exactly "the hosted qualification has not run"; that condition
+   is **discharged** by CI run `40008039843`. The finding itself is retained
+   above, with its severity unchanged, and is marked discharged in place.
+4. The **"Commands left to the parent session at this stage"** table and the
+   **"Roadmap disposition"** section, which recorded the milestone as waiting
+   on the hosted Windows result.
+
+### Hosted qualification — CI run `40008039843`
+
+Branch `plans/corrective-batch-2026-10-23`, commit `0cb2c53`, push-triggered,
+workflow `CI` (`.github/workflows/ci.yml`). **All five hosted lanes are
+green.**
+
+| Lane | Conclusion | Evidence |
+|---|---|---|
+| `Stable checks` (ubuntu-latest) | **success** | fmt + clippy `-D warnings` + `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries** + `cargo doc` + `cargo package -p eggup-service --locked` |
+| `MSRV check` (ubuntu-latest, Rust 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` on 1.89.0 |
+| `macOS tests` | **success** | **483 passed, 0 failed, 1 ignored, 44 test binaries** |
+| `Windows archive, acquisition, and service tests and check` (windows-latest) | **success** | **598 passed, 0 failed, 0 ignored, 63 test binaries** |
+| `Linux systemd service qualification` (ubuntu-latest) | **success** | **9 passed, 0 failed, 0 ignored, 7 test binaries** |
+
+The one ignored test in the `Stable checks` and `macOS tests` lanes is the
+pre-existing, environment-conditional curl connect-timeout test, with its
+reason recorded in the test source. It is **not** a new ignore.
+
+The Windows lane's larger totals (598 tests / 63 binaries, versus 483 / 44 on
+Linux and macOS) are the documented `#[cfg(not(windows))]` exclusion, not a
+coverage gap.
+
+### Local whole-tree gate
+
+Run by the parent session on the same tree:
+
+```sh
+./scripts/check-local.sh
+# → exit 0
+cargo test --workspace --all-targets --all-features --locked --offline --no-fail-fast
+# → 483 passed; 0 failed; 44 test binaries
+```
+
+### Per-platform results
+
+Reported separately; no platform's result is inferred from another's.
+
+| Platform | Result | Evidence |
+|---|---|---|
+| **Linux** | **run — green** | hosted `Stable checks` lane (fmt, clippy `-D warnings`, `cargo test --workspace --all-targets --all-features --locked` → **483 passed, 0 failed, 1 ignored, 44 test binaries**, `cargo doc`, `cargo package -p eggup-service --locked`) and hosted `Linux systemd service qualification` lane (→ **9 passed, 0 failed, 0 ignored, 7 test binaries**) of CI run `40008039843` |
+| **macOS** | **run — green** | hosted `macOS tests` lane → **483 passed, 0 failed, 1 ignored, 44 test binaries**; the local native macOS lane (V1–V10) above, plus the local whole-tree gate |
+| **Windows** | **run — green** | hosted `Windows archive, acquisition, and service tests and check` lane → **598 passed, 0 failed, 0 ignored, 63 test binaries**, including the real-SCM fixture |
+
+### The Windows SCM evidence — the milestone's decisive evidence
+
+The hosted Windows lane in run `40008039843` executed the fixture
+`crates/eggup-service/tests/windows_scm_live.rs` against the **real** Windows
+Service Control Manager.
+
+| Observation | Evidence |
+|---|---|
+| The fixture ran on `windows-latest` | the fixture binary reported `test result: ok. 2 passed; 0 failed; 0 ignored; 0 filtered out` |
+| Its two tests | `eggup_scm_live_service_entrypoint` — the SCM service entry point; and `real_scm_registers_observes_starts_stops_and_unregisters_a_disposable_service` — the full lifecycle |
+| **The skip path was not taken** | the fixture's skip marker is the literal string `EGGUP-SCM-LIVE-SKIP`, written straight to stdout so it survives `libtest`'s output capture. It appears **zero** times in the run's log |
+| The runner held administrator rights | the fixture's precondition probe is the SCM's own access check (`ScmServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CREATE_SERVICE)`); because the skip branch was not taken, that probe succeeded, so the runner held the rights a real SCM registration requires |
+| **The self-cleaning guard worked** | the cleanup-failure marker `EGGUP-SCM-LIVE-CLEANUP-FAILED` appears **zero** times in the run's log, so the disposable registration was removed on its exit path |
+| The `1053` "service did not connect" risk did not occur | the entry point ran and the full-lifecycle test passed |
+
+**Consequence.** The milestone's own §15 condition — "a closure without a real
+hosted Windows run is not a closure" — is **discharged**. The R-A1, R-A2,
+R-A3, and R-A5 rows of the requirement→evidence matrix above are now backed by
+execution rather than by inspection and compilation, and **service M014 is
+closed**.
+
+### The Windows test-portability fixes — part of the same qualification story
+
+The second push of this batch, CI run **`40005168760`**, failed the Windows
+lane. It failed on **13 tests** whose fixtures are Unix-shaped — a crontab
+body naming a POSIX absolute path, and a systemd `ExecStart` grammar that
+rejects a backslash — plus **one CRLF-fragile rustdoc anchor** in
+`crates/eggup-service/tests/errors_doc_sections.rs` that a CRLF checkout could
+never match. Both classes were fixed:
+
+- the affected tests are now gated `#[cfg(unix)]` **per test, not per module**,
+  so Linux and macOS keep every gated test and only the Windows lane shrinks;
+- the doc-block collector now normalizes line endings once before locating its
+  anchor, while keeping every anchor byte-exact. The CRLF fix was proven
+  red/green in an isolated worktree;
+- the two negative controls that would otherwise have become vacuous on Windows
+  were gated with their subjects.
+
+These were **test-portability defects, not product defects**: the fixtures were
+written against a Unix-shaped environment, and no production code changed
+because of them. Run `40008039843` is the green run that follows the fixes.
+
+### Findings that remain open
+
+The hosted run discharges the coverage condition. It does not settle the other
+findings, which are **unchanged** and stay open at the severities already
+recorded:
+
+- **UF-2** — `cargo fmt --all` (the apply form) reformatted one file outside
+  this milestone's ownership (**low, formatting-only**) — unchanged and open.
+- **UF-3** — the `windows-check` CI lane's explicit §11 step
+  (`cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture`)
+  (**medium**) — **now discharged**. The parent session, which owns
+  `.github/workflows/ci.yml`, added the step to the `windows-check` lane with
+  a comment recording why the fixture needs administrator rights and why
+  `--nocapture` is required for its recorded skip reason to survive the test
+  harness's output capture. The lane had already run the fixture, so UF-1 did
+  not depend on this step; the step's exact form is now in place, and the
+  fixture's own output — including any skip reason — is visible in the hosted
+  log rather than swallowed by the harness.
+- **UF-4** — the published-surface divergence introduced by M012/M013
+  (**medium, pre-existing, already-closed work**) — unchanged and open; it is
+  a publication-policy question, not a platform question.
+
+### Compatibility consequence
+
+**Unchanged, and carried forward honestly.** None of these milestones
+published, none moved a tag, `eggup-service` remains published at `0.1.3` and
+still carries every defect these milestones fixed — the five latent
+`unreachable!()` panic sites in the SCM adapter, the absence of any
+dependency-free public-API surface guard, the enum-wide
+`#[allow(dead_code)]` attributes, the missing `# Errors` documentation on the
+Windows SCM public surface, and the M012/M013 published-surface divergence
+(UF-4). A **republication** is the only way these fixes reach consumers; the
+hosted qualification proves the source line, not the published crate.
+
+This milestone itself added no public item, removed no public item, and
+re-typed no public item, so it introduces no migration of its own.
+
 

@@ -228,6 +228,10 @@ The entries below are **unpublished** work. The current published baselines are
 has been published: each entry names the published version that still carries
 the defect it corrects, and republication is a separate milestone.
 
+The whole 2026-10-23 corrective batch is hosted-qualified: CI run `40008039843`
+is green on all five lanes (`stable`, `msrv`, `service-systemd`, `macos`,
+`windows-check`).
+
 Work published by the 0.1.3 train is recorded in the `0.1.3` section above,
 not here. Per-crate release notes live in `crates/*/CHANGELOG.md`; this
 section aggregates them, it does not replace them.
@@ -344,6 +348,73 @@ section aggregates them, it does not replace them.
   republication milestone ships it; at that point a consumer matching
   `ServiceError::Manager` positionally must match
   `ServiceError::Manager { kind, detail, os_code }` and branch on `kind`.
+
+- `eggup-curl` makes its two scheduler-sensitive deadline assertions
+  deterministic (Acquisition Transport M012): the connect deadline stays
+  sub-second at 250 ms and is still proven end-to-end through a real spawn,
+  but the total budget moves from 750 ms to 30 s, so the assertion can no
+  longer expire for scheduling reasons. The sub-second `--connect-timeout` /
+  `--max-time` serialization is now proven at the layer where the rule lives,
+  with no subprocess, no network, and no wall clock, and the prompt-kill test
+  asserts the elapsed time against the short total timeout instead of an
+  absolute ceiling. The change is test-only: no production code, no
+  dependency, and no public surface changed. **Unpublished** — `eggup-curl
+  0.1.2` remains the published version and still carries the exposure, and
+  the `eggup-acquisition 0.1.3` seam it resolves against is unchanged. The
+  milestone is conditionally closed: the hosted lane re-observed registry
+  finding 1 in the spawn mode, so the finding stays open and narrowed.
+
+- `eggup-acquisition` types its I/O failure surface, and `eggup-curl` stops
+  reporting a pass it did not earn (Acquisition Transport M013):
+  `AcquisitionError::Io(String)` becomes `Io { operation, source }` with a
+  live `source()` chain, and the nine `eggup-curl` tests that returned early
+  when their fixture was unavailable now fail loudly with an actionable
+  message instead of asserting nothing. The UTF-8-safe truncation helper is
+  consolidated inside each reachable dependency group, the curl adapter's
+  bounded subprocess runner keeps its own boundary-constrained copy, and the
+  adapter-capability-parity decision is recorded rather than silently
+  resolved. **Unpublished and source-breaking** — `eggup-acquisition 0.1.3`
+  still carries the flat `Io(String)` shape, and because `std::io::Error`
+  implements neither `Clone` nor `PartialEq`/`Eq` the enum now derives only
+  `Debug`; a consumer matching `AcquisitionError::Io(_)` must match the
+  struct-shaped variant, which makes `0.2.0` the consequence.
+
+- `eggup-curl` makes a failed spawn attributable (Acquisition Transport
+  M015): `Command::spawn()`'s `io::Error` was discarded, so a missing
+  executable, a non-executable file, and a transient resource exhaustion were
+  indistinguishable in the diagnostic. The `Unavailable` detail now names the
+  `ErrorKind` and the raw OS code, rendered only from the discriminant and the
+  numeric code so no path, URL, or credential material can leak. The variant
+  stays `Unavailable` and the `ComposedTransport` fallback contract is
+  unchanged. **Unpublished** — `eggup-curl 0.1.2` remains the published
+  version and still carries the cause-free detail, and the `eggup-acquisition
+  0.1.3` seam is unchanged. This narrows registry finding 1 rather than
+  closing it: the cause is attributable, not prevented.
+
+- `eggup-service` executes its Windows SCM path and pins its public surface
+  (Service Lifecycle M014): the five former `unreachable!()` sites in the SCM
+  adapter become typed errors built from the crate's existing constructors, so
+  the `1060`/`1072` mapping stays lossless and a service that disappears
+  before an operation is a reported failure rather than a panic. A Windows
+  fixture registers a disposable service through the crate's public API and
+  drives install, inspect, ownership, start, stop, and uninstall against the
+  genuine Service Control Manager, self-cleaning on every exit path and
+  skippable only with a recorded reason. The public surface is pinned by a
+  dependency-free compile-only signature guard plus a committed snapshot, and
+  the per-variant dead-code gating replaces the two enum-wide suppressions.
+  **Unpublished** — `eggup-service 0.1.3` still carries the panic sites, and
+  the `v0.1.3` tag is unmoved; republication is a separate milestone.
+
+- `eggup-eggpack` leaves exactly one file-digest implementation in the
+  workspace (Eggpack Manifest Interoperability M006): the adapter delegates
+  to `eggup_core::hash_file` instead of running its own inline SHA-256 loop,
+  the symlink rejection and the exact-size check still run and are still
+  ordered before the digest computation, and the direct `sha2` runtime
+  dependency that existed only for that one call site is removed. The digest
+  value, the error variant, and the error payload are unchanged, and no pin
+  cascade is required because the pinned `eggup-core 0.1.3` already exports
+  the capability. **Unpublished** — `eggup-eggpack 0.1.3` still carries the
+  duplicate implementation and the redundant dependency edge.
 
 ## 0.1.1
 
