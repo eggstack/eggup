@@ -126,6 +126,17 @@ copy carries `## 0.2.0 — 2026-10-24`, the date it was published, which is the
 convention every earlier per-crate release section follows. Registry state is
 immutable, so the published heading is not corrected there.
 
+The close-out that follows the publication is qualified separately, because it
+is documentation-only and cannot change what was published. Commit `fd60b4b`
+("close out the 0.2.0 publication train") is green on all five lanes in run
+`40102904892`, and commit `390c224` (the registry's publication-row correction)
+was **red in the `stable` lane** in run `40103357142` on a transient `ETXTBSY`
+in the pre-existing core unit test `bounded_candidates_are_exact_and_environment_is_cleared`;
+`git diff fd60b4b 390c224 -- crates/ scripts/ .github/` is empty, so the code was
+byte-identical to the green run, and the rerun on the same source SHA (attempt
+2) was green on all five lanes. That is the third recorded re-observation of
+registry finding 1, and it is recorded there rather than here.
+
 `eggup-dist` was unpublished and existed only as migration predecessor evidence. It was removed after Eggpack Contract M002 qualified the complete M003 behavior; see `plans/closure/distribution-bootstrap/004-status.md`.
 
 Existing simple consumers:
@@ -206,6 +217,16 @@ against the registry. Finding 17 was registered by Acquisition M016.
    `ETXTBSY` is transient by construction: the kernel refuses to execute a file
    that is momentarily open for writing, which is what a host package
    replacement does to the interpreter a `#!/bin/sh` script names.
+   **Re-observed again 2026-10-24 on the hosted Ubuntu lane in run `40103357142`**,
+   with the identical `ETXTBSY` in the identical pre-existing core unit test
+   `bounded_candidates_are_exact_and_environment_is_cleared`. The failing
+   commit `390c224` changed `plans/registry.md` only — `git diff fd60b4b
+   390c224 -- crates/ scripts/ .github/` is empty, so the code was byte-identical
+   to the green run `40102904892` — and the rerun on the same source SHA
+   (attempt 2) was **green on all five lanes**. This is the third recorded
+   re-observation of the same class and the same test; the transient host-level
+   cause is unchanged, so the class stays in this one place rather than being
+   registered separately.
 2. **`CleanupDisposition::DeferredToProcessExit` is a source-visible addition to
    a closed enum.** Required by M010 for truthful Windows self-update reporting;
    no truthful value exists in the `0.1.2` two-variant set, and marking the enum
