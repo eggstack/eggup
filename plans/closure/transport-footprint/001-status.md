@@ -1,6 +1,6 @@
 # Transport Footprint Milestone 001 — isolated-configuration coverage corrective
 
-Status: closed (pending the parent session's hosted CI qualification)
+Status: closed; hosted-qualified in CI run `40062299630` (commit `b9885fa`), all five lanes green
 
 Source plan:
 - plans/implementation/transport-footprint/001-isolated-configuration-coverage-corrective.md
@@ -695,3 +695,55 @@ and the workflow in `architecture/tooling-governance.md` §6.
 
 No "Parent-session verification addendum" section appears in this record: that
 section is added by the parent session after the hosted CI qualification.
+
+## Parent-session verification addendum (2026-10-24, hosted qualification)
+
+**Hosted CI run `40062299630`** (commit `b9885fa`) — **all five lanes green**.
+
+| Lane | Result | Evidence |
+|---|---|---|
+| `stable` (Linux) | **success** | `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-targets --all-features --locked`, `cargo doc --workspace --no-deps --locked`, and the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
+| `msrv` (Linux, 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` at the declared floor and the packaged-service step. This lane runs no tests |
+| `macos` | **success** | full `cargo test` plus the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
+| `windows-check` | **success** | nine targeted `cargo test` steps plus the full workspace run: **637 passed, 0 failed, 68 test binaries** |
+| `service-systemd` (Linux) | **success** | the real-systemd fixtures: **9 passed, 0 failed, 7 test binaries** |
+
+The Windows lane's 637 against the other lanes' 518 is **not** a coverage
+difference. That lane runs nine separate `cargo test` steps, so its aggregate
+double-counts the binaries the other lanes run once, and it additionally runs
+`--all-features` for `eggup-eggpack`. The per-step counts are the evidence; the
+aggregate is a sum over steps, not a distinct-test count.
+
+### What this supersedes
+
+This record's platform table and its §13.4 leave the Linux rows **not run**,
+and the requirement matrix's row 11 leaves the workspace-wide gate to the
+parent session. **Both are superseded.**
+
+The milestone's own CI coverage, which this record asked for, is now observed:
+
+| Lane | What ran | Evidence |
+|---|---|---|
+| `stable` (Linux) | `cargo build` for all three configurations — curl-only, eggfetch-only, both-adapters | three `Compiling eggup-transport-footprint` and three `Finished` lines in the run log |
+| `msrv` (Linux, 1.89.0) | `cargo check` for all three configurations | three `Checking eggup-transport-footprint` lines at the 1.89 floor. This lane runs no tests, so the guard is *compiled* there, not *executed* |
+| `macos` | `cargo build` for all three configurations | three `Compiling eggup-transport-footprint` lines in the run log |
+| `windows-check` | **not run, unchanged by design** | the lane does not build `eggup-transport-footprint`, before or after this milestone. Recorded as **not run**, never as green |
+| `service-systemd` (Linux) | **not run, unchanged by design** | the lane never builds the workspace |
+
+The linkage-discipline guard `crates/eggup-transport-footprint/tests/cross_link_guard.rs`
+executed natively in the `stable`, `macos`, and `windows-check` lanes, and
+passed in all three. It carries no `required-features`, so it runs in the
+default configuration as well — which is the point of the guard.
+
+The parent session's own workspace-wide gate also ran on this tree:
+`./scripts/check-local.sh` → **exit 0**, including the
+`scripts/check-docs-truth.sh` documentation-truth check, and
+`cargo test --workspace --all-targets --all-features --locked --offline
+--no-fail-fast` → **518 passed, 0 failed, 48 test binaries**.
+
+### Compatibility consequence, carried forward
+
+None, and that is the point of this milestone: the crate is `publish = false`
+with no registry version, no manifest changed, `Cargo.lock` did not change, and
+no published crate's dependency graph moved. The recorded dependency counts
+**3 / 92 / 93** still reproduce exactly.

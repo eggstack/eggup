@@ -1,6 +1,6 @@
 # Transport Footprint Roadmap
 
-Status: active; M001 closed 2026-10-23 (hosted qualification pending) — `001-isolated-configuration-coverage-corrective.md`, closure at `plans/closure/transport-footprint/001-status.md`; no other milestone is registered; the crate has never been published and is not publishable by design (`publish = false`)
+Status: active; M001 closed 2026-10-23 and hosted-qualified in run `40062299630` — `001-isolated-configuration-coverage-corrective.md`, closure at `plans/closure/transport-footprint/001-status.md`; no other milestone is registered; the crate has never been published and is not publishable by design (`publish = false`)
 
 Long-term references:
 
@@ -260,7 +260,7 @@ milestone.
 
 Plan: `plans/implementation/transport-footprint/001-isolated-configuration-coverage-corrective.md`.
 
-Status: **closed** 2026-10-23 (hosted qualification pending) — closure
+Status: **closed** 2026-10-23 and hosted-qualified in run `40062299630` — closure
 `plans/closure/transport-footprint/001-status.md`.
 
 Class: invariant (it closes a registered **medium** finding, registry entry 12).
@@ -411,7 +411,7 @@ documentation obligations that M001's closure must carry as evidence.
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M001 isolated-configuration coverage corrective | closed 2026-10-23; hosted qualification pending; closes registry open finding 12 (**medium**) | `plans/implementation/transport-footprint/001-isolated-configuration-coverage-corrective.md` | `plans/closure/transport-footprint/001-status.md` | — |
+| M001 isolated-configuration coverage corrective | closed 2026-10-23; hosted-qualified (run `40062299630`); closes registry open finding 12 (**medium**) | `plans/implementation/transport-footprint/001-isolated-configuration-coverage-corrective.md` | `plans/closure/transport-footprint/001-status.md` | — |
 
 **Next milestone.** M001 is the only milestone in this subsystem, and it is
 closed. There is no blocked milestone and no unwritten-but-authorable

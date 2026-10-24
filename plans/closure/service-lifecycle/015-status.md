@@ -2,7 +2,7 @@
 
 ## Status
 
-**Closed, with one residual published-crate finding recorded for the parent.**
+**Closed and hosted-qualified in CI run `40062299630` (commit `b9885fa`), all five lanes green, with two residual published-crate findings recorded for the parent.**
 
 Every production change, fixture, guard, and documentation update this
 milestone requires is in the tree, every requirement is proven on the native
@@ -723,3 +723,73 @@ here:
 **Count: 15 new tests** (13 in the two new integration targets, 1 in the
 fixture module's shared helper — which contributes the `eggup_fixture_child`
 entry point to each target — and 1 crate-private).
+
+## Parent-session verification addendum (2026-10-24, hosted qualification)
+
+**Hosted CI run `40062299630`** (commit `b9885fa`) — **all five lanes green**.
+
+| Lane | Result | Evidence |
+|---|---|---|
+| `stable` (Linux) | **success** | `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-targets --all-features --locked`, `cargo doc --workspace --no-deps --locked`, and the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
+| `msrv` (Linux, 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` at the declared floor and the packaged-service step. This lane runs no tests |
+| `macos` | **success** | full `cargo test` plus the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
+| `windows-check` | **success** | nine targeted `cargo test` steps plus the full workspace run: **637 passed, 0 failed, 68 test binaries** |
+| `service-systemd` (Linux) | **success** | the real-systemd fixtures: **9 passed, 0 failed, 7 test binaries** |
+
+The Windows lane's 637 against the other lanes' 518 is **not** a coverage
+difference. That lane runs nine separate `cargo test` steps, so its aggregate
+double-counts the binaries the other lanes run once, and it additionally runs
+`--all-features` for `eggup-eggpack`. The per-step counts are the evidence; the
+aggregate is a sum over steps, not a distinct-test count.
+
+### The first hosted run was red, and what it proved
+
+Hosted run `40061134915` (commit `5ae2301`) was **red in four lanes**, and the
+two failures it produced are the most useful evidence this milestone has:
+
+1. **Windows — one test failed.** `the_managers_argv_is_byte_identical` failed
+   with `OwnershipDenied { id: "my-daemon.service", ownership: Unknown }`.
+   The cause is correct production behaviour the new test did not account for:
+   `parse_exec_start` rejects any `ExecStart` argv containing a backslash and
+   then requires the path to be absolute, so on Windows **no** value can parse —
+   a drive path has a backslash and a backslash-free path is not absolute
+   there. systemd is a Linux-only manager with a Unix-path-shaped `ExecStart`
+   grammar. The single guard was split into three single-concern tests and
+   only the systemd one carries the repository's established per-test
+   `#[cfg(unix)]` gate; the launchd and cron guards are platform-neutral and
+   now execute on the Windows lane too, which the single test never reached.
+   No assertion was weakened, no production code changed, and the macOS
+   coverage of the file rose from 12 to 14 tests.
+2. **Four lanes — `cargo package -p eggup-service --locked` failed** with
+   `E0599: no method named 'stdin_data' found for struct 'CommandSpec'`. That
+   step resolves `eggup-core` from crates.io, so it compiles the packaged
+   crate against the **published** `eggup-core 0.1.3`, which carries neither
+   core's unconditional deadline (M014) nor its bounded stdin (M017). The
+   deferral and its full reasoning are recorded in **UF-4** above and in
+   registry finding **16**; the strict step is restored by the `eggup-core`
+   republication milestone.
+
+### What this supersedes
+
+The platform table above records the Windows result as **compile-only, and
+warning-free**, with the Windows **suite not executed**, and names the hosted
+`windows-check` lane as the parent's qualification step. **That is superseded.**
+The hosted lane ran the whole `eggup-service` suite natively, including both
+new fixture targets — `tests/bounded_executor_consolidation.rs` and
+`tests/bounded_executor_environment.rs` — and all of it passed.
+
+The real Windows Service Control Manager fixture also ran: `2 passed; 0
+failed; 0 ignored`. Its `EGGUP-SCM-LIVE-SKIP` marker appears **zero** times in
+the run log, so the skip path was not taken, and `EGGUP-SCM-LIVE-CLEANUP-FAILED`
+appears **zero** times, so the disposable registration was removed.
+
+### Compatibility consequence, carried forward
+
+Unchanged by the hosted qualification: `eggup-service` is published at
+**`0.1.3`**, and the published crate carries **both** the replaced runner and
+the stdin-verdict defect described in **UF-1** — the defect that reports a
+*successful* `crontab -` stdin write as a failure. The `v0.1.3` tag is unmoved
+and no republication was performed. The public surface is unchanged, so a
+consumer of the published crate sees no API difference; a consumer of a future
+`0.1.4` sees the consolidation and the fix. Registry finding **15** stays open
+for the published crate until that republication lands.

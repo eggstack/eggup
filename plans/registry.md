@@ -433,10 +433,10 @@ registry's consumer row is updated accordingly.
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
-| Verified update core | M001-M017 closed; M014 and M015 closed 2026-10-23 and hosted-qualified in run `40008039843`; M017 closed 2026-10-23, hosted qualification pending | M016 `eggup-core` contract-doc packaging — named as the follow-on by planning C013; not yet authored, and it needs the republication to be authorized separately |
-| Acquisition transport | M001-M015 closed; M012 conditionally closed; M014 closed 2026-10-23, hosted qualification pending; acquisition/eggfetch 0.1.3 published, curl 0.1.2 published | no further acquisition milestone is registered. **Open finding 1 stays open**: M012 narrowed its timeout-coupling mode, M015 made the spawn cause attributable, and the hosted Stable lane re-observed the flake |
-| Transport footprint | M001 closed 2026-10-23; hosted qualification pending; the subsystem roadmap was created 2026-10-23, which was the prerequisite its first milestone required | no further transport-footprint milestone is registered |
-| Service lifecycle | M001–M015 closed; M012, M013, and M014 closed 2026-10-23 and hosted-qualified in run `40008039843`; M015 closed 2026-10-23, hosted qualification pending | no further service-lifecycle milestone is registered. The `SystemExecutor` consolidation that M012 deferred is closed by M015 |
+| Verified update core | M001-M017 closed; M014 and M015 closed 2026-10-23 and hosted-qualified in run `40008039843`; M017 closed 2026-10-23 and hosted-qualified in run `40062299630` | M016 `eggup-core` contract-doc packaging — named as the follow-on by planning C013; not yet authored, and it needs the republication to be authorized separately |
+| Acquisition transport | M001-M015 closed; M012 conditionally closed; M014 closed 2026-10-23, hosted-qualified in run `40062299630`; acquisition/eggfetch 0.1.3 published, curl 0.1.2 published | no further acquisition milestone is registered. **Open finding 1 stays open**: M012 narrowed its timeout-coupling mode, M015 made the spawn cause attributable, and the hosted Stable lane re-observed the flake |
+| Transport footprint | M001 closed 2026-10-23 and hosted-qualified in run `40062299630`; the subsystem roadmap was created 2026-10-23, which was the prerequisite its first milestone required | no further transport-footprint milestone is registered |
+| Service lifecycle | M001–M015 closed; M012, M013, and M014 closed 2026-10-23 and hosted-qualified in run `40008039843`; M015 closed 2026-10-23 and hosted-qualified in run `40062299630` | no further service-lifecycle milestone is registered. The `SystemExecutor` consolidation that M012 deferred is closed by M015 |
 | Archive extraction | M001 lineage + M004 closed; `eggup-archive 0.1.3` published 2026-10-06; M005 closed 2026-10-23 and hosted-qualified in run `40008039843` | no further archive milestone is registered |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
 | Eggpack manifest interoperability | M001-M006 closed; `eggup-eggpack 0.1.3` carries the member-identity cross-check; M006 closed 2026-10-23 and hosted-qualified in run `40008039843` | no further Eggpack manifest milestone is registered |
@@ -464,16 +464,16 @@ milestone appears in exactly one table in this registry.
 | Acquisition transport | M012 sub-second deadline test determinism corrective | conditionally closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/acquisition-transport/012-status.md` | Test-only; no production change, no dependency, no republication of `eggup-curl 0.1.2`. The deadline under test is decoupled from the enforced budget. **Open condition**: the hosted Stable lane re-observed registry finding 1 in the spawn mode, so this milestone is not closed |
 | Verified update core | M014 bounded-execution deadline corrective | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/verified-update-core/014-status.md` | Closes finding 3 (high). The deadline is an unconditional maximum bound and the descendant-holds-pipe case is fail-closed. `eggup-core 0.1.3` keeps the defect until republication; `eggup-eggpack`'s `=0.1.3` pin blocks propagation |
 | Verified update core | M015 public API contract truthfulness corrective | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/verified-update-core/015-status.md` | Closes finding 10 (medium). The never-constructed `FailureCategory` variant is removed (`#[non_exhaustive]`, downstream-compatible); all 32 public fallible items carry an `# Errors` section enforced by `clippy::missing_errors_doc`. `run_bounded` is untouched — M014 owns that |
-| Verified update core | M017 bounded stdin execution corrective | closed 2026-10-23; hosted qualification pending | `plans/closure/verified-update-core/017-status.md` | Supplies the stdin capability Service M015 needs. `CommandSpec::stdin_data` + `MAX_STDIN_BYTES` (1 MiB, inclusive); an oversize payload is rejected before any spawn; the three `Error::Io` operation strings are a stable documented classification surface. Additive; unpublished |
+| Verified update core | M017 bounded stdin execution corrective | closed 2026-10-23; hosted-qualified (`40062299630`) | `plans/closure/verified-update-core/017-status.md` | Supplies the stdin capability Service M015 needs. `CommandSpec::stdin_data` + `MAX_STDIN_BYTES` (1 MiB, inclusive); an oversize payload is rejected before any spawn; the three `Error::Io` operation strings are a stable documented classification surface. Additive; unpublished |
 | Archive extraction | M005 cleanup contract truthfulness and member-write deduplication | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/archive-extraction/005-status.md` | Closes finding 4 (high). The `eggup-archive 0.1.3` cleanup API has a reachable, truthful `Ok` path on all four entry points; `eggup-eggpack`'s `=0.1.3` pin blocks it. The hosted run also exposed and fixed a CRLF-fragile test anchor in the member-write guard |
 | Service lifecycle | M012 commit-engine dedup and ownership-type unification | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/service-lifecycle/012-status.md` | Closes finding 5 (high). One commit/rollback engine serves both orchestrators; the stricter former behaviour wins; the former differences survive as policy inputs. `eggup_service::Ownership` re-exports `eggup_core::Ownership`. The `SystemExecutor` consolidation M012 deferred is closed by M015 |
 | Service lifecycle | M013 manager failure taxonomy and deadline contract | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/service-lifecycle/013-status.md` | Closes finding 7 (medium). Typed `ManagerFailureKind` replaces `permission_hint` matching; one timeout model for systemd/launchd/SCM; one cron listing/rule. Source-breaking: `ServiceError::Manager` matchers — republication only. Three low-severity findings stay open |
 | Service lifecycle | M014 Windows SCM execution coverage and API-surface guard | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/service-lifecycle/014-status.md` | Closes open finding 6 (high). The hosted Windows lane ran the real SCM fixture (`2 passed; 0 failed; 0 ignored`, no `EGGUP-SCM-LIVE-SKIP`), discharging the plan's condition that a closure without a real hosted Windows run is not a closure |
-| Service lifecycle | M015 bounded executor consolidation corrective | closed 2026-10-23; hosted qualification pending | `plans/closure/service-lifecycle/015-status.md` | Closes M012 **Finding 1** (**low**): `SystemExecutor` now delegates to `eggup_core::run_bounded`. The public API and every manager's argv are unchanged. **Also fixes finding 15** (**medium**): the old runner misreported a *successful* stdin write as a failure. No new dependency |
+| Service lifecycle | M015 bounded executor consolidation corrective | closed 2026-10-23; hosted-qualified (`40062299630`) | `plans/closure/service-lifecycle/015-status.md` | Closes M012 **Finding 1** (**low**): `SystemExecutor` now delegates to `eggup_core::run_bounded`. The public API and every manager's argv are unchanged. **Also fixes finding 15** (**medium**): the old runner misreported a *successful* stdin write as a failure. No new dependency |
 | Acquisition transport | M013 adapter assertion strength and failure typing | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/acquisition-transport/013-status.md` | Closes open finding 8 (medium). Nine vacuously-passing `eggup-curl` tests; typed IO failure surface on the zero-dependency seam. Source-breaking: `AcquisitionError::Io(String)` became `Io { operation, source }` and the derives are `Debug` only |
 | Acquisition transport | M015 spawn failure diagnosability corrective | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/acquisition-transport/015-status.md` | The `Unavailable` detail names the `ErrorKind` and the raw OS code, so a spawn failure is attributable instead of cause-free. The variant stays `Unavailable`; the fallback contract is unchanged. **Narrows** open finding 1 rather than closing it |
-| Acquisition transport | M014 adapter capability parity corrective | closed 2026-10-23; hosted qualification pending | `plans/closure/acquisition-transport/014-status.md` | Closes the parity finding deferred by M013: the curl adapter now exposes a caller-settable `User-Agent`. The control sits on `CurlTransport`, not `CurlConfig`, because `CurlConfig`'s public fields make any added field source-breaking for the published `eggup-curl 0.1.2`. Additive; unpublished |
-| Transport footprint | M001 isolated-configuration coverage corrective | closed 2026-10-23; hosted qualification pending | `plans/closure/transport-footprint/001-status.md` | Closes open finding 12 (**medium**). CI builds the curl-only, eggfetch-only, and both-adapters configurations; a linkage-discipline guard rejects a sibling-adapter reference in every configuration, with a discriminating negative control. Counts 3 / 92 / 93 unchanged. `publish = false`; no tag moved |
+| Acquisition transport | M014 adapter capability parity corrective | closed 2026-10-23; hosted-qualified (`40062299630`) | `plans/closure/acquisition-transport/014-status.md` | Closes the parity finding deferred by M013: the curl adapter now exposes a caller-settable `User-Agent`. The control sits on `CurlTransport`, not `CurlConfig`, because `CurlConfig`'s public fields make any added field source-breaking for the published `eggup-curl 0.1.2`. Additive; unpublished |
+| Transport footprint | M001 isolated-configuration coverage corrective | closed 2026-10-23; hosted-qualified (`40062299630`) | `plans/closure/transport-footprint/001-status.md` | Closes open finding 12 (**medium**). CI builds the curl-only, eggfetch-only, and both-adapters configurations; a linkage-discipline guard rejects a sibling-adapter reference in every configuration, with a discriminating negative control. Counts 3 / 92 / 93 unchanged. `publish = false`; no tag moved |
 | Eggpack manifest interoperability | M006 canonical digest reuse | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/eggpack-manifest-interoperability/006-status.md` | Closes open finding 9 (medium). Removes a redundant direct `sha2` runtime dependency from a published crate. `Cargo.lock` unchanged; the resolved `sha2` is still `0.10.9`; no pin cascade |
 | Planning/closure hygiene corrective | C013 post-audit documentation truth reconciliation | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/planning-closure-hygiene-corrective/013-status.md` | Closes open finding 11 (medium). Docs-only: root `CHANGELOG.md`, `docs/`, `AGENTS.md`, the architecture deep dives, and this registry's own contradictory rows. Adds the `scripts/check-docs-truth.sh` gate command |
 | Archive extraction | M004 eggup-archive 0.1.3 correctness publication | closed 2026-10-06 | `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md`; `plans/closure/archive-extraction/004-status.md` | published from `bd43683` (run `37527706900` green); registry-only tar.gz + zip fixtures 6/6; Windows device-alias case fails against 0.1.2 |
@@ -679,6 +679,22 @@ The 2026-09-26 review opened acquisition M007 and service M007 (both closed). Th
   a discarded `spawn()` cause in `eggup-curl` (now acquisition M015). Registry
   finding 1 stays **open and narrowed**: acquisition M012 is conditionally
   closed because the hosted lane re-observed the flake in the spawn mode.
+- Third implementation pass (2026-10-24, same branch): **five** further
+  milestones are implemented and closed — acquisition M014 (adapter capability
+  parity), core M017 (bounded stdin), service M015 (bounded-executor
+  consolidation), transport-footprint M001 (isolated-configuration coverage,
+  plus the subsystem roadmap its first milestone required), and a
+  documentation-anchor repair that re-derived **376** stale line citations
+  across four architecture deep dives. CI run `40062299630` is green on **all
+  five** lanes. The local gate passes **518** tests with 0 failures. The first
+  hosted run of this pass, `40061134915`, was **red in four lanes** and is the
+  evidence behind two recorded consequences: the Windows argv guard needed
+  per-test `#[cfg(unix)]` gating because the systemd `ExecStart` grammar is
+  Unix-only by construction, and the packaged-service verification is
+  **deferred** until the `eggup-core` republication. The pass also registered
+  **finding 15** (**medium**), a defect the consolidation *found*: the
+  published `eggup-service 0.1.3` reports a successful `crontab -` stdin write
+  as a failure.
 - Core: M001-M009 are closed and the 0.1.2 core/archive pair remains published. Current consumer-parity research registers M010 (current-executable authority + Windows running-image rollback) and M011 (proof-authorized stale-lock recovery) as ready. A later Core package/publication milestone is intentionally unwritten until both close.
   - Acquisition: M001-M006 are closed; M007 is conditionally closed. M008 closed via hosted run `36222536670`. **M009 closed 2026-10-04**: `eggup-curl 0.1.2` published from `b485228` (checksum `79df200f…b465`, 17193 bytes) after hosted run `37223895075` passed Stable/MSRV/macOS/Windows; no `src/` byte changed and no tag moved. **M010 closed 2026-10-06**: `eggup-acquisition 0.1.3` published, carrying the two `0b8cb98` seam fixes that `0.1.2` lacks. See
   `plans/closure/acquisition-transport/`.
@@ -702,7 +718,10 @@ corrective plans; see "Dependency-ready implementation work" and the
 "Post-0.1.3 open findings" section. **All nine are now implemented and
 closed**, and a hosted runner was reachable for the qualification: CI run
 `40008039843` is green on **all five** lanes, and the local gate passes 483
-tests with 0 failures. The Windows lane executed the real Windows SCM fixture,
+tests with 0 failures. A third implementation pass added five more milestones
+— acquisition M014, core M017, service M015, transport-footprint M001, and the
+architecture-anchor repair — qualified by CI run `40062299630`, also green on
+all five lanes, with the local gate now passing 518 tests with 0 failures. The Windows lane executed the real Windows SCM fixture,
 so service M014 — the one milestone whose own plan states that a closure
 without a real hosted Windows run is not a closure — is closed. Two further
 milestones closed in the same pass: acquisition M012 (conditionally) and
@@ -717,18 +736,27 @@ and narrowed** — M012 decoupled the deadline under test from the enforced
 budget, and M015 made the spawn cause attributable rather than cause-free. An
 intermittent spawn failure under host resource pressure can still occur, and
 preventing it is not in scope of either milestone. **Acquisition M014**
-(adapter capability parity) is a named follow-on that is `ready for handoff`
-and not yet authored.
+(adapter capability parity) is now closed, in the third implementation pass.
 
 Two consequences are now unblocked. First, service M012 deliberately deferred
 the `SystemExecutor` consolidation because core's bounded-execution primitive
-was defective; core M014 has since closed, so that consolidation can be
-authored. Second, service M013's failure taxonomy retyped
+was defective; core M014 has since closed, and that consolidation is now
+authored and closed as service M015. Second, service M013's failure taxonomy retyped
 `ServiceError::Manager`, so a republication of `eggup-service` — and, through
 the `=0.1.3` pins, of `eggup-eggpack` — is the only way the fixed crates reach
 consumers. Acquisition M013's typed I/O surface is source-breaking in the same
-way, and its adapter-capability-parity decision is deferred to acquisition
+way, and its adapter-capability-parity decision is now closed by acquisition
 M014.
+
+The same republication cascade now has a **third** member. Service M015's
+consolidated runner calls core's bounded-stdin capability, which is not in the
+published `eggup-core 0.1.3`, so `eggup-service` can no longer be packaged
+against the registry. The four CI package steps are deferred to
+`cargo package -p eggup-service --locked --no-verify` with the reason recorded
+in the workflow itself, and registry finding **16** (**medium**, open) names
+the `eggup-core` republication milestone as the follow-on that restores the
+strict step. **That republication is a tracked milestone, the parent session
+owns it, and CI never performs it.**
 
 The registry's own pre-existing status contradictions (Acquisition M010 "ready" versus "closed"; Gregg M004 "blocked" versus "authorable") and the stale `0.1.2` claims in `CHANGELOG.md`, `docs/`, `AGENTS.md`, and the architecture deep dives were owned by planning C013 and **are now repaired** — C013 closed 2026-10-23 at `plans/closure/planning-closure-hygiene-corrective/013-status.md`. Each milestone now has one status in this registry, and the `Dependency-ready
 implementation work` table above is the authoritative one.

@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 014 — adapter capability parity corrective
 
-Status: closed (pending the parent session's hosted CI qualification)
+Status: closed; hosted-qualified in CI run `40062299630` (commit `b9885fa`), all five lanes green
 
 Source plan:
 - plans/implementation/acquisition-transport/014-adapter-capability-parity-corrective.md
@@ -434,3 +434,43 @@ The plan's `Status:` header was updated from `ready for handoff` to
 
 No "Parent-session verification addendum" section appears in this record: that
 section is added by the parent session after the hosted CI qualification.
+
+## Parent-session verification addendum (2026-10-24, hosted qualification)
+
+**Hosted CI run `40062299630`** (commit `b9885fa`) — **all five lanes green**.
+
+| Lane | Result | Evidence |
+|---|---|---|
+| `stable` (Linux) | **success** | `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-targets --all-features --locked`, `cargo doc --workspace --no-deps --locked`, and the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
+| `msrv` (Linux, 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` at the declared floor and the packaged-service step. This lane runs no tests |
+| `macos` | **success** | full `cargo test` plus the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
+| `windows-check` | **success** | nine targeted `cargo test` steps plus the full workspace run: **637 passed, 0 failed, 68 test binaries** |
+| `service-systemd` (Linux) | **success** | the real-systemd fixtures: **9 passed, 0 failed, 7 test binaries** |
+
+The Windows lane's 637 against the other lanes' 518 is **not** a coverage
+difference. That lane runs nine separate `cargo test` steps, so its aggregate
+double-counts the binaries the other lanes run once, and it additionally runs
+`--all-features` for `eggup-eggpack`. The per-step counts are the evidence; the
+aggregate is a sum over steps, not a distinct-test count.
+
+### What this supersedes
+
+The platform table above records **Linux: not run** and **Windows: not run**,
+and the note that hosted CI qualification is the parent session's
+responsibility. **Both are superseded.** This milestone is now qualified on all
+three platforms, and the hosted lanes are the authoritative evidence for Linux
+and Windows.
+
+The `eggup-curl` suite — including the new `User-Agent` control's tests and the
+crate's `assertion_guard` — ran natively in the `stable` lane on Linux, in the
+`macos` lane, and in the `windows-check` lane. The control's validation,
+its `--user-agent` argv emission, and its terminal `InvalidInput` rejection
+are therefore not macOS-only observations.
+
+### Compatibility consequence, carried forward
+
+Unchanged by the hosted qualification, and stated here so it is not lost:
+`eggup-curl` is published at **`0.1.2`** and the published crate still carries
+no `User-Agent` control. The `v0.1.2` tag is unmoved, no republication was
+performed, and the `v0.1.3` republication milestone named by this plan's §16
+remains the delivery path. The `eggup-acquisition 0.1.3` seam is unchanged.

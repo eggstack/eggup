@@ -2,9 +2,10 @@
 
 ## Status
 
-**closed** — native macOS evidence only. Hosted CI qualification and the Linux
-and Windows platforms were **not run** from this machine, so the milestone's
-hosted qualification is still outstanding. See finding **F1**.
+**closed** — hosted-qualified in CI run `40062299630` (commit `b9885fa`), all
+five lanes green, including native Linux and Windows executions of the new
+bounded-stdin fixture. The parent-session addendum at the end of this record
+supersedes the earlier macOS-only qualification and finding **F1**.
 
 No medium-or-higher finding about this milestone's own change remains open.
 Two medium findings remain open about the *publication* of this change and
@@ -726,3 +727,52 @@ gives every child a null stdin, and no publication milestone authorizes it.
 **Not applied by this milestone:** the root `CHANGELOG.md` edit, the
 `plans/registry.md` edit, and the roadmap edit — all three are outside this
 milestone's ownership and are described here as prose for the parent to apply.
+
+## Parent-session verification addendum (2026-10-24, hosted qualification)
+
+**Hosted CI run `40062299630`** (commit `b9885fa`) — **all five lanes green**.
+
+| Lane | Result | Evidence |
+|---|---|---|
+| `stable` (Linux) | **success** | `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-targets --all-features --locked`, `cargo doc --workspace --no-deps --locked`, and the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
+| `msrv` (Linux, 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` at the declared floor and the packaged-service step. This lane runs no tests |
+| `macos` | **success** | full `cargo test` plus the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
+| `windows-check` | **success** | nine targeted `cargo test` steps plus the full workspace run: **637 passed, 0 failed, 68 test binaries** |
+| `service-systemd` (Linux) | **success** | the real-systemd fixtures: **9 passed, 0 failed, 7 test binaries** |
+
+The Windows lane's 637 against the other lanes' 518 is **not** a coverage
+difference. That lane runs nine separate `cargo test` steps, so its aggregate
+double-counts the binaries the other lanes run once, and it additionally runs
+`--all-features` for `eggup-eggpack`. The per-step counts are the evidence; the
+aggregate is a sum over steps, not a distinct-test count.
+
+### What this supersedes
+
+The header of this record states the milestone closed on **native macOS
+evidence only**, with hosted CI qualification and the Linux and Windows
+platforms **not run**. §12 lists "Every hosted CI lane, and the Linux and
+Windows platforms" as not run, and **F1** is the finding that tracks exactly
+that. **All of those are superseded.** This milestone is now qualified on all
+three platforms.
+
+The new fixture `crates/eggup-core/tests/candidate_stdin.rs` ran **natively**
+in all three lanes — `stable` (Linux), `macos`, and `windows-check`. Its
+cases are therefore real executions on Linux and Windows, not compile-only
+observations:
+
+- the bounded stdin payload is delivered to the child and echoed back;
+- a payload over `MAX_STDIN_BYTES` is rejected with `Error::InvalidInput`
+  **and no child is spawned**;
+- a child that exits without reading its stdin yields the typed `Err` with
+  operation `"writing bounded stdin"`;
+- with no payload attached, stdin is still null;
+- the deadline still bounds a child that never reads a large payload.
+
+### Compatibility consequence, carried forward
+
+Unchanged by the hosted qualification: `eggup-core` is published at **`0.1.3`**
+and the published crate still nulls stdin and lacks `stdin_data` and
+`MAX_STDIN_BYTES`. The `v0.1.3` tag is unmoved and no republication was
+performed. `Error` keeps exactly its seven published variants on both sides of
+this change. The `eggup-eggpack` `=0.1.3` pin still blocks propagation of the
+core change into the eggpack adapter, exactly as this record's §9 states.

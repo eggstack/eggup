@@ -228,9 +228,15 @@ The entries below are **unpublished** work. The current published baselines are
 has been published: each entry names the published version that still carries
 the defect it corrects, and republication is a separate milestone.
 
-The whole 2026-10-23 corrective batch is hosted-qualified: CI run `40008039843`
-is green on all five lanes (`stable`, `msrv`, `service-systemd`, `macos`,
-`windows-check`).
+The whole 2026-10-23 corrective batch is hosted-qualified. CI run
+`40008039843` is green on all five lanes (`stable`, `msrv`, `service-systemd`,
+`macos`, `windows-check`) for the first eleven milestones, and CI run
+`40062299630` is green on all five lanes for the five that followed it
+(`eggup-curl` User-Agent parity, `eggup-core` bounded stdin, `eggup-service`
+bounded-executor consolidation, the `eggup-transport-footprint` isolated
+configuration coverage, and the architecture-anchor repair). The first of those
+two runs, `40061134915`, was red in four lanes and is the evidence behind the
+packaged-crate deferral recorded below.
 
 Work published by the 0.1.3 train is recorded in the `0.1.3` section above,
 not here. Per-crate release notes live in `crates/*/CHANGELOG.md`; this
