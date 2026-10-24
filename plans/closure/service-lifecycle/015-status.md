@@ -128,10 +128,10 @@ was modified (R-D2).
 | **R-A3** — the `program` string is the resolved path | `lib.rs:1051` (`program_path.to_string_lossy()`) | `classifies_a_missing_program_as_not_found_with_the_current_detail ... ok`; `classifies_a_spawn_failure_as_a_typed_manager_failure ... ok` |
 | **R-A4** — the consolidation is internal; the rustdoc names `run_bounded` | `lib.rs:976-990` (the rustdoc), `:989-992` (the struct and its **public** field), `:994` (`Default`), `:1013` (`with_max_output`) | `cargo test -p eggup-service --locked --offline --test public_api_surface` → `the_committed_snapshot_lists_every_public_item ... ok`, `every_top_level_public_item_is_pinned ... ok`; `git diff --stat -- crates/eggup-service/tests/public-api-surface.txt` → no output |
 | **R-A5** — `read_bounded_generic` deleted iff it had no other caller | deleted from `crates/eggup-service/src/lib.rs` (it occupied `:1305-1328` before the change) | `grep -rn "read_bounded_generic" crates/eggup-service/src/` → no hits |
-| **R-B1** — the mapping table, exhaustively, with a fallback arm | `lib.rs:1080-1139`: `:1082` (`timed_out`), `:1088` (`output_limited`), `:1094-1098` (success), `:1104-1111` (spawn), `:1112-1115` (poll), `:1116-1119` (stdin write), `:1123-1128` (**the fallback arm**), `:1130-1133` (`CandidateExecution`), `:1134` (`InvalidInput`), `:1135-1138` (the remaining variants) | `cargo test -p eggup-service --locked --offline` → all twelve tests in `bounded_executor_consolidation` pass |
+| **R-B1** — the mapping table, exhaustively, with a fallback arm | `lib.rs:1080-1139`: `:1082` (`timed_out`), `:1088` (`output_limited`), `:1094-1098` (success), `:1104-1111` (spawn), `:1112-1115` (poll), `:1116-1119` (stdin write), `:1123-1128` (**the fallback arm**), `:1130-1133` (`CandidateExecution`), `:1134` (`InvalidInput`), `:1135-1138` (the remaining variants) | `cargo test -p eggup-service --locked --offline` → all fourteen tests in `bounded_executor_consolidation` pass |
 | **R-B2** — the timeout is the caller's timeout less the elapsed pre-flight; a zero remaining budget spawns nothing | `lib.rs:1049` (the budget starts before the resolve), `:1052-1054` (the remaining budget), `:1055-1060` (the zero-budget early return, before any spawn) | `cargo test -p eggup-service --locked --offline` → `a_timeout_yields_the_timeout_kind ... ok` |
 | **R-B3** — a valid-UTF-8 pair is byte-identical; a non-UTF-8 pair is dropped | `lib.rs:1070-1075` | `cargo test -p eggup-service --locked --offline --test bounded_executor_environment` → `the_child_environment_is_cleared_and_only_the_session_bus_variables_are_injected ... ok` |
-| **R-C1** — the argv builders untouched; no existing `fake.expect(...)` vector edited | `lib.rs:1691` (`show_argv`), `:1729` (`run_unit`), `:1894` (`is-active`), `:2392` (`disable`), `:2428` and `:2470` (`daemon-reload`), `:2481` (`enable`), `:2658` (`launchctl list`), `:2938` (`bootout`), `:3024` (`stop`), `:3046` (`bootstrap`), `:3059` (`kickstart`), `:3412` (`crontab -l`), `:3455` (`crontab -`) | `cargo test -p eggup-service --locked --offline` → `the_managers_argv_is_byte_identical ... ok`; `git diff -- crates/eggup-service/src/lib.rs` shows no change to any `fake.expect(` vector |
+| **R-C1** — the argv builders untouched; no existing `fake.expect(...)` vector edited | `lib.rs:1691` (`show_argv`), `:1729` (`run_unit`), `:1894` (`is-active`), `:2392` (`disable`), `:2428` and `:2470` (`daemon-reload`), `:2481` (`enable`), `:2658` (`launchctl list`), `:2938` (`bootout`), `:3024` (`stop`), `:3046` (`bootstrap`), `:3059` (`kickstart`), `:3412` (`crontab -l`), `:3455` (`crontab -`) | `cargo test -p eggup-service --locked --offline` → `the_systemd_managers_argv_is_byte_identical ... ok` (Unix-gated), `the_launchd_managers_argv_is_byte_identical ... ok`, `the_cron_managers_argv_is_byte_identical ... ok`; `git diff -- crates/eggup-service/src/lib.rs` shows no change to any `fake.expect(` vector |
 | **R-C2** — the taxonomies unchanged | `lib.rs:339` (`ManagerFailureKind`), `:406` (`ServiceError`) | `cargo test -p eggup-service --locked --offline --test manager_failure_kinds` → `14 passed; 0 failed` |
 | **R-C3** — the M014 public-API guard passes with the snapshot unmodified | `crates/eggup-service/tests/public-api-surface.txt` (unmodified) | `cargo test -p eggup-service --locked --offline --test public_api_surface` → `5 passed; 0 failed`; `git diff --stat -- crates/eggup-service/tests/public-api-surface.txt` → no output |
 | **R-C4** — `Cargo.toml` and `Cargo.lock` byte-identical | `crates/eggup-service/Cargo.toml`, `Cargo.lock` (unmodified) | `git status --short -- crates/eggup-service/Cargo.toml Cargo.lock` → no output; `cargo tree -p eggup-service --locked --offline --depth 1` → `eggup-core v0.1.3` + `windows-args v0.2.0` (unchanged) |
@@ -197,7 +197,7 @@ error (§14's stop condition 11 did not fire — both bounds are 1 MiB).
 | **P4** | An output overflow still fails closed and discards the stream | `an_output_overflow_yields_the_protocol_kind_and_discards_the_stream` — the child emits 8 192 bytes against a 1 024-byte bound; the kind is `Protocol` and the detail is exactly `manager output exceeded bound for {program}`. |
 | **P5** | A nonzero exit is still `Ok` with the observed status | `a_nonzero_exit_is_ok_with_the_observed_status` — the child exits 3; the result is `Ok` with `status == Some(3)`. |
 | **P6** | The `crontab -` path still receives its payload | `delivers_the_stdin_payload_to_the_child` — the payload arrives byte-for-byte. **This is the one assertion the replaced runner fails** (see "Baseline evidence"). |
-| **P7** | No manager's argv changes | `the_managers_argv_is_byte_identical` — the golden vectors for `systemctl` (`show`, `is-active`, `start`, `stop`, `enable`, `disable`, `daemon-reload`), `launchctl` (`list`, `bootstrap`, `bootout`, `kickstart`, `stop`), and `crontab` (`-l`, `-`) are compared with the observed argv, and the `FakeExecutor` refuses any deviation. |
+| **P7** | No manager's argv changes | `the_systemd_managers_argv_is_byte_identical` (`#[cfg(unix)]`-gated), `the_launchd_managers_argv_is_byte_identical`, and `the_cron_managers_argv_is_byte_identical` — the golden vectors for `systemctl` (`show`, `is-active`, `start`, `stop`, `enable`, `disable`, `daemon-reload`), `launchctl` (`list`, `bootstrap`, `bootout`, `kickstart`, `stop`), and `crontab` (`-l`, `-`) are compared with the observed argv, and the `FakeExecutor` refuses any deviation. |
 | **P8** | The child environment is cleared; only the session-bus variables are injected | `the_child_environment_is_cleared_and_only_the_session_bus_variables_are_injected` (the environment is empty for a non-`--user` command) plus the crate-private `the_session_bus_filter_is_exactly_three_variables` (`lib.rs:4268`), which pins the filter to exactly `DBUS_SESSION_BUS_ADDRESS`, `SYSTEMD_BUS_ADDRESS`, `XDG_RUNTIME_DIR` on every lane. |
 | **P9** | The allowlist is the only path to a binary; no `PATH` lookup | `resolve_manager_program` and `validate_executable_path` are unmodified (`lib.rs:1143`, `:1171`); the **resolved** path is what reaches core (`lib.rs:1062`). `the_pre_flight_rejections_are_service_errors_not_core_errors` proves no child is started by a rejected call. |
 | **P10** | The pre-flight rejections are unchanged | `rejects_a_zero_timeout_an_over_range_timeout_and_an_over_bound_stdin_payload` — all four `ServiceError::invalid` messages are asserted exactly. |
@@ -347,7 +347,7 @@ other agents were editing the tree concurrently.
 
 | Platform | What was run | Result |
 |---|---|---|
-| **macOS** (this machine: darwin 25.6.0 arm64; Rust 1.89) | commands 1–11 above, including the whole `eggup-service` suite | **All green. 0 failed.** The twelve `bounded_executor_consolidation` fixtures, the two `bounded_executor_environment` fixtures, the 112 lib tests, the M014 public-API guard, and the `manager_failure_kinds` taxonomy all pass. |
+| **macOS** (this machine: darwin 25.6.0 arm64; Rust 1.89) | commands 1–11 above, including the whole `eggup-service` suite | **All green. 0 failed.** The fourteen `bounded_executor_consolidation` fixtures, the two `bounded_executor_environment` fixtures, the 112 lib tests, the M014 public-API guard, and the `manager_failure_kinds` taxonomy all pass. The consolidation target's count is **fourteen** at the current head; the **twelve** in command 3's per-target list below is the count at the implementation baseline `20ac770`, before the argv guard was split (see the 2026-10-24 corrective addendum). |
 | **Linux** | nothing | **Not run.** No Linux host was available in this session. No Linux result is inferred from the macOS result. |
 | **Windows** | `cargo check --target x86_64-pc-windows-msvc --all-targets --locked --offline -p eggup-service` and the matching `clippy -D warnings` | **Compile-only, and warning-free.** The Windows **suite was not executed** — no Windows host was available. The hosted `windows-check` lane (which runs `cargo test --workspace --all-targets --locked --no-fail-fast` and therefore the whole `eggup-service` suite, including both new fixture targets) is the **parent's** qualification step, and this record does **not** predict its result. |
 
@@ -662,7 +662,7 @@ here:
 |---|---|
 | `crates/eggup-service/src/lib.rs` | The consolidation (`:1021-1141`), the `read_bounded_generic` deletion, the `SystemExecutor` rustdoc, six `#[cfg(unix)]` gates on the Unix-shaped executor tests, and the new crate-private `the_session_bus_filter_is_exactly_three_variables`. |
 | `crates/eggup-service/tests/common/fixture_child.rs` | **New.** The portable child fixture. |
-| `crates/eggup-service/tests/bounded_executor_consolidation.rs` | **New.** Twelve tests. |
+| `crates/eggup-service/tests/bounded_executor_consolidation.rs` | **New.** Fourteen tests (twelve at the implementation baseline; the argv guard was split into three in `b9885fa`). |
 | `crates/eggup-service/tests/bounded_executor_environment.rs` | **New.** Two tests. |
 | `crates/eggup-service/README.md` | The process-execution bullet. |
 | `crates/eggup-service/CHANGELOG.md` | One `## Unreleased` entry. |
@@ -690,7 +690,7 @@ here:
 
 ## Test inventory added by this milestone
 
-`crates/eggup-service/tests/bounded_executor_consolidation.rs` — 12 tests:
+`crates/eggup-service/tests/bounded_executor_consolidation.rs` — 14 tests:
 
 | Test | Proves |
 |---|---|
@@ -704,7 +704,9 @@ here:
 | `a_timeout_yields_the_timeout_kind` | **T5** — the timeout kind. |
 | `an_output_overflow_yields_the_protocol_kind_and_discards_the_stream` | **T6** — the overflow kind and detail. |
 | `a_nonzero_exit_is_ok_with_the_observed_status` | **T7** — `Ok` with the observed status. |
-| `the_managers_argv_is_byte_identical` | **T8** — the golden argv for every manager. |
+| `the_systemd_managers_argv_is_byte_identical` | **T8** — the golden `systemctl` argv. `#[cfg(unix)]`-gated: the crate's `ExecStart` grammar is Unix-path-shaped, so no Windows spelling can satisfy it. |
+| `the_launchd_managers_argv_is_byte_identical` | **T8** — the golden `launchctl` argv. Platform-neutral; it runs on the Windows lane too. |
+| `the_cron_managers_argv_is_byte_identical` | **T8** — the golden `crontab` argv. Platform-neutral; it runs on the Windows lane too. |
 | `the_pre_flight_rejections_are_service_errors_not_core_errors` | **T10** — `InvalidInput`, and no child started. |
 
 `crates/eggup-service/tests/bounded_executor_environment.rs` — 2 tests:
@@ -720,9 +722,23 @@ here:
 |---|---|
 | `the_session_bus_filter_is_exactly_three_variables` | The portable counterpart of T9's Unix-only `--user` case. |
 
-**Count: 15 new tests** (13 in the two new integration targets, 1 in the
-fixture module's shared helper — which contributes the `eggup_fixture_child`
-entry point to each target — and 1 crate-private).
+**Count: 16 new tests** — 14 `#[test]` attributes in
+`bounded_executor_consolidation.rs` and 2 in `bounded_executor_environment.rs`,
+which is 16 attributes in total, of which the shared `eggup_fixture_child`
+entry point appears in **both** targets and is counted once: **15 distinct
+integration tests**, plus **1** crate-private test
+(`the_session_bus_filter_is_exactly_three_variables`).
+
+> **Corrected 2026-10-24 by Service M016.** This line previously read *"Count:
+> 15 new tests (13 in the two new integration targets, 1 in the fixture module's
+> shared helper — which contributes the `eggup_fixture_child` entry point to
+> each target — and 1 crate-private)"*. It under-counted the total by one: it
+> was written against the pre-split state of `b9885fa`, in which the argv
+> guard was **one** test rather than three, and its own arithmetic counted the
+> shared `eggup_fixture_child` entry point twice — once inside the "13 in the
+> two new integration targets" and once again as the separate "+1 in the
+> fixture module's shared helper". The count above is the count at the current
+> head. See the corrective addendum at the end of this record.
 
 ## Parent-session verification addendum (2026-10-24, hosted qualification)
 
@@ -733,11 +749,11 @@ entry point to each target — and 1 crate-private).
 | `stable` (Linux) | **success** | `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-targets --all-features --locked`, `cargo doc --workspace --no-deps --locked`, and the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
 | `msrv` (Linux, 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` at the declared floor and the packaged-service step. This lane runs no tests |
 | `macos` | **success** | full `cargo test` plus the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
-| `windows-check` | **success** | nine targeted `cargo test` steps plus the full workspace run: **637 passed, 0 failed, 68 test binaries** |
+| `windows-check` | **success** | **ten** targeted `cargo test` steps plus the full workspace run: **637 passed, 0 failed, 68 test binaries** |
 | `service-systemd` (Linux) | **success** | the real-systemd fixtures: **9 passed, 0 failed, 7 test binaries** |
 
 The Windows lane's 637 against the other lanes' 518 is **not** a coverage
-difference. That lane runs nine separate `cargo test` steps, so its aggregate
+difference. That lane runs **ten** separate `cargo test` steps, so its aggregate
 double-counts the binaries the other lanes run once, and it additionally runs
 `--all-features` for `eggup-eggpack`. The per-step counts are the evidence; the
 aggregate is a sum over steps, not a distinct-test count.
@@ -793,3 +809,104 @@ and no republication was performed. The public surface is unchanged, so a
 consumer of the published crate sees no API difference; a consumer of a future
 `0.1.4` sees the consolidation and the fix. Registry finding **15** stays open
 for the published crate until that republication lands.
+
+## Corrective addendum (2026-10-24) — test-inventory correction by Service M016
+
+This addendum is added by **Service M016**
+(`plans/implementation/service-lifecycle/016-published-change-release-note-corrective.md`,
+closure `plans/closure/service-lifecycle/016-status.md`). It corrects the
+**test inventory** of this record. It changes **no production code, no test
+code, no behaviour, and no requirement outcome** — every requirement in the
+matrix above was met at implementation time and still is. What was wrong is the
+**inventory's arithmetic and its test names**, which were written against the
+pre-`b9885fa` state of the tree and were never reconciled after that commit.
+
+### How the gap went undetected
+
+Commit `b9885fa` — the hosted-qualification commit — **split** the single
+`the_managers_argv_is_byte_identical` guard into three single-concern tests
+and **added** `cargo test -p eggup-service --test windows_scm_live --locked --
+--nocapture` to the hosted `windows-check` lane. That commit changed the
+inventory; this record was written at baseline `20ac770` and its inventory
+sections were **not** updated to match. The record's own §"Parent-session
+verification addendum" even states the new count ("the macOS coverage of the
+file rose from 12 to 14 tests"), which is what made the earlier sections
+self-contradictory rather than merely stale.
+
+### Corrections, with the command used to count
+
+| # | Site in this record | Before | After | Count command |
+|---|---|---|---|---|
+| 1 | § "Requirement → evidence matrix", row **R-C1** | cited the deleted `the_managers_argv_is_byte_identical` as live verification evidence | cites `the_systemd_managers_argv_is_byte_identical` (Unix-gated), `the_launchd_managers_argv_is_byte_identical`, and `the_cron_managers_argv_is_byte_identical` | `cargo test -p eggup-service --locked --offline` |
+| 2 | § "Behaviour-equivalence result", row **P7** | cited the deleted `the_managers_argv_is_byte_identical` | cites the three current argv guards | `cargo test -p eggup-service --locked --offline` |
+| 3 | § "Per-platform results", **macOS** row | "The twelve `bounded_executor_consolidation` fixtures" | "The fourteen `bounded_executor_consolidation` fixtures" | `grep -c '^\s*#\[test\]' crates/eggup-service/tests/bounded_executor_consolidation.rs` → `14` |
+| 3b | § "Requirement → evidence matrix", row **R-B1** | "all twelve tests in `bounded_executor_consolidation` pass" | "all fourteen tests in `bounded_executor_consolidation` pass" | same `grep -c` → `14` |
+| 4 | § "Files touched by this milestone" | "**New.** Twelve tests." | "**New.** Fourteen tests (twelve at the implementation baseline; the argv guard was split into three in `b9885fa`)." | same `grep -c` → `14` |
+| 5 | § "Test inventory added by this milestone" — heading | "`bounded_executor_consolidation.rs` — 12 tests:" | "`bounded_executor_consolidation.rs` — 14 tests:" | same `grep -c` → `14` |
+| 6 | § "Test inventory added by this milestone" — **T8** row | one row for the deleted `the_managers_argv_is_byte_identical` | three rows: `the_systemd_managers_argv_is_byte_identical` (`#[cfg(unix)]`), `the_launchd_managers_argv_is_byte_identical`, `the_cron_managers_argv_is_byte_identical` | `grep -n -B2 '^fn the_\(systemd\|launchd\|cron\)_managers_argv_is_byte_identical' crates/eggup-service/tests/bounded_executor_consolidation.rs` |
+| 7 | § "Test inventory added by this milestone" — count | "**Count: 15 new tests** (13 in the two new integration targets, 1 in the fixture module's shared helper … and 1 crate-private)" | "**Count: 16 new tests** — 16 `#[test]` attributes (14 + 2), the shared `eggup_fixture_child` entry point counted once → **15 distinct integration tests**, plus **1** crate-private test" | `grep -c '^\s*#\[test\]'` on both targets → `14` and `2`; the shared entry point appears in both |
+| 8 | § "Parent-session verification addendum", `windows-check` lane row | "nine targeted `cargo test` steps" | "**ten** targeted `cargo test` steps" | `awk 'NR>=116 && NR<=154' .github/workflows/ci.yml \| grep -c 'run: cargo test'` → `10` |
+| 9 | § "Parent-session verification addendum", aggregate paragraph | "That lane runs nine separate `cargo test` steps" | "That lane runs **ten** separate `cargo test` steps" | same `awk`/`grep -c` → `10` |
+
+### The ten `windows-check` `cargo test` steps, enumerated
+
+The hosted lane's steps are at `.github/workflows/ci.yml:116-154`:
+
+| # | `.github/workflows/ci.yml` line | Step |
+|---|---|---|
+| 1 | `:122` | `cargo test -p eggup-acquisition -p eggup-archive -p eggup-curl --locked` |
+| 2 | `:123` | `cargo test -p eggup-eggpack --all-targets --all-features --locked` |
+| 3 | `:124` | `cargo test -p eggup-service --lib diagnostic_byte_bounds_preserve_utf8_at_256_and_512_edges --locked` |
+| 4 | `:125` | `cargo test -p eggup-service --lib service_errors_output_and_permission_remediation_stay_utf8_bounded --locked` |
+| 5 | `:126` | `cargo test -p eggup-service --lib lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free --locked` |
+| 6 | `:127` | `cargo test -p eggup-service --lib windows_scm::tests --locked` |
+| 7 | `:134` | `cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture` |
+| 8 | `:138` | `cargo test -p eggup-core --test current_executable --locked` |
+| 9 | `:139` | `cargo test -p eggup-core --test stale_lock_recovery --locked` |
+| 10 | `:142` | `cargo test --workspace --all-targets --locked --no-fail-fast` |
+
+Step 7 is the one `b9885fa` added; the lane's eleventh step is
+`cargo package -p eggup-service --locked --no-verify` at `:154`, which is a
+packaging step and not a `cargo test` step.
+
+### What this addendum does **not** change
+
+- **The historical baseline evidence is untouched.** § "Baseline evidence"
+  quotes the `20ac770` run, whose output legitimately contains
+  `the_managers_argv_is_byte_identical` and whose count is legitimately
+  **twelve** — that was the tree at that commit. The "eleven of the twelve"
+  reading and the quoted test listing remain verbatim historical records.
+- **Command 3's per-target list in § "Exact commands run and results"** shows
+  `12` for the consolidation target. That was the true count at the
+  implementation baseline `20ac770` and is left as the historical record; the
+  current count is **14**, and the **macOS** row of § "Per-platform results"
+  now says so explicitly.
+- **The hosted-run findings are untouched.** The first hosted run's failure
+  `the_managers_argv_is_byte_identical` failed on Windows is a **historical
+  event**: that test existed, failed, and was then split. The split is what
+  the correction above records; the failure itself remains part of the
+  record.
+- **No requirement outcome changed.** Every row of the requirement → evidence
+  matrix above was met, and still is. The two rows whose *cited evidence* was
+  wrong (**R-C1**, **P7**) are now cited against the live test names.
+
+### A related inconsistency, resolved by Service M016
+
+This record's § "Documentation / operations evidence" states that the
+`crates/eggup-service/CHANGELOG.md` entry recorded "**the eight
+differences**". It did not: the changelog said *"Seven differences"* and
+enumerated only six, so the release note for **D8** — the fix for the
+stdin-verdict defect in the published crate — was **absent from the crate's
+own changelog**. Service M016 adds that release note and corrects the count
+to eight. This addendum records the correction's effect here: the claim in
+§ "Documentation / operations evidence" is now **true**.
+
+### Out of scope for this record, flagged for the parent
+
+`AGENTS.md` § "Verify" described the `windows-check` lane as running "nine
+`cargo test` steps". The lane runs **ten** (§ "The ten `windows-check`
+`cargo test` steps, enumerated" above). **This is already resolved in the
+working tree**: `AGENTS.md` now reads "ten `cargo test` steps", corrected by
+another agent concurrently with this milestone. `AGENTS.md` is **not owned by
+Service M016** and was **not edited** by it; the correction is recorded here so
+the two files agree in the final tree.

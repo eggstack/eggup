@@ -474,3 +474,41 @@ Unchanged by the hosted qualification, and stated here so it is not lost:
 no `User-Agent` control. The `v0.1.2` tag is unmoved, no republication was
 performed, and the `v0.1.3` republication milestone named by this plan's §16
 remains the delivery path. The `eggup-acquisition 0.1.3` seam is unchanged.
+
+## Superseded addendum (2026-10-24, Acquisition Transport M016)
+
+**Acquisition Transport M016** — plan
+`plans/implementation/acquisition-transport/016-adapter-publication-coupling-corrective.md`,
+closure `plans/closure/acquisition-transport/016-status.md` — supersedes two
+statements in this record. The record's own text is left in place, as a closed
+closure's text must be; this addendum is the record of the correction.
+
+### What this supersedes
+
+| # | Superseded statement | Where | Corrected statement |
+|---|---|---|---|
+| S1 | "Because the change is additive, such a republication would be a non-breaking `0.1.3`." | § "Publication status" | **False once the seam's next release is published.** The seam's next release is `eggup-acquisition 0.2.0` and it is **source-breaking**; `0.2.0` does **not** satisfy the `^0.1.0` requirement this crate declares today, so the requirement **must widen to `0.2`** at publication time. The workspace is **version-lockstep**, so the seam's `0.2.0` release moves the workspace version to `0.2.0` and this crate's next publication is **`eggup-curl 0.2.0`, not `0.1.3`**. |
+| S2 | `SP = %x20 ; permitted only between two non-SP characters` | § "Validation grammar and bound implemented" | The implementation permits a **run** of interior `SP` (only a leading and a trailing `SP` are refused). RFC 7230 §3.2 permits the run (`field-content = field-vchar [ 1*( SP / HTAB ) field-vchar ]`). M016 corrects the **documentation**; the accepted value set, the rejection set, and the argv emission are unchanged. |
+
+### The consumer-facing consequence, stated once
+
+A consumer that depends on the seam **directly** inherits the seam's source
+break when it moves to `0.2`. A consumer of `eggup-curl` inherits it too,
+once `eggup-curl` is republished with the widened requirement, because the
+seam's `AcquisitionError` is part of the adapter's public surface
+(`AcquisitionTransport::fetch` returns it). Such a consumer must update its
+`AcquisitionError::Io` matchers and must stop cloning or comparing whole
+`AcquisitionError` values.
+
+What this milestone established remains true: the adapter's **own** API change
+is additive and introduces no source break of its own.
+
+### Unchanged
+
+- **No republication was performed**, no tag was moved, and no published
+  version was bumped by M016 either. `eggup-curl` remains published at
+  **`0.1.2`**, `eggup-acquisition` at **`0.1.3`**.
+- The published artifacts keep their current shape and behavior.
+- The residual copies of the corrected `User-Agent` grammar in
+  `crates/eggup-curl/README.md` and `architecture/curl-adapter.md` are owned by
+  another writer and are reported in the M016 closure record.

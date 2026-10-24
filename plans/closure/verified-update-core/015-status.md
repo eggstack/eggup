@@ -770,3 +770,62 @@ needs a separate core publication and a separate adapter republication with the
 exact-pin cascade. Neither is authorized by this milestone, and this addendum
 changes nothing about that: the hosted qualification qualifies the **working
 tree**, not the published crate.
+
+## Addendum (2026-10-24, Verified Update Core M018) — U1 closed, and the status reconciled
+
+This addendum was written by **Verified Update Core M018**
+(`plans/closure/verified-update-core/018-bounded-stdin-outcome-priority-corrective.md`,
+`plans/closure/verified-update-core/018-status.md`), which owns this file. It
+corrects two things in this record and does not rewrite any other evidence in
+it.
+
+### U1 is closed on the evidence of commit `ab90688`
+
+The finding **U1** above states that the four missing type-level rustdocs —
+`Error`, `RecoveryError`, `RecoveryResult`, and the `Result` alias — were not
+written because `crates/eggup-core/src/error.rs` "was **left untouched**" by
+that session's ownership grant.
+
+**That premise is false against the baseline.** Commit `ab90688` — the very
+commit that ships this closure record — added all four rustdocs to
+`crates/eggup-core/src/error.rs`:
+
+```text
+$ git show ab90688 -- crates/eggup-core/src/error.rs
+-/// Errors produced while validating a local update plan or preparing private stage state.
++/// The error type of every `eggup-core` fallible entry point.
++///
++/// `Error` is a **closed** enum with exactly the seven variants below, so a
++/// downstream exhaustive `match` compiles unchanged. …
+```
+
+The four rustdocs are present in the baseline tree at
+`crates/eggup-core/src/error.rs`: `Result` at `:4-8`, `Error` at `:10-27`,
+`RecoveryError` at `:65-71`, and `RecoveryResult` at `:89-95`. The requirement
+of plan §6.2 is therefore met, and **U1 is closed**. The finding's severity was
+**low** because it was documentation-only; it is now closed, not carried.
+
+### The status wording is reconciled with the registry and the roadmap
+
+This record's header reads "conditionally closed", while
+`plans/registry.md` ("M001-M017 closed") and
+`plans/subsystems/verified-update-core-roadmap.md` (the `M015` row, "closed")
+read closed. `AGENTS.md` requires the closure record, the registry, and the
+roadmap to agree, and with U1 closed the remaining basis for "conditionally
+closed" is gone.
+
+The parent session owns `plans/registry.md` and `plans/subsystems/**`; the
+reconciliation of those two files is to be applied by the parent session, and
+the exact wording to use is drafted in
+`plans/closure/verified-update-core/018-status.md` § "Appendix — ready-to-paste
+rows for the parent session", under "### `plans/closure/verified-update-core/015-status.md` — status reconciliation".
+
+### What this addendum does not change
+
+- The **implementation evidence** of M015 is untouched: the taxonomy change, the
+  `as_str()` strings, the `# Errors` coverage, and the crate-local lint are
+  exactly as recorded above.
+- The **hosted qualification** recorded in this record's own addendum is
+  untouched.
+- Nothing here publishes anything, moves a tag, or changes the published
+  `eggup-core 0.1.3`.

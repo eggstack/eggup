@@ -776,3 +776,58 @@ and the published crate still nulls stdin and lacks `stdin_data` and
 performed. `Error` keeps exactly its seven published variants on both sides of
 this change. The `eggup-eggpack` `=0.1.3` pin still blocks propagation of the
 core change into the eggpack adapter, exactly as this record's §9 states.
+
+## Addendum (2026-10-24, Verified Update Core M018) — the write-failure rule is superseded
+
+This addendum was written by **Verified Update Core M018**
+(`plans/implementation/verified-update-core/018-bounded-stdin-outcome-priority-corrective.md`,
+`plans/closure/verified-update-core/018-status.md`), which owns this file. It
+corrects one statement in this record and does not rewrite any other evidence
+in it.
+
+### The statement this record superseded
+
+The "The deadline bounds the writer" section of this record states:
+
+> - A writer failure detected **after** the deadline was reached does not
+>   retroactively turn the deadline outcome into an `Err`: the deadline already
+>   decided that outcome. This is stated in the rustdoc
+>   (`candidate.rs:203-205`).
+
+**That statement was not true of the code this record qualified.** The rustdoc
+at `candidate.rs:203-205` did publish that rule, but the implementation
+evaluated the stdin-error arm (`candidate.rs:375-385`) **before** the deadline
+arm (`candidate.rs:404-411`) inside the poll loop, and the writer's verdict
+carried no instant, so a write failure that was observed after the deadline
+was reached was reported as an `Err` in the runs where the runner's poll phase
+happened to observe the verdict before the deadline arm ran. The same input
+and the same timeout therefore produced two different public classifications of
+one logical scenario.
+
+### What replaces it
+
+**Verified Update Core M018** states one rule and implements it so the rustdoc
+is literally true:
+
+> The deadline has priority over the stdin writer's verdict, and the verdict is
+> classified by the instant at which the writer observed the write's
+> completion — not by the instant at which the runner polled for it. A write
+> failure observed before the deadline is an `Err`; a write failure observed at
+> or after the deadline is the deadline outcome (`Ok` with `timed_out` set); a
+> writer still in flight at the deadline is abandoned.
+
+M018's closure record is `plans/closure/verified-update-core/018-status.md`.
+
+### What this addendum does not change
+
+- The **capability** M017 delivered is untouched: `CommandSpec::stdin_data`,
+  `MAX_STDIN_BYTES`, the pre-spawn rejection of an oversized payload, the
+  dedicated writer thread, the typed `Error::Io` with operation
+  `"writing bounded stdin"`, and the stable classification surface of the three
+  `operation` strings all stand exactly as recorded above.
+- The **hosted qualification** recorded in this record's own addendum is
+  untouched: run `40062299630` qualified the M017 change as it stood then.
+- The **residual F4** (an abandoned stdin writer) is carried forward unchanged
+  and is restated in M018's closure record.
+- Nothing here publishes anything, moves a tag, or changes the published
+  `eggup-core 0.1.3`.

@@ -70,9 +70,9 @@ another.
 | # | Requirement (plan §) | Evidence (file:line) | Command and observed result |
 |---|---|---|---|
 | 1 | The `stable` lane builds all three configurations with `--locked`, as three separate steps (§13.1) | `.github/workflows/ci.yml:26`, `:27`, `:28` (comment at `:22-25`) | `cargo build -p eggup-transport-footprint --no-default-features --features curl --locked --offline` → **exit 0**; `--features eggfetch` → **exit 0**; `--features curl,eggfetch` → **exit 0**. YAML parse check (`python3 -c "import yaml; ..."`) → `stable -> 10 steps`, the three `cargo build -p eggup-transport-footprint` runs listed in order |
-| 2 | The `msrv` lane checks all three configurations at 1.89.0 with `--locked`, as three separate steps (§13.2) | `.github/workflows/ci.yml:43`, `:44`, `:45` (comment at `:39-42`); toolchain pinned at `:37` (`dtolnay/rust-toolchain@1.89.0`) | `cargo check -p eggup-transport-footprint --no-default-features --features curl --locked --offline` → **exit 0**; `--features eggfetch` → **exit 0**; `--features curl,eggfetch` → **exit 0**. YAML parse check → `msrv -> 7 steps`, the three `cargo check -p eggup-transport-footprint` runs listed in order |
-| 3 | The `macos` lane builds the curl-only and eggfetch-only configurations with `--locked`, as two separate steps (§13.3) | `.github/workflows/ci.yml:79`, `:80` (comment at `:76-78`); the dual configuration is already built by the lane's `--all-features` step at `:75` | `cargo build -p eggup-transport-footprint --no-default-features --features curl --locked --offline` → **exit 0**; `--features eggfetch` → **exit 0**. YAML parse check → `macos -> 6 steps`, the two `cargo build -p eggup-transport-footprint` runs listed |
-| 4 | The `windows-check` lane and the `service-systemd` lane are unmodified; Windows binary coverage is recorded as `not run` (§13.4) | `.github/workflows/ci.yml:48-65` (`service-systemd`) and `:83-110` (`windows-check`) — byte-identical to `20ac770` | `git diff .github/workflows/ci.yml` → the diff hunks are at `@@ -19,6 +19,13 @@` (stable), `@@ -29,6 +36,13 @@` (msrv), `@@ -59,6 +73,11 @@` (macos) only; no hunk touches `windows-check` or `service-systemd`. YAML parse check → `service-systemd -> 9 steps`, `windows-check -> 13 steps`, neither containing an `eggup-transport-footprint` run |
+| 2 | The `msrv` lane checks all three configurations at 1.89.0 with `--locked`, as three separate steps (§13.2) | `.github/workflows/ci.yml:54`, `:55`, `:56` (comment at `:50-53`); toolchain pinned at `:48` (`dtolnay/rust-toolchain@1.89.0`) | `cargo check -p eggup-transport-footprint --no-default-features --features curl --locked --offline` → **exit 0**; `--features eggfetch` → **exit 0**; `--features curl,eggfetch` → **exit 0**. YAML parse check → `msrv -> 7 steps`, the three `cargo check -p eggup-transport-footprint` runs listed in order |
+| 3 | The `macos` lane builds the curl-only and eggfetch-only configurations with `--locked`, as two separate steps (§13.3) | `.github/workflows/ci.yml:101`, `:102` (comment at `:98-100`); the dual configuration is already built by the lane's `--all-features` step at `:97` | `cargo build -p eggup-transport-footprint --no-default-features --features curl --locked --offline` → **exit 0**; `--features eggfetch` → **exit 0**. YAML parse check → `macos -> 6 steps`, the two `cargo build -p eggup-transport-footprint` runs listed |
+| 4 | The `windows-check` lane and the `service-systemd` lane are unmodified; Windows binary coverage is recorded as `not run` (§13.4) | `.github/workflows/ci.yml:70-87` (`service-systemd`) and `:116-154` (`windows-check`) — byte-identical to `20ac770` | `git diff .github/workflows/ci.yml` → the diff hunks are at `@@ -19,6 +19,13 @@` (stable), `@@ -29,6 +36,13 @@` (msrv), `@@ -59,6 +73,11 @@` (macos) only; no hunk touches `windows-check` or `service-systemd`. YAML parse check → `service-systemd -> 9 steps`, `windows-check -> 13 steps`, neither containing an `eggup-transport-footprint` run |
 | 5 | `crates/eggup-transport-footprint/tests/cross_link_guard.rs` exists and contains exactly the two guards of §10.1, using `std` only, with no `unsafe` block (§13.5) | The file, 381 lines. T1 at `:65-93`; T2 at `:230-381`. `use std::fs;` at `:29`, `use std::path::{Path, PathBuf};` at `:30`. No `unsafe` token in the file | `grep -c unsafe crates/eggup-transport-footprint/tests/cross_link_guard.rs` → **0**; the only two `use` statements are `std::fs` (`:29`) and `std::path` (`:30`). `cargo clippy -p eggup-transport-footprint --all-targets --all-features --locked --offline -- -D warnings` → **exit 0**, no warnings (`unsafe_code = "deny"` is inherited from the workspace lint table, `[workspace.lints.rust] unsafe_code = "deny"` in the root `Cargo.toml:21-22`) |
 | 6 | `cargo test -p eggup-transport-footprint --all-targets --locked --offline` reports **2 passed**, and the `no targets matched` warning is gone (§13.6) | The test target at `crates/eggup-transport-footprint/tests/cross_link_guard.rs`; the crate's manifest has no `[[test]]` entry — the `tests/` target is auto-discovered and carries no `required-features` | `cargo test -p eggup-transport-footprint --all-targets --locked --offline` → `running 2 tests` / `test manifest_keeps_the_shape_that_produces_the_recorded_counts ... ok` / `test single_adapter_fixtures_never_reference_the_sibling_adapter ... ok` / `test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`. The baseline warning was reproduced and is now gone: with the `tests/` directory absent, the same command printed `warning: target filter \`all-targets\` specified, but no targets matched; this is a no-op`; with it present, the warning does not appear |
 | 7 | The three dependency-count commands print **3**, **92**, **93**, in that order (§13.7) | `crates/eggup-transport-footprint/Cargo.toml:15-31` — unchanged by this milestone | `cargo tree -p eggup-transport-footprint --no-default-features --features curl --locked --offline --prefix none \| sort -u \| grep -v '(\*)$' \| wc -l` → **3**; `--features eggfetch` → **92**; `--features curl,eggfetch` → **93**. Identical before and after the change set — see "Dependency-count verification" below |
@@ -93,8 +93,8 @@ The change set is **two files** plus this closure record and the plan's
 |---|---|---|
 | New guard test target | `crates/eggup-transport-footprint/tests/cross_link_guard.rs` (new, 381 lines) | T1 at `:65-93`, T2 at `:230-381`. `std` only (`:29-30`). Auto-discovered integration test; **no** manifest entry and **no** dev-dependency were added. The test target carries no `required-features`, which is what makes it run in every configuration including `default = []` |
 | `stable` lane: three isolated-configuration builds | `.github/workflows/ci.yml:26-28` (comment `:22-25`) | `cargo build` with `--no-default-features --features curl` / `eggfetch` / `curl,eggfetch`, each `--locked`, each its own step |
-| `msrv` lane: three isolated-configuration checks | `.github/workflows/ci.yml:43-45` (comment `:39-42`) | `cargo check`, matching the lane's existing type-check style; `--locked` |
-| `macos` lane: two isolated-configuration builds | `.github/workflows/ci.yml:79-80` (comment `:76-78`) | `cargo build` with `--features curl` and `--features eggfetch`, `--locked`. The dual configuration is already covered by the lane's existing `--all-features` step at `:75` |
+| `msrv` lane: three isolated-configuration checks | `.github/workflows/ci.yml:54-56` (comment `:50-53`) | `cargo check`, matching the lane's existing type-check style; `--locked` |
+| `macos` lane: two isolated-configuration builds | `.github/workflows/ci.yml:101-102` (comment `:98-100`) | `cargo build` with `--features curl` and `--features eggfetch`, `--locked`. The dual configuration is already covered by the lane's existing `--all-features` step at `:97` |
 | Plan status header | `plans/implementation/transport-footprint/001-isolated-configuration-coverage-corrective.md:3` | `Status: ready for handoff` → `Status: implemented` |
 | Plan factual corrections | same file, §3.6 (after the three-row table), §8.2 S2 row, §10.2 NC-3 | Three observations recorded below under "Plan corrections". No decision was reversed and no section was restructured |
 
@@ -423,10 +423,10 @@ Reported separately, as required. **No platform is inferred from another**
 |---|---|---|---|---|
 | **macOS** (darwin 25.6.0, arm64; local, rustc 1.89.0) | **all three** configurations built — curl-only, eggfetch-only, dual (`cargo build`, commands 2-4 above) **plus** all three `cargo check`ed (10-12) | **executed** — `2 passed; 0 failed` (command 8), and again under `--all-features` (command 9) | **3 / 92 / 93** — measured on this platform, before and after | **Run — green.** This is the platform on which the recorded counts were captured. |
 | **Linux** (`stable`) | **not run** by this milestone — the hosted `stable` lane will build all three (`ci.yml:26-28`) | **not run** — the hosted lane's `cargo test --workspace --all-targets --all-features --locked` will run it | **not claimed** — the counts were not measured on Linux | **Not run.** No Linux host was available in this session. Nothing is inferred from the macOS run. The hosted lane is the parent's qualification. |
-| **Linux** (`msrv`, 1.89.0) | **not run** — the hosted `msrv` lane will `cargo check` all three (`ci.yml:43-45`) | **not run** — the `msrv` lane runs `cargo check`, not `cargo test`, so the guard is *compiled* there but not *executed* | **not claimed** — the counts are a resolution result, not a toolchain result | **Not run.** No Linux host was available in this session. |
+| **Linux** (`msrv`, 1.89.0) | **not run** — the hosted `msrv` lane will `cargo check` all three (`ci.yml:54-56`) | **not run** — the `msrv` lane runs `cargo check`, not `cargo test`, so the guard is *compiled* there but not *executed* | **not claimed** — the counts are a resolution result, not a toolchain result | **Not run.** No Linux host was available in this session. |
 | **Linux** (`service-systemd`) | **not run** — the lane never builds the workspace and was **not modified** | **not run** — the lane never builds the workspace | **not claimed** | **Not run**, and **unchanged by design** (plan §6.3). |
-| **macOS** hosted (`macos` lane) | **not run** — the hosted lane will build curl-only and eggfetch-only (`ci.yml:79-80`); the dual configuration is already covered by the lane's `--all-features` step | **not run** — the hosted lane's `cargo test --workspace --all-targets --all-features --locked` will run it | **not claimed** from the hosted run; the local macOS run above is the measured capture | **Not run** locally as a hosted lane. The local macOS run is reported above and is **not** a substitute for the hosted qualification. |
-| **Windows** (`windows-check`) | **none — `not run`**, before this milestone and after it. The lane was **not modified** (plan §6.3: the crate has no `#[cfg]` attribute and no platform-specific code, so a Windows build proves nothing about the property being guarded) | **not run** — the hosted lane's `cargo test --workspace --all-targets --locked --no-fail-fast` (`ci.yml:109`) *will* execute it, because the new test target has no `required-features` and the guard is platform-independent by construction (it reads text files) | **not claimed** — the transitive crate set of `eggup-eggfetch` is platform-dependent, and the recorded 3 / 92 / 93 are the macOS capture | **Not run.** No Windows host was available in this session. **No coverage was removed**: the status quo is preserved and stated, not inferred. |
+| **macOS** hosted (`macos` lane) | **not run** — the hosted lane will build curl-only and eggfetch-only (`ci.yml:101-102`); the dual configuration is already covered by the lane's `--all-features` step | **not run** — the hosted lane's `cargo test --workspace --all-targets --all-features --locked` will run it | **not claimed** from the hosted run; the local macOS run above is the measured capture | **Not run** locally as a hosted lane. The local macOS run is reported above and is **not** a substitute for the hosted qualification. |
+| **Windows** (`windows-check`) | **none — `not run`**, before this milestone and after it. The lane was **not modified** (plan §6.3: the crate has no `#[cfg]` attribute and no platform-specific code, so a Windows build proves nothing about the property being guarded) | **not run** — the hosted lane's `cargo test --workspace --all-targets --locked --no-fail-fast` (`ci.yml:142`) *will* execute it, because the new test target has no `required-features` and the guard is platform-independent by construction (it reads text files) | **not claimed** — the transitive crate set of `eggup-eggfetch` is platform-dependent, and the recorded 3 / 92 / 93 are the macOS capture | **Not run.** No Windows host was available in this session. **No coverage was removed**: the status quo is preserved and stated, not inferred. |
 
 ## Invariant review
 
@@ -527,7 +527,7 @@ eight CI steps. Nothing else depends on either.
 | Document | What changed |
 |---|---|
 | `crates/eggup-transport-footprint/tests/cross_link_guard.rs` | **New.** 381 lines. The module doc states the claim (`:3-9`), the `required-features` limitation (`:5-9`), the two guards (`:11-17`), the source-level nature of the checks (`:19-21`), and the `std`-only / `CARGO_MANIFEST_DIR` / no-`required-features` properties (`:23-27`). T1 at `:65-93`; T2 at `:230-381`; helpers: `crate_root` `:37`, `read_text` `:42`, `strip_comment` `:102`, `parse_tables` `:124`, `table` `:164`, `unquote` `:172`, `value` `:184`, `normalize_list` `:194`, `declared_dependencies` `:201` |
-| `.github/workflows/ci.yml` | `stable` gains three `cargo build` steps (`:26-28`, comment `:22-25`); `msrv` gains three `cargo check` steps (`:43-45`, comment `:39-42`); `macos` gains two `cargo build` steps (`:79-80`, comment `:76-78`). `service-systemd` and `windows-check` are **unchanged**; no job, command, timeout, trigger, or permission was changed |
+| `.github/workflows/ci.yml` | `stable` gains three `cargo build` steps (`:26-28`, comment `:22-25`); `msrv` gains three `cargo check` steps (`:54-56`, comment `:50-53`); `macos` gains two `cargo build` steps (`:101-102`, comment `:98-100`). `service-systemd` and `windows-check` are **unchanged**; no job, command, timeout, trigger, or permission was changed |
 | `plans/implementation/transport-footprint/001-isolated-configuration-coverage-corrective.md` | `Status:` header `:3` → `implemented`. Three **factual** corrections recorded (below); no decision reversed, no section restructured |
 | `plans/closure/transport-footprint/001-status.md` | **New.** This record |
 
@@ -592,7 +592,7 @@ milestone closes.
 
 | ID | Finding | Severity | Status |
 |---|---|---|---|
-| M001-UF-1 | The `windows-check` lane builds **none** of the three footprint **binaries** — before this milestone and after it | **low** | **Open by decision, not by omission** (plan §6.3). The crate contains no `#[cfg]` attribute, no platform-specific code, and no OS-varying path; the property being guarded is dependency resolution and linkage, which the manifest and lockfile govern, not the target platform. No coverage was removed. A Windows-parity build is a bounded, **deliberately unwritten** follow-on candidate in the roadmap's §7, not a corrective this milestone owes. The lane's **guard-test** coverage *does* run — the new test target has no `required-features` and the lane's `cargo test --workspace --all-targets --locked --no-fail-fast` (`ci.yml:109`) executes it — but it must be **observed** in the hosted run, not assumed |
+| M001-UF-1 | The `windows-check` lane builds **none** of the three footprint **binaries** — before this milestone and after it | **low** | **Open by decision, not by omission** (plan §6.3). The crate contains no `#[cfg]` attribute, no platform-specific code, and no OS-varying path; the property being guarded is dependency resolution and linkage, which the manifest and lockfile govern, not the target platform. No coverage was removed. A Windows-parity build is a bounded, **deliberately unwritten** follow-on candidate in the roadmap's §7, not a corrective this milestone owes. The lane's **guard-test** coverage *does* run — the new test target has no `required-features` and the lane's `cargo test --workspace --all-targets --locked --no-fail-fast` (`ci.yml:142`) executes it — but it must be **observed** in the hosted run, not assumed |
 | M001-UF-2 | The recorded dependency counts 3 / 92 / 93 are a **macOS** capture; the transitive crate set of `eggup-eggfetch` is platform-dependent, so no Linux or Windows count is claimed | **low** | **Open by decision.** The counts are a resolution result against the current registry state, not a toolchain or platform invariant. §15's per-platform rule forbids claiming a count for a platform that did not run the commands, and none is claimed |
 | M001-UF-3 | `plans/003-planning-process.md` §17 enumerates the active Eggup roadmaps and lists six; `transport footprint` is now a seventh | **low** | **Open, parent-owned decision** (plan §12.4, §16.6). The enumeration is a factual index of the active roadmaps and an incomplete index is itself drift; the file's own §6.2 rule protects normative *decisions*, not factual indices. **Recommendation: add it.** If the parent declines, this residual stands as an open low-severity documentation item owned by a later planning milestone, and the roadmap's §12 M001 row must state it. The file is normative and was **not** edited by this milestone |
 | M001-UF-4 | The plan's §8.2 S2 row named only `E0433`; a `use`-form cross-link actually fails with `E0432` | **low** | **Corrected in this milestone.** The plan's §3.6 and §8.2 now name both codes and the exact texts, and the closure records both observed outputs. No behavior or decision changed |
@@ -705,11 +705,11 @@ section is added by the parent session after the hosted CI qualification.
 | `stable` (Linux) | **success** | `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-targets --all-features --locked`, `cargo doc --workspace --no-deps --locked`, and the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
 | `msrv` (Linux, 1.89.0) | **success** | `cargo check --workspace --all-targets --locked` at the declared floor and the packaged-service step. This lane runs no tests |
 | `macos` | **success** | full `cargo test` plus the packaged-service step: **518 passed, 0 failed, 48 test binaries** |
-| `windows-check` | **success** | nine targeted `cargo test` steps plus the full workspace run: **637 passed, 0 failed, 68 test binaries** |
+| `windows-check` | **success** | ten targeted `cargo test` steps plus the full workspace run: **637 passed, 0 failed, 68 test binaries** |
 | `service-systemd` (Linux) | **success** | the real-systemd fixtures: **9 passed, 0 failed, 7 test binaries** |
 
 The Windows lane's 637 against the other lanes' 518 is **not** a coverage
-difference. That lane runs nine separate `cargo test` steps, so its aggregate
+difference. That lane runs ten separate `cargo test` steps, so its aggregate
 double-counts the binaries the other lanes run once, and it additionally runs
 `--all-features` for `eggup-eggpack`. The per-step counts are the evidence; the
 aggregate is a sum over steps, not a distinct-test count.
@@ -747,3 +747,41 @@ None, and that is the point of this milestone: the crate is `publish = false`
 with no registry version, no manifest changed, `Cargo.lock` did not change, and
 no published crate's dependency graph moved. The recorded dependency counts
 **3 / 92 / 93** still reproduce exactly.
+
+## C014 re-anchoring addendum (2026-10-24)
+
+**No milestone behaviour changed, no requirement changed, and no evidence was
+withdrawn.** This addendum records a documentation-truth repair applied by
+planning C014
+(`plans/implementation/planning-closure-hygiene-corrective/014-documentation-truth-corrective.md`,
+closure `plans/closure/planning-closure-hygiene-corrective/014-status.md`).
+
+Commit `b9885fa` inserted the `--no-verify` package steps and the live Windows
+SCM fixture into `.github/workflows/ci.yml` after this record was written in
+`5ae2301`, so every `ci.yml:` line number this record cited resolved to
+unrelated content. All of them are now re-anchored to the current workflow
+file and were verified against it line by line:
+
+| Claim | Was | Now |
+|---|---|---|
+| `stable` footprint builds | `:26-28` (comment `:22-25`) | unchanged — still correct |
+| `msrv` footprint checks | `:43-45` (comment `:39-42`), toolchain `:37` | `:54-56` (comment `:50-53`), toolchain `:48` |
+| `macos` footprint builds | `:79-80` (comment `:76-78`), dual covered at `:75` | `:101-102` (comment `:98-100`), dual covered at `:97` |
+| `service-systemd` job | `:48-65` | `:70-87` |
+| `windows-check` job | `:83-110` | `:116-154` |
+| Windows closing workspace test | `:109` | `:142` |
+
+Two counts in the parent-session addendum above were also wrong **for the run
+they describe**: the hosted run `40062299630` was executed at commit
+`b9885fa`, whose Windows lane already had **ten** `cargo test` steps — the
+live SCM fixture (`ci.yml:134`) was part of that commit. "nine targeted
+`cargo test` steps" and "That lane runs nine separate `cargo test` steps" are
+corrected to **ten** in the two places they appeared.
+
+The YAML-parse step counts quoted in §13 (`stable -> 10 steps`, `msrv -> 7
+steps`, `service-systemd -> 9 steps`, `macos -> 6 steps`, `windows-check -> 13
+steps`) are **not** changed: they are the recorded output of the parse check
+this milestone ran against the workflow file as it stood then, before
+`b9885fa`. They are historical evidence and are left exactly as measured.
+The step *anchors* are re-anchored; the step *counts* from that earlier parse
+are not rewritten.

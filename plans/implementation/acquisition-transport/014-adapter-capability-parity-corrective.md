@@ -603,3 +603,67 @@ carry:
   aligning the eggfetch control's placement. Neither is in scope here.
 - The parent session owns all git mutations (commit, tag, publication). This
   milestone produces working-tree changes only.
+
+## Addendum (2026-10-24) — the republication consequence is superseded by M016
+
+**Acquisition Transport M016** — plan
+`plans/implementation/acquisition-transport/016-adapter-publication-coupling-corrective.md`,
+closure `plans/closure/acquisition-transport/016-status.md` — supersedes three
+statements in this plan. The plan's own text is left in place, as a closed
+plan's text must be; this addendum is the record of the correction.
+
+### Superseded — §6.1 (lines 211-216): the republication is not a non-breaking `0.1.3`
+
+This plan stated:
+
+> Consequence: the change is **purely additive at the API level**, so a future
+> `eggup-curl` republication would be a non-breaking `0.1.3` (minor/patch),
+> not a `0.2.0` boundary.
+
+**That is false once the seam's next release is published.** The seam's next
+release is `eggup-acquisition 0.2.0`, and it is **source-breaking** (M013
+retyped `AcquisitionError::Io` and dropped `Clone`/`PartialEq`/`Eq`). `0.2.0`
+does **not** satisfy the `^0.1.0` requirement this adapter declares today, so
+the adapter's `eggup-acquisition` requirement **must widen to `0.2`** at
+publication time. The workspace is **version-lockstep**, so the seam's `0.2.0`
+release moves the workspace version to `0.2.0` and the adapter's next
+publication is therefore **`eggup-curl 0.2.0`, not `0.1.3`**. A consumer of the
+seam — directly, or through this adapter once it is republished with the
+widened requirement — **inherits the seam's source break** and must update its
+`AcquisitionError::Io` matchers.
+
+What §6.1 correctly established is unchanged and still true: the adapter's
+**own** API change is purely additive, so it introduces no source break *of its
+own*. The corrected statement is narrower, and it is about the **dependency**:
+the republication is not a non-breaking `0.1.3`, because the adapter's
+`eggup-acquisition` requirement must cross the seam's major boundary.
+
+### Superseded — §9.3 (line 439): the same consequence, restated
+
+§9.3 closed with "Because the change is additive, such a republication would
+be a non-breaking `0.1.3`." The same correction applies: the republication
+must widen the seam requirement to `0.2` and is published as `0.2.0`, and a
+consumer inherits the seam's source break. Everything else in §9.3 — that no
+republication is performed by this milestone, that the `v0.1.2` tag is not
+moved, and that no version is bumped — **remains true**.
+
+### Superseded — §6.3 (line 256): the `SP` line of the accepted grammar
+
+§6.3's grammar block stated:
+
+```text
+SP         = %x20            ; permitted only between two non-SP characters
+```
+
+The implementation has always permitted a **run** of interior `SP` — only a
+**leading** and a **trailing** `SP` are refused — so the documented rule was
+stricter than the code. RFC 7230 §3.2 permits the run anyway
+(`field-content = field-vchar [ 1*( SP / HTAB ) field-vchar ]`, whose interior
+run is `1*`), and repeated interior `SP` cannot inject a header, become an
+option, or escape the field value. **M016 corrects the documentation, not the
+behavior**: the accepted value set is unchanged. The same correction applies
+to the grammar block reproduced in this milestone's closure record.
+
+The residual copies of the corrected grammar in
+`crates/eggup-curl/README.md` and `architecture/curl-adapter.md` are owned by
+another writer and are reported in the M016 closure record.
