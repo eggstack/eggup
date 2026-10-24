@@ -5,6 +5,31 @@
 Nothing in this section has been published. `0.1.3` is the published baseline on
 crates.io, and no publication milestone authorizes these entries.
 
+**Declared next release: `0.2.0`** — source-breaking. No publication, no tag
+movement, and no version bump is authorized by this milestone; `0.1.3` remains
+the published baseline on crates.io.
+
+**Publication coupling with the seam's `0.2.0` release (Acquisition Transport
+M016).** The seam's next release is `0.2.0`, and `0.2.0` does **not** satisfy
+the `^0.1.0` requirement the two adapters declare today, nor the `=0.1.3` pin
+the leaf adapter declares. Every in-workspace dependent's requirement must
+therefore widen, in the same publication milestone, to:
+
+- `eggup-curl`: `eggup-acquisition` = "0.2" (widened from "0.1.0").
+- `eggup-eggfetch`: `eggup-acquisition` = "0.2" (widened from "0.1.0").
+- `eggup-eggpack`: `eggup-acquisition` = "=0.2.0" (re-pinned from "=0.1.3").
+- `eggup-transport-footprint`: `eggup-acquisition` = "0.2" (widened from "0.1.0").
+
+**This entry records the coupling; it does not perform it.** No manifest is
+changed by this entry, no version is bumped, and nothing is published. The
+publication milestone must move the workspace version to `0.2.0` (the workspace
+is version-lockstep, so all eight crates move with it), apply the widenings
+above, re-pin `eggup-eggpack`'s other exact pins (`eggup-core`,
+`eggup-archive`) to the new version, and publish in dependency order: the
+seam, then the adapters, then the leaf. `eggup-transport-footprint` is
+`publish = false` and is never published; its requirement widens only so the
+workspace still resolves.
+
 **Typed I/O failure surface (Acquisition Transport M013).** `AcquisitionError::Io`
 no longer flattens the underlying `std::io::Error` into a string. The variant is
 retyped in place as `Io { operation: &'static str, source: std::io::Error }`,
@@ -92,11 +117,6 @@ stays terminal for the requested URL. Diagnostic redaction is unchanged, and no
 raw upstream, command-line, or credential material is ever embedded. The part
 file is still created exclusively, owner-private (`0600` on Unix), never
 symlink-followed, and promoted with race-safe no-clobber semantics.
-
-## Unreleased
-
-Nothing in this section has been published. `0.1.3` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
 
 ## 0.1.2 — 2026-10-02
 

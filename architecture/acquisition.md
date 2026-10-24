@@ -46,7 +46,7 @@ Crates that depend on it:
 |---|---|---|
 | `eggup-eggfetch` | `0.1.0` (caret) + path | native HTTP adapter; implements `AcquisitionTransport` |
 | `eggup-curl` | `0.1.0` (caret) + path | external-process adapter; implements `AcquisitionTransport` |
-| `eggup-eggpack` | `=0.1.2` exact pin + path | `use eggup_acquisition::{AcquisitionRequest, FetchLimits}` only (`eggup-eggpack/src/lib.rs:6`) — binds requests, never transports |
+| `eggup-eggpack` | `=0.1.3` exact pin + path | `use eggup_acquisition::{AcquisitionRequest, FetchLimits}` only (`eggup-eggpack/src/lib.rs:6`) — binds requests, never transports |
 | `eggup-transport-footprint` | `0.1.0` (caret) + path | `curl_only.rs` / `eggfetch_only.rs` use `AcquisitionRequest` + `FetchLimits`; `dual.rs` uses `ComposedTransport` + `CompositionPolicy` |
 
 The caret/exact-pin split is deliberate: adapters inherit a seam fix on the next
@@ -731,9 +731,9 @@ tests, and Windows `cargo check`.
   the two **inlined** UTF-8-safe truncation walks that used to sit inside
   `redact_url` (the 256-byte cap plus `…`) and `__scrub_upstream_text` (the
   512-byte cap) now both call this crate's own `truncate_utf8_bytes`
-  (`lib.rs:437-445`), and `eggup-curl` / `eggup-eggfetch` delegate their private
+  (`lib.rs:384-392`), and `eggup-curl` / `eggup-eggfetch` delegate their private
   `bound` helpers to the adapter-facing `__adapter_bound_detail`
-  (`lib.rs:429-431`) instead of keeping a local copy. The **group-2** copy —
+  (`lib.rs:376-378`) instead of keeping a local copy. The **group-2** copy —
   `eggup-service`'s `bounded_detail` (`service/src/commit_engine.rs:236`) —
   is **not** reached by this crate and is owned by
   `plans/implementation/service-lifecycle/012-commit-engine-deduplication-corrective.md`,

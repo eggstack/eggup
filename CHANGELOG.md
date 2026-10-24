@@ -439,6 +439,31 @@ section aggregates them, it does not replace them.
   and still carries the missing control, the `eggup-acquisition 0.1.3` seam
   it resolves against is unchanged, and the `v0.1.2` tag is unmoved;
   republication is a separate milestone.
+- The two transport adapters record their publication coupling with the seam
+  (Acquisition Transport M016): the seam's next release is
+  `eggup-acquisition 0.2.0` and is source-breaking, because
+  `AcquisitionError::Io(String)` became `Io { operation, source }` and the enum
+  derives `Debug` only. Both adapters call seam capabilities —
+  `__adapter_io` and `__adapter_bound_detail` — that exist only in the
+  unpublished seam, and the `^0.1.0` requirement they declare does not accept
+  `0.2.0`, so neither adapter can be packaged against the registry today. The
+  adapters' changelogs had stated that a future republication would keep them
+  at `0.1.3` and require no consumer migration; both halves are false once the
+  seam goes to `0.2.0`, and they are now corrected. The seam's changelog
+  declares its next release and records the widening each dependent needs —
+  the two adapters to `0.2`, `eggup-eggpack` to `=0.2.0`, and
+  `eggup-transport-footprint` to `0.2` — and a guard fails when a dependent
+  neither accepts that version nor records the widening. **Unpublished** — no
+  manifest, version, or publication changed; the widening belongs to the
+  publication milestone, which needs explicit maintainer authorization. The
+  published `eggup-acquisition 0.1.3` still carries the pre-coupling seam
+  surface, and the published `eggup-curl 0.1.2` and `eggup-eggfetch 0.1.3`
+  still carry the pre-coupling adapter state — the seam's `Io(String)` variant
+  and the adapters' `eggup-acquisition = "0.1.0"` requirement — and the tags are
+  unmoved. The
+  `User-Agent` grammar in the curl adapter's public documentation is also
+  corrected: interior spaces may repeat, as RFC 7230's `field-content`
+  permits, which is what the implementation has always accepted.
 
 - `eggup-core` bounds the stdin a child may receive (Verified Update Core
   M017): `CommandSpec::stdin_data` attaches a payload to the bounded
@@ -485,6 +510,69 @@ section aggregates them, it does not replace them.
   `v0.1.3` tag is unmoved. The crate's packaged-source verification against
   the registry is deferred for the same reason and is restored by the
   `eggup-core` republication. No consumer migration is required.
+- `eggup-service` states its own published-change record accurately (Service
+  Lifecycle M016). The crate's `CHANGELOG.md` omitted the release note for the
+  **eighth** behaviour difference of the consolidation — the one that is a
+  **defect fix, not a cost**: the replaced runner consumed the stdin writer's
+  verdict with `try_recv`, so a successful `crontab -` write was reported as a
+  failure. The difference count was corrected from "seven" to eight and the
+  missing release note added. The changelog's compatibility call-out named only
+  one source-breaking change; the unflagged `LifecycleUpdateReceipt::engine_policy`
+  field addition — which stops a consumer that constructs the receipt with a
+  struct literal from compiling — is now stated in the entry that introduces the
+  field. The service M015 closure's test inventory is corrected: **14** tests in
+  `bounded_executor_consolidation.rs` (not 12), the three current argv guards
+  replace the deleted `the_managers_argv_is_byte_identical`, the total is **16**
+  new tests (not 15), and the hosted `windows-check` lane runs **ten**
+  `cargo test` steps (not nine). **Unpublished** — documentation only; no
+  production code, test code, manifest, lockfile, CI file, or architecture
+  document changed, nothing published, and the `v0.1.3` tag is unmoved.
+  `eggup-service 0.1.3` still carries the stdin-verdict defect until a
+  republication.
+- `eggup-core` gives the bounded-stdin deadline priority over the writer's
+  verdict, and classifies that verdict by its own observation instant (Verified
+  Update Core M018). The M017 entry promised that "a write failure detected
+  after the deadline was reached does not retroactively turn the deadline
+  outcome into an `Err`", but the implementation evaluated the stdin arm
+  before the deadline arm, so the same input at the same timeout could be
+  classified either way depending on the runner's poll phase. The deadline now
+  has priority: the writer stamps its verdict with the instant it observed the
+  write, a failure observed **before** the deadline is an `Err`, and one
+  observed **at or after** it is the deadline outcome (`Ok`, `timed_out` set).
+  An undelivered payload is never reported as a success, and the unconditional
+  deadline guarantee is unchanged. Two overstated statements are corrected: the
+  child's stdin pipe is only broken by the kill **unless a surviving descendant
+  inherited it**, and the `FailureCategory` mapping has five producers in a
+  shipped build, not six — `Injected` is test-only. The M015 closure record's
+  **U1** is closed on the evidence of commit `ab90688`, which did add the four
+  type-level rustdocs the finding said were missing. **Unpublished** — `Error`
+  keeps exactly its seven published variants, no new dependency was added, and
+  `eggup-core 0.1.3` still carries the old behaviour until a republication; the
+  `v0.1.3` tag is unmoved.
+- The documentation-truth gate now checks what it claims to check (Planning /
+  Closure Hygiene C014). `scripts/check-docs-truth.sh` previously opened only
+  `docs/`, `README.md`, `AGENTS.md`, the root `CHANGELOG.md`, and
+  `plans/registry.md` — it never read a `Cargo.toml`, did not cover
+  `architecture/*.md` at all, and skipped every registry table row with fewer
+  than four cells, which hid the stale "Recently closed foundation" table
+  entirely. It now reads the crate manifests and the per-crate changelogs,
+  covers the architecture deep dives, and reads three-cell rows; each change is
+  red-first proven against a documented false negative. The
+  `architecture/transport-footprint.md` deep dive is corrected: it still said
+  that no CI job builds the isolated single-adapter configurations, that the gap
+  the crate exists to close "is still open", that the crate has "no subsystem
+  roadmap", and that it has "zero `#[test]` functions" — all four contradicted
+  the branch's own work. The dependency counts 3 / 92 / 93 are unchanged and
+  still reproduce exactly.
+- The architecture deep dives are re-anchored and their claims re-checked
+  (Planning / Closure Hygiene C015). 179 stale `path:line` citations were
+  re-derived across the five deep dives whose source crates were stable, and
+  eleven substantive claims were corrected — among them a table row that still
+  documented `permission_hint`, an API service M013 removed from the crate, a
+  citation to a line past the end of the file, and three stale `=0.1.2` pins
+  where the manifest says `=0.1.3`. **Unpublished** — documentation only; no
+  production code, test code, manifest, lockfile, CI file, or script changed,
+  and no tag moved.
 
 ## 0.1.1
 

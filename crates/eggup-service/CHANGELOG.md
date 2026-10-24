@@ -81,11 +81,12 @@ migration is required for the type-identity changes**: `eggup_service::Ownership
 resolving under their existing spellings.
 
 The milestone entries below are also **not published** and require **no
-consumer migration until a republication milestone ships them**. One of them —
-the typed manager failure kinds — is a source-breaking change for a consumer
-that matches `ServiceError::Manager` positionally or branches on its message
-text; that migration becomes necessary only at republication, and the exact
-replacement is named in its entry below.
+consumer migration until a republication milestone ships them**. **Two** of
+them are source-breaking changes for a consumer that matches
+`ServiceError::Manager` positionally, branches on its message text, or
+constructs `LifecycleUpdateReceipt` with a struct literal; those migrations
+become necessary only at republication, and the exact replacement is named in
+each entry below.
 
 - **Changed: `SystemExecutor`'s bounded runner now delegates to
   `eggup_core::run_bounded`.** The hand-rolled spawn, reader threads, writer
@@ -97,14 +98,16 @@ replacement is named in its entry below.
   `argv[0]`), and the filtered child environment. The observable outcomes
   are preserved under an explicit, exhaustive mapping: the same
   `ManagerFailureKind` for every reachable failure, the same status and
-  bounded output on success, and the same pre-flight rejections. Seven
+  bounded output on success, and the same pre-flight rejections. **Eight**
   differences are recorded in `architecture/service-lifecycle.md` §
   "Behaviour differences of the consolidation": two are stronger (a reader
   error and an output overflow now fail closed, and an overflowing child is
-  now killed and reaped), one normalises the timeout detail text, one drops a
-  non-UTF-8 environment pair rather than passing it through lossily, one is
-  unchanged, and one changes the kind in a deep corner that has no portable
-  fixture. **The public API is unchanged** — `CommandExecutor`,
+  now killed and reaped), one normalises the timeout detail text, one changes
+  the detail text of the descendant-holds-the-pipe case to the timeout detail,
+  one drops a non-UTF-8 environment pair rather than passing it through
+  lossily, one is unchanged, one changes the kind in a deep corner that has
+  no portable fixture, and the **eighth is a defect fix, not a cost** — see
+  the `Fixed` entry below. **The public API is unchanged** — `CommandExecutor`,
   `SystemExecutor` (including its public `max_output_bytes` field),
   `ManagerCommandOutput`, and the `ServiceError` / `ManagerFailureKind`
   taxonomies all keep their exact shapes, and the public-API guard still
@@ -113,6 +116,23 @@ replacement is named in its entry below.
   published `eggup-service 0.1.3` keeps the hand-rolled runner until a
   separate republication milestone, and **no consumer migration is
   required**.
+- **Fixed: a successful stdin write is no longer reported as a stdin
+  failure.** The replaced runner polled its stdin-writer channel with
+  `try_recv()` on every wait-loop iteration, and `try_recv` *removes* the
+  message it returns — so the writer's `Ok(())` verdict was consumed and
+  discarded by a check that only looks for `Err(_)`, and the post-exit check
+  then found an empty, disconnected channel and reported
+  `Manager(Spawn, "manager stdin failed for {program}")` for a write that had
+  **succeeded**. The consolidated runner keeps the verdict and reports the
+  failure only when the write itself failed. This is difference **D8** in
+  `architecture/service-lifecycle.md` § "Behaviour differences of the
+  consolidation", and it is a **defect fix, not a cost**: it is the only one
+  of the eight that turns a failure into a success. The affected path is the
+  `crontab -` install, the crate's only production stdin caller, so a
+  consumer that installs a cron block through the published `0.1.3` receives
+  a typed `Spawn` failure instead of a successful install. **The published
+  `eggup-service 0.1.3` still carries the defect**: the fix is on the source
+  line only and reaches consumers at the next republication.
 - **Fixed: two divergent copies of the destructive commit/rollback engine.**
   `disposition.rs` and `lifecycle_update.rs` each carried a full orchestrator
   and their own copies of the transition, rollback-quiesce, panic-safe-inspect,
@@ -140,7 +160,13 @@ replacement is named in its entry below.
   field. `commit_with_lifecycle_with_engine_policy` and
   `commit_with_disposition_with_engine_policy` select it;
   `commit_with_lifecycle` and `commit_with_disposition` keep their existing
-  signatures and run the engine under the default policy.
+  signatures and run the engine under the default policy. **Consumer impact:**
+  `LifecycleUpdateReceipt` gains one public field, `engine_policy`
+  (`CommitEnginePolicy`), so a consumer of the published `0.1.3` that
+  constructs that struct with a **struct literal** — the struct has no
+  `Default` impl, so a literal is its only construction path — must add the
+  field and stops compiling until it does. A consumer that only *reads* the
+  receipt's fields is unaffected.
 - **Fixed: three structurally identical ownership enums.** `eggup_service::Ownership`
   is now a re-export of `eggup_core::Ownership`, and `eggup_service::CronOwnership`
   is a public type alias of it, so all three denote **one** type and no

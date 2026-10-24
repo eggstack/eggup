@@ -33,7 +33,12 @@ to ship in seam → adapter → leaf order.
 crate uses a caret requirement. Consequence:
 
 - A fix published to a caret consumer (`eggup-curl`, `eggup-eggfetch`,
-  `eggup-service`) is inherited automatically on the next resolve.
+  `eggup-service`) is inherited automatically on the next resolve — **within the
+  same major version only**. A caret requirement does not cross a major
+  boundary: `^0.1.0` does not accept `0.2.0`, so a consumer that depends on
+  both the seam and an adapter inherits the seam's source break only after the
+  adapter's own requirement is widened. Widening a requirement is a manifest
+  change that belongs to the publication milestone, not to the fix milestone.
 - The same fix **cannot** reach `eggup-eggpack 0.1.3` consumers. The adapter
   needs a **separate republication** to inherit a seam fix.
 

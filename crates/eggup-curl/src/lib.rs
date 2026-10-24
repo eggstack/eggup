@@ -219,9 +219,18 @@ impl CurlTransport {
     /// ```text
     /// user-agent = 1*( VCHAR / SP / obs-text )
     /// VCHAR      = %x21-7E          ; printable ASCII, excluding SP
-    /// SP         = %x20            ; permitted only between two non-SP characters
+    /// SP         = %x20            ; permitted inside the value; a run of SP is
+    ///                              ; permitted, but a leading or trailing SP is not
     /// obs-text   = %xA0-10FFFF     ; any non-ASCII scalar value (C1 excluded)
     /// ```
+    ///
+    /// A run of interior `SP` is permitted because the HTTP field-value grammar
+    /// permits it: RFC 7230 §3.2 defines `field-content` as
+    /// `field-vchar [ 1*( SP / HTAB ) field-vchar ]`, whose interior run is
+    /// `1*`. The accepted set is therefore a subset of a well-formed HTTP field
+    /// value, and the rules that actually protect the request head — no C0 or
+    /// C1 control character, no `DEL`, no leading or trailing `SP` — are
+    /// enforced exactly.
     ///
     /// The value is rejected with [`AcquisitionError::InvalidInput`] when it is
     /// empty, when its UTF-8 length exceeds [`MAX_USER_AGENT_BYTES`], when it

@@ -1,6 +1,6 @@
 # `eggup-core` — Verified Update Transaction Deep Dive
 
-Status: current as of `eggup-core` 0.1.2 (`M009` closure, published to crates.io).
+Status: current as of `eggup-core` 0.1.3 (published to crates.io).
 The failure-taxonomy and public-failure-mode material reflects Verified Update Core
 M015, which is an unpublished source change; `0.1.3` remains the published baseline.
 
@@ -116,12 +116,12 @@ Everything below is re-exported from `crates/eggup-core/src/lib.rs:32-53`.
 | --- | --- | --- |
 | `CommandSpec` | Bounded external-command request (program, args, cwd, timeout, output cap, explicit env only, optional bounded stdin payload) | `candidate.rs:31` |
 | `CommandOutput` | Exit code, captured stdout/stderr, `timed_out`, `output_limited`, `success` | `candidate.rs:133` |
-| `run_bounded` | Spawn/wait/poll under an unconditional wall-clock deadline, with kill-on-timeout and output truncation | `candidate.rs:278` |
-| `CandidateValidator` | Trait: `validate(&VerifiedTransaction) -> Result<()>` | `candidate.rs:525` |
-| `ExactIdentityValidator` | Runs a member's staged file and requires exact stdout | `candidate.rs:540` |
-| `CrossMemberAgreementValidator` | Requires every member to print the same identity | `candidate.rs:641` |
-| `AllValidators<'a>` | Fan-out over validators; empty by default | `candidate.rs:675` |
-| `ValidatedTransaction` | Terminal pre-commit state; exposes `commit` / `commit_with_post_commit` | `candidate.rs:711` |
+| `run_bounded` | Spawn/wait/poll under an unconditional wall-clock deadline, with kill-on-timeout and output truncation | `candidate.rs:304` |
+| `CandidateValidator` | Trait: `validate(&VerifiedTransaction) -> Result<()>` | `candidate.rs:643` |
+| `ExactIdentityValidator` | Runs a member's staged file and requires exact stdout | `candidate.rs:658` |
+| `CrossMemberAgreementValidator` | Requires every member to print the same identity | `candidate.rs:759` |
+| `AllValidators<'a>` | Fan-out over validators; empty by default | `candidate.rs:793` |
+| `ValidatedTransaction` | Terminal pre-commit state; exposes `commit` / `commit_with_post_commit` | `candidate.rs:829` |
 | `MAX_STDIN_BYTES` | Inclusive bound on one bounded stdin payload (1 MiB) | `candidate.rs:27` |
 
 ### Locking (`lock.rs`)
@@ -224,7 +224,7 @@ must still handle it.
   staged-byte mutation between verify and commit is caught before any live mutation.
 - **Advances via**: `ValidatedTransaction::validate` (`candidate.rs:725`).
 
-### `ValidatedTransaction` — `candidate.rs:711`
+### `ValidatedTransaction` — `candidate.rs:829`
 
 - **Proves**: (a) **every** member carries `IntegrityStatus::Verified` — a member
   that is `NotRequired` (declared `IntegrityRequirement::None`) always fails here
@@ -237,8 +237,8 @@ must still handle it.
 - **Can still fail**: any ownership, revalidation, backup, commit, rollback, or
   finalization failure. The staged bytes can still change after `validate` returns;
   that is exactly what the under-lock revalidation exists to catch.
-- **Advances via**: `commit` (`candidate.rs:785`) or `commit_with_post_commit`
-  (`candidate.rs:813`).
+- **Advances via**: `commit` (`candidate.rs:903`) or `commit_with_post_commit`
+  (`candidate.rs:931`).
 
 ### `TransactionReceipt` — `transaction.rs:296`
 
@@ -302,7 +302,7 @@ change in the answer between the two calls fails the transaction closed.
 
 ### Candidate execution and bounded validators
 
-`run_bounded` (`candidate.rs:278`) is the only place core spawns a process. It clears the
+`run_bounded` (`candidate.rs:304`) is the only place core spawns a process. It clears the
 environment (`candidate.rs:291`), passes only explicitly added variables, applies a
 caller timeout, kills the child on expiry, and caps captured output. The bounds are
 observables on the result, not silent truncations: `timed_out` and `output_limited`
@@ -328,10 +328,17 @@ spawned**, so an oversized payload fails closed and no process is created for it
 within the bound is written by a dedicated writer thread, which closes the pipe when it
 ends; the writer thread starts only after the output readers are attached, so a child that
 fills stdout or stderr before draining its stdin cannot deadlock both sides. The deadline
-bounds the writer exactly as it bounds the readers: at the deadline the child is killed,
-which breaks the child's stdin pipe and unblocks the writer, and a writer still blocked in
-`write` is abandoned explicitly, exactly like a reader blocked on a pipe a surviving
-descendant holds. A bounded execution is not reported as complete until the writer has
+bounds the writer exactly as it bounds the readers. The deadline has **priority** over
+the writer's verdict: at the deadline the child is killed — which breaks the child's
+stdin pipe and unblocks the writer *unless a surviving descendant inherited that pipe*,
+in which case a writer still blocked in `write` is abandoned explicitly, exactly like a
+reader blocked on a pipe a surviving descendant holds. The writer's verdict is classified
+by the instant the **writer** observed the write, not by the instant the runner polled
+for it, so the classification is a fact about the write rather than about the runner's
+poll phase. A write failure observed **before** the deadline is an `Err`; one observed
+**at or after** it is the deadline outcome (`Ok`, `timed_out` set), because the deadline
+already decided that outcome and an undelivered payload is never reported as a success.
+A bounded execution is not reported as complete until the writer has
 delivered its verdict, so a write failure is never lost behind a "the child exited"
 observation.
 
@@ -342,17 +349,19 @@ The `operation` string of `Error::Io` is a **stable classification surface** for
 be running), and `"writing bounded stdin"` (the stdin payload could not be written, which
 includes the broken pipe a child produces when it exits without reading its stdin; the
 child is killed and reaped, so the payload was **not delivered** and the execution must not
-be treated as complete). When a failed stdin write and an output overflow are live at the
+be treated as complete — but only when the writer observed the failure **before** the
+deadline; a failure observed at or after the deadline is the deadline outcome instead).
+When a failed stdin write and an output overflow are live at the
 same time, the write failure wins: it is an `Err`, and the caller must not be told that the
 execution merely overflowed. The normative statement lives in the `run_bounded` rustdoc in
 `src/candidate.rs`.
 
-`ExactIdentityValidator` (`candidate.rs:540`) requires exact stdout equality for one
-member; `CrossMemberAgreementValidator` (`candidate.rs:641`) requires every member in a
+`ExactIdentityValidator` (`candidate.rs:658`) requires exact stdout equality for one
+member; `CrossMemberAgreementValidator` (`candidate.rs:759`) requires every member in a
 bundle to print the same identity. Timeout and output-overflow are converted into
-`Error::CandidateExecution` at `candidate.rs:625-633`, so a validator cannot report
+`Error::CandidateExecution` at `candidate.rs:743-751`, so a validator cannot report
 success by being silent. `AllValidators::new()` is empty by default
-(`candidate.rs:681`, `Default` at `candidate.rs:695`), which means `AllValidators` is a
+(`candidate.rs:799`, `Default` at `candidate.rs:812`), which means `AllValidators` is a
 convenience fan-out, not a policy.
 
 `CandidateValidator` receives `&VerifiedTransaction`, so a custom validator sees staged
@@ -555,7 +564,7 @@ because no live mutation and no backup exist yet. The observed digests are retai
 2. Otherwise run the validator. Any error propagates unchanged, so validators keep full
    control of their error variants. The number of validators is not itself gated.
 
-### commit — `candidate.rs:785` → `transaction.rs:408`
+### commit — `candidate.rs:903` → `transaction.rs:408`
 
 `commit_inner` runs strictly in this order:
 
@@ -638,7 +647,7 @@ Pre-mutation failures skip all of this via `finish_failure_no_mutation`
 (`transaction.rs:1107`), which reports `rollback_performed == false,
 rollback_verified == true`.
 
-### `commit_with_post_commit` — `candidate.rs:813`
+### `commit_with_post_commit` — `candidate.rs:931`
 
 1. Steps 1-6 run exactly as above, but on success the lock and backup are **retained**
    rather than finalized.
@@ -648,8 +657,8 @@ rollback_verified == true`.
    `lib.rs:677`). The callback receives no transaction handle and therefore no mutation
    authority.
 3. The check's error text is reduced to bounded core-owned text of at most 512 bytes
-   (`bounded_display`, `candidate.rs:945`); a panic is caught and recorded as a
-   `PostCommitCheck` failure (`candidate.rs:552-563`).
+   (`bounded_display`, `candidate.rs:1063`); a panic is caught and recorded as a
+   `PostCommitCheck` failure (`transaction.rs:552-563`).
 4. `PostCommitFailurePolicy::KeepInstalled` finalizes and returns `Committed` with
    `post_commit_failure` set. A finalize failure upgrades cleanup to
    `RetainedForRecovery` and sets `failure` to a `Finalize` report, keeping the
@@ -726,10 +735,10 @@ evidence is a disposition rather than a category. See
 | `BoundSources` entry for a non-member | `Err(InvalidInput)` | Producer/consumer key mismatch; fix the map | `stage.rs:57-60` |
 | Staged digest mismatch or non-regular staged file at verify | `Err(VerificationFailed)` | Re-resolve artifacts; no receipt exists yet | `integrity.rs:214`, `integrity.rs:226` |
 | Any member lacking `IntegrityStatus::Verified` (including a `NotRequired` member) reaches `validate` | `Err(VerificationFailed)` | Declare `IntegrityRequirement::Sha256` and verify; the gate will not be bypassed | `candidate.rs:726-733` |
-| Validator returns an error, or `run_bounded` times out / truncates output | `Err(<validator's variant>)`, typically `CandidateExecution` | Handle validator error variants | `candidate.rs:734`, `candidate.rs:625-632` |
+| Validator returns an error, or `run_bounded` times out / truncates output | `Err(<validator's variant>)`, typically `CandidateExecution` | Handle validator error variants | `candidate.rs:734`, `candidate.rs:743-751` |
 | `run_bounded` spawn/poll failure | `Err(Io)` (`operation` `"spawning bounded candidate"` / `"polling bounded candidate"`) | Environment problem; nothing was committed | `candidate.rs:306`, `candidate.rs:372` |
 | Stdin payload larger than `MAX_STDIN_BYTES` | `Err(InvalidInput)` | **No child was spawned** and nothing was committed; shorten the payload | `candidate.rs:281-287` |
-| Stdin payload cannot be written, including the broken pipe of a child that exits without reading it | `Err(Io)` (`operation` `"writing bounded stdin"`) | The payload was **not delivered**; the child was killed and reaped, and nothing was committed | `candidate.rs:375-385`, `candidate.rs:439` |
+| Stdin payload cannot be written, including the broken pipe of a child that exits without reading it, **when the writer observed the failure before the deadline** | `Err(Io)` (`operation` `"writing bounded stdin"`) | The payload was **not delivered**; the child was killed and reaped, and nothing was committed. A failure observed **at or after** the deadline is the deadline outcome instead (`Ok`, `timed_out` set) | `candidate.rs:413-436`, `candidate.rs:513-515` |
 | Lock record already present (including stale or malformed) | `Err(UpdateInProgress { lock })` | Inspect with `MutationLock::inspect`; a stale lock needs manual operator removal | `lock.rs:421-422` |
 | Lock token exceeds 4096 bytes, or lock write fails | `Err(InvalidInput)` / `Err(Io)` (lock file removed on write failure) | Shorten identifiers | `lock.rs:416`, `lock.rs:424-427` |
 | Injected `LockCreation` (test seam) | `Err(Injected)` | Proves the pre-lock path performs zero mutation | `transaction.rs:417` |

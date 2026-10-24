@@ -134,7 +134,7 @@ API-surface notes for review:
   `with_executable` and again at every fetch entry point.
 - All `CurlConfig` fields are public for 0.1.x source compatibility, exactly like
   `FetchLimits`. That is why `config.validate()` runs at construction *and*
-  again per fetch (`lib.rs:337`, `lib.rs:408`) — a directly constructed struct
+  again per fetch (`lib.rs:346`, `lib.rs:417`) — a directly constructed struct
   literal cannot bypass it.
 - `with_executable` performs **no** `fs` check on the path. Existence,
   executability, and spawnability are deliberately deferred to the request so
@@ -630,7 +630,7 @@ destination keeps its `FOREIGN` contents.
 Every message this crate authors is category text plus the seam's redacted URL,
 truncated by `bound` to at most 512 bytes **at a UTF-8 character boundary**
 (`lib.rs:536-544`; the boundary property is pinned by
-`diagnostic_bound_never_splits_multibyte_code_points`, `lib.rs:1046`). `bound`
+`diagnostic_bound_never_splits_multibyte_code_points`, `lib.rs:1055`). `bound`
 itself is a one-line delegation to the seam's shared rule
 (`eggup_acquisition::__adapter_bound_detail`), so this crate keeps **no local
 copy** of the truncation logic.
@@ -876,7 +876,7 @@ so both adapters offer the same caller capability.
 ```text
 user-agent = 1*( VCHAR / SP / obs-text )
 VCHAR      = %x21-7E          ; printable ASCII, excluding SP
-SP         = %x20            ; permitted only between two non-SP characters
+SP         = %x20            ; permitted as interior whitespace, including runs
 obs-text   = %xA0-10FFFF     ; any non-ASCII scalar value (C1 excluded)
 ```
 

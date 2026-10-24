@@ -1,7 +1,7 @@
 # Archive Extraction — Deep Dive
 
 Review entry point for `eggup-archive`: a single-file crate
-(`crates/eggup-archive/src/lib.rs`, 3512 lines, 51 `#[test]` functions) that
+(`crates/eggup-archive/src/lib.rs`, 3717 lines, 52 `#[test]` functions) that
 extracts explicitly declared regular files from **already verified** local
 `tar.gz` and `zip` archives into one owner-private directory, then hands the
 bytes to `eggup-core` staging through open file objects rather than
@@ -121,10 +121,10 @@ because `File` cursors are shared across clones (`lib.rs:530-534`).
 set of things that may ever be written; everything else in the archive is
 counted and discarded.
 
-- `ArchiveMember::new` (`lib.rs:96`) validates the declared pair up front
+- `ArchiveMember::new` (`lib.rs:98`) validates the declared pair up front
   against a hardcoded 4096-byte length cap, because the plan's
   `max_path_bytes` is not known yet.
-- `ArchivePlan::new` (`lib.rs:145-170`) re-validates both strings against the
+- `ArchivePlan::new` (`lib.rs:139-170`) re-validates both strings against the
   plan's `max_path_bytes` and enforces three allowlist invariants: no empty
   allowlist, no count above `max_entries`, and no two members sharing a
   `source_path` or a case-insensitively equal `output_name`
@@ -211,8 +211,8 @@ compressed bound is advisory with respect to the bytes actually read; a file
 swapped between the check and the read is not re-validated. The crate relies on
 the caller's precondition here — the caller is required to have already
 integrity-gated the artifact, and `eggup-eggpack::validate_acquired_archive`
-(`crates/eggup-eggpack/src/lib.rs:481`) does exactly that size+SHA-256 gate
-before any extraction.
+(`crates/eggup-eggpack/src/lib.rs:497`, digest at `:522-523`) does exactly that
+size+SHA-256 gate before any extraction.
 
 `max_member_bytes` and `max_total_uncompressed_bytes` are the real budget and
 are enforced **while streaming**, inside `copy_bounded` (`lib.rs:1102-1113`):
@@ -580,7 +580,7 @@ hashing as it streams and reports it three ways — `ExtractedMember::sha256()`,
 decides whether the expected value is *trustworthy*. A caller who passes
 `None` for both expected facts gets an extraction with evidence and no check at
 all, which is why `eggup-eggpack::archive_plan_for`
-(`crates/eggup-eggpack/src/lib.rs:546-551`) always supplies both.
+(`crates/eggup-eggpack/src/lib.rs:552-557`) always supplies both.
 
 The crate is explicitly not the first verifier of the archive itself
 (ADR-0005 §Archive precondition). It checks the archive's *internal* structure
@@ -747,4 +747,4 @@ Recorded for the parent; no code was changed.
   430-709 — `archive_format_for_name`, `validate_acquired_archive`,
   `archive_plan_for`, `core_plan_for_archive*`, `bind_archive_members`; and
   [`tests/archive_handoff.rs`](../crates/eggup-eggpack/tests/archive_handoff.rs)
-  `run_handoff` (line 231) for the full end-to-end order.
+  `run_handoff` (line 238) for the full end-to-end order.

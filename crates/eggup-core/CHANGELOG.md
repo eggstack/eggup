@@ -28,6 +28,51 @@ explains why that addition is not removable.
 Nothing in this section has been published. `0.1.3` is the published baseline on
 crates.io, and no publication milestone authorizes these entries.
 
+**Bounded-stdin outcome-priority corrective (Verified Update Core M018).** The
+published rule for `run_bounded`'s bounded stdin write was not the rule the
+implementation applied, and the failure taxonomy's producer count was stated
+for a test build. This corrective states one rule, implements it so the
+rustdoc is literally true, and corrects the statements that were not.
+
+- **Changed: the deadline has priority over the stdin writer's verdict, and the
+  verdict is classified by its own observation instant.** The writer now stamps
+  its verdict with the instant at which it observed the write's completion, so
+  "before or after the deadline" is a fact about the write and never a fact
+  about when `run_bounded` happened to poll for the verdict. A write failure
+  observed **before** the deadline is an `Err`
+  (`Error::Io { operation: "writing bounded stdin", source }`), as before. A
+  write failure observed **at or after** the deadline no longer turns the
+  deadline outcome into an `Err`: the deadline already decided that outcome,
+  and the call returns `Ok` with `timed_out` set. A writer that had not
+  delivered its verdict when the deadline was reached is abandoned, exactly
+  like a reader blocked on a pipe a surviving descendant holds.
+- **Behaviour change.** Before this corrective, a write failure observed after
+  the deadline was reached was reported as an `Err` in some runs and as the
+  deadline outcome in others, depending on the poll phase, so the same input
+  and the same timeout produced two different public classifications. The
+  classification is now a function of the write's own observation instant. An
+  undelivered payload is never reported as a success: the outcome is either an
+  `Err` or an `Ok` whose `timed_out` flag is set.
+- **Fixed: the deadline's effect on the writer is stated truthfully.** Killing
+  the direct child breaks the child's stdin pipe only for a child that is still
+  running and whose stdin pipe no descendant inherited. A descendant that
+  inherited the pipe keeps it open, so the writer stays blocked until that
+  descendant exits or closes the pipe; the earlier wording overstated this.
+- **Fixed: the failure taxonomy's producer count.** `FailureCategory`'s rustdoc
+  said that six categories are produced by the crate's internal
+  error-to-category mapping. Five are produced in a shipped build; the sixth,
+  `FailureCategory::Injected`, is produced by that same mapping only in this
+  crate's own test builds.
+- **Unchanged: the public surface.** `Error` keeps exactly the seven published
+  variants (plus the `#[cfg(test)]`-only `Error::Injected`), `FailureCategory`
+  keeps its members and its published `as_str()` strings, and no new public
+  item was added. The dependency surface is unchanged: `sha2` plus the
+  Windows-only `self-replace`. No new dependency and no `unsafe`.
+- **Unpublished, and no migration required.** The published `eggup-core 0.1.3`
+  still carries the pre-correction behaviour; this corrective reaches consumers
+  only when a new version is published, and no publication milestone authorizes
+  that here. No consumer needs to change anything.
+
 **Bounded stdin execution corrective (Verified Update Core M017).** `run_bounded`
 gave every child a **null** stdin, so a downstream adapter whose workflow needs a
 child to read a payload — a service manager installing a unit or a crontab from
@@ -48,18 +93,23 @@ stdin capability.
   cannot deadlock both sides.
 - **The deadline now bounds the writer too.** The wall-clock deadline remains an
   unconditional maximum bound on the whole bounded execution. At the deadline
-  the child is killed, which breaks the child's stdin pipe and unblocks the
-  writer, and a writer still blocked in `write` is abandoned explicitly,
-  exactly like a reader blocked on a pipe a surviving descendant holds. A
-  bounded execution is not reported as complete until the writer has delivered
-  its verdict, so a write failure is never lost behind a "the child exited"
-  observation.
+  the direct child is killed, which breaks the child's stdin pipe for a child
+  that is still running and whose stdin pipe no descendant inherited; a
+  descendant that inherited the pipe keeps it open, so a writer still blocked
+  in `write` is abandoned explicitly and ends only when that descendant exits
+  or closes the pipe, exactly like a reader blocked on a pipe a surviving
+  descendant holds. A bounded execution is not reported as complete until the
+  writer has delivered its verdict, so a write failure is never lost behind a
+  "the child exited" observation.
 - **Added: a typed write failure.** A stdin payload that cannot be written —
   including the broken pipe a child produces when it exits without reading its
   stdin — kills and reaps the child and then fails closed with
-  `Error::Io { operation: "writing bounded stdin", source }`. When a failed
-  write and an output overflow are live at the same time, the write failure
-  wins.
+  `Error::Io { operation: "writing bounded stdin", source }`, when the failure
+  was observed before the deadline. A failure observed at or after the
+  deadline does not become an error: the deadline already decided that
+  outcome, and the call returns `Ok` with `timed_out` set (see the M018 entry
+  above). When a failed write and an output overflow are live at the same
+  time, the write failure wins.
 - **Added: a stable error-classification surface.** The `operation` string of
   `Error::Io` is now a published contract for `run_bounded`: `"spawning
   bounded candidate"`, `"polling bounded candidate"`, and `"writing bounded

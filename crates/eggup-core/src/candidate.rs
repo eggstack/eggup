@@ -195,14 +195,38 @@ impl CommandOutput {
 /// draining its stdin cannot deadlock both sides.
 ///
 /// The deadline bounds the stdin writer exactly as it bounds the output
-/// readers: when the deadline is reached, the child is killed, which breaks the
-/// child's stdin pipe and unblocks the writer, and a writer that is still
-/// blocked in `write` is abandoned explicitly, exactly like a reader blocked
-/// on a pipe a surviving descendant holds. A bounded execution is not reported
-/// as complete until the writer has delivered its verdict, so a write failure
-/// is never lost behind a "the child exited" observation. A write failure
-/// detected **after** the deadline was reached does not retroactively turn the
-/// deadline outcome into an `Err`: the deadline already decided that outcome.
+/// readers: when the deadline is reached, the direct child is killed, which
+/// breaks the child's stdin pipe **for a child that is still running and whose
+/// stdin pipe no descendant inherited**, and a writer that is still blocked in
+/// `write` is abandoned explicitly, exactly like a reader blocked on a pipe a
+/// surviving descendant holds. Killing the direct child does not break the
+/// pipe for a descendant that inherited it: that descendant keeps the write end
+/// open, so the writer stays blocked until the descendant exits or closes the
+/// pipe, and the writer is reclaimed only then. A bounded execution is not
+/// reported as complete until the writer has delivered its verdict, so a write
+/// failure is never lost behind a "the child exited" observation.
+///
+/// # The deadline and a stdin write failure
+///
+/// The deadline has priority over the writer's verdict. The writer stamps its
+/// verdict with the instant at which it observed the write's completion, so
+/// whether a write failure happened **before** or **after** the deadline is a
+/// fact about the write itself and never a fact about when this call happened
+/// to poll for the verdict:
+///
+/// - a write failure stamped **before** the deadline is an `Err`: the payload
+///   was not delivered, so the child is killed and reaped and the call fails
+///   closed rather than reporting a partial success;
+/// - a write failure stamped **at or after** the deadline does not turn the
+///   deadline outcome into an `Err`: the deadline already decided that outcome,
+///   so the call returns `Ok` with `timed_out` set;
+/// - a writer that had not delivered its verdict when the deadline was reached
+///   is abandoned, exactly like a reader blocked on a pipe a surviving
+///   descendant holds. Its verdict is never observed, and the deadline outcome
+///   stands.
+///
+/// A payload that was not delivered is therefore never reported as a success:
+/// the outcome is either an `Err` or an `Ok` whose `timed_out` flag is set.
 ///
 /// A descendant of the direct child can inherit the stdout or stderr pipe and
 /// hold it open after the direct child has exited. Core terminates only the
@@ -229,7 +253,9 @@ impl CommandOutput {
 /// - the child ran to completion: `Ok`, with the exit code, and `timed_out`
 ///   and `output_limited` both `false`;
 /// - the deadline was reached: `Ok`, with `timed_out` set; the direct child
-///   is killed only if it was still running;
+///   is killed only if it was still running. This outcome also covers a stdin
+///   payload that was never delivered, so an undelivered payload is never
+///   reported as a success;
 /// - a stream exceeded `max_output_bytes`: `Ok`, with `output_limited` set and
 ///   that stream's captured bytes discarded;
 /// - the command could not be spawned or polled, or the stdin payload could
@@ -305,6 +331,11 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     let mut child = command
         .spawn()
         .map_err(|source| Error::io("spawning bounded candidate", source))?;
+    // The deadline starts once the spawn has returned, so a blocking spawn is
+    // not covered by it. It is fixed here, before any thread exists, so that
+    // the instant a stdin writer observes its write can be compared against a
+    // deadline that was already decided.
+    let deadline = Instant::now() + spec.timeout;
     let stdout = child
         .stdout
         .take()
@@ -342,11 +373,17 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
         thread::spawn(move || {
             use std::io::Write as _;
             let result = pipe.write_all(&payload).and_then(|()| pipe.flush());
-            let _ = stdin_tx.send(result);
+            // The verdict carries the instant at which the writer observed the
+            // write's completion, so that "before or after the deadline" is a
+            // fact about the write and not about when this call polls for it.
+            let verdict = WriterVerdict {
+                observed_at: Instant::now(),
+                result,
+            };
+            let _ = stdin_tx.send(verdict);
         })
     });
 
-    let deadline = Instant::now() + spec.timeout;
     let mut timed_out = false;
     let mut output_limited = false;
     let mut status = None;
@@ -354,7 +391,7 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     let mut stderr_result = None;
     let mut stdout_finished = false;
     let mut stderr_finished = false;
-    let mut stdin_result: Option<io::Result<()>> = None;
+    let mut stdin_result: Option<WriterVerdict> = None;
     let mut stdin_finished = stdin_thread.is_none();
     let mut stdin_error: Option<io::Error> = None;
     loop {
@@ -372,16 +409,32 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
                 .try_wait()
                 .map_err(|source| Error::io("polling bounded candidate", source))?;
         }
-        if let Some(Err(source)) = stdin_result.take() {
-            // A failed stdin write decides the outcome: the payload was not
-            // delivered, so the child is killed and reaped and the call fails
-            // closed rather than reporting a partial success.
-            stdin_error = Some(source);
-            if status.is_none() {
-                let _ = child.kill();
-                status = child.wait().ok();
+        if let Some(verdict) = stdin_result.take() {
+            match classify_writer_verdict(verdict, deadline) {
+                WriterVerdictClass::Delivered => {}
+                WriterVerdictClass::FailedBeforeDeadline(source) => {
+                    // A failed stdin write decides the outcome: the payload was
+                    // not delivered, and the deadline had not yet decided it, so
+                    // the child is killed and reaped and the call fails closed
+                    // rather than reporting a partial success.
+                    stdin_error = Some(source);
+                    if status.is_none() {
+                        let _ = child.kill();
+                        status = child.wait().ok();
+                    }
+                    break;
+                }
+                WriterVerdictClass::FailedAtOrAfterDeadline => {
+                    // The write failed at or after the deadline, so the deadline
+                    // already decided the outcome and it stands.
+                    timed_out = true;
+                    if status.is_none() {
+                        let _ = child.kill();
+                        status = child.wait().ok();
+                    }
+                    break;
+                }
             }
-            break;
         }
         if output_limited {
             // The output bound decides the outcome: the child is killed and
@@ -415,6 +468,29 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     // reported rather than lost.
     stdout_finished = poll_reader(&stdout_rx, &mut stdout_result, &mut output_limited);
     stderr_finished = poll_reader(&stderr_rx, &mut stderr_result, &mut output_limited);
+    // The writer's verdict is drained one last time, so a verdict that arrived
+    // at the bound is classified rather than lost. The poll is guarded by the
+    // same flag the loop uses: once the writer has delivered its verdict, the
+    // slot is empty and the channel is disconnected, and a second poll would
+    // mistake that for a writer that ended without a verdict.
+    if !stdin_finished {
+        stdin_finished = poll_writer(&stdin_rx, &mut stdin_result);
+    }
+    if let Some(verdict) = stdin_result.take() {
+        // A verdict that arrived at the bound is classified by the instant the
+        // writer observed it, exactly like a verdict the loop delivered. A
+        // failure observed before the deadline is the write failure the
+        // published precedence rule gives: it wins over any other outcome. A
+        // failure observed at or after the deadline leaves the outcome the
+        // loop already decided untouched.
+        match classify_writer_verdict(verdict, deadline) {
+            WriterVerdictClass::Delivered => {}
+            WriterVerdictClass::FailedBeforeDeadline(source) => {
+                stdin_error = Some(source);
+            }
+            WriterVerdictClass::FailedAtOrAfterDeadline => {}
+        }
+    }
     if stdout_finished || stdout_thread.is_finished() {
         // The reader delivered its result, or it has already ended, so it only
         // has to return: the join is bounded.
@@ -451,31 +527,73 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     })
 }
 
-/// Drains one stdin writer result if it has already arrived.
+/// The verdict a bounded stdin writer delivers.
+///
+/// The verdict carries the instant at which the writer observed the write's
+/// completion. That instant is what decides the outcome against the deadline,
+/// so the classification of a write failure never depends on when the bounded
+/// runner happened to poll for the verdict.
+struct WriterVerdict {
+    /// The instant at which the writer observed the write's completion.
+    observed_at: Instant,
+    /// The result of the write itself.
+    result: io::Result<()>,
+}
+
+/// The outcome one stdin writer verdict produces.
+#[derive(Debug)]
+enum WriterVerdictClass {
+    /// The payload was written and the pipe was closed.
+    Delivered,
+    /// The write failed before the deadline, so the payload was not delivered.
+    FailedBeforeDeadline(io::Error),
+    /// The write failed at or after the deadline, so the deadline already
+    /// decided the outcome.
+    FailedAtOrAfterDeadline,
+}
+
+/// Classifies one writer verdict against the deadline.
+///
+/// The verdict's own observation instant decides the classification, never the
+/// instant at which the bounded runner polled for it. A failure observed
+/// before the deadline is a failure the caller must see as an `Err`; a failure
+/// observed at or after the deadline does not retroactively turn the deadline
+/// outcome into an `Err`, because the deadline already decided it.
+fn classify_writer_verdict(verdict: WriterVerdict, deadline: Instant) -> WriterVerdictClass {
+    match verdict.result {
+        Ok(()) => WriterVerdictClass::Delivered,
+        Err(source) if verdict.observed_at < deadline => {
+            WriterVerdictClass::FailedBeforeDeadline(source)
+        }
+        Err(_) => WriterVerdictClass::FailedAtOrAfterDeadline,
+    }
+}
+
+/// Drains one stdin writer verdict if it has already arrived.
 ///
 /// Returns `true` when the writer thread is known to have ended, that is, when
-/// it delivered its result, and `false` while the writer is still blocked in
+/// it delivered its verdict, and `false` while the writer is still blocked in
 /// `write`.
-fn poll_writer(
-    receiver: &mpsc::Receiver<io::Result<()>>,
-    slot: &mut Option<io::Result<()>>,
-) -> bool {
+fn poll_writer(receiver: &mpsc::Receiver<WriterVerdict>, slot: &mut Option<WriterVerdict>) -> bool {
     if slot.is_some() {
         return true;
     }
     match receiver.try_recv() {
-        Ok(result) => {
-            *slot = Some(result);
+        Ok(verdict) => {
+            *slot = Some(verdict);
             true
         }
         Err(mpsc::TryRecvError::Disconnected) => {
             // The writer ended without delivering a verdict. The writer this
             // module spawns cannot do that, because its send is unconditional
             // and the thread cannot panic; it is still treated as a write
-            // failure so that the outcome fails closed.
-            *slot = Some(Err(io::Error::other(
-                "bounded stdin writer ended without a result",
-            )));
+            // failure so that the outcome is never reported as a success.
+            *slot = Some(WriterVerdict {
+                observed_at: Instant::now(),
+                result: Err(io::Error::other(
+                    "bounded stdin writer ended without a result",
+                )),
+            });
             true
         }
         Err(mpsc::TryRecvError::Empty) => false,
@@ -958,4 +1076,71 @@ fn bounded_display(value: &impl std::fmt::Display) -> String {
     let mut output = Bounded(String::new());
     let _ = std::write!(&mut output, "{value}");
     output.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{classify_writer_verdict, WriterVerdict, WriterVerdictClass};
+    use std::io;
+    use std::time::{Duration, Instant};
+
+    /// A write failure observed strictly before the deadline is a failure the
+    /// caller must see as an `Err`: the payload was not delivered, so the
+    /// outcome fails closed.
+    #[test]
+    fn candidate_writer_verdict_before_the_deadline_fails_closed() {
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let verdict = WriterVerdict {
+            observed_at: deadline - Duration::from_millis(1),
+            result: Err(io::Error::other("broken pipe")),
+        };
+
+        match classify_writer_verdict(verdict, deadline) {
+            WriterVerdictClass::FailedBeforeDeadline(source) => {
+                assert_eq!(
+                    source.kind(),
+                    io::ErrorKind::Other,
+                    "the underlying failure must be preserved"
+                );
+            }
+            other => panic!("a failure observed before the deadline must fail closed: {other:?}"),
+        }
+    }
+
+    /// A write failure observed at or after the deadline does not turn the
+    /// deadline outcome into an `Err`: the deadline already decided it.
+    #[test]
+    fn candidate_writer_verdict_after_the_deadline_does_not_fail_closed() {
+        let deadline = Instant::now() + Duration::from_secs(1);
+
+        for offset in [Duration::ZERO, Duration::from_millis(1)] {
+            let verdict = WriterVerdict {
+                observed_at: deadline + offset,
+                result: Err(io::Error::other("broken pipe")),
+            };
+
+            assert!(
+                matches!(
+                    classify_writer_verdict(verdict, deadline),
+                    WriterVerdictClass::FailedAtOrAfterDeadline
+                ),
+                "a failure observed at or after the deadline must not fail closed"
+            );
+        }
+    }
+
+    /// A successful write is a delivery, whatever the deadline says.
+    #[test]
+    fn candidate_writer_verdict_success_is_a_delivery() {
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let verdict = WriterVerdict {
+            observed_at: deadline + Duration::from_secs(1),
+            result: Ok(()),
+        };
+
+        assert!(matches!(
+            classify_writer_verdict(verdict, deadline),
+            WriterVerdictClass::Delivered
+        ));
+    }
 }

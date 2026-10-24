@@ -56,7 +56,7 @@ to stay correct.
 
 Each has occurred at least once — check for them explicitly:
 
-1. **CI lane understatement.** Windows runs nine `cargo test` steps
+1. **CI lane understatement.** Windows runs ten `cargo test` steps
    (`ci.yml:122-142`) plus the packaged-service step, whose registry-resolved
    compile is deferred. There is also a privileged Linux `service-systemd`
    lane. Count commands, not bullets: three named `eggup-service` diagnostic
@@ -85,10 +85,11 @@ Each has occurred at least once — check for them explicitly:
 8. **Broken markdown tables.** Copy-pasting a row between tables of different
    arity silently drops cells. Check column counts.
 9. **Counting steps, not bullets.** A CI lane that runs three separately-named
-   tests is three steps, not one. `windows-check` is nine `cargo test` steps
+   tests is three steps, not one. `windows-check` is ten `cargo test` steps
    (`ci.yml:122-142`): one combined three-crate run, eggpack, three named
-   service tests, SCM, two Core integration fixtures, and the full workspace
-   run. It then packages the service crate. Count the `- run:` lines.
+   service tests, SCM, the live SCM fixture, two Core integration fixtures, and
+   the full workspace run. It then packages the service crate. Count the
+   `- run:` lines.
 10. **A quoted phrase that was never written.** A governance section attributed
     a quoted comment to a skill file that did not contain it. When a doc quotes
     another doc, `grep` the quoted string — a paraphrase presented as a

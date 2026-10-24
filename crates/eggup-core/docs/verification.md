@@ -36,10 +36,16 @@ timeout or output overflow. Stdin is null unless the caller attaches a bounded p
 larger payload is rejected with `Error::InvalidInput` before any child is spawned, and the
 payload is written by a dedicated writer thread that the deadline bounds exactly as it bounds
 the output readers. The deadline bounds the whole bounded execution, so a bounded call always
-returns; the normative statement of that contract, of what a descendant holding the output pipe
-open means for the result, of the bounded stdin capability, and of the stable `Error::Io`
-`operation` strings a downstream adapter may branch on, lives in the `run_bounded` rustdoc in
-`src/candidate.rs` and in `architecture/core-transaction.md`. `ExactIdentityValidator` and
+returns. The deadline has priority over the stdin writer's verdict, and the verdict is
+classified by the instant at which the writer observed the write, not by the instant at which
+the runner polled for it: a write failure observed before the deadline is an `Err`, a write
+failure observed at or after it is the deadline outcome (`Ok` with `timed_out` set), and a
+writer still in flight at the deadline is abandoned. An undelivered payload is never reported
+as a success. The normative statement of that contract, of the deadline semantics, of what a
+descendant holding the output pipe open means for the result, of the bounded stdin capability,
+and of the stable `Error::Io` `operation` strings a downstream adapter may branch on, lives in
+the `run_bounded` rustdoc in `src/candidate.rs` and in `architecture/core-transaction.md`.
+`ExactIdentityValidator` and
 `CrossMemberAgreementValidator` are consumer-policy-neutral helpers; a consumer can
 supply a custom `CandidateValidator` for a different identity contract. No fallback or
 release ordering is selected by core.

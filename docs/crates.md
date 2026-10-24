@@ -21,7 +21,8 @@ The only crate most consumers need. Owns staging, SHA-256 verification, bounded
 candidate validation, destination-ownership revalidation, locking, replacement,
 rollback, and receipts.
 
-- **Dependencies:** `sha2` only.
+- **Dependencies:** `sha2`, plus `self-replace` on Windows only (deferred deletion
+  of a replaced running image; the Unix and macOS graphs stay `sha2`-only).
 - **Status:** published at `0.1.3`.
 - **Boundary:** transport, service managers, and Eggpack types stay out. If you
   need those, take a separate crate.

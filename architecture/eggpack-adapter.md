@@ -7,10 +7,10 @@ file and a contract disagree, the contract wins.
 
 | | |
 |---|---|
-| Source | `crates/eggup-eggpack/src/lib.rs` (single file, 849 lines) |
-| Tests | 7 inline `#[test]` + 3 integration files (56 tests) |
+| Source | `crates/eggup-eggpack/src/lib.rs` (single file, 855 lines) |
+| Tests | 7 inline `#[test]` + 4 integration files (64 tests) |
 | Crate docs | [`README.md`](../crates/eggup-eggpack/README.md), [`CHANGELOG.md`](../crates/eggup-eggpack/CHANGELOG.md) |
-| Status | Published to crates.io at `0.1.2` |
+| Status | Published to crates.io at `0.1.3` |
 | Boundary ADR | [ADR-0004](../plans/adrs/ADR-0004-eggpack-producer-eggup-consumer-boundary.md) |
 
 ## Purpose and ownership boundary
@@ -222,7 +222,7 @@ ManifestProjection                                   lib.rs:93   (adapter-owned 
 Three translation facts worth checking during review:
 
 - **Hex digests are decoded inside `project`, not downstream.** Every
-  `sha256_bytes()` call site (`lib.rs:349`, `:368`, `:384`, `:395`) maps failure
+  `sha256_bytes()` call site (`lib.rs:350`, `:369`, `:385`, `:396`) maps failure
   to `InvalidManifest`. By the time a `ManifestProjection` exists, all digests
   are `[u8; 32]` values that Eggup can compare. A projection can never carry an
   undecodable or half-validated digest.
@@ -255,10 +255,12 @@ as the enforcement point:
   ([`tests/interoperability.rs:972`](../crates/eggup-eggpack/tests/interoperability.rs))
   asserts the manifest contains `eggpack-manifest = "=0.1.0"` and that it
   contains no `git =`, `rev =`, `branch =`, or `tag =` edge; asserts all three
-  Eggup edges stay `=0.1.2`; and asserts `eggpack-core`, `eggpack-contract`,
-  and `eggpack-bootstrap` appear nowhere.
+  Eggup edges stay `=0.1.3` — derived from the adapter's own
+  `env!("CARGO_PKG_VERSION")` rather than a hardcoded literal, so the invariant
+  is "pinned to *our* version" and survives the next workspace bump; and asserts
+  `eggpack-core`, `eggpack-contract`, and `eggpack-bootstrap` appear nowhere.
 - `adapter_source_claims_no_producer_or_service_authority`
-  ([`tests/interoperability.rs:1019`](../crates/eggup-eggpack/tests/interoperability.rs))
+  ([`tests/interoperability.rs:1023`](../crates/eggup-eggpack/tests/interoperability.rs))
   splits `src/lib.rs` at `#[cfg(test)]` and asserts 24 authority tokens are
   absent from production code: `api.github.com`, `reqwest`, `hyper`, `tokio`,
   `mirror`, `fallback`, `latest`, `base_url`, `base-origin`, `install_root`,
@@ -556,16 +558,17 @@ records `extraction_root.join(manifest install)` as an **advisory** path
 advisory paths are never opened during staging when a bound handle is
 supplied; the string exists to satisfy `ArtifactMember::new`'s validation and
 to support diagnostics. `eggup-core` documents the same rule independently
-(`domain.rs:415-416`: the recorded source path is advisory diagnostics only
-once a handle is supplied).
+(`crates/eggup-core/src/domain.rs:696-700`: the recorded source path is advisory
+diagnostics only and is never opened, even if it now names foreign state).
 
 This is why the caller must capture `ExtractedArchive::root()`
-(`eggup-archive` `lib.rs:328`) before `persist()` consumes the guard. After
+(`eggup-archive` `crates/eggup-archive/src/lib.rs:349`) before `persist()`
+consumes the guard. After
 persistence the caller holds a `PersistedExtraction`, and the adapter's
 advisory path must still be meaningful for as long as the plan exists.
 
 Test `advisory_member_entry_replacement_does_not_redirect_staged_bytes`
-([`tests/archive_handoff.rs:586`](../crates/eggup-eggpack/tests/archive_handoff.rs))
+([`tests/archive_handoff.rs:593`](../crates/eggup-eggpack/tests/archive_handoff.rs))
 exercises the exact attack this design forecloses: replacing the file at the
 advisory path after extraction must not change which bytes get staged, because
 staging reads the bound handle.
@@ -594,9 +597,9 @@ identical content — the case where it matters most.
 (`lib.rs:552-557`), so a correctly-produced extraction always carries exactly
 the identities the projection declares. Tests:
 `bind_archive_members_cross_checks_bound_identity_not_just_count`
-(`archive_handoff.rs:482`) and
+(`archive_handoff.rs:489`) and
 `bind_archive_members_rejects_an_extraction_of_a_different_projection`
-(`archive_handoff.rs:554`).
+(`archive_handoff.rs:561`).
 
 ### Two caller obligations the types do not enforce
 
@@ -653,7 +656,7 @@ Every `AdapterError` variant, what triggers it, and where.
 | JSON input exceeds `MAX_MANIFEST_BYTES` (1 MiB) | `InvalidManifest` | `lib.rs:413-415` |
 | Input is not valid UTF-8 | `InvalidManifest` | `lib.rs:416` |
 | `ReleaseManifest::from_json` parse or schema failure | `InvalidManifest`; producer diagnostic discarded | `lib.rs:417` |
-| Hex digest fails to decode (artifact or member) | `InvalidManifest` | `lib.rs:349`, `:368`, `:384`, `:395` |
+| Hex digest fails to decode (artifact or member) | `InvalidManifest` | `lib.rs:350`, `:369`, `:385`, `:396` |
 | Exact canonical target absent, or an alias is used | `TargetNotFound` | `lib.rs:333-335` |
 | Request map missing or has extra entries | `MapMismatch("acquisition request")` | `lib.rs:198-202` |
 | Acquired-path map missing or has extra entries | `MapMismatch("acquired path")` | `lib.rs:245-251` |
@@ -882,11 +885,15 @@ verified against the code rather than assumed:
 Drift **outside** this document's ownership, recorded here so the owning
 workstream can act on it:
 
-- `overview.md`'s `849 / 63` figure is now stale: the crate is 855 source
-  lines with 7 inline plus 28 + 13 + 15 + 8 integration tests. `overview.md`
-  is not edited by this milestone.
-- `docs/crates.md:117` still carries `=0.1.2` for the Eggup pins, which are
-  `=0.1.3`. Pre-existing drift, not introduced here; `docs/` is non-normative.
+- `overview.md`'s `849 / 63` figure was stale: the crate is 855 source lines
+  with 7 inline plus 28 + 13 + 15 + 8 integration tests, i.e. 71 in total.
+  Corrected in `overview.md` by the architecture-anchor corrective.
+- `docs/crates.md` previously carried `=0.1.2` for the Eggup pins, which are
+  `=0.1.3`. That drift has been **repaired**: `docs/crates.md:119-120` now
+  states `=0.1.3` and names `crates/eggup-eggpack/Cargo.toml` as the source of
+  truth. `docs/crates.md:117` is the separate `cargo tree --workspace` review
+  rule and never carried a version pin. `docs/` is non-normative, so this
+  document does not restate its wording.
 
 Two items that read as imprecision but are not drift, recorded here so a
 future reviewer does not re-raise them:

@@ -42,6 +42,37 @@ dual-transport behavior live in `eggup-acquisition` (`ComposedTransport`,
 Nothing in this section has been published. `0.1.3` is the published baseline on
 crates.io, and no publication milestone authorizes these entries.
 
+**Publication coupling with the seam's `0.2.0` release (Acquisition Transport
+M016).**
+
+- **Corrected: the compatibility consequence of a future republication.** The
+  M013 entry below stated that this crate's own API change required no
+  consumer migration. That is true of **this crate's items** and false of
+  **this crate's consumers** once the seam's next release is published. The
+  seam's next release is **`eggup-acquisition 0.2.0`**, and it is
+  **source-breaking**: `AcquisitionError::Io(String)` became
+  `Io { operation, source }`, and the enum derives `Debug` only. `0.2.0` does
+  **not** satisfy the `^0.1.0` requirement this crate declares today.
+- **This crate's requirement must widen at publication time.** The widening is
+  recorded here and applied by the publication milestone, not by this one:
+  `eggup-acquisition` = "0.2" (widened from "0.1.0").
+- **This crate's own next published version is therefore not `0.1.3`.** The
+  workspace is version-lockstep, so the seam's `0.2.0` release moves the
+  workspace version to `0.2.0`, and this crate's next publication is
+  `eggup-eggfetch 0.2.0`.
+- **A consumer inherits the seam's source break.** A consumer that depends on
+  the seam **directly** inherits the source break when it moves to `0.2`, and a
+  consumer of this crate inherits it too once this crate is republished with
+  the widened requirement — the seam's `AcquisitionError` is part of this
+  crate's public surface, because `AcquisitionTransport::fetch` returns it.
+  Such a consumer must update its `AcquisitionError::Io` matchers, and must
+  stop cloning or comparing whole `AcquisitionError` values.
+- **What is unchanged.** This crate's own public API additions remain
+  additive, and **nothing published has changed**: the published `0.1.3`
+  artifact keeps its current shape and behavior, and the published
+  `eggup-acquisition 0.1.3` is untouched. This entry records the coupling; it
+  performs no publication, no version bump, and no manifest change.
+
 **Typed I/O failure surface and internal consolidation (Acquisition Transport
 M013).**
 
@@ -65,14 +96,16 @@ redaction, and the `User-Agent` it already exposes through
 `EggfetchConfig::user_agent` — is unchanged. The only consumer-visible
 consequence is the source break in `eggup-acquisition`'s `AcquisitionError::Io`
 variant, which this crate now builds through the seam's typed constructor
-(`eggup-acquisition` M013). **No consumer migration is required in this
-crate**, and no publication or version bump is authorized by this milestone.
+(`eggup-acquisition` M013). **No consumer migration is required by this crate's
+own API change**, and no publication or version bump is authorized by this
+milestone. A consumer's obligation when this crate is next published is
+recorded in the M016 entry above.
 
-The adapter still exposes a caller-settable `User-Agent` while `eggup-curl`
-exposes none; that asymmetry is a known, documented difference in the *adapter
-configuration surface*, not in the seam contract, and it is owned by the named
-follow-up milestone "Acquisition M014 — adapter capability parity
-(`User-Agent` and the `CurlConfig` public-field API boundary)".
+The adapter still exposes a caller-settable `User-Agent`; the `eggup-curl`
+adapter gained the same capability in M014 (see its changelog), so the two
+adapters are now capability-parity. Placement parity is deliberately not
+claimed: this adapter's control stays in `EggfetchConfig`, which is published
+at `0.1.3`.
 
 ## 0.1.2 — 2026-10-02
 

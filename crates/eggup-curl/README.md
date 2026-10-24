@@ -54,7 +54,7 @@ The accepted grammar is:
 ```text
 user-agent = 1*( VCHAR / SP / obs-text )
 VCHAR      = %x21-7E          ; printable ASCII, excluding SP
-SP         = %x20            ; permitted only between two non-SP characters
+SP         = %x20            ; permitted as interior whitespace, including runs
 obs-text   = %xA0-10FFFF     ; any non-ASCII scalar value (C1 excluded)
 ```
 

@@ -238,20 +238,31 @@ and with `plans/registry.md`:
 
 | Assertion | What it checks |
 |---|---|
-| 1 | No `docs/`, `README.md`, or `AGENTS.md` version literal outside the known set |
+| 1 | No checked surface (`docs/`, `README.md`, `AGENTS.md`, `architecture/*.md`) states a version literal outside the known set — the registry history unioned with the version the manifests declare. A literal the same clause explicitly disclaims ("not a `0.1.4`") is not a claim |
 | 2 | No `docs/` file states the current version as `0.1.2`; the single legitimate `eggup-curl` occurrence is allowlisted |
-| 3 | No `docs/` file states a normative rule without linking the contract that owns it |
+| 3 | No `docs/` file and no `architecture/*.md` deep dive states a normative rule without linking the contract that owns it. The owning deep dive is exempt: it is the owner, not a leak |
 | 4 | The root `CHANGELOG.md` `Unreleased` section does not contradict the `0.1.3` section |
-| 5 | No milestone carries two statuses in `plans/registry.md`, and the registry names its authoritative table |
-| 7 | (opt-in, `--baseline <ref>`) The milestone's change set touches no `crates/*/src/**` path, no `Cargo.lock`, and no crate manifest |
+| 5 | No milestone carries two statuses in `plans/registry.md` — three-cell tables included, not only the four-cell ones — and the registry names its authoritative table |
+| 7 | (opt-in, `--baseline <ref>`) The milestone's change set touches no `crates/*/src/**` path, no `crates/*/build.rs`, no `Cargo.lock`, and no crate manifest. Untracked files are read too: a file that was just created is untracked until it is added |
+| 8 | The documentation agrees with the **manifests**: the workspace-version claim, every published-version claim (against the crate's own `CHANGELOG.md` released headings and the manifest's `publish` flag), and every dependency claim (a subset of the manifest's declared edges) |
+| 9 | No surface states the opposite polarity of a tracked invariant (a member declared `NotRequired` always fails; there is no escape hatch) |
 
 Assertion 6 — the transport-footprint dependency counts 3 / 92 / 93 — is a
 `cargo tree` resolution check and is therefore **not** in the script; it is a
 milestone verification command. Assertion 7 is milestone-scoped by nature, so
 it runs only when a baseline ref is supplied; the gate invocation runs
-assertions 1-5. The script was added by planning C013 after the tracked drift
-was closed without re-verification; see
-`plans/closure/planning-closure-hygiene-corrective/013-status.md`.
+assertions 1-5, 8, and 9. The script was added by planning C013 after the
+tracked drift was closed without re-verification, and extended by planning C014
+after the gate was found to compare nothing with the manifests; see
+`plans/closure/planning-closure-hygiene-corrective/013-status.md` and
+`plans/closure/planning-closure-hygiene-corrective/014-status.md`.
+
+**What the gate still does not decide.** A claim whose subject is ambiguous — a
+paragraph that names two crates and asserts one published version — is **skipped
+and reported as a note**, never guessed. A rule added to a file that already
+cites its owning contract is not detected: assertion 3 asks whether a file
+links the owner, not whether a line was added. Both are recorded as residual
+gaps, not as covered checks.
 
 ### 4.2 The `cargo tree` caveat
 
@@ -279,11 +290,11 @@ under time pressure, and it is the one that protects the layered design.
 
 | Job | Runner | Toolchain | Exact commands | What it uniquely proves |
 |---|---|---|---|---|
-| `stable` | `ubuntu-latest` | stable + `rustfmt`, `clippy` | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --all-features --locked`; `cargo doc --workspace --no-deps --locked`; `cargo package -p eggup-service --locked` | Linux is the reference platform. The only lane that runs clippy, fmt, and doc; also verifies packaged service source |
-| `msrv` | `ubuntu-latest` | `1.89.0` (`ci.yml:48`) | `cargo check --workspace --all-targets --locked`; `cargo package -p eggup-service --locked --no-verify` | The workspace type-checks at the declared `rust-version` floor and the service crate is packaged there. Clippy and tests are not run here. The package step's registry-resolved compile is deferred; see the packaging note below |
+| `stable` | `ubuntu-latest` | stable + `rustfmt`, `clippy` | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --all-features --locked`; three `cargo build -p eggup-transport-footprint` steps (`ci.yml:26-28`); `cargo doc --workspace --no-deps --locked`; `cargo package -p eggup-service --locked --no-verify` | Linux is the reference platform. The only lane that runs clippy, fmt, and doc; it builds all three isolated transport configurations; also verifies packaged service source. The package step's registry-resolved compile is deferred; see the packaging note below |
+| `msrv` | `ubuntu-latest` | `1.89.0` (`ci.yml:48`) | `cargo check --workspace --all-targets --locked`; three `cargo check -p eggup-transport-footprint` steps (`ci.yml:54-56`); `cargo package -p eggup-service --locked --no-verify` | The workspace type-checks at the declared `rust-version` floor and the service crate is packaged there. Clippy and tests are not run here. The three feature-gated footprint configurations are checked at the MSRV floor, because a default-features check compiles none of the three binaries. The package step's registry-resolved compile is deferred; see the packaging note below |
 | `service-systemd` | `ubuntu-latest` | stable | registry-only published 0.1.2 negative control; privileged current workspace systemd test; registry-only published 0.1.3 positive quiescence and Foreign/malformed controls | Real systemd evidence for the published limitation and correction, auto-restart stop, residual cgroup refusal, and foreign preservation |
-| `macos` | `macos-latest` | stable | `cargo test --workspace --all-targets --all-features --locked`; `cargo package -p eggup-service --locked` | The full test suite and packaged service source pass on a non-Linux Unix — the only evidence for macOS behavior |
-| `windows-check` | `windows-latest` | stable | nine `cargo test` steps (`ci.yml:122-142`), followed by `cargo package -p eggup-service --locked --no-verify` (`ci.yml:154`) | Windows compiles and *runs* the workspace and separately packages the service crate; that package step's registry-resolved compile is deferred, see the packaging note below. Targeted tests run first so a platform-specific failure is named before the broad run buries it |
+| `macos` | `macos-latest` | stable | `cargo test --workspace --all-targets --all-features --locked`; two `cargo build -p eggup-transport-footprint` steps (`ci.yml:101-102`); `cargo package -p eggup-service --locked --no-verify` | The full test suite passes on a non-Linux Unix — the only evidence for macOS behavior — and the two isolated single-adapter transport configurations are built there. The package step's registry-resolved compile is deferred; see the packaging note below |
+| `windows-check` | `windows-latest` | stable | ten `cargo test` steps (`ci.yml:122-142`), followed by `cargo package -p eggup-service --locked --no-verify` (`ci.yml:154`) | Windows compiles and *runs* the workspace and separately packages the service crate; that package step's registry-resolved compile is deferred, see the packaging note below. Targeted tests run first so a platform-specific failure is named before the broad run buries it |
 
 ### 5.1 Why `windows-check` leads with targeted steps
 
@@ -355,7 +366,7 @@ platform lane that a whole-workspace run would not guarantee.
 | Gap | Detail |
 |---|---|
 | No `cargo tree` anywhere in CI | The dependency-boundary review is local-only, and the local step is advisory (§4.2) |
-| No `cargo check` with `--all-features` on the MSRV lane | `msrv` uses `cargo check --workspace --all-targets --locked` (`ci.yml:49`) — no `--all-features`. Feature-gated code is not compiled at the 1.89 floor, so an MSRV break that only appears under a non-default feature passes |
+| No `cargo check` with `--all-features` on the MSRV lane | `msrv` uses `cargo check --workspace --all-targets --locked` (`ci.yml:49`) — no `--all-features` on the workspace check. The three feature-gated footprint configurations are checked separately at the same floor (`ci.yml:54-56`), so the fixture binaries *are* compiled at 1.89; any other non-default feature remains uncompiled there, so an MSRV break that only appears under such a feature still passes |
 | No `cargo check` with `--all-features` on the Windows lane | `ci.yml:122-154` runs default-feature tests plus a packaged `eggup-service` step; it does not build the feature-gated footprint binaries on Windows |
 | Clippy and fmt run on Linux only | A `#[cfg(windows)]` or `#[cfg(target_os = "macos")]` clippy violation is not caught by any lane — the Windows and macOS jobs run `test`/`check`, never `clippy` |
 | `cargo doc` on Linux only | `deny(missing_docs)` is not re-verified per platform, which is acceptable since rustdoc is platform-independent |
@@ -390,21 +401,24 @@ required-features = ["curl", "eggfetch"]
 `default = []`, so the three footprint binaries are all feature-gated. The
 consequences:
 
-- **`msrv` job**: `cargo check --workspace --all-targets --locked` enables no
-  features beyond defaults, so `curl_only`, `eggfetch_only`, and `dual` are not
-  built at all. The MSRV floor is never applied to the composition binaries that
-  link both adapters together — the code most likely to break on a toolchain
-  floor, because it is the only place two independent adapter dependency
-  graphs meet.
+- **`msrv` job**: the workspace step `cargo check --workspace --all-targets
+  --locked` enables no features beyond defaults, so on its own it builds none
+  of the three binaries. The lane therefore carries **three dedicated steps**,
+  one per configuration (`ci.yml:54-56`), so the 1.89 floor *is* applied to the
+  composition binaries that link both adapters together — the code most likely
+  to break on a toolchain floor, because it is the only place two independent
+  adapter dependency graphs meet.
 - **`windows-check` job**: the closing `cargo test --workspace --all-targets
-  --locked` has the same gap. Combined with the fact that the Windows lane does
-  not run `--all-features` on anything, **no Windows lane ever compiles the
-  footprint binaries.** Windows coverage exists for every crate under default
-  features — the archives, the seam, the curl adapter, the eggpack adapter, the
-  Core self-update and lock-race fixtures, and selected service tests — the footprint
-  fixtures are Linux/macOS-only in practice, with no job recording that fact.
-- Only `stable` and `macos` use `--all-features` and therefore actually compile
-  these three binaries.
+  --locked` has the same gap, and the Windows lane runs no `--all-features` on
+  anything, so **no Windows lane ever compiles the footprint binaries.**
+  Windows coverage exists for every crate under default features — the
+  archives, the seam, the curl adapter, the eggpack adapter, the Core
+  self-update and lock-race fixtures, and selected service tests — the footprint
+  fixtures are Linux/macOS-only in practice, and no job records that fact.
+- **`stable` and `macos` jobs**: both build the binaries. `stable` builds all
+  three configurations (`ci.yml:26-28`); `macos` builds the two isolated
+  configurations (`ci.yml:101-102`), and its workspace `--all-features` test
+  step (`ci.yml:97`) compiles the dual one.
 
 `cargo tree --workspace --locked` is likewise feature-blind, so the local gate
 does not surface the footprint crates' optional adapter edges either.
@@ -575,9 +589,9 @@ instances, recorded at the end of this file. The maintenance rules:
   of `eggup-core`'s failure enums.
 - A doc that claims a **CI lane** is read from the workflow file, not from
   another doc. `verify-workflow` and `AGENTS.md` both once understated the
-  Windows lane as compile-only; it now runs nine `cargo test` steps and a
+  Windows lane as compile-only; it now runs ten `cargo test` steps and a
   packaged service build, and the fifth `service-systemd` job runs privileged
-  real-manager qualification (`ci.yml:34-80`).
+  real-manager qualification (`ci.yml:70-87`).
 - A doc that claims a **publication status** is checked against crates.io.
   `eggup-service` was described as "unpublished" in three places while being on
   crates.io at `0.1.0`/`0.1.1`.
@@ -761,7 +775,7 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 
 | Was | Resolution |
 |---|---|
-| `verify-workflow` + `AGENTS.md` described `windows-check` as `cargo check` / "compile-only" | Both now describe its nine `cargo test` steps plus the packaged-service step (registry-resolved compile deferred), and the real Linux systemd service lane (§5) |
+| `verify-workflow` + `AGENTS.md` described `windows-check` as `cargo check` / "compile-only" | Both now describe its ten `cargo test` steps plus the packaged-service step (registry-resolved compile deferred), and the real Linux systemd service lane (§5) |
 | `AGENTS.md` gave `eggup-eggpack` a partial dependency list, omitting `sha2` | `sha2` added; `AGENTS.md` no longer restates the list at all and now points at `crates/eggup-eggpack/Cargo.toml`, the owner of the exact set |
 | `AGENTS.md` stated "keep crate `README.md` + `CHANGELOG.md` current" as absolute | Now scoped to library crates, with `eggup-transport-footprint` named as the exception (§3.4) |
 | `core-transaction.md` listed a previous generation of `FailureCategory`, `FailurePhase`, `IntegrityRequirement`, `IntegrityStatus`, and `PermissionsIntent` | All five rows regenerated from source; the two `FailureCategory::Destination` references replaced with real variants |
@@ -774,7 +788,7 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | `registry.md` "Recently closed foundation" understated 3 workstreams and omitted 3 | Rewritten to match the closure directories |
 | `registry.md` "Planned / blocked work" declared 4 columns; 4 rows carried 5 | Cells merged; two rows that duplicated rows in the same table removed |
 | `planning-closure-hygiene-corrective/010` plan still read `Status: ready for handoff` | Set to closed, matching its closure record and C011/C012 |
-| Windows lane counted as "four `cargo test` invocations" in §5, §7.3, the Resolved table, `verify-workflow`, and `docs-hygiene` | It now has **nine** test steps at `ci.yml:66-79` — the three named `eggup-service` tests are three steps, not one bullet. All five locations and the count-step drift class were updated |
+| Windows lane counted as "four `cargo test` invocations" in §5, §7.3, the Resolved table, `verify-workflow`, and `docs-hygiene` | It now has **ten** test steps at `ci.yml:122-142` — the three named `eggup-service` tests are three steps, not one bullet, and the live SCM fixture added by commit `b9885fa` is a fourth. All five locations and the count-step drift class were updated |
 | §4.1 attributed the quote "dependency-surface review, no gate" to `verify-workflow`, and "review-only, no gate" to `AGENTS.md` | Neither string exists in those files. Replaced with the actual sentences from each (the section is now §4.2 after the documentation-truth check became §4.1) |
 | §4 described `scripts/check-local.sh` as "6 lines" | It is 10 lines (shebang + `set -euo pipefail` + 5 `cargo` commands + the documentation-truth check + blank); the per-line table uses the correct `4`-`9` numbering |
 | [overview.md](overview.md) claimed "Every crate carries `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]`" | Scoped to the 7 library crates; `eggup-transport-footprint` has no `lib.rs`, so `missing_docs` is not enforced there at all (§3.4) |

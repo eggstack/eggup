@@ -110,8 +110,10 @@ impl FailurePhase {
 /// A stable machine-readable classification of a *produced* transaction
 /// failure.
 ///
-/// Every member of this enum describes a failure that can actually occur. Six
-/// of them are produced by the crate's internal error-to-category mapping, and
+/// Every member of this enum describes a failure that can actually occur. Five
+/// of them are produced by the crate's internal error-to-category mapping in a
+/// shipped build, and a sixth — [`Injected`](Self::Injected) — is produced by
+/// that same mapping only in this crate's own test builds.
 /// [`PostCommitCheck`](Self::PostCommitCheck) is produced directly when a
 /// caller-supplied post-commit check fails or panics.
 /// [`Injected`](Self::Injected) is produced only by this crate's own test

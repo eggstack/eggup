@@ -34,7 +34,9 @@ anywhere**, by design ([ADR-0003](../plans/adrs/ADR-0003-verification-layers-and
 
 The workspace is deliberately **dependency-inverted from the call order**: the
 crate that runs *last* (`eggup-core`, the local mutation engine) is depended on
-by the layers that run *before* it, and it depends on nothing but `sha2`. That is
+by the layers that run *before* it, and it depends on nothing but `sha2` plus a
+**Windows-only** `self-replace` edge (deferred deletion of a replaced running
+image; the Unix and macOS graphs stay `sha2` only). That is
 what keeps the mutation core testable in isolation and free of transport, service
 manager, and producer concerns.
 
@@ -61,12 +63,12 @@ not moved. `eggup-transport-footprint` is `publish = false`.
    |                        |         +---- eggup-service (windows-args; windows-service on win)
    +--> eggup-archive       |
    (tar/zip/flate2/fs_at/   +---- eggup-core  <---- eggup-service
-    sha2; dev-dep: core)         (sha2 only)
+    sha2; dev-dep: core)         (sha2; self-replace on Windows only)
 ```
 
 In plain dependency order, deepest first:
 
-1. **`eggup-core`** → `sha2`. Policy-neutral local mechanics.
+1. **`eggup-core`** → `sha2` (plus `self-replace` on Windows only). Policy-neutral local mechanics.
 2. **`eggup-acquisition`** → *nothing*. Transport-neutral seam, fixtures, composition.
 3. **`eggup-eggfetch`** → `eggup-acquisition` + `eggfetch-core` + `tokio` + `futures-util`. Native HTTP adapter.
 4. **`eggup-curl`** → `eggup-acquisition` only. External-process adapter, no HTTP/TLS stack.
@@ -87,42 +89,51 @@ Two consequences worth knowing before reviewing anything:
 
 ## Module map
 
-`LOC` is source lines; `tests` is the count of `#[test]` functions. All 7
+`LOC` is source lines under the crate's `src/` directory; `tests` is the count
+of `#[test]` functions across the crate's `src/` **and** `tests/` directories
+(inline unit tests plus integration targets). All 7
 library crates carry `#![forbid(unsafe_code)]` and `#![deny(missing_docs)]` on
 their crate root; `eggup-transport-footprint` is the exception — it is
 binary-only with no `lib.rs`, so it relies on the workspace lint table for
 `unsafe_code` and has no `missing_docs` enforcement
 ([tooling-governance.md](tooling-governance.md) §3.4).
 
+*Figures are a snapshot of the working tree at the time this table was
+corrected. `eggup-core` and `eggup-curl` were being edited concurrently at
+that moment, so their line counts need re-derivation once those edits land.*
+
 | Module (crate) | Role | LOC / tests | Key capabilities | Deep dive |
 |---|---|---|---|---|
-| `eggup-core` | Policy-neutral local mechanics | 5650 / 54 | `InstallPlan` → `Prepared` → `Verified` → `Validated` → `Receipt`; SHA-256 integrity, bounded candidate execution, caller-proven `Absent \| Owned \| Foreign \| Unknown`, `MutationLock` + opt-in `StaleLockVerifier` recovery, locked ownership + staged-digest revalidation, commit/rollback, `commit_with_post_commit`, `InstallPlan::for_current_executable` self-update | [core-transaction.md](core-transaction.md) |
-| `eggup-acquisition` | Transport-neutral seam, fixtures, composition | 2182 / 38 | `AcquisitionRequest`, `FetchLimits` + `effective()` = `min(request, adapter)`, `CancelFlag`, `Success \| NotFound` vs hard failure (`InvalidInput`/`Transport`/`Timeout`/`TooLarge`/`Cancelled`/`Io`/`Unavailable`), `AcquisitionTransport`, `FixtureTransport`, `ComposedTransport` + `CompositionPolicy`, exclusive 0600 temp + no-clobber promotion, URL redaction | [acquisition.md](acquisition.md) |
-| `eggup-eggfetch` | Native HTTP adapter | 1231 / 25 | `EggfetchConfig::strict()` single policy point (timeout ceilings, redirect bound, explicit `ProxyDecision`, HTTP/1 + Rustls), status classification, streaming artifacts, sync-over-async bridge, category-only redacted errors | [eggfetch-adapter.md](eggfetch-adapter.md) |
-| `eggup-curl` | External curl adapter | 1672 / 24 | `CurlConfig::strict()` single policy point (explicit executable, opt-in PATH discovery, connect/total ceilings, redirect/protocol/proxy explicit, `--disable` against curlrc), direct-process execution with kill/reap, same-request HTTP status capture, private temp + no-clobber promotion | [curl-adapter.md](curl-adapter.md) |
-| `eggup-service` | Manager-neutral lifecycle | 10101 / 104 | `ServiceSpec` / `Ownership` / `LifecycleSnapshot`, `ServiceManager` + `TestDoubleManager`, `SystemExecutor` (allowlisted paths, cleared env, bounded I/O), `atomic_write_definition`, systemd / launchd / cron / Windows SCM adapters, `commit_with_lifecycle`, `UpdateRuntimeDisposition` + `plan_unix`/`plan_windows` + `DirectRuntimeControl` + `commit_with_disposition` | [service-lifecycle.md](service-lifecycle.md) |
-| `eggup-archive` | Bounded local archive extraction | 3512 / 51 | Explicit tar.gz/zip member allowlists, finite compressed/decompressed budgets, regular-file-only extraction, private root, no-clobber files, streamed SHA-256/size evidence, `ExtractedArchive` → `PersistedExtraction` → `BoundExtraction` handoff, internal `DirectoryGuard` cleanup | [archive-extraction.md](archive-extraction.md) |
-| `eggup-eggpack` | Optional Eggpack ReleaseManifest v1 adapter (leaf) | 849 / 63 | `project` / `project_json`, `bind_requests` (tightened byte caps), `default_destinations`, `materialize_artifact_set[_with_destinations]`, direct/bundle installable vs archive extraction-required, `core_plan_for_archive*`, `bind_archive_members`, `install_ids` | [eggpack-adapter.md](eggpack-adapter.md) |
-| `eggup-transport-footprint` | Non-published footprint fixtures | 45 / 0 | Three `required-features` binaries — `curl_only`, `eggfetch_only`, `dual` — that pin which transport stacks a consumer links; measures the cost of the transport choice | [transport-footprint.md](transport-footprint.md) |
+| `eggup-core` | Policy-neutral local mechanics | 7181 / 110 | `InstallPlan` → `Prepared` → `Verified` → `Validated` → `Receipt`; SHA-256 integrity, bounded candidate execution, caller-proven `Absent \| Owned \| Foreign \| Unknown`, `MutationLock` + opt-in `StaleLockVerifier` recovery, locked ownership + staged-digest revalidation, commit/rollback, `commit_with_post_commit`, `InstallPlan::for_current_executable` self-update | [core-transaction.md](core-transaction.md) |
+| `eggup-acquisition` | Transport-neutral seam, fixtures, composition | 2229 / 50 | `AcquisitionRequest`, `FetchLimits` + `effective()` = `min(request, adapter)`, `CancelFlag`, `Success \| NotFound` vs hard failure (`InvalidInput`/`Transport`/`Timeout`/`TooLarge`/`Cancelled`/`Io`/`Unavailable`), `AcquisitionTransport`, `FixtureTransport`, `ComposedTransport` + `CompositionPolicy`, exclusive 0600 temp + no-clobber promotion, URL redaction | [acquisition.md](acquisition.md) |
+| `eggup-eggfetch` | Native HTTP adapter | 1229 / 31 | `EggfetchConfig::strict()` single policy point (timeout ceilings, redirect bound, explicit `ProxyDecision`, HTTP/1 + Rustls), status classification, streaming artifacts, sync-over-async bridge, category-only redacted errors | [eggfetch-adapter.md](eggfetch-adapter.md) |
+| `eggup-curl` | External curl adapter | 2532 / 38 | `CurlConfig::strict()` single policy point (explicit executable, opt-in PATH discovery, connect/total ceilings, redirect/protocol/proxy explicit, `--disable` against curlrc), direct-process execution with kill/reap, same-request HTTP status capture, private temp + no-clobber promotion | [curl-adapter.md](curl-adapter.md) |
+| `eggup-service` | Manager-neutral lifecycle | 11700 / 174 | `ServiceSpec` / `Ownership` / `LifecycleSnapshot`, `ServiceManager` + `TestDoubleManager`, `SystemExecutor` (allowlisted paths, cleared env, bounded I/O), `atomic_write_definition`, systemd / launchd / cron / Windows SCM adapters, `commit_with_lifecycle`, `UpdateRuntimeDisposition` + `plan_unix`/`plan_windows` + `DirectRuntimeControl` + `commit_with_disposition` | [service-lifecycle.md](service-lifecycle.md) |
+| `eggup-archive` | Bounded local archive extraction | 3717 / 59 | Explicit tar.gz/zip member allowlists, finite compressed/decompressed budgets, regular-file-only extraction, private root, no-clobber files, streamed SHA-256/size evidence, `ExtractedArchive` → `PersistedExtraction` → `BoundExtraction` handoff, internal `DirectoryGuard` cleanup | [archive-extraction.md](archive-extraction.md) |
+| `eggup-eggpack` | Optional Eggpack ReleaseManifest v1 adapter (leaf) | 855 / 71 | `project` / `project_json`, `bind_requests` (tightened byte caps), `default_destinations`, `materialize_artifact_set[_with_destinations]`, direct/bundle installable vs archive extraction-required, `core_plan_for_archive*`, `bind_archive_members`, `install_ids` | [eggpack-adapter.md](eggpack-adapter.md) |
+| `eggup-transport-footprint` | Non-published footprint fixtures | 45 / 2 | Three `required-features` binaries — `curl_only`, `eggfetch_only`, `dual` — that pin which transport stacks a consumer links; measures the cost of the transport choice | [transport-footprint.md](transport-footprint.md) |
 | tooling + governance | Workspace, verification, planning | — | `scripts/check-local.sh` (fmt/clippy/test/doc/tree), CI (stable, MSRV 1.89, macOS, Windows), workspace lints, `plans/` ADRs + subsystem roadmaps + closure records + registry, and the agent-facing surface (`AGENTS.md` + `.opencode/skills/`) | [tooling-governance.md](tooling-governance.md) |
 
 ### Source layout inside the larger crates
 
 - `eggup-core` — `lib.rs` (state machine, facade) + `domain.rs`, `candidate.rs`,
   `transaction.rs`, `stage.rs`, `current_exe.rs`, `integrity.rs`, `lock.rs`,
-  `error.rs`, `test_support.rs`; six runnable `examples/` plus two integration
-  test files (`current_executable.rs`, `stale_lock_recovery.rs`) that drive real
-  running-image replacement and real lock races.
+  `error.rs`, `test_support.rs`, `failure_taxonomy_tests.rs`; six runnable
+  `examples/` plus four integration test files (`candidate_deadline.rs`,
+  `candidate_stdin.rs`, `current_executable.rs`, `stale_lock_recovery.rs`) that
+  drive real running-image replacement and real lock races.
 - `eggup-service` — `lib.rs` (neutral model + Unix mechanics),
+  `commit_engine.rs` (the single commit-and-rollback engine),
   `disposition.rs` (M006 runtime-authority barrier), `lifecycle_update.rs`
-  (definition writing + `commit_with_lifecycle`), `windows_scm.rs` (native SCM).
+  (lifecycle orchestration over the engine, policy/receipt/error types),
+  `windows_scm.rs` (native SCM).
 - `eggup-archive` — single `lib.rs`; the extraction, binding, and
   cleanup-guard machinery is large enough that the internal stages are the
   interesting review surface.
-- `eggup-eggpack` — single `lib.rs` plus three integration test files
-  (`interoperability.rs`, `archive_handoff.rs`, `caller_destinations.rs`);
-  integration tests outnumber unit tests, which is the right shape for a
-  conformance adapter.
+- `eggup-eggpack` — single `lib.rs` plus four integration test files
+  (`interoperability.rs`, `archive_handoff.rs`, `caller_destinations.rs`,
+  `digest_reuse.rs`); integration tests outnumber unit tests, which is the
+  right shape for a conformance adapter.
 
 ## Two orthogonal axes
 
@@ -201,7 +212,8 @@ The failure modes this workspace is most protective against, stated as review
 checks:
 
 - **`eggup-core` must not gain** transport, service-manager, Eggpack, or
-  authenticity-verifier dependencies. Its only dependency is `sha2`.
+  authenticity-verifier dependencies. Its only dependencies are `sha2` and the
+  Windows-only `self-replace` edge.
 - **`eggup-acquisition` must not gain** any dependency at all, and must not
   learn release policy (no "try the next version", no mirror logic).
 - **Adapters must not coordinate with each other.** `eggup-curl` does not know

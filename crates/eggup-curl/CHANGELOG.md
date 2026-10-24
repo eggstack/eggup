@@ -5,6 +5,37 @@
 Nothing in this section has been published. `0.1.2` is the published baseline on
 crates.io, and no publication milestone authorizes these entries.
 
+**Publication coupling with the seam's `0.2.0` release (Acquisition Transport
+M016).**
+
+- **Corrected: the compatibility consequence of a future republication.** The
+  M014 entry below stated that a future republication would keep this crate at
+  `0.1.3` and would require no consumer migration. Both halves are **false**
+  once the seam's next release is published. The seam's next release is
+  **`eggup-acquisition 0.2.0`**, and it is **source-breaking**:
+  `AcquisitionError::Io(String)` became `Io { operation, source }`, and the
+  enum derives `Debug` only. `0.2.0` does **not** satisfy the `^0.1.0`
+  requirement this crate declares today.
+- **This crate's requirement must widen at publication time.** The widening is
+  recorded here and applied by the publication milestone, not by this one:
+  `eggup-acquisition` = "0.2" (widened from "0.1.0").
+- **This crate's own next published version is therefore not `0.1.3`.** The
+  workspace is version-lockstep, so the seam's `0.2.0` release moves the
+  workspace version to `0.2.0`, and this crate's next publication is
+  `eggup-curl 0.2.0`.
+- **A consumer inherits the seam's source break.** A consumer that depends on
+  the seam **directly** inherits the source break when it moves to `0.2`, and a
+  consumer of this crate inherits it too once this crate is republished with
+  the widened requirement — the seam's `AcquisitionError` is part of this
+  crate's public surface, because `AcquisitionTransport::fetch` returns it.
+  Such a consumer must update its `AcquisitionError::Io` matchers, and must
+  stop cloning or comparing whole `AcquisitionError` values.
+- **What is unchanged.** This crate's own public API additions remain
+  additive, and **nothing published has changed**: the published `0.1.2`
+  artifact keeps its current shape and behavior, and the published
+  `eggup-acquisition 0.1.3` is untouched. This entry records the coupling; it
+  performs no publication, no version bump, and no manifest change.
+
 **Spawn-failure diagnosability (Acquisition Transport M015).**
 
 - **Fixed: a spawn failure reported no cause.** When `Command::spawn()` failed,
@@ -40,9 +71,11 @@ failure is unchanged, and the fallback contract is unchanged. The only
 consumer-visible difference is the **text** of the spawn-failure detail, which
 now carries the OS cause after the established
 `curl spawn failed for {redacted}` prefix. **No consumer migration is required
-in this crate**, and no publication or version bump is authorized by this
-milestone: the published `0.1.2` artifact keeps the cause-free detail until a
-separate republication milestone ships this change.
+by this crate's own API change**, and no publication or version bump is
+authorized by this milestone: the published `0.1.2` artifact keeps the
+cause-free detail until a separate republication milestone ships this change.
+A consumer's obligation when this crate is next published is recorded in the
+M016 entry above.
 
 **Adapter capability parity: a caller-settable `User-Agent` (Acquisition Transport
 M014).**
@@ -77,10 +110,13 @@ M014).**
   adding a field there would be source-breaking for every struct-literal
   construction — and `CurlTransport` gains only a **private** field, a new
   constructor, and a new accessor. No existing public signature was added,
-  removed, or retyped, so **no consumer migration is required**, and a future
-  republication would be a non-breaking `0.1.3`. **No publication or version
-  bump is authorized by this milestone**: the published `0.1.2` artifact keeps
-  its current shape and behavior.
+  removed, or retyped, so **no consumer migration is required by this crate's
+  own items**. The republication consequence stated here is **superseded** by
+  the M016 entry above: the next publication is not `0.1.3`, because the seam's
+  next release is `0.2.0` and this crate's `eggup-acquisition` requirement must
+  widen with it. **No publication or version bump is authorized by this
+  milestone**: the published `0.1.2` artifact keeps its current shape and
+  behavior.
 
 **Test-strengthening and internal consolidation (Acquisition Transport M013).**
 
@@ -121,8 +157,10 @@ the adapter gains no `User-Agent` surface **in M013** (M014 later added one;
 see the M014 entry above). The only consumer-visible
 consequence is the source break in `eggup-acquisition`'s `AcquisitionError::Io`
 variant, which this crate now builds through the seam's typed constructor
-(`eggup-acquisition` M013). **No consumer migration is required in this
-crate**, and no publication or version bump is authorized by this milestone.
+(`eggup-acquisition` M013). **No consumer migration is required by this crate's
+own API change**, and no publication or version bump is authorized by this
+milestone. A consumer's obligation when this crate is next published is
+recorded in the M016 entry above.
 
 **Test determinism hardening (Acquisition Transport M012).**
 

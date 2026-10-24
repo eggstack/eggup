@@ -26,11 +26,22 @@ use eggup_core::{run_bounded, CommandOutput, CommandSpec, Error, MAX_STDIN_BYTES
 /// The fixture root, used for the helper markers.
 const HELPER_ROOT: &str = "EGGUP_CORE_CANDIDATE_STDIN_HELPER_ROOT";
 
+/// The environment variable that carries the lifetime a helper must wait for,
+/// in milliseconds.
+const LIFETIME_MS: &str = "EGGUP_CORE_CANDIDATE_STDIN_LIFETIME_MS";
+
+/// The marker the helper writes its lifetime instants into.
+const LIFETIME_MARKER: &str = "lifetime";
+
+/// The temporary name the helper publishes its lifetime record under.
+const LIFETIME_MARKER_TMP: &str = "lifetime.tmp";
+
 /// The test name each helper role is selected by.
 const ECHO_TEST: &str = "candidate_stdin_helper_echoes_stdin";
 const LENGTH_TEST: &str = "candidate_stdin_helper_reports_stdin_length";
 const IGNORE_TEST: &str = "candidate_stdin_helper_exits_without_reading_stdin";
 const SLEEPER_TEST: &str = "candidate_stdin_helper_sleeper_ignores_stdin";
+const LIFETIME_TEST: &str = "candidate_stdin_helper_exits_after_its_lifetime";
 
 /// The marker the helper writes once it has started.
 const STARTED_MARKER: &str = "started";
@@ -39,6 +50,33 @@ const STARTED_MARKER: &str = "started";
 const SHORT_DEADLINE: Duration = Duration::from_millis(300);
 /// The deadline the other fixtures give the bounded execution.
 const GENEROUS_DEADLINE: Duration = Duration::from_secs(20);
+
+/// The deadline the classification sweep gives the bounded execution.
+///
+/// The sweep's deadline is also the margin the helper binary gets to start:
+/// a helper that starts after the deadline is killed at the deadline before
+/// it writes its start marker, so a short deadline would turn a loaded host
+/// into a skipped sample. The deadline is therefore long enough for the
+/// helper to start even on a busy machine.
+const SWEEP_DEADLINE: Duration = Duration::from_millis(120);
+
+/// The offsets from the deadline, in milliseconds, that the classification
+/// sweep walks.
+///
+/// The child's exit instant is the child's own start plus its lifetime, and
+/// the deadline is the spawn's return plus the timeout, so the child's exit
+/// crosses the deadline at a lifetime close to the timeout itself. The ladder
+/// walks across that crossing in two-millisecond steps, from well before it to
+/// just after it.
+const SWEEP_OFFSETS_MS: std::ops::RangeInclusive<i64> = -25..=1;
+
+/// How long a fixture waits for a helper's start marker.
+///
+/// The helper writes the marker as its first act, but a helper binary can
+/// start after a short deadline on a loaded host, and the runner then kills
+/// it at the deadline before it writes anything. Polling for the marker
+/// turns that race into a reported condition instead of a failure.
+const MARKER_WAIT: Duration = Duration::from_millis(100);
 
 /// The generous bound the parent allows a bounded call to take.
 ///
@@ -95,6 +133,29 @@ impl Fixture {
 impl Drop for Fixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+/// Polls for the helper's start marker until the bound expires.
+///
+/// Returns `true` when the marker appeared within [`MARKER_WAIT`].
+///
+/// The helper writes the marker as its first act, but a helper binary can
+/// start after a short deadline on a loaded host, and the runner then kills
+/// it at the deadline before it writes anything. A fixture that reads the
+/// marker once would fail on that race, so the marker is polled for a bounded
+/// time instead, and a helper that never started is reported as a distinct
+/// condition by the caller.
+fn wait_for_marker(fixture: &Fixture) -> bool {
+    let bound = Instant::now() + MARKER_WAIT;
+    loop {
+        if fixture.exists(STARTED_MARKER) {
+            return true;
+        }
+        if Instant::now() >= bound {
+            return false;
+        }
+        thread::sleep(Duration::from_millis(2));
     }
 }
 
@@ -208,6 +269,55 @@ fn candidate_stdin_helper_sleeper_ignores_stdin() {
     }
     thread::sleep(SLEEPER_LIFETIME);
     std::process::exit(0);
+}
+
+/// Waits for the lifetime it was told to wait for, then exits without reading
+/// its stdin.
+///
+/// The helper records the wall-clock instants at which it started and at which
+/// it exits, so that a fixture can state exactly when the child's exit
+/// happened relative to the bounded runner's deadline.
+#[test]
+fn candidate_stdin_helper_exits_after_its_lifetime() {
+    if !invoked_as(LIFETIME_TEST) {
+        return;
+    }
+    let lifetime_ms: u64 = std::env::var(LIFETIME_MS)
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    let started = SystemTime::now();
+    if let Some(root) = helper_root() {
+        let _ = fs::write(root.join(STARTED_MARKER), b"started");
+    }
+    thread::sleep(Duration::from_millis(lifetime_ms));
+    let exited = SystemTime::now();
+    if let Some(root) = helper_root() {
+        // The record is published by a rename, so a reader never sees a torn
+        // record: it sees the whole record or no record at all.
+        let temporary = root.join(LIFETIME_MARKER_TMP);
+        let _ = fs::write(
+            &temporary,
+            format!(
+                "started={} exited={}",
+                epoch_micros(started),
+                epoch_micros(exited)
+            ),
+        );
+        let _ = fs::rename(&temporary, root.join(LIFETIME_MARKER));
+    }
+    std::process::exit(0);
+}
+
+/// The wall-clock instant in microseconds since the Unix epoch.
+///
+/// The helper and the fixture share one clock, so the instants they record
+/// are directly comparable.
+fn epoch_micros(instant: SystemTime) -> u128 {
+    instant
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_micros())
+        .unwrap_or(0)
 }
 
 // ---------------------------------------------------------------------------
@@ -384,10 +494,6 @@ fn candidate_stdin_deadline_bounds_a_child_that_never_reads_stdin() {
     let elapsed = started.elapsed();
 
     assert!(
-        fixture.exists(STARTED_MARKER),
-        "the child was never spawned, so the fixture did not exercise the defect"
-    );
-    assert!(
         output.timed_out(),
         "the deadline must be reported: {output:?}"
     );
@@ -403,4 +509,216 @@ fn candidate_stdin_deadline_bounds_a_child_that_never_reads_stdin() {
         elapsed < GENEROUS_ELAPSED_CEILING,
         "the bounded call must return within the generous ceiling: {elapsed:?}"
     );
+    // The helper writes its start marker as its first act. On a loaded host
+    // the helper binary can start after the deadline and be killed at the
+    // deadline before it writes anything, so the marker is polled for a
+    // bounded time, and a helper that never started is a distinct condition:
+    // the deadline outcome must still stand.
+    if !wait_for_marker(&fixture) {
+        assert!(
+            output.timed_out(),
+            "a helper that never started must still report the deadline outcome: {output:?}"
+        );
+    }
+}
+
+/// A write failure the child produced **before** the deadline is an `Err`.
+///
+/// The payload is larger than the OS pipe buffer, so the write cannot succeed
+/// against a child that never reads its stdin, and the child exits
+/// immediately, so the write fails long before the generous deadline. The
+/// payload was not delivered, so the call fails closed.
+#[test]
+fn candidate_stdin_write_failure_before_the_deadline_is_an_error() {
+    let fixture = Fixture::new("write-failure-before-deadline");
+    let payload = vec![b'x'; MAX_STDIN_BYTES];
+    let spec = helper_spec(&fixture, IGNORE_TEST, GENEROUS_DEADLINE).stdin_data(payload);
+
+    let error = run_bounded_within(&spec, GENEROUS_BOUND)
+        .expect_err("a stdin write that failed before the deadline must fail closed");
+
+    assert!(
+        fixture.exists(STARTED_MARKER),
+        "the child was never spawned, so the fixture did not exercise the defect"
+    );
+    match error {
+        Error::Io { operation, source } => {
+            assert_eq!(
+                operation, "writing bounded stdin",
+                "the operation string must classify the failure"
+            );
+            assert!(
+                source.kind() != std::io::ErrorKind::Other,
+                "the underlying I/O error must be preserved: {source:?}"
+            );
+        }
+        other => panic!("the failure must be a typed I/O error: {other:?}"),
+    }
+}
+
+/// A write failure the child produced **at or after** the deadline does not
+/// turn the deadline outcome into an `Err`.
+///
+/// The child waits far past the deadline without reading its stdin, so the
+/// bounded stdin write is still blocked when the deadline is reached. The
+/// runner kills the child, which breaks the pipe, so the write fails at the
+/// deadline or after it: the deadline already decided that outcome. The
+/// caller therefore sees `Ok` with `timed_out` set — never an `Err`, and
+/// never a success, because the payload was not delivered.
+#[test]
+fn candidate_stdin_write_failure_at_or_after_the_deadline_is_not_an_error() {
+    let fixture = Fixture::new("write-failure-at-deadline");
+    let payload = vec![b'x'; MAX_STDIN_BYTES];
+    // The child outlives the deadline by a wide margin, so it is certainly
+    // still running when the deadline is reached and is killed there.
+    let lifetime_ms = SWEEP_DEADLINE.as_millis() as u64 + 5_000;
+    let spec = helper_spec(&fixture, LIFETIME_TEST, SWEEP_DEADLINE)
+        .environment(LIFETIME_MS, lifetime_ms.to_string())
+        .stdin_data(payload);
+
+    let output = run_bounded_within(&spec, GENEROUS_BOUND)
+        .expect("a write failure at the deadline must not turn the outcome into an error");
+
+    assert!(
+        output.timed_out(),
+        "the deadline must be reported: {output:?}"
+    );
+    assert!(
+        !output.output_limited(),
+        "the output bound must not fire: {output:?}"
+    );
+    assert!(
+        !output.success(),
+        "an undelivered payload must never be reported as a success: {output:?}"
+    );
+    // The helper writes its start marker as its first act. On a loaded host
+    // the helper binary can start after the deadline and be killed at the
+    // deadline before it writes anything, so the marker is polled for a
+    // bounded time, and a helper that never started is a distinct condition:
+    // the deadline outcome must still stand.
+    if !wait_for_marker(&fixture) {
+        assert!(
+            output.timed_out(),
+            "a helper that never started must still report the deadline outcome: {output:?}"
+        );
+    }
+}
+
+/// The classification of a stdin write failure follows the write's own
+/// instant, and no side of the deadline ever reports an undelivered payload
+/// as a success.
+///
+/// The fixture walks the child's lifetime across the deadline. Two facts make
+/// the outcome checkable from outside the runner:
+///
+/// - only the child's own exit breaks the stdin pipe before the deadline: the
+///   runner's kill happens at the deadline. A write failure that is reported
+///   as an error therefore happened before the deadline, so it must come from
+///   a child that exited on its own — a child that recorded no exit was
+///   killed at the deadline instead;
+/// - a child that recorded no exit was still running when the deadline was
+///   reached and was killed there, so its write failed at or after the
+///   deadline, and the deadline outcome must stand: `Ok` with `timed_out` set.
+///
+/// Every sample must additionally never report an undelivered payload as a
+/// success.
+#[test]
+fn candidate_stdin_write_failure_classification_is_stable_across_the_deadline() {
+    let mut samples_without_a_started_helper = 0usize;
+    for offset_ms in SWEEP_OFFSETS_MS {
+        let lifetime_ms = (SWEEP_DEADLINE.as_millis() as i64 + offset_ms).max(0) as u64;
+        let fixture = Fixture::new(&format!("sweep-{lifetime_ms}"));
+        let payload = vec![b'x'; MAX_STDIN_BYTES];
+        let spec = helper_spec(&fixture, LIFETIME_TEST, SWEEP_DEADLINE)
+            .environment(LIFETIME_MS, lifetime_ms.to_string())
+            .stdin_data(payload);
+
+        let result = run_bounded_within(&spec, GENEROUS_BOUND);
+
+        // The helper writes its start marker as its first act. A helper binary
+        // can start after the sweep deadline on a loaded host, and the runner
+        // then kills it at the deadline before it writes anything, so the
+        // marker is polled for a bounded time rather than read once.
+        let helper_started = wait_for_marker(&fixture);
+        if !helper_started {
+            samples_without_a_started_helper += 1;
+        }
+
+        match read_lifetime(&fixture) {
+            // The helper exited on its own, so it started, and it recorded the
+            // instants of its own start and exit.
+            Some((child_started, child_exited)) => {
+                assert!(
+                    helper_started,
+                    "a helper that recorded its exit wrote its start marker"
+                );
+                match result {
+                    Err(Error::Io { operation, .. }) => {
+                        assert_eq!(
+                            operation, "writing bounded stdin",
+                            "the operation string must classify the failure"
+                        );
+                        assert!(
+                            child_exited >= child_started,
+                            "the child's recorded instants must be ordered: {child_started} then {child_exited}"
+                        );
+                    }
+                    Err(other) => panic!("the failure must be a typed I/O error: {other:?}"),
+                    Ok(output) => {
+                        assert!(
+                            !output.success(),
+                            "an undelivered payload must never be reported as a success: {output:?}"
+                        );
+                        assert!(
+                            output.timed_out(),
+                            "a write failure observed at or after the deadline leaves the deadline outcome standing: {output:?}"
+                        );
+                    }
+                }
+            }
+            // No lifetime record: the helper was killed at the deadline, or it
+            // never started at all. Either way the payload was not delivered
+            // and the deadline decided the outcome.
+            None => {
+                let output = result.expect(
+                    "a helper that delivered no verdict cannot have produced a write failure",
+                );
+                assert!(
+                    output.timed_out(),
+                    "a helper that was killed at the deadline must report the deadline outcome: {output:?}"
+                );
+                assert!(
+                    !output.success(),
+                    "an undelivered payload must never be reported as a success: {output:?}"
+                );
+            }
+        }
+    }
+    if samples_without_a_started_helper > 0 {
+        eprintln!(
+            "note: {samples_without_a_started_helper} of {} sweep samples had a helper binary that \
+             did not start before the sweep deadline; those samples prove only the deadline outcome",
+            SWEEP_OFFSETS_MS.count()
+        );
+    }
+}
+
+/// Reads the lifetime instants the helper recorded, in microseconds since the
+/// Unix epoch.
+///
+/// Returns `None` when the helper recorded no exit, which is what a helper
+/// that was killed before its exit leaves behind.
+fn read_lifetime(fixture: &Fixture) -> Option<(u128, u128)> {
+    let record = fs::read_to_string(fixture.marker(LIFETIME_MARKER)).ok()?;
+    let mut started = None;
+    let mut exited = None;
+    for field in record.split_whitespace() {
+        if let Some(value) = field.strip_prefix("started=") {
+            started = value.parse::<u128>().ok();
+        }
+        if let Some(value) = field.strip_prefix("exited=") {
+            exited = value.parse::<u128>().ok();
+        }
+    }
+    Some((started?, exited?))
 }

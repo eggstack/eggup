@@ -14,6 +14,7 @@
 
 const CRATE_SOURCE: &str = include_str!("../src/lib.rs");
 const TYPED_IO_TESTS: &str = include_str!("typed_io_contract.rs");
+const PUBLICATION_COUPLING_TESTS: &str = include_str!("publication_coupling.rs");
 
 /// The vacuous-exit needle, assembled at runtime so this guard's own source
 /// never contains the literal pattern it forbids.
@@ -31,6 +32,7 @@ fn sources() -> Vec<(&'static str, &'static str)> {
     vec![
         ("src/lib.rs", CRATE_SOURCE),
         ("tests/typed_io_contract.rs", TYPED_IO_TESTS),
+        ("tests/publication_coupling.rs", PUBLICATION_COUPLING_TESTS),
     ]
 }
 
@@ -140,6 +142,20 @@ fn required_behaviors_have_named_asserting_tests() {
         (
             "the redaction caps are byte-identical after consolidation",
             &["redaction_caps_are_byte_identical_after_consolidation"],
+        ),
+        (
+            "the seam's changelog declares exactly one Unreleased section with the next release",
+            &["seam_changelog_declares_exactly_one_unreleased_section_with_a_next_release"],
+        ),
+        (
+            "every in-workspace dependent either accepts the declared next release or records the required widening",
+            &["dependent_requirements_accept_the_next_release_or_record_the_widening"],
+        ),
+        (
+            "the published adapters record the required widening and claim no contradicted republication version",
+            &[
+                "adapter_changelogs_record_the_widening_and_assert_no_contradicted_republication_version",
+            ],
         ),
     ];
 
