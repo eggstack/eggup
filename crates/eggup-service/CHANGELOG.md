@@ -87,6 +87,32 @@ that matches `ServiceError::Manager` positionally or branches on its message
 text; that migration becomes necessary only at republication, and the exact
 replacement is named in its entry below.
 
+- **Changed: `SystemExecutor`'s bounded runner now delegates to
+  `eggup_core::run_bounded`.** The hand-rolled spawn, reader threads, writer
+  thread, and wait loop in `SystemExecutor::run` are replaced by one
+  `eggup_core::CommandSpec` and one `eggup_core::run_bounded` call. The
+  service keeps every policy decision in front of that call: the argv
+  emptiness and NUL checks, the timeout range check, the `MAX_CRONTAB_BYTES`
+  stdin bound, the allowlisted absolute program path (never the raw
+  `argv[0]`), and the filtered child environment. The observable outcomes
+  are preserved under an explicit, exhaustive mapping: the same
+  `ManagerFailureKind` for every reachable failure, the same status and
+  bounded output on success, and the same pre-flight rejections. Seven
+  differences are recorded in `architecture/service-lifecycle.md` §
+  "Behaviour differences of the consolidation": two are stronger (a reader
+  error and an output overflow now fail closed, and an overflowing child is
+  now killed and reaped), one normalises the timeout detail text, one drops a
+  non-UTF-8 environment pair rather than passing it through lossily, one is
+  unchanged, and one changes the kind in a deep corner that has no portable
+  fixture. **The public API is unchanged** — `CommandExecutor`,
+  `SystemExecutor` (including its public `max_output_bytes` field),
+  `ManagerCommandOutput`, and the `ServiceError` / `ManagerFailureKind`
+  taxonomies all keep their exact shapes, and the public-API guard still
+  passes with its snapshot unmodified. **No new dependency, no manifest
+  change, and no lockfile change.** This entry is **unpublished**: the
+  published `eggup-service 0.1.3` keeps the hand-rolled runner until a
+  separate republication milestone, and **no consumer migration is
+  required**.
 - **Fixed: two divergent copies of the destructive commit/rollback engine.**
   `disposition.rs` and `lifecycle_update.rs` each carried a full orchestrator
   and their own copies of the transition, rollback-quiesce, panic-safe-inspect,

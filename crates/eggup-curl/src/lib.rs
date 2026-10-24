@@ -26,6 +26,15 @@ pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_TOTAL_TIMEOUT: Duration = Duration::from_secs(120);
 /// Default redirect bound when following is enabled.
 pub const DEFAULT_MAX_REDIRECTS: usize = 10;
+/// Maximum accepted outbound `User-Agent` length, in bytes.
+///
+/// The bound keeps the outbound header value a bounded HTTP field value. It
+/// matches the 512-byte magnitude this adapter already uses for bounded
+/// diagnostics. A longer value is rejected with
+/// [`AcquisitionError::InvalidInput`]; see
+/// [`CurlTransport::with_executable_and_user_agent`] for the full accepted
+/// grammar.
+pub const MAX_USER_AGENT_BYTES: usize = 512;
 /// Bound for captured curl stdout (`-w "%{http_code}"` plus slack).
 const MAX_WRITE_OUT_BYTES: u64 = 64;
 /// Parent polling granularity while waiting for the owned child.
@@ -165,6 +174,7 @@ impl CurlConfig {
 pub struct CurlTransport {
     executable: PathBuf,
     config: CurlConfig,
+    user_agent: Option<String>,
 }
 
 impl CurlTransport {
@@ -174,6 +184,10 @@ impl CurlTransport {
     /// [`discover_curl_executable`] is opt-in only. Config validation happens
     /// here; executable existence/spawn is classified per-request as
     /// `Unavailable` so composition can fall back.
+    ///
+    /// The constructed adapter sends **no** `User-Agent`: no `--user-agent`
+    /// element reaches `curl`, so `curl` applies its own default. Use
+    /// [`CurlTransport::with_executable_and_user_agent`] to set one.
     pub fn with_executable(
         executable: impl Into<PathBuf>,
         config: CurlConfig,
@@ -185,7 +199,61 @@ impl CurlTransport {
                 "curl executable path must not be empty".to_string(),
             )));
         }
-        Ok(Self { executable, config })
+        Ok(Self {
+            executable,
+            config,
+            user_agent: None,
+        })
+    }
+
+    /// Builds an adapter from an explicit executable path plus config and a
+    /// caller-supplied outbound `User-Agent` value.
+    ///
+    /// The value is validated here and is used for **every** request this
+    /// adapter makes. It reaches `curl` as the literal argv element following
+    /// `--user-agent`, positioned before the `--` separator and the URL. No
+    /// shell is involved, so the value is never re-parsed or interpolated.
+    ///
+    /// # Accepted grammar
+    ///
+    /// ```text
+    /// user-agent = 1*( VCHAR / SP / obs-text )
+    /// VCHAR      = %x21-7E          ; printable ASCII, excluding SP
+    /// SP         = %x20            ; permitted only between two non-SP characters
+    /// obs-text   = %xA0-10FFFF     ; any non-ASCII scalar value (C1 excluded)
+    /// ```
+    ///
+    /// The value is rejected with [`AcquisitionError::InvalidInput`] when it is
+    /// empty, when its UTF-8 length exceeds [`MAX_USER_AGENT_BYTES`], when it
+    /// contains any C0 control character (including `CR`, `LF`, `NUL`, and
+    /// `HTAB`), `DEL` (`U+007F`), or any C1 control character
+    /// (`U+0080`-`U+009F`), or when it begins or ends with a space.
+    ///
+    /// `InvalidInput` is terminal: unlike `Unavailable` it never causes a
+    /// composed transport to fall back to another adapter.
+    ///
+    /// The control characters are refused because `curl` does not sanitize
+    /// `--user-agent`: a value containing `CR LF` would be written into the
+    /// request head verbatim and inject an additional header.
+    pub fn with_executable_and_user_agent(
+        executable: impl Into<PathBuf>,
+        config: CurlConfig,
+        user_agent: impl Into<String>,
+    ) -> Result<Self, AcquisitionError> {
+        config.validate()?;
+        let executable = executable.into();
+        if executable.as_os_str().is_empty() {
+            return Err(AcquisitionError::InvalidInput(bound(
+                "curl executable path must not be empty".to_string(),
+            )));
+        }
+        let user_agent = user_agent.into();
+        validate_user_agent(&user_agent)?;
+        Ok(Self {
+            executable,
+            config,
+            user_agent: Some(user_agent),
+        })
     }
 
     /// Returns the configured executable path.
@@ -197,6 +265,65 @@ impl CurlTransport {
     pub fn config(&self) -> &CurlConfig {
         &self.config
     }
+
+    /// Returns the outbound `User-Agent` value this adapter will send.
+    ///
+    /// `None` means no `--user-agent` element is emitted and `curl` applies
+    /// its own default. See
+    /// [`CurlTransport::with_executable_and_user_agent`] for the accepted
+    /// grammar.
+    pub fn user_agent(&self) -> Option<&str> {
+        self.user_agent.as_deref()
+    }
+}
+
+/// Validates a caller-supplied outbound `User-Agent` value.
+///
+/// The accepted grammar is the one documented on
+/// [`CurlTransport::with_executable_and_user_agent`]. Every rejection is
+/// `InvalidInput`, which is terminal: it never lets a composed transport fall
+/// back to another adapter because of a malformed caller input.
+fn validate_user_agent(user_agent: &str) -> Result<(), AcquisitionError> {
+    if user_agent.is_empty() {
+        return Err(AcquisitionError::InvalidInput(bound(
+            "user agent must not be empty".to_string(),
+        )));
+    }
+    if user_agent.len() > MAX_USER_AGENT_BYTES {
+        return Err(AcquisitionError::InvalidInput(bound(
+            "user agent exceeds the maximum length".to_string(),
+        )));
+    }
+    let mut chars = user_agent.chars();
+    let first = chars.next();
+    let last = user_agent.chars().next_back();
+    // An HTTP field value is delimited by optional whitespace that a recipient
+    // may strip, so a value with surrounding spaces would not be transmitted
+    // faithfully.
+    if first == Some(' ') || last == Some(' ') {
+        return Err(AcquisitionError::InvalidInput(bound(
+            "user agent must not begin or end with a space".to_string(),
+        )));
+    }
+    for ch in user_agent.chars() {
+        let permitted = match ch {
+            // VCHAR: printable ASCII, excluding SP.
+            '\u{21}'..='\u{7E}' => true,
+            // SP: interior only; the surrounding-space case is refused above.
+            '\u{20}' => true,
+            // obs-text: any non-ASCII scalar value, C1 controls excluded.
+            '\u{A0}'..='\u{10FFFF}' => true,
+            // Everything else is a C0 control (CR, LF, NUL, HTAB, ...), DEL, or
+            // a C1 control.
+            _ => false,
+        };
+        if !permitted {
+            return Err(AcquisitionError::InvalidInput(bound(
+                "user agent must not contain control characters".to_string(),
+            )));
+        }
+    }
+    Ok(())
 }
 
 impl AcquisitionTransport for CurlTransport {
@@ -237,6 +364,7 @@ impl AcquisitionTransport for CurlTransport {
         let outcome = run_curl_to_file(
             &self.executable,
             &self.config,
+            self.user_agent.as_deref(),
             request,
             &tmp,
             &mut file,
@@ -317,6 +445,7 @@ impl AcquisitionTransport for CurlTransport {
         let outcome = run_curl_to_file(
             &self.executable,
             &self.config,
+            self.user_agent.as_deref(),
             request,
             &tmp,
             &mut file,
@@ -539,11 +668,18 @@ fn redirect_protocols(config: &CurlConfig, url: &str) -> Vec<String> {
 #[allow(clippy::too_many_arguments)]
 fn build_curl_args(
     config: &CurlConfig,
+    user_agent: Option<&str>,
     url: &str,
     max_bytes: u64,
     eff_connect: Duration,
     eff_total: Duration,
 ) -> Result<Vec<String>, AcquisitionError> {
+    // The caller-supplied value is re-validated here, before a single element
+    // is pushed, so an invalid value can never produce an argv and can never
+    // reach the wire.
+    if let Some(agent) = user_agent {
+        validate_user_agent(agent)?;
+    }
     // Ignore ~/.curlrc so ambient config cannot smuggle proxy/auth policy.
     let mut args: Vec<String> = vec![
         "--disable".to_string(),
@@ -575,6 +711,13 @@ fn build_curl_args(
         args.push("--noproxy".to_string());
         args.push("*".to_string());
     }
+    if let Some(agent) = user_agent {
+        // A literal argv element: the child is spawned without a shell, so the
+        // value is transmitted exactly as given and cannot be re-parsed as an
+        // option (curl takes the element after `--user-agent` as the value).
+        args.push("--user-agent".to_string());
+        args.push(agent.to_string());
+    }
     args.push("--output".to_string());
     args.push("-".to_string());
     args.push("--write-out".to_string());
@@ -601,6 +744,7 @@ fn proxy_kind(config: &CurlConfig) -> ProxyKind {
 fn run_curl_to_file(
     executable: &Path,
     config: &CurlConfig,
+    user_agent: Option<&str>,
     request: &AcquisitionRequest,
     output: &Path,
     output_file: &mut File,
@@ -611,7 +755,7 @@ fn run_curl_to_file(
 ) -> Result<CurlOutcome, AcquisitionError> {
     let url = request.url().to_string();
     let redacted = request.redacted();
-    let args = build_curl_args(config, &url, max_bytes, eff_connect, eff_total)?;
+    let args = build_curl_args(config, user_agent, &url, max_bytes, eff_connect, eff_total)?;
     let proxy_env = proxy_env_snapshot(&config.proxy);
     let start = Instant::now();
     let deadline = start + eff_total;
@@ -1015,6 +1159,42 @@ mod tests {
             0,
             false,
         )
+    }
+
+    /// Serves one request and records the raw request head the client sent.
+    ///
+    /// `serve_once` proves the adapter's behavior; this variant additionally
+    /// captures what the peer actually received, so a header the adapter sets
+    /// can be asserted on the wire rather than only in the child's argv.
+    /// The head is written before the response is sent, so a client that has
+    /// received the response is guaranteed to find the record on disk.
+    #[cfg(not(windows))]
+    fn serve_once_recording_head(status: u16, body: Vec<u8>, record: &Path) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().unwrap();
+        let record = record.to_path_buf();
+        thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+                stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+                let mut buf = [0u8; 8192];
+                let read = stream.read(&mut buf).unwrap_or(0);
+                let _ = fs::write(&record, &buf[..read]);
+                let reason = match status {
+                    200 => "OK",
+                    404 => "Not Found",
+                    500 => "Internal Server Error",
+                    _ => "OK",
+                };
+                let mut head = format!("HTTP/1.1 {status} {reason}\r\n");
+                head.push_str(&format!("Content-Length: {}\r\n", body.len()));
+                head.push_str("Content-Type: application/octet-stream\r\n");
+                head.push_str("Connection: close\r\n\r\n");
+                let _ = stream.write_all(head.as_bytes());
+                let _ = stream.write_all(&body);
+            }
+        });
+        format!("http://{addr}")
     }
 
     /// Minimal fake curl executable (Unix-only): writes a fixed body to stdout
@@ -1523,6 +1703,7 @@ mod tests {
         // is narrowed.
         let https = build_curl_args(
             &cfg,
+            None,
             "https://example.com/artifact",
             1024,
             Duration::from_secs(1),
@@ -1535,6 +1716,7 @@ mod tests {
         // A cleartext request may still be redirected to either scheme.
         let http = build_curl_args(
             &cfg,
+            None,
             "http://example.com/artifact",
             1024,
             Duration::from_secs(1),
@@ -1547,6 +1729,7 @@ mod tests {
         // Scheme comparison is case-insensitive, as URLs are.
         let upper = build_curl_args(
             &cfg,
+            None,
             "HTTPS://example.com/artifact",
             1024,
             Duration::from_secs(1),
@@ -1560,6 +1743,7 @@ mod tests {
         let http_only = CurlConfig::strict().allowed_protocols(vec!["http".to_string()]);
         let denied = build_curl_args(
             &http_only,
+            None,
             "https://example.com/artifact",
             1024,
             Duration::from_secs(1),
@@ -1594,7 +1778,7 @@ mod tests {
             ),
         ];
         for (connect, total, expected_connect, expected_total) in cases {
-            let args = build_curl_args(&cfg, "https://example.com/x", 1024, connect, total)
+            let args = build_curl_args(&cfg, None, "https://example.com/x", 1024, connect, total)
                 .expect("builds");
             let connect_idx = args
                 .iter()
@@ -1611,6 +1795,7 @@ mod tests {
         // than widen to a second.
         let err = build_curl_args(
             &cfg,
+            None,
             "https://example.com/x",
             1024,
             Duration::from_nanos(500),
@@ -1648,8 +1833,15 @@ mod tests {
         let (eff_connect, eff_total) = cfg.effective_timeouts(sub_second_pair);
         assert_eq!(eff_connect, Duration::from_millis(250));
         assert_eq!(eff_total, Duration::from_millis(750));
-        let args = build_curl_args(&cfg, "https://example.com/x", 1024, eff_connect, eff_total)
-            .expect("builds");
+        let args = build_curl_args(
+            &cfg,
+            None,
+            "https://example.com/x",
+            1024,
+            eff_connect,
+            eff_total,
+        )
+        .expect("builds");
         assert_eq!(value_after(&args, "--connect-timeout"), "0.25");
         assert_eq!(value_after(&args, "--max-time"), "0.75");
 
@@ -1662,6 +1854,7 @@ mod tests {
         assert_eq!(capped_total, Duration::from_millis(400));
         let capped_args = build_curl_args(
             &capped,
+            None,
             "https://example.com/x",
             1024,
             capped_connect,
@@ -1680,6 +1873,7 @@ mod tests {
         // than widen to a second.
         let err = build_curl_args(
             &cfg,
+            None,
             "https://example.com/x",
             1024,
             Duration::from_nanos(500),
@@ -2031,6 +2225,299 @@ mod tests {
             )
             .unwrap();
         assert_eq!(out.success().unwrap().bytes(), b"via-fixture");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// M014 (§6.2, §6.4): a configured `User-Agent` reaches `curl` as a
+    /// literal argv element, positioned before the `--` separator and the URL.
+    ///
+    /// The position matters: `--` is what isolates the URL from the options,
+    /// so an option emitted after it would be read as part of the URL rather
+    /// than as an option.
+    #[test]
+    fn user_agent_is_emitted_as_a_literal_argv_element_before_the_url() {
+        let cfg = CurlConfig::strict();
+        let agent = "eggup-curl-test/1.0 (Macintosh; x86_64)";
+        let args = build_curl_args(
+            &cfg,
+            Some(agent),
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect("builds");
+        let flag = args
+            .iter()
+            .position(|a| a == "--user-agent")
+            .expect("the user agent flag is present");
+        assert_eq!(
+            args[flag + 1],
+            agent,
+            "the value must be the exact element following the flag"
+        );
+        assert_eq!(
+            args.iter().filter(|a| *a == "--user-agent").count(),
+            1,
+            "the flag must appear exactly once"
+        );
+        let separator = args.iter().position(|a| a == "--").expect("separator");
+        let url = args
+            .iter()
+            .position(|a| a == "https://example.com/x")
+            .expect("url");
+        assert!(
+            flag < separator,
+            "--user-agent must be emitted before the -- separator"
+        );
+        assert!(separator < url, "the -- separator must precede the URL");
+        assert_eq!(url, args.len() - 1, "the URL stays the last element");
+    }
+
+    /// M014 (§6.3, R3-R5): a value carrying a control character is rejected
+    /// as `InvalidInput`, and no argv is produced for it.
+    ///
+    /// `curl` does not sanitize `--user-agent`: a `CR LF` inside the value is
+    /// written into the request head verbatim and injects a second header.
+    /// The adapter therefore refuses the value before it can reach the wire.
+    #[test]
+    fn user_agent_rejects_control_characters_without_producing_argv() {
+        let cfg = CurlConfig::strict();
+        let rejected = [
+            "eggup\r\nX-Injected: 1",
+            "eggup\rvalue",
+            "eggup\nvalue",
+            "eggup\u{0}value",
+            "eggup\tvalue",
+            "eggup\u{7F}value",
+            "eggup\u{85}value",
+            "eggup\u{9F}value",
+        ];
+        for bad in rejected {
+            let err = build_curl_args(
+                &cfg,
+                Some(bad),
+                "https://example.com/x",
+                1024,
+                Duration::from_secs(1),
+                Duration::from_secs(2),
+            )
+            .expect_err("a control character must be rejected");
+            assert!(
+                matches!(err, AcquisitionError::InvalidInput(_)),
+                "expected InvalidInput for {bad:?}, got {err:?}"
+            );
+            // The constructor refuses it too, so no transport can carry it.
+            let ctor = CurlTransport::with_executable_and_user_agent(
+                "/usr/bin/curl",
+                CurlConfig::strict(),
+                bad,
+            )
+            .expect_err("a control character must be refused at construction");
+            assert!(
+                matches!(ctor, AcquisitionError::InvalidInput(_)),
+                "expected InvalidInput for {bad:?}, got {ctor:?}"
+            );
+        }
+    }
+
+    /// M014 (§6.3, R1-R2): the empty value and an over-bound value are
+    /// rejected, and a value exactly at the bound is accepted.
+    #[test]
+    fn user_agent_rejects_empty_and_over_bound_values() {
+        let cfg = CurlConfig::strict();
+        let empty = build_curl_args(
+            &cfg,
+            Some(""),
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect_err("an empty value must be rejected");
+        assert!(matches!(empty, AcquisitionError::InvalidInput(_)));
+
+        let at_bound = "a".repeat(MAX_USER_AGENT_BYTES);
+        let ok = build_curl_args(
+            &cfg,
+            Some(&at_bound),
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect("a value exactly at the bound must be accepted");
+        let flag = ok
+            .iter()
+            .position(|a| a == "--user-agent")
+            .expect("the user agent flag is present");
+        assert_eq!(ok[flag + 1], at_bound);
+
+        let over_bound = "a".repeat(MAX_USER_AGENT_BYTES + 1);
+        let err = build_curl_args(
+            &cfg,
+            Some(&over_bound),
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect_err("an over-bound value must be rejected");
+        assert!(matches!(err, AcquisitionError::InvalidInput(_)));
+
+        // The constructor applies the same bound.
+        let ctor = CurlTransport::with_executable_and_user_agent(
+            "/usr/bin/curl",
+            CurlConfig::strict(),
+            over_bound.clone(),
+        )
+        .expect_err("an over-bound value must be refused at construction");
+        assert!(matches!(ctor, AcquisitionError::InvalidInput(_)));
+    }
+
+    /// M014 (§6.5): the default transport sends no `User-Agent`, and its argv
+    /// is element-for-element what it was before the control existed.
+    ///
+    /// The published `eggup-curl 0.1.2` behavior is what a consumer already
+    /// observes on the wire, so the default path must not change silently.
+    #[test]
+    fn default_transport_emits_no_user_agent_and_keeps_the_previous_argv() {
+        let cfg = CurlConfig::strict();
+        let transport = CurlTransport::with_executable("/usr/bin/curl", cfg.clone())
+            .expect("the transport builds");
+        assert_eq!(
+            transport.user_agent(),
+            None,
+            "the default transport must not carry a user agent"
+        );
+
+        let args = build_curl_args(
+            &cfg,
+            None,
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect("builds");
+        assert!(
+            !args.iter().any(|a| a == "--user-agent"),
+            "the default argv must not carry --user-agent"
+        );
+        assert_eq!(
+            args,
+            vec![
+                "--disable",
+                "--silent",
+                "--show-error",
+                "--no-progress-meter",
+                "--location",
+                "--max-redirs",
+                "10",
+                "--connect-timeout",
+                "1",
+                "--max-time",
+                "2",
+                "--max-filesize",
+                "1024",
+                "--proto",
+                "=http,https",
+                "--proto-redir",
+                "=https",
+                "--noproxy",
+                "*",
+                "--output",
+                "-",
+                "--write-out",
+                "%{stderr}%{http_code}",
+                "--",
+                "https://example.com/x",
+            ],
+            "the default argv must be unchanged"
+        );
+    }
+
+    /// M014 (§6.3): a rejected caller value is a terminal `InvalidInput`, and
+    /// a composed transport does not fall back on it.
+    ///
+    /// `Unavailable` is the only outcome the seam falls back on. A malformed
+    /// caller input must therefore never be classified as `Unavailable`, or a
+    /// composed transport would silently serve the request from another
+    /// adapter.
+    #[test]
+    fn rejected_user_agent_is_a_terminal_invalid_input_not_unavailable() {
+        use eggup_acquisition::{ComposedTransport, CompositionPolicy};
+        let err = CurlTransport::with_executable_and_user_agent(
+            "/usr/bin/curl",
+            CurlConfig::strict(),
+            "bad\rvalue",
+        )
+        .expect_err("a control character must be refused at construction");
+        assert!(matches!(err, AcquisitionError::InvalidInput(_)));
+        assert!(
+            !err.is_unavailable(),
+            "a rejected caller value must never be classified as unavailable"
+        );
+
+        // The same terminality at the composition layer: a curl adapter that
+        // fails with `InvalidInput` is not retried on the secondary transport.
+        let curl = CurlTransport::with_executable_and_user_agent(
+            "/usr/bin/curl",
+            CurlConfig::strict(),
+            "eggup-curl-test/1.0",
+        )
+        .expect("builds");
+        let fixture = FixtureTransport::new();
+        fixture.route(
+            "https://example.com/meta",
+            FixtureResponse::body(b"via-fixture".to_vec()),
+        );
+        let composed = ComposedTransport::new(&curl, &fixture, CompositionPolicy::UnavailableOnly);
+        let bad_limits = FetchLimits {
+            max_metadata_bytes: 0,
+            ..limits()
+        };
+        let composed_err = composed
+            .fetch_metadata(
+                &req("https://example.com/meta"),
+                bad_limits,
+                &CancelFlag::new(),
+            )
+            .expect_err("a terminal failure must not fall back to the fixture");
+        assert!(
+            matches!(composed_err, AcquisitionError::InvalidInput(_)),
+            "the composed transport must surface the terminal failure, got {composed_err:?}"
+        );
+    }
+
+    /// M014 (§6.1): the configured value reaches the wire as the outbound
+    /// `User-Agent` header.
+    ///
+    /// The argv assertions prove what the adapter asks `curl` to do; this
+    /// proves what the peer actually receives.
+    #[cfg(not(windows))]
+    #[test]
+    fn user_agent_reaches_the_wire_as_the_configured_header() {
+        let dir = temp_dir("curl-ua-wire");
+        let record = dir.join("request-head");
+        let base = serve_once_recording_head(200, b"ok".to_vec(), &record);
+        let curl_exe = require_curl_executable();
+        let transport = CurlTransport::with_executable_and_user_agent(
+            curl_exe,
+            CurlConfig::strict(),
+            "eggup-curl-test/1.0",
+        )
+        .expect("builds");
+        assert_eq!(transport.user_agent(), Some("eggup-curl-test/1.0"));
+        let out = transport
+            .fetch_metadata(&req(&format!("{base}/x")), limits(), &CancelFlag::new())
+            .expect("the loopback fetch must succeed");
+        assert_eq!(out.success().unwrap().bytes(), b"ok");
+        let head = fs::read_to_string(&record).expect("the request head was recorded");
+        assert!(
+            head.contains("User-Agent: eggup-curl-test/1.0\r\n"),
+            "the configured user agent must reach the wire; the head was {head:?}"
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 }

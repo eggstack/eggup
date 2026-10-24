@@ -41,3 +41,13 @@ liveness, record age, executable name, or service state; see
 
 Integrity is checksum evidence only. No authenticity or signature verification
 exists in this crate.
+
+Bounded candidate execution clears the inherited environment, bounds stdout and
+stderr per stream, and enforces an unconditional wall-clock deadline that kills
+and reaps the child. A caller may attach a bounded stdin payload with
+`CommandSpec::stdin_data`; the payload is bounded by `MAX_STDIN_BYTES`
+inclusively, an oversized payload is rejected before any child is spawned, and a
+failed write fails closed with a typed `Error::Io` whose `operation` is
+`"writing bounded stdin"`. The `operation` strings `"spawning bounded
+candidate"`, `"polling bounded candidate"`, and `"writing bounded stdin"` are a
+stable classification surface a downstream adapter may branch on.

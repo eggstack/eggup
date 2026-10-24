@@ -14,6 +14,18 @@ use crate::transaction::{PostCommitFailurePolicy, TransactionReceipt};
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_OUTPUT_LIMIT: usize = 64 * 1024;
 
+/// The maximum number of bytes one bounded stdin payload may carry.
+///
+/// The bound is **inclusive**: a payload of exactly `MAX_STDIN_BYTES` is
+/// accepted. A larger payload is rejected by [`run_bounded`] with
+/// [`Error::InvalidInput`] **before any child is spawned**, so the bound fails
+/// closed and no process is created for an oversized payload.
+///
+/// The bound is a single per-call bound on the whole payload. It is separate
+/// from [`CommandSpec::max_output_bytes`], which bounds each captured output
+/// stream independently.
+pub const MAX_STDIN_BYTES: usize = 1024 * 1024;
+
 /// An argv-based candidate command with bounded execution policy.
 #[derive(Debug, Clone)]
 pub struct CommandSpec {
@@ -23,6 +35,7 @@ pub struct CommandSpec {
     timeout: Duration,
     max_output_bytes: usize,
     environment: Vec<(String, String)>,
+    stdin_data: Option<Vec<u8>>,
 }
 
 impl CommandSpec {
@@ -35,6 +48,7 @@ impl CommandSpec {
             timeout: DEFAULT_TIMEOUT,
             max_output_bytes: DEFAULT_OUTPUT_LIMIT,
             environment: Vec::new(),
+            stdin_data: None,
         }
     }
 
@@ -91,6 +105,27 @@ impl CommandSpec {
         self.environment.push((name.into(), value.into()));
         self
     }
+
+    /// Attaches a bounded stdin payload for the command to read.
+    ///
+    /// The builder is **infallible**: the bound is enforced at execution time,
+    /// not here, so an oversized payload is rejected by [`run_bounded`] before
+    /// any child is spawned rather than by this builder.
+    ///
+    /// Without a payload the child's stdin is null, exactly as before. With a
+    /// payload the child's stdin is a pipe, and a dedicated writer thread
+    /// writes the bytes and closes the pipe, so the command observes EOF when
+    /// the payload has been delivered. The writer is bounded by the same
+    /// deadline that bounds the output readers.
+    ///
+    /// The payload is bounded by [`MAX_STDIN_BYTES`], inclusively.
+    ///
+    /// [`run_bounded`]: crate::run_bounded
+    /// [`MAX_STDIN_BYTES`]: crate::MAX_STDIN_BYTES
+    pub fn stdin_data(mut self, data: impl Into<Vec<u8>>) -> Self {
+        self.stdin_data = Some(data.into());
+        self
+    }
 }
 
 /// A bounded child-process result with timeout and overflow state.
@@ -141,13 +176,33 @@ impl CommandOutput {
     }
 }
 
-/// Executes a command with cleared environment, null stdin, bounded output, and kill/reap.
+/// Executes a command with cleared environment, bounded stdin, bounded output, and kill/reap.
 ///
 /// The wall-clock deadline set by [`CommandSpec::timeout`] is an unconditional
 /// maximum bound on the whole bounded execution. It is evaluated on every poll
 /// whether or not the direct child has already exited, so this call always
 /// returns. The deadline starts once the spawn has returned, so a blocking
 /// spawn is not covered by it.
+///
+/// Stdin is **null** unless the caller attached a payload with
+/// [`CommandSpec::stdin_data`]. An attached payload is bounded by
+/// [`MAX_STDIN_BYTES`], inclusively: a larger payload is rejected with
+/// [`Error::InvalidInput`] **before any child is spawned**, so no process is
+/// created for it. A payload within the bound is written by a dedicated writer
+/// thread, which closes the pipe when it ends, so the child observes EOF once
+/// the payload has been delivered. The writer thread is started only after the
+/// output readers are attached, so a child that fills stdout or stderr before
+/// draining its stdin cannot deadlock both sides.
+///
+/// The deadline bounds the stdin writer exactly as it bounds the output
+/// readers: when the deadline is reached, the child is killed, which breaks the
+/// child's stdin pipe and unblocks the writer, and a writer that is still
+/// blocked in `write` is abandoned explicitly, exactly like a reader blocked
+/// on a pipe a surviving descendant holds. A bounded execution is not reported
+/// as complete until the writer has delivered its verdict, so a write failure
+/// is never lost behind a "the child exited" observation. A write failure
+/// detected **after** the deadline was reached does not retroactively turn the
+/// deadline outcome into an `Err`: the deadline already decided that outcome.
 ///
 /// A descendant of the direct child can inherit the stdout or stderr pipe and
 /// hold it open after the direct child has exited. Core terminates only the
@@ -167,6 +222,7 @@ impl CommandOutput {
 /// not own: it has no process-group or job-object dependency and `unsafe` is
 /// denied. Such a reader is abandoned explicitly, and it ends when the pipe
 /// reaches EOF, that is, when the holding descendant exits or closes the pipe.
+/// The same rule applies to the stdin writer.
 ///
 /// The caller observes four distinguishable outcomes:
 ///
@@ -176,13 +232,43 @@ impl CommandOutput {
 ///   is killed only if it was still running;
 /// - a stream exceeded `max_output_bytes`: `Ok`, with `output_limited` set and
 ///   that stream's captured bytes discarded;
-/// - the command could not be spawned or polled: `Err`.
+/// - the command could not be spawned or polled, or the stdin payload could
+///   not be written: `Err`.
+///
+/// # Error classification
+///
+/// The `operation` string of [`Error::Io`] is a **stable classification
+/// surface** for this function: a downstream adapter may branch on it, so
+/// these three strings are part of the published contract.
+///
+/// - `"spawning bounded candidate"` — the child could not be spawned. Nothing
+///   was created, so the caller should treat it as an environment problem and
+///   may retry under its own policy.
+/// - `"polling bounded candidate"` — the child's status could not be polled.
+///   The child may still be running, so the caller must not treat the outcome
+///   as a completed execution.
+/// - `"writing bounded stdin"` — the stdin payload could not be written, which
+///   includes the broken pipe a child produces when it exits without reading
+///   its stdin. The child is killed and reaped before the error is returned,
+///   so the payload was **not delivered** and the caller must not treat the
+///   execution as complete.
+///
+/// When a failed stdin write and an output overflow are live at the same time,
+/// the **write failure wins**: it is an `Err`, and the caller must not be told
+/// that the execution merely overflowed.
 ///
 /// # Errors
 ///
-/// Returns [`Error::Io`] when the command cannot be spawned or when polling
-/// the child fails, and [`Error::CandidateExecution`] when the spawned child's
-/// stdout or stderr pipe is missing.
+/// Returns [`Error::InvalidInput`] when the attached stdin payload is larger
+/// than [`MAX_STDIN_BYTES`]. Nothing is spawned in that case.
+///
+/// Returns [`Error::Io`] when the command cannot be spawned, when polling the
+/// child fails, or when the stdin payload cannot be written. The `operation`
+/// string distinguishes the three cases; see
+/// [Error classification](#error-classification).
+///
+/// Returns [`Error::CandidateExecution`] when the spawned child's stdout,
+/// stderr, or stdin pipe is missing.
 ///
 /// A command that ran to completion, that reached the deadline, or that
 /// exceeded its output bound is **not** an error: those outcomes are reported
@@ -190,11 +276,24 @@ impl CommandOutput {
 /// and [`CommandOutput::exit_code`] on an `Ok` result. A reader error is
 /// surfaced as `output_limited`, never as an `Err`.
 pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
+    // The stdin bound is enforced before anything is spawned, so an oversized
+    // payload fails closed with no child created.
+    if let Some(data) = &spec.stdin_data {
+        if data.len() > MAX_STDIN_BYTES {
+            return Err(Error::InvalidInput(
+                "stdin data exceeds the bounded stdin bound".into(),
+            ));
+        }
+    }
     let mut command = Command::new(&spec.program);
     command
         .args(&spec.args)
         .env_clear()
-        .stdin(Stdio::null())
+        .stdin(if spec.stdin_data.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     if let Some(current_dir) = &spec.current_dir {
@@ -214,6 +313,20 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
         .stderr
         .take()
         .ok_or_else(|| Error::CandidateExecution("missing stderr pipe".into()))?;
+    // The stdin handle is taken before the readers start, but the write itself
+    // starts only after both readers are attached.
+    let stdin_pipe = if spec.stdin_data.is_some() {
+        match child.stdin.take() {
+            Some(pipe) => Some(pipe),
+            None => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(Error::CandidateExecution("missing stdin pipe".into()));
+            }
+        }
+    } else {
+        None
+    };
     let (stdout_tx, stdout_rx) = mpsc::channel();
     let (stderr_tx, stderr_rx) = mpsc::channel();
     let limit = spec.max_output_bytes;
@@ -222,6 +335,15 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     });
     let stderr_thread = thread::spawn(move || {
         let _ = stderr_tx.send(read_limited(stderr, limit));
+    });
+    let (stdin_tx, stdin_rx) = mpsc::channel();
+    let stdin_thread = stdin_pipe.map(|mut pipe| {
+        let payload = spec.stdin_data.clone().unwrap_or_default();
+        thread::spawn(move || {
+            use std::io::Write as _;
+            let result = pipe.write_all(&payload).and_then(|()| pipe.flush());
+            let _ = stdin_tx.send(result);
+        })
     });
 
     let deadline = Instant::now() + spec.timeout;
@@ -232,6 +354,9 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     let mut stderr_result = None;
     let mut stdout_finished = false;
     let mut stderr_finished = false;
+    let mut stdin_result: Option<io::Result<()>> = None;
+    let mut stdin_finished = stdin_thread.is_none();
+    let mut stdin_error: Option<io::Error> = None;
     loop {
         if !stdout_finished {
             stdout_finished = poll_reader(&stdout_rx, &mut stdout_result, &mut output_limited);
@@ -239,10 +364,24 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
         if !stderr_finished {
             stderr_finished = poll_reader(&stderr_rx, &mut stderr_result, &mut output_limited);
         }
+        if !stdin_finished {
+            stdin_finished = poll_writer(&stdin_rx, &mut stdin_result);
+        }
         if status.is_none() {
             status = child
                 .try_wait()
                 .map_err(|source| Error::io("polling bounded candidate", source))?;
+        }
+        if let Some(Err(source)) = stdin_result.take() {
+            // A failed stdin write decides the outcome: the payload was not
+            // delivered, so the child is killed and reaped and the call fails
+            // closed rather than reporting a partial success.
+            stdin_error = Some(source);
+            if status.is_none() {
+                let _ = child.kill();
+                status = child.wait().ok();
+            }
+            break;
         }
         if output_limited {
             // The output bound decides the outcome: the child is killed and
@@ -253,9 +392,10 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
             }
             break;
         }
-        if status.is_some() && stdout_result.is_some() && stderr_result.is_some() {
-            // The bounded execution completed: the child exited and both pipes
-            // reached EOF.
+        if status.is_some() && stdout_result.is_some() && stderr_result.is_some() && stdin_finished
+        {
+            // The bounded execution completed: the child exited, both pipes
+            // reached EOF, and the stdin writer delivered its verdict.
             break;
         }
         // The deadline is unconditional: it is evaluated whether or not the
@@ -283,6 +423,21 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
     if stderr_finished || stderr_thread.is_finished() {
         let _ = stderr_thread.join();
     }
+    if let Some(writer) = stdin_thread {
+        if stdin_finished || writer.is_finished() {
+            // The writer delivered its result, or it has already ended, so it
+            // only has to return: the join is bounded.
+            let _ = writer.join();
+        }
+        // A writer that was still blocked in `write` when the bound was reached
+        // is abandoned explicitly, exactly like a reader blocked on a pipe a
+        // surviving descendant holds. It ends when the child's stdin pipe
+        // breaks, that is, when the child is killed or a holding descendant
+        // exits or closes the pipe.
+    }
+    if let Some(source) = stdin_error {
+        return Err(Error::io("writing bounded stdin", source));
+    }
     Ok(CommandOutput {
         exit_code: status.and_then(|status| status.code()),
         stdout: stdout_result
@@ -294,6 +449,37 @@ pub fn run_bounded(spec: &CommandSpec) -> Result<CommandOutput> {
         timed_out,
         output_limited,
     })
+}
+
+/// Drains one stdin writer result if it has already arrived.
+///
+/// Returns `true` when the writer thread is known to have ended, that is, when
+/// it delivered its result, and `false` while the writer is still blocked in
+/// `write`.
+fn poll_writer(
+    receiver: &mpsc::Receiver<io::Result<()>>,
+    slot: &mut Option<io::Result<()>>,
+) -> bool {
+    if slot.is_some() {
+        return true;
+    }
+    match receiver.try_recv() {
+        Ok(result) => {
+            *slot = Some(result);
+            true
+        }
+        Err(mpsc::TryRecvError::Disconnected) => {
+            // The writer ended without delivering a verdict. The writer this
+            // module spawns cannot do that, because its send is unconditional
+            // and the thread cannot panic; it is still treated as a write
+            // failure so that the outcome fails closed.
+            *slot = Some(Err(io::Error::other(
+                "bounded stdin writer ended without a result",
+            )));
+            true
+        }
+        Err(mpsc::TryRecvError::Empty) => false,
+    }
 }
 
 /// Drains one reader result if it has already arrived.

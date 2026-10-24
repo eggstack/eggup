@@ -146,7 +146,11 @@ lifecycle-snapshot model plus reusable Unix manager mechanics
   implement `ServiceManager` on top of the M001 contract:
   - shared bounded command runner (literal argv, no shell, null/controlled
     stdin, bounded output, deadline with kill/reap, injectable `FakeExecutor`
-    for tests);
+    for tests); the bounded execution itself is delegated to
+    `eggup_core::run_bounded`, while this crate's own pre-flight — the
+    allowlisted absolute program path, the cleared environment, the bounded
+    stdin payload, and the timeout range — stays in front of that call and
+    is unchanged;
   - systemd: explicit `--system`/`--user` scope, narrow `ExecStart` parsing
     (ambiguous/specifier shapes yield `Unknown`), atomic definition writes,
     explicit `enable`/`daemon-reload` only, bounded `start`/`stop`/`restart`

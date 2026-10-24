@@ -31,8 +31,41 @@ no `sudo`, and no release/version/mirror policy.
 - Redirect, protocol, and proxy policy are explicit. `~/.curlrc` is ignored
   via `--disable`. Disabled proxy uses a cleared environment plus
   `--noproxy "*"`.
+- An optional outbound `User-Agent` is caller-settable per adapter. The value is
+  validated before it can reach the wire and is passed to `curl` as the literal
+  argv element following `--user-agent`, before the `--` separator and the URL.
+  By default the adapter sends **no** `User-Agent`, so `curl` applies its own
+  default and the published wire behavior is unchanged.
 - Diagnostics use category text plus the redacted URL; raw curl output,
   command lines, and proxy credentials are never embedded.
 
 Transport fallback (`curl <-> Eggfetch` for the same exact URL) lives in
 `eggup-acquisition::ComposedTransport` and is never release/source fallback.
+
+## Outbound `User-Agent`
+
+`CurlTransport::with_executable_and_user_agent(executable, config, user_agent)`
+installs a `User-Agent` used for **every** request that adapter makes.
+`CurlTransport::user_agent()` returns the accepted value, or `None` when none
+was installed (the default).
+
+The accepted grammar is:
+
+```text
+user-agent = 1*( VCHAR / SP / obs-text )
+VCHAR      = %x21-7E          ; printable ASCII, excluding SP
+SP         = %x20            ; permitted only between two non-SP characters
+obs-text   = %xA0-10FFFF     ; any non-ASCII scalar value (C1 excluded)
+```
+
+A value is rejected with `AcquisitionError::InvalidInput` when it is empty;
+when its UTF-8 length exceeds `MAX_USER_AGENT_BYTES` (512 bytes); when it
+contains any C0 control character (including `CR`, `LF`, `NUL`, and `HTAB`),
+`DEL` (`U+007F`), or any C1 control character (`U+0080`-`U+009F`); or when it
+begins or ends with a space.
+
+`InvalidInput` is terminal: unlike `Unavailable` it never makes a composed
+transport fall back to another adapter, so a malformed value cannot silently
+change which transport serves the request. The control characters are refused
+because `curl` does not sanitize `--user-agent` — a value containing `CR LF`
+would be written into the request head verbatim and inject a header.

@@ -29,13 +29,17 @@ The post-commit path then holds the lock and backup through one caller-owned
 check and resolves a failed check using explicit `KeepInstalled` or
 `RollBack` policy.
 
-Candidate commands use literal argv vectors, clear inherited environment, null
-stdin, a controlled working directory, an unconditional wall-clock deadline, bounded
-stdout and stderr, and kill/reap on timeout or output overflow. The deadline bounds the
-whole bounded execution, so a bounded call always returns; the normative statement of
-that contract, and of what a descendant holding the output pipe open means for the
-result, lives in the `run_bounded` rustdoc in `src/candidate.rs` and in
-`architecture/core-transaction.md`. `ExactIdentityValidator` and
+Candidate commands use literal argv vectors, clear inherited environment, a controlled working
+directory, an unconditional wall-clock deadline, bounded stdout and stderr, and kill/reap on
+timeout or output overflow. Stdin is null unless the caller attaches a bounded payload with
+`CommandSpec::stdin_data`; an attached payload is bounded by `MAX_STDIN_BYTES` inclusively, a
+larger payload is rejected with `Error::InvalidInput` before any child is spawned, and the
+payload is written by a dedicated writer thread that the deadline bounds exactly as it bounds
+the output readers. The deadline bounds the whole bounded execution, so a bounded call always
+returns; the normative statement of that contract, of what a descendant holding the output pipe
+open means for the result, of the bounded stdin capability, and of the stable `Error::Io`
+`operation` strings a downstream adapter may branch on, lives in the `run_bounded` rustdoc in
+`src/candidate.rs` and in `architecture/core-transaction.md`. `ExactIdentityValidator` and
 `CrossMemberAgreementValidator` are consumer-policy-neutral helpers; a consumer can
 supply a custom `CandidateValidator` for a different identity contract. No fallback or
 release ordering is selected by core.

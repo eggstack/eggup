@@ -512,7 +512,24 @@ bounded input (used only for `crontab -`). Missing binaries, timeouts, and
 output overflows are `Err(ServiceError::Manager)` — carrying the classified
 kind (`NotFound`, `Timeout`, `Spawn`, `Protocol`); **non-zero exits are `Ok`
 with the observed status** (`lib.rs:968-973`), and it is the adapter's job to
-classify them as `Protocol` (`ensure_mutation_success`, `lib.rs:2235`).
+classify them as `Protocol` (`ensure_mutation_success`, `lib.rs:2126`).
+
+`SystemExecutor::run` (`lib.rs:1021-1141`) is a **thin policy layer over
+`eggup_core::run_bounded`**. The bounded-execution mechanic — the spawn, the
+per-stream capture bound, the unconditional deadline, the kill-and-reap
+teardown, the dedicated stdin writer — lives in core. The service keeps every
+policy decision in front of it: the argv emptiness and NUL checks, the
+timeout range check, the `MAX_CRONTAB_BYTES` stdin bound, the allowlisted
+absolute program path, and the filtered child environment. Core never sees the
+raw `argv[0]`, never sees the ambient environment, and never decides that a
+lock, a path, or a privilege is acceptable.
+
+The mapping from core's result to the service's taxonomy is exhaustive and is
+pinned by the classification surface core documents: `"spawning bounded
+candidate"`, `"polling bounded candidate"`, and `"writing bounded stdin"`
+(`crates/eggup-core/src/candidate.rs:307`, `:373`, `:439`). The match has an
+explicit fallback arm that **names** an unrecognised operation, so a future
+core change is attributable rather than silently folded into "spawn failed".
 
 The output type is named `ManagerCommandOutput` because it is the output of one
 *manager* command. `eggup_core` exports a different, unrelated `CommandOutput`;
@@ -530,7 +547,7 @@ boundary, alongside the already-registered `CleanupDisposition` finding in
 
 ### Executable allowlisting and path resolution
 
-`resolve_manager_program` (`lib.rs:933-958`) is the only path from a program name
+`resolve_manager_program` (`lib.rs:1143-1169`) is the only path from a program name
 to a binary:
 
 | Requested | Resolution |
@@ -542,69 +559,110 @@ to a binary:
 | Anything else | `Err(InvalidInput("manager program must be absolute or allowlisted"))` |
 
 There is **no `PATH` lookup at all**. `validate_executable_path`
-(`lib.rs:960-981`) additionally requires the path to be absolute, to exist, to
+(`lib.rs:1171-1196`) additionally requires the path to be absolute, to exist, to
 be a regular file (not a symlink-to-directory or device), and — under
 `#[cfg(unix)]` — to have at least one execute bit (`mode & 0o111 != 0`).
 All candidates failing validation yields `Manager("trusted manager binary missing")`.
 
+The **resolved** path — never the raw `argv[0]` — is what the service hands to
+core (`lib.rs:1062-1065`), and it is the resolved path that every failure
+detail names. Core never resolves a program name.
+
 ### Environment clearing
 
-`cmd.env_clear()` (`lib.rs:724`) runs unconditionally. The only variables
-re-added come from `filtered_manager_environment` (`lib.rs:926-947`), and only
+The child environment is cleared unconditionally, and the only variables
+re-added come from `filtered_manager_environment` (`lib.rs:1198-1218`), and only
 when the argv is `systemctl` **with** `--user`:
 
 `DBUS_SESSION_BUS_ADDRESS`, `XDG_RUNTIME_DIR`, `SYSTEMD_BUS_ADDRESS`.
 
 Any other argv shape gets an empty environment. Tests
-`command_environment_adds_nothing` and
+`command_environment_adds_nothing` (`lib.rs:4200`) and
 `manager_resolution_ignores_ambient_path_and_environment_filters_sentinels`
-(`lib.rs:3425`, `3439`) pin both halves.
+(`lib.rs:4214`) pin both halves, and
+`the_session_bus_filter_is_exactly_three_variables` (`lib.rs:4268`) pins the
+allowlist to exactly those three names.
+
+The filter yields `(OsString, OsString)` pairs, while core's
+`CommandSpec::environment` takes `impl Into<String>`. A pair whose key **and**
+value are valid UTF-8 is converted and passed through byte-identically; a pair
+that is **not** valid UTF-8 is **dropped** rather than lossily converted
+(`lib.rs:1070-1075`). A mangled session-bus address would be worse than no
+session-bus address at all, so the fail-closed direction is to drop the pair.
 
 ### Output and timeout bounds
 
 | Bound | Value | Enforced at |
 |---|---|---|
-| Per-stream captured output | `max_output_bytes` (default `MAX_COMMAND_OUTPUT_BYTES` = 256 KiB; `with_max_output` accepts `1..=16 MiB`) | `lib.rs:688`, `964` |
-| stdin payload | `MAX_CRONTAB_BYTES` = 1 MiB | `lib.rs:712` |
-| command timeout | non-zero and `<= MAX_TRANSITION_TIMEOUT + 60s` | `lib.rs:709` |
-| argv | non-empty, no NUL in any element | `lib.rs:703`, `706` |
+| Per-stream captured output | `max_output_bytes` (default `MAX_COMMAND_OUTPUT_BYTES` = 256 KiB; `with_max_output` accepts `1..=16 MiB`) | `lib.rs:895`, `1013` |
+| stdin payload | `MAX_CRONTAB_BYTES` = 1 MiB | `lib.rs:897` |
+| command timeout | non-zero and `<= MAX_TRANSITION_TIMEOUT + 60s` | `lib.rs:901` |
+| argv | non-empty, no NUL in any element | `lib.rs:1032`, `1035` |
 
-Output overflow is **fail-closed**: `read_bounded_generic` returns an overflow
-flag (`lib.rs:949-972`) and `run` returns
-`Manager("manager output exceeded bound")` rather than a truncated buffer
-(`lib.rs:838-842`). A reviewer should note that the child is *not* killed on
-overflow — it has already exited at that point in the flow.
+Output overflow is **fail-closed**: core's bounded reader refuses a stream that
+exceeds the bound, the captured bytes are discarded, and the service maps the
+result to `Manager(Protocol, "manager output exceeded bound for {program}")`
+(`lib.rs:1088-1093`). Unlike the hand-rolled runner this replaced, **the child
+is now killed and reaped on overflow** — a still-running runaway child is
+terminated instead of being left to finish on its own.
+
+The deadline the caller hands to the service bounds the **whole** call: the
+service starts its budget before the program resolution and gives core the
+*remaining* budget (`lib.rs:1049-1060`). If the remaining budget is already
+zero the call returns the timeout failure **without spawning anything**.
 
 ### The stdin deadlock fix
 
-The reader threads are attached **before** the stdin write (`lib.rs:741-761`),
-and the stdin write itself runs on its own thread driven by the same
-deadline-checked wait loop (`lib.rs:762-793`, `794-805`). A child that fills
-stdout before draining stdin can therefore no longer deadlock both sides: the
-kill at the deadline closes the pipe and unblocks the writer. A *completed but
-failed* write still fails closed, and its verdict is collected before the output
-is trusted (`lib.rs:811-823`).
+The stdin payload is attached to core's spec, and core writes it on a
+**dedicated writer thread** with the readers already attached, so a child that
+fills stdout before draining stdin cannot deadlock both sides. The
+deadline is unconditional and bounds the writer exactly as it bounds the
+readers: at the deadline the child is killed, which closes the pipe and
+unblocks the writer. A *completed but failed* write fails closed with
+`Manager(Spawn, "manager stdin failed for {program}")` — the same kind and the
+same detail the hand-rolled runner produced.
 
 ### No shell interpolation
 
-There is no `sh -c`, no `Command::args` stringification, and no
-`PATH`-mediated resolution. `cmd.args(&argv[1..])` passes each element as one
-argument (`lib.rs:721-723`). `ServiceSpec::new` additionally rejects control
+There is no `sh -c`, no argument stringification, and no `PATH`-mediated
+resolution. Each argv element after the program is passed as one literal
+argument (`lib.rs:1063`). `ServiceSpec::new` additionally rejects control
 characters in args (`lib.rs:91-95`) and `run` rejects NUL in any argv element
-(`lib.rs:706`), which is the argv-level analogue of a shell-metacharacter
+(`lib.rs:1035`), which is the argv-level analogue of a shell-metacharacter
 rejection. The same executor backs cron, where the desired block *is* a shell
 line — that is caller-owned content written to the crontab, never
 interpolated into a command this crate builds.
 
+### Behaviour differences of the consolidation
+
+The consolidation preserves every observable outcome except the eight recorded
+here. Seven are the honest cost of moving the mechanic into core, and each is
+pinned by a test in `crates/eggup-service/tests/bounded_executor_consolidation.rs`
+except **D7**, which has no portable fixture and is recorded in
+`plans/closure/service-lifecycle/015-status.md`. The eighth, **D8**, is not a
+cost: it is a **defect in the runner this consolidation replaced**, which the
+consolidation fixes.
+
+| # | Difference | Direction |
+|---|---|---|
+| **D1** | A mid-stream reader error is now fail-closed. The hand-rolled reader broke out of the read loop and reported a successful capture of partial output; core surfaces a reader error as `output_limited`, which maps to `Manager(Protocol, "manager output exceeded bound for {program}")`. The detail says "exceeded bound" for what is really a read failure — a cosmetic imprecision inherited from the mapping. | Fail-closed (stronger) |
+| **D2** | Core kills the child on an output overflow; the hand-rolled runner did not, because the overflow was only detected after the child had already exited. The observable result — a `Protocol` manager failure — is unchanged. | Strictly safer |
+| **D3** | The timeout detail text is normalised. The hand-rolled runner could produce `"manager command timed out for {program}"`, `"manager output collection timed out"`, or `"manager command timed out"`; all of them now read `"manager command timed out for {program}"`. The machine-readable discriminator — `ServiceError::manager_kind() == Some(Timeout)` — is unchanged. | Detail text only |
+| **D4** | A descendant that holds the stdout/stderr pipe open now ends at the deadline with the *timeout* detail rather than `"manager output collection timed out"`. Core also abandons the still-blocked reader explicitly instead of joining it. | Same kind, different detail text (D3 covers the text) |
+| **D5** | A non-UTF-8 environment pair is dropped rather than passed through byte-exactly, because core's setter takes `impl Into<String>`. A valid UTF-8 value is unaffected. | Narrowing, fail-closed |
+| **D6** | The spawn-failure `NotFound` detail names the **resolved** program, while the pre-flight `validate_executable_path` `NotFound` names the **requested** one. Both survive the consolidation unchanged. | No change |
+| **D7** | A stdin writer that is still blocked when the deadline passes is now reported as a **timeout**, not as a stdin failure. Reaching it requires a descendant to hold the child's stdin pipe open after the child itself exits. In the two ordinary cases — the broken pipe (both report `Spawn`) and the child still running at the deadline (both report `Timeout`) — the kinds are identical. | Kind change, in a deep corner |
+| **D8** | **A successful stdin write is no longer reported as a stdin failure.** The replaced runner polled its writer channel with `try_recv()` on every wait-loop iteration; `try_recv` *removes* the message, so a verdict of `Ok(())` was consumed and discarded by a check that only looks for `Err(_)`. The post-exit check then found an empty, disconnected channel and reported `Manager(Spawn, "manager stdin failed for {program}")` for a write that had **succeeded**. Core keeps the verdict and reports the failure only when the write itself failed. The affected path is the `crontab -` install, the crate's only production stdin caller. | **Defect fixed** (a failure becomes a success) |
+
 ### `FakeExecutor`
 
-`FakeExecutor` (`lib.rs:992`) scripts expectations as a FIFO of exact argv
+`FakeExecutor` (`lib.rs:1239`) scripts expectations as a FIFO of exact argv
 vectors and records every observed call with its stdin. A mismatch or an
-unscripted call is a hard `Err` (`lib.rs:1053-1061`), so **adapter tests fail if
+unscripted call is a hard `Err` (`lib.rs:1313-1342`), so **adapter tests fail if
 the adapter issues an unexpected command** — this is the mechanism that keeps
-the adapter command surface under test. `is_exhausted()` (`lib.rs:1036`) lets a
+the adapter command surface under test. `is_exhausted()` (`lib.rs:1308`) lets a
 test assert every scripted command was consumed. It also implements
-`CommandExecutor` for `&FakeExecutor` (`lib.rs:1066`) so it can be shared with
+`CommandExecutor` for `&FakeExecutor` (`lib.rs:1344`) so it can be shared with
 adapters that take ownership.
 
 ## Definition writing
@@ -1173,7 +1231,8 @@ distribution:
 | Area | Tests | Demonstrates |
 |---|---|---|
 | Neutral model (`lib.rs:3093+`) | ~13 | Ownership classification, snapshot intent preservation, health/state separation, denial of `Foreign` / `Unknown`, `RestoreIntent` |
-| `SystemExecutor` (`lib.rs:3345-3520`) | ~7 | Timeout kills and reaps, output bound fails closed, literal argv with no shell, non-zero exit is `Ok` with status, missing binary fails closed, env adds nothing, `PATH` ignored, deadline rejects zero and only shrinks |
+| `SystemExecutor` (`lib.rs:4101-4212`) | 6 (Unix-only) | Timeout kills and reaps, output bound fails closed, literal argv with no shell, non-zero exit is `Ok` with status, missing binary fails closed, env adds nothing. These six use POSIX absolute paths, so they are `#[cfg(unix)]`-gated per test and each has a portable counterpart in the integration targets below. |
+| Session-bus filter (`lib.rs:4268`) | 1 | The user-scoped environment filter is exactly three variables, on every platform |
 | systemd (`lib.rs:3520-3850`) | ~11 | Absent / exact-owned / foreign-executable / argv-drift / ambiguous-`ExecStart` / specifier-`ExecStart` / config-identity / state mapping / permission-without-`sudo` / atomic-write fault preserving the old file / bounded start-stop-restart |
 | launchd (`lib.rs:3851-4116`) | ~7 | Absent/exact/foreign/unknown, user-vs-system domain distinctness, malformed plist, bootstrap/bootout/kickstart, restart-after-incomplete-stop, label-only is not ownership, config reconciliation |
 | cron (`lib.rs:4117-4271`) | ~9 | Empty-to-absent-to-install, byte-for-byte preservation of unrelated entries, idempotence, duplicate marker, modified block is foreign, owned-only removal, no redundant write, timeout/missing binary, no start/stop semantics |
@@ -1196,6 +1255,8 @@ The integration test targets under `crates/eggup-service/tests/`:
 | `commit_engine_policy.rs`, `commit_engine_parity.rs` | 7 | The single engine's policy inputs and the parity of the two orchestrators |
 | `manager_deadline_budget.rs`, `manager_detail_byte_cap.rs` | 4 | The one-deadline budget and the one byte ceiling |
 | `systemd_failed_service.rs` | 1 | A real systemd `failed` unit, stop, and quiescence |
+| `bounded_executor_consolidation.rs` | 12 | The consolidation's observable outcomes, against a portable child fixture: the status and bounded output of a run, the stdin payload delivered byte-for-byte, the literal argv with no shell, the four pre-flight rejections with their messages, the typed missing-program and spawn failures, the timeout kind, the output-overflow kind, the nonzero exit, and the golden argv every manager builds. The child program is the test binary itself, re-executed with a mode argument, so the fixture is portable and needs no shell, no interpreter, and no manifest change. |
+| `bounded_executor_environment.rs` | 2 | The child environment is cleared, and only the three session-bus variables are injected for user-scoped systemd. A dedicated binary, so `std::env::set_var` cannot race another test. The `--user` injection case is Unix-only, because only Unix can run a program named `systemctl`; its portable counterpart is the crate-private filter assertion in `lib.rs`. |
 
 The three tests CI runs individually on Windows are pinned because they assert
 UTF-8 boundary behavior that a differently-configured default run would not

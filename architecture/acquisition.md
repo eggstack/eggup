@@ -1,6 +1,6 @@
 # Acquisition Seam Deep-Dive (`crates/eggup-acquisition`)
 
-> Source: `crates/eggup-acquisition/src/lib.rs` (2182 lines, single file, 38 `#[test]`
+> Source: `crates/eggup-acquisition/src/lib.rs` (2229 lines, single file, 38 `#[test]`
 > functions), `README.md`, `CHANGELOG.md`, `Cargo.toml`. Crate attributes:
 > `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]` (`lib.rs:1-2`).
 > Manifest: `description = "Transport-neutral acquisition seam and deterministic fixture
@@ -100,10 +100,10 @@ is why the `__adapter_*` constructors exist.
 `AcquisitionError` is `#[non_exhaustive]`, which constrains **consumer matching**
 (a wildcard arm is required) but not **adapter construction**: both adapters build
 `InvalidInput`, `Transport`, `Timeout`, `TooLarge`, and `Cancelled` directly
-(`eggfetch/src/lib.rs:139,163,282,314,493`; `curl/src/lib.rs:129,767,781`). The
+(`eggfetch/src/lib.rs:139,163,282,314,493`; `curl/src/lib.rs:138,955,941`). The
 typed `Io` variant is the exception: because it carries a `std::io::Error`, it is
 built through the seam's adapter-facing `__adapter_io` constructor
-(`eggfetch/src/lib.rs:352`; `curl/src/lib.rs:254,288,339,590,682,690,696,707,711`).
+(`eggfetch/src/lib.rs:352`; `curl/src/lib.rs:382,416,468,764,856,864,870,881,885`).
 
 `ArtifactEvidence` has a public field, so a consumer can construct one;
 `MetadataBytes` has no public constructor at all (`lib.rs:214-216`). That asymmetry
@@ -119,8 +119,8 @@ these are the only sanctioned way to build a temp file, promote it, and return
 
 | Item | Kind | Role | Line |
 |---|---|---|---|
-| `__adapter_unavailable` | fn | Build `Unavailable(detail)`; bounds the detail | `296-298` |
-| `__adapter_io` | fn | Build the typed `Io { operation, source }` | `312-314` |
+| `__adapter_unavailable` | fn | Build `Unavailable(detail)`; bounds the detail | `314-316` |
+| `__adapter_io` | fn | Build the typed `Io { operation, source }` | `325-327` |
 | `__adapter_metadata` | fn | Build `MetadataBytes` (the only constructor) | `958-960` |
 | `__adapter_artifact` | fn | Build `ArtifactEvidence` | `966-968` |
 | `__adapter_bound_detail` | fn | Apply the seam's 512-byte UTF-8-safe bound to an adapter detail | `376-378` |
@@ -169,7 +169,7 @@ internally — `eggup-eggfetch` uses a sync-over-async `block_on`
 
 `fetch_metadata` has no destination argument, so an adapter is free to use scratch
 storage. `eggup-curl` writes to an exclusive `0600` temp in `std::env::temp_dir()` and
-reads it back (`curl/src/lib.rs:218-262`) because curl delivers a body on stdout.
+reads it back (`curl/src/lib.rs:345-390`) because curl delivers a body on stdout.
 
 ### `fetch_artifact`
 
@@ -186,7 +186,7 @@ reads it back (`curl/src/lib.rs:218-262`) because curl delivers a body on stdout
 A consequence worth stating plainly: an adapter that promotes successfully cannot then
 report a fallback-eligible error. `__promote_no_clobber` returns `Ok` at the commit
 point (`lib.rs:591-597`) and the adapters return `Success` on that path
-(`eggfetch/src/lib.rs:442-448`; `curl/src/lib.rs:348-354`). This is what makes
+(`eggfetch/src/lib.rs:442-448`; `curl/src/lib.rs:477-483`). This is what makes
 artifact fallback under `ComposedTransport` safe against a primary that already
 promoted.
 
@@ -215,9 +215,9 @@ truthfully (`lib.rs:112-115`, `102-106`).
 
 The fields stay public for 0.1.x source compatibility, so `validate()` is re-run at
 every transport entry point rather than trusted from the constructor
-(`lib.rs:87-91`). The fixture calls it first in both methods (`lib.rs:768`, `778`);
-both adapters do the same (`eggfetch/src/lib.rs:344`; `curl/src/lib.rs:279`), as does
-`ComposedTransport` (`lib.rs:1083`, `1062`).
+(`lib.rs:87-91`). The fixture calls it first in both methods (`lib.rs:768`, `lib.rs:825`);
+both adapters do the same (`eggfetch/src/lib.rs:344`; `curl/src/lib.rs:407`), as does
+`ComposedTransport` (`lib.rs:1083`, `lib.rs:1109`).
 
 `max_artifact_bytes` is a mandatory plain `u64`: `None` is not representable, so every
 fetch is finitely bounded. Migration from the pre-0.1.2 `Option<u64>` field is
@@ -269,9 +269,9 @@ deliberately computes **no digest**: SHA-256 is `eggup-core`/`eggup-archive` evi
 no integrity or authenticity claim.
 
 `AcquisitionError` (`lib.rs:258-297`) is `#[non_exhaustive]`, `Display` is a
-per-variant prefix (`lib.rs:393-408`), and every string detail goes through
+per-variant prefix (`lib.rs:339-354`), and every string detail goes through
 `bound_detail` → 512 bytes, truncated only at a UTF-8 character boundary
-(`lib.rs:433-445`).
+(`lib.rs:380-393`).
 
 | Category | Meaning | Caller action | Composition fallback? |
 |---|---|---|---|
@@ -287,21 +287,21 @@ per-variant prefix (`lib.rs:393-408`), and every string detail goes through
 Two distinctions carry the taxonomy:
 
 - `Transport` vs `Unavailable` is "attempted and failed" vs "could not attempt"
-  (`lib.rs:261-263` vs `272-278`). This is what makes a curl-without-curl-binary
+  (`lib.rs:261-263` vs `lib.rs:290-296`). This is what makes a curl-without-curl-binary
   situation fall back instead of looking like a broken network.
 - `Io` is **always** terminal, including a promotion failure. Silently retrying a
   staging failure on a second transport would hide a real local problem, so the policy
   table treats it as non-fallback (`lib.rs:1081-1091`).
 
 A caller deadline produces `Timeout`, never `NotFound` and never fallback
-(`timeout_never_maps_to_not_found`, `lib.rs:1565-1595`).
+(`timeout_never_maps_to_not_found`, `lib.rs:1517-1544`).
 
 ### 6.1 The typed I/O variant
 
 `Io` is **typed**: it carries the operation that failed and the underlying
 `std::io::Error` (`lib.rs:276-302`), mirroring `eggup-core`'s published
 `Error::Io { operation, source }`. `impl std::error::Error for AcquisitionError`
-overrides `source()` and returns that `io::Error` (`lib.rs:410-420`), so a
+overrides `source()` and returns that `io::Error` (`lib.rs:356-367`), so a
 consumer can match on `std::io::ErrorKind` (`NotFound` vs `PermissionDenied` vs
 `AlreadyExists`) and walk the chain instead of parsing `Display` text.
 
@@ -310,7 +310,7 @@ Three properties are load-bearing and are pinned by fixtures:
 - **The rendered detail stays bounded.** `Display` renders
   `"acquisition I/O failed: {operation}: {source}"` through the same
   `bound_detail` rule as every other variant, so the detail never exceeds 512
-  bytes and never ends mid-character (`lib.rs:400-404`).
+  bytes and never ends mid-character (`lib.rs:347-350`).
 - **No URL or credential material is carried.** `operation` is a static label
   chosen at the construction site and `source` is the raw OS/`io` error; neither
   can contain request material. A fixture proves that a failure raised while
@@ -357,7 +357,7 @@ closely by both adapters:
 
 - `OpenOptions::new().write(true).create_new(true)` — creation fails if the path
   exists, so it never truncates a foreign file and never follows a precreated symlink
-  (`lib.rs:518-525`, `506`).
+  (`lib.rs:518-525`, `lib.rs:553`).
 - Name: `.{prefix}-{pid}-{nanos}-{nonce}.part` in the **exact** destination parent, so
   promotion stays on one filesystem and no parent is ever created
   (`lib.rs:514-517`).
@@ -419,8 +419,8 @@ Three mechanisms, with different jobs:
 | Mechanism | Scope | Credential block | Query | Fragment | Length cap |
 |---|---|---|---|---|---|
 | `AcquisitionRequest::redacted()` (`57-59`) | delegates to `redact_url` | — | — | — | — |
-| `redact_url` (`350-379`) | one URL, diagnostics | first `@` after `://` → `://<redacted>@` | always → `?<redacted>` | always → `#<redacted>` | 256 bytes + `…` |
-| `__scrub_upstream_text` (`388-438`) | arbitrary text, defense-in-depth | `://…@` blocks ≤512 bytes, advancing cursor | only if the `?` suffix contains `=` or `&` | not handled | 512 bytes, no ellipsis |
+| `redact_url` (`lib.rs:404-432`) | one URL, diagnostics | first `@` after `://` → `://<redacted>@` | always → `?<redacted>` | always → `#<redacted>` | 256 bytes + `…` |
+| `__scrub_upstream_text` (`lib.rs:441-490`) | arbitrary text, defense-in-depth | `://…@` blocks ≤512 bytes, advancing cursor | only if the `?` suffix contains `=` or `&` | not handled | 512 bytes, no ellipsis |
 
 Preserved by `redact_url`: scheme, the `<redacted>@` marker, host, port, and path.
 Stripped: `user:password@` (or a bare `user@`), the whole query string, the whole
@@ -452,7 +452,7 @@ accepts a detail for call-site compatibility and drops it (`lib.rs:693-697`,
 
 | Variant | Fallback triggers | Default |
 |---|---|---|
-| `UnavailableOnly` | `Unavailable` only | Yes (`#[default]`, `935-936`) |
+| `UnavailableOnly` | `Unavailable` only | Yes (`#[default]`, `lib.rs:982-983`) |
 | `UnavailableOrTransport` | `Unavailable`, plus `Transport` and `Timeout { .. }` | No — explicit caller opt-in |
 
 `ComposedTransport<'a>` (`lib.rs:998-1002`) borrows two `&'a dyn AcquisitionTransport`
@@ -475,7 +475,7 @@ Behavior on partial failure:
 Decisions are made from typed outcomes by `should_fallback` (`lib.rs:1034-1042`) — never
 by parsing human-readable error text (`lib.rs:995-997`). Both methods validate limits
 and check cancellation at the composition boundary before either adapter does any
-work (`lib.rs:1083-1087`, `1062-1066`).
+work (`lib.rs:1083-1087`, `lib.rs:1109-1112`).
 
 **Composition is transport fallback, never release fallback.** Both transports are
 handed the *same* `request` object, so a fallback can only ever attempt the identical
@@ -491,7 +491,7 @@ transport-fallback inputs (`lib.rs:976-977`).
 
 `FixtureTransport` (`lib.rs:728-730`) is a `Mutex<HashMap<String, FixtureResponse>>`
 behind exact-URL keys. `route()` takes `&self`, so a shared `SharedTransport` can be
-routed after construction (`lib.rs:739-744`, `903`).
+routed after construction (`lib.rs:739-744`, `lib.rs:949-950`).
 
 `FixtureResponse` constructors (`lib.rs:675-719`) map to `FixtureKind`
 (`lib.rs:664-671`):
@@ -512,7 +512,7 @@ Determinism the fixture guarantees:
   (`lib.rs:746-758`) — never a silent fallback, so a test cannot accidentally pass by
   reaching something.
 - **No sleeping.** `slow` *models* a delay purely as a comparison against
-  `limits.total_timeout` (`lib.rs:801-814`, `830-835`); wall-clock checks use
+  `limits.total_timeout` (`lib.rs:801-814`, `lib.rs:877-882`); wall-clock checks use
   `Instant::now()` on the same thread. A `slow(body, 30 s)` fixture returns in
   microseconds.
 - **Same ordering as a real transport.** Validate → cancel → parent → `dest` → lookup →
@@ -527,7 +527,7 @@ bytes, not a prefix of a real body (`lib.rs:866-872`).
 
 Why a fixture-based test is meaningful evidence for the seam: it pins the contract in
 the only place where a reviewer can assert it without a network. The composition tests
-(`lib.rs:1833-2228`) go further — `CountingTransport` and `StallingTransport` are
+(`lib.rs:1833-2229`) go further — `CountingTransport` and `StallingTransport` are
 hand-written `AcquisitionTransport` implementations used to prove fallback counts and
 budget arithmetic without depending on any real adapter.
 
@@ -548,38 +548,84 @@ Review a new adapter against this list:
 - [ ] The adapter returns seam types only through `__adapter_metadata` / `__adapter_artifact`, and does not duplicate temp/promotion logic locally.
 - [ ] The adapter does not know the other adapter exists, and never constructs a different URL.
 
-### 11.1 Adapter capability parity: the `User-Agent` asymmetry (recorded, deferred)
+### 11.1 Adapter capability parity: the `User-Agent` asymmetry (recorded, resolved by M014)
 
 **The seam contract does not include a user-agent.** `AcquisitionRequest` carries
 only a URL (`lib.rs:24-27`) and `AcquisitionTransport` carries only the request,
-the destination, the limits, and the cancellation flag (`lib.rs:672-700`). There
-is no seam-level user-agent invariant, so the asymmetry between the two adapters
+the destination, the limits, and the cancellation flag (`lib.rs:625-653`). There
+is no seam-level user-agent invariant, so the difference between the two adapters
 violates **no** seam contract.
 
-**The recorded interim difference.**
+**The difference as M013 recorded it** (before M014):
 
 | Adapter | User-agent surface | Default |
 |---|---|---|
 | `eggup-eggfetch` | Caller-settable: `EggfetchConfig::user_agent` | `DEFAULT_USER_AGENT` |
 | `eggup-curl` | **None** | curl's own default |
 
-**The concrete consequence.** A caller that switches transports loses control of
-the `User-Agent`: the wire value changes from the `eggup-eggfetch` default (or
-whatever the caller set) to curl's own default. On a transport switch the
-request is therefore *not* byte-identical on the wire, even though the seam
-contract is satisfied by both.
+**The concrete consequence M013 recorded.** A caller that switches transports
+loses control of the `User-Agent`: the wire value changes from the
+`eggup-eggfetch` default (or whatever the caller set) to curl's own default. On
+a transport switch the request is therefore *not* byte-identical on the wire,
+even though the seam contract is satisfied by both.
 
-**Owner.** This is **deferred**, not closed, to the named follow-up milestone
-**"Acquisition M014 — adapter capability parity (`User-Agent` and the
-`CurlConfig` public-field API boundary)"**. That milestone owns the API-boundary
-consequence: `CurlConfig`'s fields are public and **not** `#[non_exhaustive]`
-(`curl/src/lib.rs:49-67`), so adding a caller-settable user-agent is source-
-breaking for every external struct-literal construction and belongs at the
-intentional 0.2/1.0 boundary, not inside a corrective.
+#### M014's resolution: capability parity
 
-Until M014 lands, **M013 adds no `User-Agent` field, builder, or
-`--user-agent` argument to the curl adapter**, and the asymmetry above is the
-disclosure.
+M014 closes the capability gap in the curl adapter. A caller can now set the
+outbound `User-Agent` on **either** adapter, for **every** request that adapter
+makes:
+
+| Adapter | User-agent surface | Default | Placement |
+|---|---|---|---|
+| `eggup-eggfetch` | Caller-settable: `EggfetchConfig::user_agent` (`eggfetch/src/lib.rs:52-87`) | `DEFAULT_USER_AGENT` (`eggup-eggfetch`) | `EggfetchConfig` (published `0.1.3`) |
+| `eggup-curl` | Caller-settable: `CurlTransport::with_executable_and_user_agent` (`curl/src/lib.rs:238-257`) | **none sent**; curl's own default applies | `CurlTransport` (private field, `curl/src/lib.rs:174-179`) |
+
+**Parity means capability parity, not placement parity.** Both adapters let a
+caller set a `User-Agent`; that is the claim, and it is what M014 delivers.
+It is explicitly **not** placement parity: the two controls live in different
+types and are deliberately not aligned. `eggup-eggfetch`'s control lives in
+`EggfetchConfig`, whose `user_agent` is a public field of a public,
+non-`#[non_exhaustive]` struct in a crate published at `0.1.3`; moving it
+would be a source break for published consumers. `eggup-curl`'s control lives
+on `CurlTransport` because `CurlConfig`'s fields are public and **not**
+`#[non_exhaustive]` (`curl/src/lib.rs:58-76`), so adding a field there would
+be source-breaking for every external struct-literal construction. Each
+adapter therefore keeps the placement its own publication history allows, and
+neither may be changed to match the other.
+
+**Parity is also not default-value parity, deliberately.** The eggfetch adapter
+defaults to `eggup-eggfetch`; the curl adapter sends **no** `User-Agent` by
+default, so curl applies its own default (`curl/<version>`). Making the curl
+adapter default to `eggup-curl` would have changed the observable
+`User-Agent` header of every consumer of the published `eggup-curl 0.1.2`, for
+no concrete benefit. The default wire behavior of the published adapter is
+therefore unchanged, and the default-value difference is recorded here as a
+deliberate choice rather than a gap.
+
+**Validation is the adapter's own responsibility.** The curl adapter validates
+the value against a stated grammar (`1*( VCHAR / SP / obs-text )`, at most
+`MAX_USER_AGENT_BYTES` = 512 bytes) before it can reach the wire, and rejects
+every violation as `AcquisitionError::InvalidInput`. `InvalidInput` is
+terminal under every composition policy (§ "Composition"), so a malformed
+caller value can never turn into a silent fallback to another adapter. The
+validation is not redundant with curl's own behavior: curl does **not**
+sanitize `--user-agent`, and a value containing `CR LF` is written into the
+request head verbatim, injecting an additional header.
+
+**How parity is enforced.** A mechanical cross-adapter parity test is
+**impossible** here and none is claimed: `eggup-curl` must not know
+`eggup-eggfetch` exists, `eggup-eggfetch` must not know `eggup-curl` exists,
+and the seam must not depend on either adapter. A test that asserted "both
+adapters expose the same capability" would have to import both adapters into
+one crate, violating the boundary in one direction or the other. Parity is
+therefore enforced by **per-adapter tests** (each adapter proves its own
+control) plus **this documented contract**, which a reviewer compares as two
+documented contracts rather than as a shared assertion.
+
+**What remains open.** Nothing at the capability level: M013's UF-1 finding is
+closed. The two remaining differences — placement and default value — are
+deliberate, documented consequences of the two adapters' separate publication
+histories, and are recorded as **low** severity rather than as a defect.
 
 ### 11.2 Why the curl adapter owns its bounded subprocess runner (recorded)
 
@@ -606,13 +652,13 @@ runner, and does not depend on that milestone closing.
 
 ## 12. Testing approach
 
-38 `#[test]` functions, all in `lib.rs:1177-2229`, all offline, no sleeps. Groups:
+38 `#[test]` functions, all in `lib.rs:1159-2229`, all offline, no sleeps. Groups:
 
 | Group | Lines | Demonstrates |
 |---|---|---|
 | Outcome classification | `1159-1298` | exact body success, 2048-byte streamed artifact, metadata/artifact `TooLarge` (artifact asserts `!dest.exists()`), `NotFound`-is-data for both paths, failure ≠ `NotFound`, `Timeout` is hard |
 | Cancellation and partial writes | `1300-1346` | pre-cancelled fetch leaves no `.part`; `truncated` promotes nothing |
-| Redaction | `1348-1370`, `1774-1831` | userinfo/query/fragment sentinels absent from `Display`; fixture failure detail never echoed; `__scrub_upstream_text`; UTF-8-safe truncation at the 256/512-byte edges |
+| Redaction | `1348-1370`, `1776-1831` | userinfo/query/fragment sentinels absent from `Display`; fixture failure detail never echoed; `__scrub_upstream_text`; UTF-8-safe truncation at the 256/512-byte edges |
 | Limits validation | `1372-1487` | zero artifact bound; a 5-literal invalid matrix rejected before I/O with an empty destination dir; `connect > total`; zero timeouts; `effective()` min-per-phase matrix |
 | Destination and temp safety | `1449-1772` | missing parent creates nothing; existing `dest` preserves `FOREIGN-BYTES`; raced `dest` preserves `RACED-FOREIGN`; post-link cleanup failure still `Ok`; promote-ok removes the temp; Unix-only `0600`, no truncate, no symlink follow; cancel and early disconnect preserve a foreign sibling and remove only owned temps |
 | Timeout truthfulness | `1517-1544` | `Timeout` never becomes `NotFound`; nothing promoted |
@@ -668,7 +714,7 @@ tests, and Windows `cargo check`.
   (`lib.rs:542-549`).
 - **`FixtureResponse::slow` does not wait.** Its doc says "A body delivered only after
   `delay`" (`lib.rs:706-707`); the code returns immediately and uses `delay` only as a
-  comparison against `limits.total_timeout` (`lib.rs:801-814`, `830-835`). The tests
+  comparison against `limits.total_timeout` (`lib.rs:801-814`, `lib.rs:877-882`). The tests
   depend on the simulated form.
 - **`README.md` omits `redact_url`'s length cap.** The README Diagnostics section lists
   userinfo, query, and fragment only; the code also truncates at 256 bytes and appends
@@ -680,19 +726,19 @@ tests, and Windows `cargo check`.
 - **`__scrub_upstream_text` is documented as defense-in-depth and has no in-tree
   caller.** Neither adapter uses it; both rely on category-only text plus
   `redact_url` (`lib.rs:434-439`).
-- **Detail bounding survives as exactly two implementations, in two unreachable
-  dependency groups.** M013 consolidated the group-1 copies into this crate:
+- **Detail bounding survives as one implementation per unreachable dependency
+  group.** M013 consolidated the group-1 copies into this crate:
   the two **inlined** UTF-8-safe truncation walks that used to sit inside
   `redact_url` (the 256-byte cap plus `…`) and `__scrub_upstream_text` (the
   512-byte cap) now both call this crate's own `truncate_utf8_bytes`
   (`lib.rs:437-445`), and `eggup-curl` / `eggup-eggfetch` delegate their private
   `bound` helpers to the adapter-facing `__adapter_bound_detail`
-  (`lib.rs:429-431`) instead of keeping a local copy. The **group-2** copies —
-  `eggup-service`'s `bound_detail` (`service/src/disposition.rs:291`) and
-  `bounded_detail` (`service/src/lifecycle_update.rs:684`) — are **not** reached
-  by this crate and are owned by
-  `plans/implementation/service-lifecycle/012-commit-engine-deduplication-corrective.md`;
-  M013 does not touch them. The two groups cannot be merged because no location
+  (`lib.rs:429-431`) instead of keeping a local copy. The **group-2** copy —
+  `eggup-service`'s `bounded_detail` (`service/src/commit_engine.rs:236`) —
+  is **not** reached by this crate and is owned by
+  `plans/implementation/service-lifecycle/012-commit-engine-deduplication-corrective.md`,
+  which reduced that crate to one implementation for the whole crate; M013
+  does not touch it. The two groups cannot be merged because no location
   is reachable by both: the seam has **zero dependencies** and `eggup-core`
   depends only on `sha2`, so the seam cannot import a core or service helper
   without adding a dependency edge to a crate that must stay dependency-free.
@@ -703,6 +749,6 @@ tests, and Windows `cargo check`.
   by its own owner, service M012.
 - **`eggup-curl` no longer constructs `AcquisitionError::Unavailable` directly.**
   M013 routed the two discovery call sites and the spawn-failure site through
-  `__adapter_unavailable` (`curl/src/lib.rs:381-383`, `402-404`, `598-601`), so
+  `__adapter_unavailable` (`curl/src/lib.rs:512-513`, `531-533`, `curl/src/lib.rs:775-777`), so
   the seam's bounding now applies to them. Classification and content are
   unchanged.

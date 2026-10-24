@@ -980,6 +980,11 @@ pub trait CommandExecutor: fmt::Debug {
 /// session-bus variables. Stdin is null unless the caller supplies bounded
 /// input. Stdout/stderr are each bounded by `max_output_bytes`; overflow
 /// fails closed without assuming state. Deadlines kill and reap the child.
+///
+/// The bounded execution itself is delegated to `eggup_core::run_bounded`;
+/// this type keeps the service's own pre-flight policy — allowlisted
+/// absolute paths, a cleared environment, a bounded stdin payload, and the
+/// timeout range check — ahead of that call.
 #[derive(Debug, Clone)]
 pub struct SystemExecutor {
     /// Per-stream output bound.
@@ -1020,6 +1025,10 @@ impl CommandExecutor for SystemExecutor {
         stdin_data: Option<&[u8]>,
         timeout: Duration,
     ) -> Result<ManagerCommandOutput, ServiceError> {
+        // ---- The service's own pre-flight policy ----
+        //
+        // These checks are this crate's policy, not core's. They run ahead of
+        // every call into core, and core never sees the raw `argv[0]`.
         if argv.is_empty() || argv[0].is_empty() {
             return Err(ServiceError::invalid("manager command has no program"));
         }
@@ -1034,192 +1043,99 @@ impl CommandExecutor for SystemExecutor {
                 return Err(ServiceError::invalid("manager stdin exceeds bound"));
             }
         }
-        let command_deadline = Instant::now() + timeout;
+        // The caller's timeout bounds the whole call, so the budget starts
+        // before the resolve, exactly as it does today, and the remaining
+        // budget is what core receives.
+        let started = Instant::now();
         let program_path = resolve_manager_program(&argv[0])?;
         let program = program_path.to_string_lossy().into_owned();
-        let mut cmd = std::process::Command::new(&program_path);
-        if argv.len() > 1 {
-            cmd.args(&argv[1..]);
+        let remaining = timeout
+            .checked_sub(started.elapsed())
+            .unwrap_or(Duration::ZERO);
+        if remaining.is_zero() {
+            return Err(ServiceError::manager(
+                ManagerFailureKind::Timeout,
+                format!("manager command timed out for {program}"),
+            ));
         }
-        cmd.env_clear();
+
+        let mut spec = eggup_core::CommandSpec::new(program_path.clone())
+            .args(argv[1..].iter().map(|argument| argument.as_str()))
+            .timeout(remaining)
+            .max_output_bytes(self.max_output_bytes);
+        // The child environment is the filtered pair list, never the ambient
+        // environment. A pair that is not valid UTF-8 is dropped rather than
+        // lossily converted: a mangled session-bus address is worse than no
+        // session-bus address at all.
         for (key, value) in filtered_manager_environment(argv, std::env::vars_os()) {
-            cmd.env(key, value);
-        }
-        if stdin_data.is_some() {
-            cmd.stdin(std::process::Stdio::piped());
-        } else {
-            cmd.stdin(std::process::Stdio::null());
-        }
-        cmd.stdout(std::process::Stdio::piped());
-        cmd.stderr(std::process::Stdio::piped());
-        let mut child = cmd.spawn().map_err(|e| {
-            // The classification is decided here, where the platform's error
-            // kind is still available. Nothing downstream inspects the text.
-            let kind = ManagerFailureKind::from_spawn_error(&e);
-            let detail = match kind {
-                ManagerFailureKind::NotFound => format!("manager binary missing: {program}"),
-                _ => format!("manager spawn failed for {program}: {e}"),
+            let (Ok(key), Ok(value)) = (key.into_string(), value.into_string()) else {
+                continue;
             };
-            ServiceError::manager(kind, detail)
-        })?;
-        // Reader threads are attached before the stdin write, so a child that
-        // fills stdout/stderr before draining stdin cannot deadlock both sides.
-        let stdout_pipe: Option<Box<dyn std::io::Read + Send>> = child
-            .stdout
-            .take()
-            .map(|p| Box::new(p) as Box<dyn std::io::Read + Send>);
-        let stderr_pipe: Option<Box<dyn std::io::Read + Send>> = child
-            .stderr
-            .take()
-            .map(|p| Box::new(p) as Box<dyn std::io::Read + Send>);
-        let max = self.max_output_bytes;
-        let (tx_out, rx_out) = std::sync::mpsc::channel();
-        let (tx_err, rx_err) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let out = read_bounded_generic(stdout_pipe, max);
-            let _ = tx_out.send(out);
-        });
-        std::thread::spawn(move || {
-            let out = read_bounded_generic(stderr_pipe, max);
-            let _ = tx_err.send(out);
-        });
-        // Bounded stdin write (only for short-lived filters like `crontab -`).
-        //
-        // The write runs on its own thread: a blocking `write_all` on a pipe
-        // cannot be interrupted from this thread, and the only thing that
-        // unblocks it is closing the child's read end, which `child.kill()`
-        // does. The write is therefore bounded by driving it through the same
-        // deadline-checked wait loop below, which kills the child once
-        // `command_deadline` passes.
-        let stdin_result: Option<std::sync::mpsc::Receiver<std::io::Result<()>>> = match stdin_data
-        {
-            Some(data) => {
-                let Some(mut stdin) = child.stdin.take() else {
-                    let _ = child.kill();
-                    let _ = child.wait();
+            spec = spec.environment(key, value);
+        }
+        if let Some(data) = stdin_data {
+            spec = spec.stdin_data(data.to_vec());
+        }
+
+        match eggup_core::run_bounded(&spec) {
+            Ok(out) => {
+                if out.timed_out() {
                     return Err(ServiceError::manager(
-                        ManagerFailureKind::Spawn,
-                        format!("manager stdin unavailable for {program}"),
-                    ));
-                };
-                let (tx_in, rx_in) = std::sync::mpsc::channel();
-                // The writer thread needs owned bytes; the bound above keeps
-                // this copy small.
-                let owned = data.to_vec();
-                std::thread::spawn(move || {
-                    use std::io::Write;
-                    // Best-effort write; failure fails closed. `stdin` is
-                    // dropped on this thread, closing the pipe (EOF for the child).
-                    let _ = tx_in.send(stdin.write_all(&owned).and_then(|()| stdin.flush()));
-                });
-                Some(rx_in)
-            }
-            None => None,
-        };
-        loop {
-            // A completed write that failed fails closed. A write that is still
-            // pending is not itself a failure: the deadline below bounds it.
-            if let Some(rx) = stdin_result.as_ref() {
-                if let Ok(Err(_)) = rx.try_recv() {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(ServiceError::manager(
-                        ManagerFailureKind::Spawn,
-                        format!("manager stdin failed for {program}"),
+                        ManagerFailureKind::Timeout,
+                        format!("manager command timed out for {program}"),
                     ));
                 }
-            }
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    // The child has exited, so its stdin read end is closed and
-                    // the writer cannot block indefinitely. Collect its verdict
-                    // within the remaining budget before trusting the output.
-                    if let Some(rx) = stdin_result.as_ref() {
-                        let remaining = command_deadline
-                            .checked_duration_since(Instant::now())
-                            .filter(|d| !d.is_zero())
-                            .ok_or_else(|| {
-                                ServiceError::manager(
-                                    ManagerFailureKind::Timeout,
-                                    "manager command timed out",
-                                )
-                            })?;
-                        if !matches!(rx.recv_timeout(remaining), Ok(Ok(()))) {
-                            let _ = child.kill();
-                            let _ = child.wait();
-                            return Err(ServiceError::manager(
-                                ManagerFailureKind::Spawn,
-                                format!("manager stdin failed for {program}"),
-                            ));
-                        }
-                    }
-                    let remaining = command_deadline
-                        .checked_duration_since(Instant::now())
-                        .filter(|d| !d.is_zero())
-                        .ok_or_else(|| {
-                            ServiceError::manager(
-                                ManagerFailureKind::Timeout,
-                                "manager command timed out",
-                            )
-                        })?;
-                    let (stdout, out_overflow) = rx_out.recv_timeout(remaining).map_err(|_| {
-                        ServiceError::manager(
-                            ManagerFailureKind::Timeout,
-                            "manager output collection timed out",
-                        )
-                    })?;
-                    let remaining = command_deadline
-                        .checked_duration_since(Instant::now())
-                        .filter(|d| !d.is_zero())
-                        .ok_or_else(|| {
-                            ServiceError::manager(
-                                ManagerFailureKind::Timeout,
-                                "manager command timed out",
-                            )
-                        })?;
-                    let (stderr, err_overflow) = rx_err.recv_timeout(remaining).map_err(|_| {
-                        ServiceError::manager(
-                            ManagerFailureKind::Timeout,
-                            "manager output collection timed out",
-                        )
-                    })?;
-                    if out_overflow || err_overflow {
-                        return Err(ServiceError::manager(
-                            ManagerFailureKind::Protocol,
-                            format!("manager output exceeded bound for {program}"),
-                        ));
-                    }
-                    return Ok(ManagerCommandOutput {
-                        status: status.code(),
-                        stdout,
-                        stderr,
-                    });
-                }
-                Ok(None) => {
-                    if Instant::now() >= command_deadline {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                        return Err(ServiceError::manager(
-                            ManagerFailureKind::Timeout,
-                            format!("manager command timed out for {program}"),
-                        ));
-                    }
-                    std::thread::sleep(
-                        command_deadline
-                            .checked_duration_since(Instant::now())
-                            .unwrap_or_default()
-                            .min(Duration::from_millis(5)),
-                    );
-                }
-                Err(e) => {
-                    let _ = child.kill();
-                    let _ = child.wait();
+                if out.output_limited() {
                     return Err(ServiceError::manager(
-                        ManagerFailureKind::Spawn,
-                        format!("manager wait failed for {program}: {e}"),
+                        ManagerFailureKind::Protocol,
+                        format!("manager output exceeded bound for {program}"),
                     ));
                 }
+                Ok(ManagerCommandOutput {
+                    status: out.exit_code(),
+                    stdout: out.stdout().to_vec(),
+                    stderr: out.stderr().to_vec(),
+                })
             }
+            Err(eggup_core::Error::Io { operation, source }) => match operation {
+                // The classification is decided here, where the platform's
+                // error kind is still available. Nothing downstream inspects
+                // the text.
+                "spawning bounded candidate" => {
+                    let kind = ManagerFailureKind::from_spawn_error(&source);
+                    let detail = match kind {
+                        ManagerFailureKind::NotFound => format!("manager binary missing: {program}"),
+                        _ => format!("manager spawn failed for {program}: {source}"),
+                    };
+                    Err(ServiceError::manager(kind, detail))
+                }
+                "polling bounded candidate" => Err(ServiceError::manager(
+                    ManagerFailureKind::Spawn,
+                    format!("manager wait failed for {program}: {source}"),
+                )),
+                "writing bounded stdin" => Err(ServiceError::manager(
+                    ManagerFailureKind::Spawn,
+                    format!("manager stdin failed for {program}"),
+                )),
+                // The fallback names the unrecognised operation, so a future
+                // core change is attributable rather than silently folded
+                // into "spawn failed".
+                other => Err(ServiceError::manager(
+                    ManagerFailureKind::Spawn,
+                    format!(
+                        "manager spawn failed for {program}: unrecognised bounded execution operation {other}"
+                    ),
+                )),
+            },
+            Err(eggup_core::Error::CandidateExecution(msg)) => Err(ServiceError::manager(
+                ManagerFailureKind::Protocol,
+                format!("manager command failed for {program}: {msg}"),
+            )),
+            Err(eggup_core::Error::InvalidInput(msg)) => Err(ServiceError::invalid(msg)),
+            Err(other) => Err(ServiceError::manager(
+                ManagerFailureKind::Spawn,
+                format!("manager command failed for {program}: {other}"),
+            )),
         }
     }
 }
@@ -1300,31 +1216,6 @@ fn filtered_manager_environment(
         .into_iter()
         .filter(|(key, _)| allow.contains(&key.as_os_str()))
         .collect()
-}
-
-fn read_bounded_generic(
-    pipe: Option<Box<dyn std::io::Read + Send>>,
-    max: usize,
-) -> (Vec<u8>, bool) {
-    let Some(mut pipe) = pipe else {
-        return (Vec::new(), false);
-    };
-    let mut buf = Vec::new();
-    let mut tmp = [0u8; 8192];
-    loop {
-        use std::io::Read;
-        match pipe.read(&mut tmp) {
-            Ok(0) => break,
-            Ok(n) => {
-                buf.extend_from_slice(&tmp[..n]);
-                if buf.len() > max {
-                    return (buf, true);
-                }
-            }
-            Err(_) => break,
-        }
-    }
-    (buf, false)
 }
 
 /// One scripted expectation for [`FakeExecutor`].
@@ -4202,6 +4093,10 @@ mod unix_tests {
 
     // ---- Shared command runner ----
 
+    // Unix-only fixture: the program paths are POSIX absolute paths,
+    // which are not absolute on Windows. The portable counterparts
+    // live in the crate's integration targets.
+    #[cfg(unix)]
     #[test]
     fn command_timeout_kills_and_reaps() {
         let ex = SystemExecutor::new();
@@ -4218,6 +4113,10 @@ mod unix_tests {
         assert!(start.elapsed() < Duration::from_secs(4));
     }
 
+    // Unix-only fixture: the program paths are POSIX absolute paths,
+    // which are not absolute on Windows. The portable counterparts
+    // live in the crate's integration targets.
+    #[cfg(unix)]
     #[test]
     fn command_output_bound_fails_closed() {
         let ex = SystemExecutor::with_max_output(64).unwrap();
@@ -4234,6 +4133,10 @@ mod unix_tests {
         assert_eq!(err.manager_kind(), Some(ManagerFailureKind::Protocol));
     }
 
+    // Unix-only fixture: the program paths are POSIX absolute paths,
+    // which are not absolute on Windows. The portable counterparts
+    // live in the crate's integration targets.
+    #[cfg(unix)]
     #[test]
     fn command_passes_argv_literally_without_shell() {
         let ex = SystemExecutor::new();
@@ -4250,6 +4153,10 @@ mod unix_tests {
         assert_eq!(output.stdout_text().trim(), payload);
     }
 
+    // Unix-only fixture: the program paths are POSIX absolute paths,
+    // which are not absolute on Windows. The portable counterparts
+    // live in the crate's integration targets.
+    #[cfg(unix)]
     #[test]
     fn command_nonzero_exit_is_ok_with_status() {
         let ex = SystemExecutor::new();
@@ -4267,6 +4174,10 @@ mod unix_tests {
         assert_eq!(output.status, Some(3));
     }
 
+    // Unix-only fixture: the program paths are POSIX absolute paths,
+    // which are not absolute on Windows. The portable counterparts
+    // live in the crate's integration targets.
+    #[cfg(unix)]
     #[test]
     fn command_missing_binary_fails_closed() {
         let ex = SystemExecutor::new();
@@ -4281,6 +4192,10 @@ mod unix_tests {
         assert_eq!(err.manager_kind(), Some(ManagerFailureKind::NotFound));
     }
 
+    // Unix-only fixture: the program paths are POSIX absolute paths,
+    // which are not absolute on Windows. The portable counterparts
+    // live in the crate's integration targets.
+    #[cfg(unix)]
     #[test]
     fn command_environment_adds_nothing() {
         // The child environment is cleared for a system-scoped command.
@@ -4340,6 +4255,63 @@ mod unix_tests {
             .collect();
         assert_eq!(keys, ["DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR"]);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The user-scoped environment policy is exactly three variables.
+    ///
+    /// This is the portable counterpart of the end-to-end environment fixture
+    /// in the crate's integration targets: the filter itself is a pure
+    /// function of the argv and the source environment, so it is assertable on
+    /// every lane, including the one that cannot run a program named
+    /// `systemctl`.
+    #[test]
+    fn the_session_bus_filter_is_exactly_three_variables() {
+        let source = [
+            (
+                "DBUS_SESSION_BUS_ADDRESS".into(),
+                "unix:path=/run/user/1/bus".into(),
+            ),
+            (
+                "SYSTEMD_BUS_ADDRESS".into(),
+                "unix:path=/run/user/1/systemd/private".into(),
+            ),
+            ("XDG_RUNTIME_DIR".into(), "/run/user/1".into()),
+            ("PATH".into(), "/usr/bin".into()),
+            ("EGGUP_EXECUTOR_SENTINEL".into(), "secret".into()),
+        ];
+        let user = filtered_manager_environment(
+            &["systemctl".into(), "--user".into(), "start".into()],
+            source.clone(),
+        );
+        let mut keys: Vec<String> = user
+            .iter()
+            .map(|(key, _)| key.to_string_lossy().into_owned())
+            .collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            [
+                "DBUS_SESSION_BUS_ADDRESS",
+                "SYSTEMD_BUS_ADDRESS",
+                "XDG_RUNTIME_DIR"
+            ]
+        );
+        // The value is the caller's own, byte for byte.
+        assert_eq!(
+            user.iter()
+                .find(|(key, _)| key == "XDG_RUNTIME_DIR")
+                .map(|(_, value)| value.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            "/run/user/1"
+        );
+        // Without `--user` nothing is injected at all.
+        let system =
+            filtered_manager_environment(&["systemctl".into(), "start".into()], source.clone());
+        assert!(system.is_empty());
+        // Only a program named `systemctl` is user-scoped systemd.
+        let other =
+            filtered_manager_environment(&["/usr/bin/crontab".into(), "--user".into()], source);
+        assert!(other.is_empty());
     }
 
     #[test]

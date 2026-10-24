@@ -416,6 +416,68 @@ section aggregates them, it does not replace them.
   the capability. **Unpublished** — `eggup-eggpack 0.1.3` still carries the
   duplicate implementation and the redundant dependency edge.
 
+- `eggup-curl` gains the caller-settable `User-Agent` control the other
+  adapter already had (Acquisition Transport M014): the curl adapter now
+  accepts an outbound `User-Agent`, validates it as an HTTP field value (no
+  C0 or C1 control character, no leading or trailing space, a 512-byte
+  bound), and emits it as a literal `--user-agent` argv element ahead of the
+  `--` separator that isolates the URL. The control lives on `CurlTransport`,
+  not on `CurlConfig`, because `CurlConfig`'s public fields would make any
+  added field a source-breaking change for a consumer of the published
+  crate; the default stays unset, so the observable wire behavior of the
+  published adapter does not change. A rejected value is a terminal
+  `AcquisitionError::InvalidInput` and never `Unavailable`, so a malformed
+  value can never trigger a composed-transport fallback. The parity this
+  closes is capability parity, not placement parity and not default-value
+  parity. **Unpublished** — `eggup-curl 0.1.2` remains the published version
+  and still carries the missing control, the `eggup-acquisition 0.1.3` seam
+  it resolves against is unchanged, and the `v0.1.2` tag is unmoved;
+  republication is a separate milestone.
+
+- `eggup-core` bounds the stdin a child may receive (Verified Update Core
+  M017): `CommandSpec::stdin_data` attaches a payload to the bounded
+  execution and `MAX_STDIN_BYTES` (1 MiB, inclusive) bounds it, a payload
+  over that bound is rejected with `Error::InvalidInput` before any child is
+  spawned, and the payload is written on a dedicated thread whose failure —
+  including the broken pipe from a child that exits without reading — kills
+  and reaps the child and returns a typed `Error::Io` rather than hanging.
+  The unconditional deadline bounds that writer exactly as it bounds the
+  output readers, and the three `Error::Io` operation strings (`spawning
+  bounded candidate`, `polling bounded candidate`, `writing bounded stdin`)
+  are documented as a stable classification surface, so a downstream adapter
+  can re-classify a core failure without matching on error text. `Error`
+  keeps exactly the seven published variants, no dependency was added, and
+  the dependency surface remains `sha2` only. **Unpublished** — `eggup-core
+  0.1.3` still carries the null stdin and lacks `stdin_data` and
+  `MAX_STDIN_BYTES`, and `eggup-eggpack`'s `=0.1.3` pin blocks propagation
+  until a separate adapter republication. No consumer migration is required.
+
+- `eggup-transport-footprint` gains CI coverage for the configurations it
+  exists to represent (Transport Footprint M001): the crate's central claim
+  — that a consumer can link exactly one transport stack — was verified by
+  no machine, because every lane built only the dual configuration. The
+  curl-only, eggfetch-only, and both-adapters configurations are now built by
+  the `stable` and `macos` lanes and checked at the 1.89 MSRV floor, and a
+  linkage-discipline guard rejects a sibling-adapter reference in every
+  configuration, with a negative control that shows the guard discriminates.
+  The recorded dependency counts 3 / 92 / 93 still reproduce exactly. The
+  crate remains `publish = false` with no registry version; no published
+  crate's dependency graph changed, and no consumer migration is required.
+
+- `eggup-service` runs manager commands through `eggup_core::run_bounded`, so
+  the workspace holds one bounded-process-runner implementation instead of two
+  (Service Lifecycle M015). The crate's own safety policy — allowlisted
+  absolute program paths, a cleared child environment with only the explicit
+  user-scoped systemd session-bus variables, bounded stdin, and the timeout
+  range check — is unchanged, as are the `ManagerFailureKind` taxonomy, the
+  public API, and every manager's argv. The consolidation also fixes a
+  defect the replaced runner had: it consumed the stdin writer's verdict with
+  `try_recv`, discarding a successful write, and then read the now-empty
+  channel as a failure. The affected path is `crontab -`, the crate's only
+  production stdin caller. **Unpublished** — `eggup-service 0.1.3` still
+  carries that defect and the previous runner until a republication; the
+  `v0.1.3` tag is unmoved. No consumer migration is required.
+
 ## 0.1.1
 
 - `eggup-core`: added ADR-0002 post-commit policy via

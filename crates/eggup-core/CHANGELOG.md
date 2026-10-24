@@ -28,6 +28,60 @@ explains why that addition is not removable.
 Nothing in this section has been published. `0.1.3` is the published baseline on
 crates.io, and no publication milestone authorizes these entries.
 
+**Bounded stdin execution corrective (Verified Update Core M017).** `run_bounded`
+gave every child a **null** stdin, so a downstream adapter whose workflow needs a
+child to read a payload — a service manager installing a unit or a crontab from
+standard input — could not delegate process execution to core without losing
+that capability, and had to keep a runner of its own. Core now owns the bounded
+stdin capability.
+
+- **Added: `CommandSpec::stdin_data`.** One infallible builder attaches a
+  bounded stdin payload. Without a payload the child's stdin stays null and
+  `run_bounded` behaves exactly as before.
+- **Added: `MAX_STDIN_BYTES`.** The inclusive bound on one payload (1 MiB). A
+  larger payload is rejected with
+  `Error::InvalidInput("stdin data exceeds the bounded stdin bound")` **before
+  any child is spawned**, so the bound fails closed and no process is created.
+- **Added: a bounded stdin write.** An attached payload is written by a
+  dedicated writer thread that starts only after the output readers are
+  attached, so a child that fills stdout or stderr before draining its stdin
+  cannot deadlock both sides.
+- **The deadline now bounds the writer too.** The wall-clock deadline remains an
+  unconditional maximum bound on the whole bounded execution. At the deadline
+  the child is killed, which breaks the child's stdin pipe and unblocks the
+  writer, and a writer still blocked in `write` is abandoned explicitly,
+  exactly like a reader blocked on a pipe a surviving descendant holds. A
+  bounded execution is not reported as complete until the writer has delivered
+  its verdict, so a write failure is never lost behind a "the child exited"
+  observation.
+- **Added: a typed write failure.** A stdin payload that cannot be written —
+  including the broken pipe a child produces when it exits without reading its
+  stdin — kills and reaps the child and then fails closed with
+  `Error::Io { operation: "writing bounded stdin", source }`. When a failed
+  write and an output overflow are live at the same time, the write failure
+  wins.
+- **Added: a stable error-classification surface.** The `operation` string of
+  `Error::Io` is now a published contract for `run_bounded`: `"spawning
+  bounded candidate"`, `"polling bounded candidate"`, and `"writing bounded
+  stdin"`. A downstream adapter may branch on them, and the `run_bounded`
+  rustdoc states what each one means and what an adapter is expected to do
+  with it.
+- **Unchanged: the public error surface.** No `Error` variant was added,
+  removed, or reshaped. `Error` keeps exactly the seven published variants
+  (plus the `#[cfg(test)]`-only `Error::Injected`), so an exhaustive `match` on
+  it compiles unchanged. `FailureCategory` is untouched.
+- **Unchanged: the dependency surface.** `sha2` plus the Windows-only
+  `self-replace`. No new dependency, no `unsafe`, no process-group or
+  job-object mechanism, and no change to the transaction, staging, locking,
+  commit, rollback, or ownership machinery. SHA-256 remains integrity evidence
+  only; no authenticity or signature claim was introduced.
+- **Unpublished, and no migration required.** The published `eggup-core 0.1.3`
+  still gives every child a null stdin and still lacks `stdin_data` and
+  `MAX_STDIN_BYTES`; the capability reaches consumers only when a new version
+  is published, and no publication milestone authorizes that here. The addition
+  is source-compatible: no consumer needs to change anything, and the new
+  builder is optional.
+
 **Public-API contract truthfulness correction (Verified Update Core M015).** The
 published failure taxonomy contained a category that could never be produced:
 `FailureCategory::RetainedEvidence` was never constructed by any producer, yet

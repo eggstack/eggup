@@ -19,6 +19,13 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo test --workspace --all-targets --all-features --locked
+      # The isolated single-adapter configurations are the crate's entire
+      # purpose. Without these steps, "curl_only links no Eggfetch code" is
+      # never checked by any machine. Each configuration is its own step so a
+      # failure names itself instead of hiding in a loop.
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features curl --locked
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features eggfetch --locked
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features curl,eggfetch --locked
       - run: cargo doc --workspace --no-deps --locked
       - run: cargo package -p eggup-service --locked
 
@@ -29,6 +36,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.89.0
       - run: cargo check --workspace --all-targets --locked
+      # `cargo check --workspace --all-targets --locked` enables no feature
+      # (default = []), so it compiled none of the three footprint binaries.
+      # The MSRV floor must apply to the feature-gated paths too, and the
+      # dual configuration is where two independent adapter graphs meet.
+      - run: cargo check -p eggup-transport-footprint --no-default-features --features curl --locked
+      - run: cargo check -p eggup-transport-footprint --no-default-features --features eggfetch --locked
+      - run: cargo check -p eggup-transport-footprint --no-default-features --features curl,eggfetch --locked
       - run: cargo package -p eggup-service --locked
 
   service-systemd:
@@ -59,6 +73,11 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo test --workspace --all-targets --all-features --locked
+      # macOS is the platform on which the published 3 / 92 / 93 counts were
+      # captured, so the isolated configurations are built here as well. The
+      # dual configuration is already built by the lane's --all-features step.
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features curl --locked
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features eggfetch --locked
       - run: cargo package -p eggup-service --locked
 
   windows-check:

@@ -44,6 +44,44 @@ in this crate**, and no publication or version bump is authorized by this
 milestone: the published `0.1.2` artifact keeps the cause-free detail until a
 separate republication milestone ships this change.
 
+**Adapter capability parity: a caller-settable `User-Agent` (Acquisition Transport
+M014).**
+
+- **Added: a caller-settable outbound `User-Agent`.**
+  `CurlTransport::with_executable_and_user_agent(executable, config, user_agent)`
+  installs a `User-Agent` used for **every** request that adapter makes, and
+  `CurlTransport::user_agent()` returns the accepted value (`None` when none was
+  installed). The value reaches `curl` as the literal argv element following
+  `--user-agent`, positioned before the `--` separator and the URL. No shell is
+  involved, so the value is never re-parsed or interpolated.
+- **Added: validation before the wire.** The accepted grammar is
+  `1*( VCHAR / SP / obs-text )` — `VCHAR` is `%x21-7E`, `SP` (`%x20`) is
+  permitted only between two non-`SP` characters, and `obs-text` is any
+  non-ASCII scalar value (`%xA0-10FFFF`, C1 excluded). A value is rejected with
+  `AcquisitionError::InvalidInput` when it is empty, when its UTF-8 length
+  exceeds `MAX_USER_AGENT_BYTES` (512 bytes), when it contains any C0 control
+  character (including `CR`, `LF`, `NUL`, and `HTAB`), `DEL` (`U+007F`), or any
+  C1 control character (`U+0080`-`U+009F`), or when it begins or ends with a
+  space. A rejected value produces **no** argv. `InvalidInput` is terminal:
+  unlike `Unavailable` it never makes a composed transport fall back to another
+  adapter, so a malformed value cannot silently change which transport serves
+  the request. The control characters are refused because `curl` does not
+  sanitize `--user-agent` — a value containing `CR LF` would be written into the
+  request head verbatim and inject an additional header.
+- **Unchanged: the default wire behavior.**
+  `CurlTransport::with_executable` installs no `User-Agent`; the adapter's argv
+  contains no `--user-agent` element, so `curl` applies its own default. The
+  bytes a consumer of the published `0.1.2` sends are unchanged.
+- **Compatibility, stated precisely.** The change is **additive**. `CurlConfig`
+  is untouched — its fields are public and it is not `#[non_exhaustive]`, so
+  adding a field there would be source-breaking for every struct-literal
+  construction — and `CurlTransport` gains only a **private** field, a new
+  constructor, and a new accessor. No existing public signature was added,
+  removed, or retyped, so **no consumer migration is required**, and a future
+  republication would be a non-breaking `0.1.3`. **No publication or version
+  bump is authorized by this milestone**: the published `0.1.2` artifact keeps
+  its current shape and behavior.
+
 **Test-strengthening and internal consolidation (Acquisition Transport M013).**
 
 - **Fixed: nine tests could report a pass while asserting nothing.** Each of the
@@ -79,7 +117,8 @@ separate republication milestone ships this change.
 and its observable behavior is unchanged: no public signature, field, or
 constructor was added, removed, or retyped, and no wire request changes. The
 `Unavailable` / `Transport` classification of every failure is unchanged, and
-the adapter never gains a `User-Agent` surface. The only consumer-visible
+the adapter gains no `User-Agent` surface **in M013** (M014 later added one;
+see the M014 entry above). The only consumer-visible
 consequence is the source break in `eggup-acquisition`'s `AcquisitionError::Io`
 variant, which this crate now builds through the seam's typed constructor
 (`eggup-acquisition` M013). **No consumer migration is required in this

@@ -442,10 +442,10 @@ Evidence-based comparison, both read from source.
 | Failure when the transport itself cannot run | `Unavailable` only for runtime build / thread teardown (`lib.rs:250`, `lib.rs:266`) | `Unavailable` also for a missing executable or spawn failure; discovery via `PATH` is opt-in |
 | Blocking the caller | yes, for the whole fetch | yes, waiting on the child |
 | Determinism / hermeticity | no external process, but the Rustls + tokio stack and OS root store enter the binary | depends on an external `curl` binary and its build-time TLS backend |
-| Consumer-supplied per-request user agent | `EggfetchConfig::user_agent` | not modelled the same way; `CurlConfig` has no user-agent field |
+| Consumer-supplied per-request user agent | `EggfetchConfig::user_agent` | `CurlTransport::with_executable_and_user_agent` (M014; same capability, different placement — see §12.1) |
 | Explicit protocol allowlist per request | not exposed — HTTP/1 is fixed to `Http1Only` | `CurlConfig::allowed_protocols` is caller-configurable |
 
-### 12.1 The `User-Agent` capability asymmetry (recorded, deferred)
+### 12.1 The `User-Agent` capability asymmetry (recorded, resolved by M014)
 
 This adapter owns the adapter capability surface, so the asymmetry is recorded
 here as well as in [acquisition.md](acquisition.md) §11.1.
@@ -453,20 +453,46 @@ here as well as in [acquisition.md](acquisition.md) §11.1.
 - **The seam contract has no user-agent.** `AcquisitionRequest` carries only a
   URL and `AcquisitionTransport` only the request, destination, limits, and
   cancellation flag, so no seam invariant is violated by the difference below.
-- **`eggup-eggfetch` exposes a caller-settable `User-Agent`**
-  (`EggfetchConfig::user_agent`, defaulting to `DEFAULT_USER_AGENT`);
-  `eggup-curl` exposes none.**
-- **The concrete consequence:** a caller that switches transports loses control
-  of the `User-Agent`, and the wire value changes from this adapter's default
-  (or whatever the caller set) to curl's own default. A transport switch is
+- **As M013 recorded it:** `eggup-eggfetch` exposed a caller-settable
+  `User-Agent` (`EggfetchConfig::user_agent`, defaulting to
+  `DEFAULT_USER_AGENT`); `eggup-curl` exposed none, so a caller that switched
+  transports lost control of the `User-Agent` and the wire value changed from
+  this adapter's default to curl's own default. A transport switch was
   therefore *not* byte-identical on the wire.
-- **Owner:** the finding is **deferred, not closed**, to the named follow-up
-  milestone **"Acquisition M014 — adapter capability parity (`User-Agent` and
-  the `CurlConfig` public-field API boundary)"**. That milestone owns the
-  API-boundary consequence: `CurlConfig`'s fields are public and **not**
-  `#[non_exhaustive]`, so adding a caller-settable user-agent is source-breaking
-  for every external struct-literal construction and belongs at the intentional
-  0.2/1.0 boundary, not inside a corrective.
+- **M014's resolution: capability parity.** `eggup-curl` now also exposes a
+  caller-settable `User-Agent`
+  (`CurlTransport::with_executable_and_user_agent`), so a caller can set the
+  outbound `User-Agent` on **either** adapter, for every request that adapter
+  makes. The finding is closed at the capability level.
+- **Parity is capability parity, not placement parity.** This adapter's control
+  lives in `EggfetchConfig`, whose `user_agent` is a public field of a public,
+  non-`#[non_exhaustive]` struct in a crate published at `0.1.3`; moving it
+  would be a source break for published consumers, so it stays where it is.
+  The curl adapter's control lives on `CurlTransport` because `CurlConfig`'s
+  fields are public and **not** `#[non_exhaustive]`, so adding a field there
+  would be source-breaking for every external struct-literal construction.
+  The two shapes are deliberately different; neither adapter may be changed to
+  match the other.
+- **Parity is not default-value parity, deliberately.** This adapter still
+  defaults to `DEFAULT_USER_AGENT` (`eggup-eggfetch`); the curl adapter sends
+  **no** `User-Agent` by default, so curl applies its own default. Defaulting
+  the curl adapter to `eggup-curl` would have changed the observable header of
+  every consumer of the published `eggup-curl 0.1.2`, for no concrete
+  benefit, so the published adapter's default wire behavior is unchanged.
+- **Validation is the adapter's own responsibility.** The curl adapter validates
+  the value against a stated grammar (`1*( VCHAR / SP / obs-text )`, at most
+  `MAX_USER_AGENT_BYTES` = 512 bytes) before it can reach the wire, and rejects
+  every violation as `AcquisitionError::InvalidInput`, which is terminal under
+  every composition policy — a malformed caller value can never turn into a
+  silent fallback to another adapter. This validation is not redundant with
+  curl's own behavior: curl does **not** sanitize `--user-agent`.
+- **How parity is enforced.** A mechanical cross-adapter parity test is
+  **impossible** here and none is claimed: neither adapter may know the other
+  exists, and the seam must not depend on either. Parity is enforced by
+  **per-adapter tests** (each adapter proves its own control) plus the
+  **documented contract** in [acquisition.md](acquisition.md) §11.1, which a
+  reviewer compares as two documented contracts rather than as a shared
+  assertion.
 
 In short: eggfetch costs binary size and a TLS stack but buys a
 library-integrated timeout and no subprocess lifecycle; curl costs a
@@ -492,9 +518,9 @@ leaves to the caller, and the reason
 
 ## Known doc/code drift
 
-`curl-adapter.md` and `transport-footprint.md` are linked from
-[overview.md](overview.md)'s deep-dive index but are owned by another work
-stream; those two links are expected to resolve once those documents land.
+Both documents have landed and are linked from
+[overview.md](overview.md)'s deep-dive index: `curl-adapter.md` and
+`transport-footprint.md` are in the tree, so neither link is outstanding.
 
 - `architecture/eggfetch-adapter.md` (prior revision) cited 1180 source lines and
   described `block_on` as building a runtime per call with `.expect()` on

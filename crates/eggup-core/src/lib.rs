@@ -31,7 +31,7 @@ mod transaction;
 
 pub use candidate::{
     run_bounded, AllValidators, CandidateValidator, CommandOutput, CommandSpec,
-    CrossMemberAgreementValidator, ExactIdentityValidator, ValidatedTransaction,
+    CrossMemberAgreementValidator, ExactIdentityValidator, ValidatedTransaction, MAX_STDIN_BYTES,
 };
 pub use current_exe::CurrentExecutable;
 pub use domain::{
