@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.2.0 — 2026-10-23
+
+Published to crates.io (`plans/closure/archive-extraction/006-status.md`).
+Dependency surface at publication: `flate2`, `fs_at`, `sha2`, `tar`, and `zip`.
+The `eggup-core` edge is a path-only dev-dependency and is stripped when the
+crate is packaged, so the published crate carries **no** `eggup-core`
+dependency. No new dependency in `0.2.0`.
+
+**Compatibility, stated precisely.** No public API change: no public signature,
+field, or constructor was added, removed, or retyped, and the dependency surface
+is unchanged. The `cleanup()` **success path** changed — it is now reachable —
+so a caller that relied on the old always-`Err` result must update its
+`cleanup()` result handling: a caller that wrote `cleanup().unwrap_err()` will
+now **panic** on the success path and must be rewritten to match on the result;
+a caller that wrote `cleanup()?` and aborted the flow on error now continues on
+success; and a caller that wants the residual directory path must capture it
+from `root()` **before** the consuming cleanup call. Apart from that result
+handling, no consumer migration is required. Integrity remains SHA-256 checksum
+evidence only; no authenticity or signature claims.
+
+- **Fixed: the cleanup contract is now truthful and observable (Archive
+  Extraction M005).** The four `cleanup()` entry points
+  (`ExtractedArchive::cleanup`, `PersistedExtraction::cleanup`,
+  `BoundExtraction::cleanup`, and `DeferredCleanup::cleanup`) documented that
+  they "remove" the extraction directory, but the shared implementation emptied
+  the owned tree through the retained handle and then unconditionally returned
+  `Err(ExtractionErrorKind::CleanupFailed)`. The `Ok` path was unreachable in
+  the published `0.1.3` crate. All four now share one contract: `Ok(())` means
+  the owned root object held no entries at the final handle-relative listing,
+  and `Err(..)` with `kind() == CleanupFailed` means the owned root could
+  **not** be fully emptied — the residue may be partially emptied, its
+  emptiness is not guaranteed, and `residue_path()` names the recorded root
+  path. `ExtractionErrorKind::CleanupFailed` is now returned only on failure,
+  and `residue_path()`'s rustdoc states its two proven meanings instead of the
+  blanket "the directory is empty" claim, which was false for the cleanup
+  path. The crate still never removes the root directory itself and still
+  never traverses the root pathname; the residual empty directory is the
+  caller's to remove, and the crate adds no convenience that removes it by
+  pathname.
+
+  **Behavior change and migration note.** The success path of `cleanup()` is
+  now reachable, which is a behavior change for existing callers even though
+  every public signature is unchanged (`Result<(), ExtractionError>` is
+  retained). A caller that wrote `cleanup().unwrap_err()` will now **panic**
+  on the success path and must be rewritten to match on the result. A caller
+  that wrote `cleanup()?` and aborted the flow on error now continues on
+  success — the intended fix, but a control-flow change to review. A caller
+  that wants the residual directory path must capture it from `root()`
+  **before** the consuming cleanup call.
+
+- **Changed: one member-write path (Archive Extraction M005).** The tar.gz and
+  zip handlers shared a duplicated member-write body. It now exists exactly
+  once, in one shared helper parameterized by the per-format entry-kind
+  predicate; each handler keeps its own parsing (entry iteration, name decode,
+  path validation, duplicate detection, entry-count bound, and the tar
+  gzip-tail validation). The refactor is behavior-preserving: same bytes
+  written, same order of operations, same error kinds, same evidence, same
+  handle-authority calls.
+
+- No new dependency, no public API change, and no migration is required
+  beyond the `cleanup()` result handling described above. Integrity remains
+  SHA-256 checksum evidence only; no authenticity or signature claims.
+
+## Unreleased
+
+Nothing in this section has been published. `0.2.0` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
+
 ## 0.1.3 — 2026-10-06
 
 Published to crates.io (`plans/closure/archive-extraction/004-status.md`).
@@ -35,53 +103,6 @@ remains SHA-256 checksum evidence only.
   assert each is rejected as `InvalidPath` with nothing escaping the parent
   directory and no partial extraction retained, including a hostile entry placed
   after a valid declared member. This is the crate's most important invariant.
-
-## Unreleased
-
-Nothing in this section has been published. `0.1.3` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
-
-- **Fixed: the cleanup contract is now truthful and observable.** The four
-  `cleanup()` entry points (`ExtractedArchive::cleanup`,
-  `PersistedExtraction::cleanup`, `BoundExtraction::cleanup`, and
-  `DeferredCleanup::cleanup`) documented that they "remove" the extraction
-  directory, but the shared implementation emptied the owned tree through the
-  retained handle and then unconditionally returned
-  `Err(ExtractionErrorKind::CleanupFailed)`. The `Ok` path was unreachable in
-  a published crate. All four now share one contract: `Ok(())` means the owned
-  root object held no entries at the final handle-relative listing, and
-  `Err(..)` with `kind() == CleanupFailed` means the owned root could **not**
-  be fully emptied — the residue may be partially emptied, its emptiness is
-  not guaranteed, and `residue_path()` names the recorded root path.
-  `ExtractionErrorKind::CleanupFailed` is now returned only on failure, and
-  `residue_path()`'s rustdoc states its two proven meanings instead of the
-  blanket "the directory is empty" claim, which was false for the cleanup
-  path. The crate still never removes the root directory itself and still
-  never traverses the root pathname; the residual empty directory is the
-  caller's to remove, and the crate adds no convenience that removes it by
-  pathname.
-
-  **Behavior change and migration note.** The success path of `cleanup()` is
-  now reachable, which is a behavior change for existing callers even though
-  every public signature is unchanged (`Result<(), ExtractionError>` is
-  retained). A caller that wrote `cleanup().unwrap_err()` will now **panic**
-  on the success path and must be rewritten to match on the result. A caller
-  that wrote `cleanup()?` and aborted the flow on error now continues on
-  success — the intended fix, but a control-flow change to review. A caller
-  that wants the residual directory path must capture it from `root()`
-  **before** the consuming cleanup call.
-
-- **Changed: one member-write path.** The tar.gz and zip handlers shared a
-  duplicated member-write body. It now exists exactly once, in one shared
-  helper parameterized by the per-format entry-kind predicate; each handler
-  keeps its own parsing (entry iteration, name decode, path validation,
-  duplicate detection, entry-count bound, and the tar gzip-tail validation).
-  The refactor is behavior-preserving: same bytes written, same order of
-  operations, same error kinds, same evidence, same handle-authority calls.
-
-- No new dependency, no public API change, and no migration is required
-  beyond the `cleanup()` result handling described above. Integrity remains
-  SHA-256 checksum evidence only; no authenticity or signature claims.
 
 ## 0.1.2 — 2026-09-28
 

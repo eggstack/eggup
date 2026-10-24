@@ -52,13 +52,13 @@ separately exposed — the crate's *only* public feature surface is `curl`,
 
 | Crate | Manifest requirement | Resolved version | Note |
 |---|---|---|---|
-| `eggup-acquisition` | `"0.1.0"` (path) | `0.1.3` | The seam, and the only unconditional dependency |
-| `eggup-curl` | `"0.1.0"` (path, optional) | `0.1.3` | External-process adapter |
-| `eggup-eggfetch` | `"0.1.0"` (path, optional) | `0.1.3` | Native in-process HTTP/TLS adapter |
+| `eggup-acquisition` | `"0.2"` (path) | `0.2.0` | The seam, and the only unconditional dependency |
+| `eggup-curl` | `"0.2"` (path, optional) | `0.2.0` | External-process adapter |
+| `eggup-eggfetch` | `"0.2"` (path, optional) | `0.2.0` | Native in-process HTTP/TLS adapter |
 
 The requirement literals above are the ones in
 [`crates/eggup-transport-footprint/Cargo.toml`](../crates/eggup-transport-footprint/Cargo.toml);
-the resolved versions are the current workspace version (`0.1.3`). The manifest
+the resolved versions are the current workspace version (`0.2.0`). The manifest
 is authoritative and is not changed by this document.
 
 It inherits the 5 shared workspace keys (`version`, `edition`, `rust-version`,
@@ -97,8 +97,8 @@ until it lands in a consumer's dependency graph and binary size. These binaries
 are the fixture that makes the cost visible.
 
 Measured on this workspace at commit `ae9b47a` (macOS, `debug` profile, exact
-commands in [Verification](#verification)). The workspace version advanced to
-`0.1.3` after that measurement; the counts below are the dated capture and are
+commands in [Verification](#verification)). The workspace version has since
+advanced to `0.2.0`; the counts below are the dated capture and are
 not re-derived — the commands in [Verification](#verification) reproduce them at
 the current baseline.
 

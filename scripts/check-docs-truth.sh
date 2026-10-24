@@ -315,12 +315,21 @@ for path in DOC_FILES + ARCH_FILES:
              % (path, ", ".join(hits), " / ".join(OWNER_LINKS)))
 
 # ---------------------------------------------------------------- assertion 4
-# The root CHANGELOG.md Unreleased section does not contradict the 0.1.3 section.
+# The root CHANGELOG.md Unreleased section does not contradict the published
+# sections above it.
+#
+# The published set is read from those sections, so it is version-agnostic: a
+# crate published at any version is a crate that is on the registry, and a
+# bullet in Unreleased that names it must carry a state marker. A gate that
+# knew only one version would silently stop policing a crate the moment a
+# newer version shipped, which is exactly the drift this assertion exists to
+# prevent.
 ALIAS = {"eggup-core": "Core", "eggup-acquisition": "Acquisition", "eggup-eggfetch": "Eggfetch",
          "eggup-curl": "Curl", "eggup-archive": "Archive", "eggup-eggpack": "Eggpack",
          "eggup-service": "Service"}
-# A bullet that names a crate published at 0.1.3 is correctly marked when it
-# states that the published version still carries the defect it corrects.
+# A bullet that names a crate published at a version the bullet also states is
+# correctly marked when it states that the published version still carries the
+# defect it corrects.
 ABSENT_FROM_PUBLISHED = re.compile(
     r"still carries|remains the published version|not published|not yet published"
     r"|blocks propagation|do(?:es)? not (?:yet )?have|until a .{0,20}republication"
@@ -342,14 +351,25 @@ else:
                    "No publication milestone authorizes these entries yet"):
         if header in squashed:
             fail("4", "root Unreleased header still asserts: %s" % header)
-    published = sorted(set(re.findall(r"`(eggup-[a-z]+) 0\.1\.3`", head)))
-    for bullet in [b for b in re.split(r"\n(?=- )", unreleased) if b.startswith("- ")]:
+    published = {}
+    for name, version in re.findall(r"`(eggup-[a-z]+) (\d+\.\d+\.\d+)`", head):
+        published.setdefault(name, set()).add(version)
+    for chunk in re.split(r"\n(?=- )", unreleased):
+        if not chunk.startswith("- "):
+            continue
+        # Each bullet is evaluated on its own paragraph. A bullet that is not
+        # followed by another bullet would otherwise absorb the section's
+        # trailing paragraph, and that paragraph's wording could satisfy -- or
+        # defeat -- the state-marker check on the bullet's behalf.
+        bullet = chunk.split("\n\n", 1)[0]
         names = [c for c in published if c in bullet or (ALIAS.get(c) and ALIAS[c] in bullet)]
         if not names:
             continue
         plain = squash(bullet)
-        if "0.1.3" in plain and ABSENT_FROM_PUBLISHED.search(plain):
-            continue  # correctly marked: explicitly absent from the published 0.1.3
+        stated = set(re.findall(r"\b\d+\.\d+\.\d+\b", plain))
+        on_registry = {v for c in names for v in published[c]}
+        if stated & on_registry and ABSENT_FROM_PUBLISHED.search(plain):
+            continue  # correctly marked: explicitly absent from a published version
         if re.search(r"\bunpublished\b", plain, re.I):
             fail("4", "published-as-unpublished: %s | %s" % (", ".join(names), bullet.split("\n")[0][:70]))
         else:

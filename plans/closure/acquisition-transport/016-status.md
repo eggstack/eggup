@@ -264,6 +264,55 @@ responsibility and was **not run** here.
 | `dependent_requirements_accept_the_next_release_or_record_the_widening` | 387 | for each of the four dependents: the declared requirement accepts the declared next release, **or** a changelog records a requirement that does |
 | `adapter_changelogs_record_the_widening_and_assert_no_contradicted_republication_version` | 426 | both published adapters' `Unreleased` sections record the widening, and neither claims a republication version whose dependency range excludes the seam's next release |
 
+### Addendum 2026-10-23 — the guard was re-pointed at the published version
+
+The requirement matrix above and the three-test table above describe the guard
+**as it stood when M016 closed**, and they are left unrewritten because they are
+this milestone's evidence. The guard itself has since changed, and the change is
+recorded here so that this record does not describe a file that no longer
+exists.
+
+**What changed and why.** M016's guard enforced a *pre-publication* invariant:
+the seam's `## Unreleased` section had to declare a **next release**, and every
+in-workspace dependent had to accept it or record the widening it would need.
+The `0.2.0` publication discharged that premise — the seam's next release is no
+longer hypothetical, it is published — so the changelog cut made the guard's
+three tests fail as written. Acquisition Transport M017 (the `0.2.0`
+publication milestone) re-pointed the guard at the seam's **published**
+version instead, which is the form of the invariant that still holds after a
+release ships.
+
+**What the guard enforces now.** The seam's published version is **derived**
+from the highest `## X.Y.Z` heading in the seam's own `CHANGELOG.md` — never
+from a literal, because a literal stops guarding the moment the next release
+ships — and every in-workspace dependent must either declare a requirement that
+accepts it or have the required widening recorded in a changelog. The seam's
+changelog must carry exactly one `## Unreleased` section and list its releases
+newest-first; each published adapter's changelog must record the seam
+requirement it publishes, and that requirement must accept the published
+version; and no changelog line may claim a republication at a version whose
+dependency range excludes the seam's published release. An unknown shape — no
+version heading, no declared requirement, an unmodelled requirement form — is a
+failure, never an assumption of acceptance. The file still has **zero**
+dependencies and still reads the repository's own sources at compile time, with
+no filesystem discovery, no network, and no wall clock.
+
+**The three test names are unchanged**, because `tests/assertion_guard.rs:147-159`
+names all three as its required behaviour witnesses and panics if a named test is
+missing. Their "next release" wording is now stale relative to what they
+assert; renaming them is a two-file change and belongs to the milestone that
+owns both files.
+
+**Evidence.** `cargo test -p eggup-acquisition --locked --offline --test publication_coupling`
+→ 3 passed, 0 failed. The re-target was proven red-first in a scratch copy: a
+changelog with no `## X.Y.Z` heading fails all three tests loudly; adding a
+`## 0.3.0` heading while the dependents still accept `0.2` fails two of them
+with the version in the message, which is what proves the version is derived
+rather than hard-coded; and adding the widening record alongside that heading
+discharges the "recorded, not performed" fallback, flipping
+`dependent_requirements_accept_the_next_release_or_record_the_widening` from
+FAIL to PASS.
+
 ## Per-platform results
 
 Reported separately, as required. **No platform is inferred from another.**

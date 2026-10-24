@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.2.0 — 2026-10-23
+
+Published to crates.io (`plans/closure/eggpack-manifest-interoperability/007-status.md`).
+Published **last** in the workspace's lockstep `0.2.0` train, because this
+crate exact-pins the three Eggup dependencies it is built against. Dependency
+surface: `eggup-core` (`=0.2.0`), `eggup-archive` (`=0.2.0`),
+`eggup-acquisition` (`=0.2.0`), and `eggpack-manifest` (`=0.1.0`) — the last
+is an external crate and is **not** republished here.
+
+**Compatibility, stated precisely.** This crate's own public API is unchanged:
+no public signature, field, or constructor was added, removed, or retyped, and
+the digest value, the error variant, and the error payload are unchanged. What
+does change is the **published dependency requirements**: the three Eggup exact
+pins move from `=0.1.3` to `=0.2.0`, so this version is the mechanism by which
+the workspace's `0.2.0` fixes reach eggpack consumers — they resolve the
+`0.2.0` core, archive, and seam instead of the `0.1.3` set. A consumer that
+depends on `eggup-acquisition` directly must widen its own requirement to `0.2`
+to share the seam's copy; a `0.1.x` requirement does not accept `0.2.0` and
+resolves a separate copy of the seam instead. Apart from that inherited seam
+break, no consumer migration is required: no public signature or behavior of
+this crate changed. The adapter still selects no release, verifies no
+authenticity, and authorizes no filesystem destination; SHA-256 is integrity
+evidence only.
+
+- **Canonical digest reuse (Eggpack Manifest Interoperability M006).**
+  `validate_acquired_archive` now computes the archive digest with
+  `eggup_core::hash_file` instead of an inline SHA-256 loop, and the direct
+  `sha2 = "0.10.9"` runtime dependency is removed from this crate's manifest.
+  `sha2` now reaches the adapter only transitively, through `eggup-core` and
+  `eggup-archive`.
+- **No behavior change.** The digest value, the error variant, and the error
+  payload are unchanged. The symlink rejection and the exact-size check remain
+  and remain ordered **before** the digest computation, and a digest mismatch
+  still fails closed with `AdapterError::InvalidAcquiredFile(artifact_name)`.
+  The core routine's open and read failures are collapsed into that same
+  variant and payload, exactly as the adapter's own inline routine reported
+  them, so the published error surface is identical.
+- **`sha2` stays a dev-dependency.** The integration fixtures compute their
+  digests independently of the crate under test; that independence is
+  deliberate test design, not the runtime duplication that was removed. A
+  dev-dependency creates no runtime supply-chain edge.
+- **Compatibility.** The published `0.1.3` manifest still carries the direct
+  `sha2` edge and the inline loop. This release ships a runtime dependency
+  list one entry shorter, with an unchanged transitive closure. No consumer
+  migration is required by the digest reuse itself — no public signature or
+  behavior changed for consumers.
+- **Unchanged boundaries.** The adapter still selects no release, verifies no
+  authenticity, and authorizes no filesystem destination. SHA-256 is integrity
+  evidence only.
+
+## Unreleased
+
+Nothing in this section has been published. `0.2.0` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
+
 ## 0.1.3 — 2026-10-06
 
 Published to crates.io (`plans/closure/eggpack-manifest-interoperability/005-status.md`).
@@ -30,36 +85,6 @@ new version is published.
   declared member it would be bound to, and a mismatch fails closed with
   `AdapterError::MapMismatch`. The correct declaration-order pairing is
   unaffected. No API change.
-
-## Unreleased
-
-Nothing in this section has been published. `0.1.3` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
-
-- **Canonical digest reuse.** `validate_acquired_archive` now computes the
-  archive digest with `eggup_core::hash_file` instead of an inline SHA-256
-  loop, and the direct `sha2 = "0.10.9"` runtime dependency is removed from
-  this crate's manifest. `sha2` now reaches the adapter only transitively,
-  through `eggup-core` and `eggup-archive`.
-- **No behavior change.** The digest value, the error variant, and the error
-  payload are unchanged. The symlink rejection and the exact-size check remain
-  and remain ordered **before** the digest computation, and a digest mismatch
-  still fails closed with `AdapterError::InvalidAcquiredFile(artifact_name)`.
-  The core routine's open and read failures are collapsed into that same
-  variant and payload, exactly as the adapter's own inline routine reported
-  them, so the published error surface is identical.
-- **`sha2` stays a dev-dependency.** The integration fixtures compute their
-  digests independently of the crate under test; that independence is
-  deliberate test design, not the runtime duplication that was removed. A
-  dev-dependency creates no runtime supply-chain edge.
-- **Compatibility.** The published `0.1.3` manifest still carries the direct
-  `sha2` edge and the inline loop. A future publication of this crate would
-  ship a runtime dependency list one entry shorter, with an unchanged
-  transitive closure. No consumer migration is required — no public
-  signature, behavior, or dependency changed for consumers.
-- **Unchanged boundaries.** The adapter still selects no release, verifies no
-  authenticity, and authorizes no filesystem destination. SHA-256 is integrity
-  evidence only.
 
 ## 0.1.2 — 2026-10-02
 

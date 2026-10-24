@@ -44,11 +44,13 @@ manager, and producer concerns.
 
 Derived from the `crates/*/Cargo.toml` manifests. Arrows point from dependent to
 dependency (compile-time direction). All 8 crates carry the workspace version
-`0.1.3`; all seven library crates are published at `0.1.2` or `0.1.3` on crates.io.
-Service M011 published the M010 `eggup-service 0.1.3` correction from source
-`feb6ae5aea4c9b61c4051957f3662ca49d845f9e`; its checksum and external
-qualification are recorded in the M011 closure. The shared `v0.1.3` tag was
-not moved. `eggup-transport-footprint` is `publish = false`.
+`0.2.0`; all seven library crates are published at `0.2.0` on crates.io.
+The 0.2.0 line is one lockstep train published from a single source commit,
+because `eggup-acquisition`'s next release is source-breaking and the
+workspace shares one version; per-crate checksums, package dependency graphs,
+and the registry-only fixture results are recorded in the five publication
+closure records under `plans/closure/`. The `v0.1.1`, `v0.1.2`, and `v0.1.3`
+tags were not moved. `eggup-transport-footprint` is `publish = false`.
 
 ```text
                          eggup-transport-footprint   (publish = false, 3 bins)
@@ -74,7 +76,7 @@ In plain dependency order, deepest first:
 4. **`eggup-curl`** → `eggup-acquisition` only. External-process adapter, no HTTP/TLS stack.
 5. **`eggup-service`** → `eggup-core` + `windows-args` (+ `windows-service` on Windows). Lifecycle adapters.
 6. **`eggup-archive`** → `tar`, `zip`, `flate2`, `fs_at`, `sha2` (dev-dep `eggup-core`). Bounded local extraction.
-7. **`eggup-eggpack`** → `eggup-core` + `eggup-archive` + `eggup-acquisition` (`=0.1.3`) + `eggpack-manifest =0.1.0`. Leaf producer adapter.
+7. **`eggup-eggpack`** → `eggup-core` + `eggup-archive` + `eggup-acquisition` (`=0.2.0`) + `eggpack-manifest =0.1.0`. Leaf producer adapter.
 8. **`eggup-transport-footprint`** → `eggup-acquisition` + optional `eggup-curl` / `eggup-eggfetch`. **Non-published** footprint fixtures.
 
 Two consequences worth knowing before reviewing anything:
@@ -258,10 +260,11 @@ Contract-level detail that belongs to no single crate:
 - [closure records](../plans/closure/README.md) — requirement → evidence matrices
 
 Publication state: `eggup-core`, `eggup-archive`, `eggup-acquisition`,
-`eggup-eggfetch`, `eggup-eggpack`, and `eggup-service` are published at `0.1.3`;
-`eggup-curl` is published through `0.1.2`. Service M011 published the M010
-correction from `feb6ae5`; checksum and registry-only qualification are in its
-closure record. The shared `v0.1.3` tag was not moved.
+`eggup-curl`, `eggup-eggfetch`, `eggup-eggpack`, and `eggup-service` are
+published at `0.2.0`. The 0.2.0 line is one lockstep train from a single
+source commit; checksums and registry-only qualification are in the five
+publication closure records under `plans/closure/`. The `v0.1.1`, `v0.1.2`,
+and `v0.1.3` tags were not moved.
 `eggup-transport-footprint` is `publish = false` by design and has no registry
 version. CI never publishes; releases are manual — see
 [tooling-governance.md](tooling-governance.md) §8.

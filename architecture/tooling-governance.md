@@ -55,7 +55,7 @@ dependency of one crate silently activate in another.
 `[workspace.package]` (`Cargo.toml:14-19`) declares exactly five keys:
 
 ```toml
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.89"
 license = "MIT"
@@ -115,16 +115,26 @@ silently break them:
   arrow is one-way, and the test fixtures are what need the transaction types.
 
 **Exact-pin asymmetry.** `eggup-eggpack` pins its in-workspace deps with exact
-requirements (`=0.1.3`) and takes `eggpack-manifest` as `=0.1.0` from the
-registry. Every other crate uses a caret requirement — and several still carry
-the literal `"0.1.0"` even though the workspace version is now `0.1.3`
-(`eggup-eggfetch` → `eggup-acquisition`, `eggup-curl` → `eggup-acquisition`,
-`eggup-service` → `eggup-core`, and all three in
+requirements (`=0.2.0`) and takes `eggpack-manifest` as `=0.1.0` from the
+registry. Every other crate uses a caret requirement — and every one of them
+now carries the literal `"0.2"`, which matches the workspace version
+`0.2.0` (`eggup-eggfetch` → `eggup-acquisition`, `eggup-curl` →
+`eggup-acquisition`, `eggup-service` → `eggup-core`, and all three in
 `eggup-transport-footprint`). These resolve correctly through the path
-dependencies, so the build is not broken, but the literals are stale relative
-to `[workspace.package] version`. The pin style also differs by crate for no
-stated reason, which means a version bump has to be reasoned about per-crate
-rather than applied uniformly.
+dependencies, so the build is not broken. The pin style still differs by crate
+for no stated reason, which means a version bump has to be reasoned about
+per-crate rather than applied uniformly.
+
+**The `0.2.0` widening was load-bearing, not cosmetic.** The seam's
+`0.2.0` is source-breaking (`AcquisitionError::Io(String)` became
+`Io { operation, source }`, and the enum derives `Debug` only). A caret
+requirement does not cross a major boundary, so `eggup-curl`,
+`eggup-eggfetch`, and `eggup-service` had to be widened from `"0.1.0"` to
+`"0.2"` in the same change set: leaving them at `^0.1.0` would have let a
+consumer's lockfile resolve `eggup-core 0.1.3`, which has no
+`CommandSpec::stdin_data` and therefore cannot compile `eggup-service 0.2.0`.
+The widening belongs to the publication milestone, not to a fix milestone,
+because it is a manifest change that changes what a registry resolve selects.
 
 ## 3. Lint policy
 
@@ -644,28 +654,33 @@ CI added."
 
 | Crate | Workspace version | On crates.io | Note |
 |---|---|---|---|
-| `eggup-core` | 0.1.3 | 0.1.0, 0.1.1, 0.1.2, **0.1.3** | Sole dep `sha2`; transaction mechanics |
-| `eggup-archive` | 0.1.3 | 0.1.2, **0.1.3** | Bounded extraction |
-| `eggup-acquisition` | 0.1.3 | 0.1.0, 0.1.1, 0.1.2, **0.1.3** | Zero-dependency seam |
-| `eggup-eggfetch` | 0.1.3 | 0.1.0, 0.1.1, 0.1.2, **0.1.3** | Native HTTP adapter |
-| `eggup-curl` | 0.1.3 | **0.1.2** | External-curl adapter |
-| `eggup-eggpack` | 0.1.3 | 0.1.2, **0.1.3** | Only crate touching producer types; pins `=0.1.3` |
-| `eggup-service` | 0.1.3 | 0.1.0, 0.1.1, 0.1.2, **0.1.3** | M011 published the owned failed-systemd quiescence correction |
-| `eggup-transport-footprint` | 0.1.3 | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
+| `eggup-core` | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Sole dep `sha2`; transaction mechanics |
+| `eggup-archive` | 0.2.0 | 0.1.2, 0.1.3, **0.2.0** | Bounded extraction |
+| `eggup-acquisition` | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Zero-dependency seam |
+| `eggup-eggfetch` | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Native HTTP adapter |
+| `eggup-curl` | 0.2.0 | 0.1.2, **0.2.0** | External-curl adapter |
+| `eggup-eggpack` | 0.2.0 | 0.1.2, 0.1.3, **0.2.0** | Only crate touching producer types; pins `=0.2.0` |
+| `eggup-service` | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Carries the stdin-verdict fix the published `0.1.3` lacks |
+| `eggup-transport-footprint` | 0.2.0 | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
-All 8 crates share workspace version `0.1.3`; seven are on crates.io at
-`0.1.2` or `0.1.3`. Six have reached `0.1.3`.
+All 8 crates share workspace version `0.2.0`; all seven library crates are on
+crates.io at `0.2.0`. The 0.2.0 line is one lockstep train, published in
+dependency order — the seam, then the adapters, then the leaf — because a
+crate is published only after every in-workspace dependency it names is on the
+registry. `eggup-curl` skipped `0.1.3` entirely: its next release after
+`0.1.2` is `0.2.0`, because the seam's source break forced the whole
+version-lockstep workspace forward.
 
-**`eggup-service` is current with the workspace.** M011 published `0.1.3` on
-2026-10-09 with the M010 owned failed-systemd quiescence correction. The
-package was built from `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`, after the
-shared `v0.1.3` tag; that tag remains unchanged and package provenance is carried
-by `.cargo_vcs_info.json`.
+**The `0.1.x` line stays on crates.io.** No published version is withdrawn
+and no tag is moved; `v0.1.1`, `v0.1.2`, and `v0.1.3` remain where they are,
+and `v0.2.0` is created only after the registry-only proofs pass, pointing at
+the exact publication source commit. Package provenance is carried by
+`.cargo_vcs_info.json`.
 
 `CHANGELOG.md` discipline follows the same separation: every published crate
 keeps an `Unreleased` section (7 of 8 crates have a CHANGELOG; the fixture
-crate is the exception), while the service `0.1.3` release is documented in its
-published changelog and M011 record.
+crate is the exception), while each published release is documented in its
+crate's changelog and in the publication closure record for its milestone.
 
 ## 9. Reviewer's checklist
 

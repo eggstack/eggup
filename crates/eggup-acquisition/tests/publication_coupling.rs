@@ -1,12 +1,11 @@
 //! M016 — the publication-coupling guard.
 //!
-//! The seam's next release is source-breaking (`0.2.0`), and `0.2.0` does not
-//! satisfy the `^0.1.0` requirement the two adapters declare today, nor the
-//! `=0.1.3` pin the leaf adapter declares. The coupling is expensive to
-//! rediscover: `cargo package` resolves a dependency from the **registry**, so
-//! an adapter that was never widened does not compile against the published
-//! seam, and a manifest that is never widened does not resolve at all once the
-//! seam's version moves.
+//! The seam's **published** version is the version every in-workspace
+//! dependent must resolve. `cargo package` resolves a dependency from the
+//! **registry**, so an adapter whose requirement was never widened does not
+//! compile against the published seam, and a manifest that was never widened
+//! does not resolve at all once the seam's version moves. The coupling is
+//! expensive to rediscover, so it is enforced mechanically here.
 //!
 //! These tests read the seam's own `CHANGELOG.md`, the in-workspace
 //! dependents' `Cargo.toml` manifests, and the dependents' `CHANGELOG.md`
@@ -14,22 +13,37 @@
 //! and no wall clock. They live in `tests/` so that the sources they scan can
 //! be copied into a pristine baseline worktree.
 //!
+//! The seam's published version is **derived** from the highest `## X.Y.Z`
+//! heading its changelog declares, never from a literal. A literal would stop
+//! guarding the moment the next release shipped, which is exactly the drift
+//! this guard exists to catch; the derivation keeps following the changelog as
+//! the seam's releases move.
+//!
 //! The guard implements Cargo's requirement comparison itself, for the
 //! requirement forms this workspace uses, because the seam must keep **zero**
 //! dependencies. A requirement form the guard does not model is a **failure**,
 //! never an assumption of acceptance.
+//!
+//! The three test names below are the ones `tests/assertion_guard.rs` names
+//! as its required behavior witnesses, so they are retained verbatim even
+//! where their wording ("next release") predates the re-pointing at the
+//! published version. Renaming them is a two-file change and belongs to the
+//! milestone that owns both files.
 
 use std::fmt;
 
-/// The seam's own changelog. Its `Unreleased` section is the seam's record of
-/// what the next publication will be.
+/// The seam's own changelog. Its release sections are the seam's record of
+/// what it has published.
 const SEAM_CHANGELOG: &str = include_str!("../CHANGELOG.md");
-
-/// The marker that declares the seam's next release.
-const NEXT_RELEASE_MARKER: &str = "Declared next release:";
 
 /// The dependency whose requirement this guard tracks.
 const DEPENDENCY: &str = "eggup-acquisition";
+
+/// The prefix every changelog section heading carries.
+const HEADING: &str = "## ";
+
+/// The heading of the section that stages the next release.
+const UNRELEASED: &str = "## Unreleased";
 
 /// An in-workspace dependent of the seam.
 struct Dependent {
@@ -135,7 +149,7 @@ struct Requirement {
 
 impl Requirement {
     /// Parses a requirement. A form this guard does not model is an **error**,
-    /// never an assumption that the requirement accepts the next release.
+    /// never an assumption that the requirement accepts the published release.
     fn parse(raw: &str) -> Result<Self, String> {
         let trimmed = raw.trim();
         let (kind, rest) = if let Some(rest) = trimmed.strip_prefix('^') {
@@ -181,38 +195,100 @@ impl Requirement {
     }
 }
 
-/// Extracts every `## Unreleased` section of a changelog.
-fn unreleased_sections(changelog: &str) -> Vec<&str> {
-    let mut sections = Vec::new();
-    let mut rest = changelog;
-    loop {
-        let index = if rest.starts_with("## Unreleased") {
-            Some(0)
-        } else {
-            rest.find("\n## Unreleased").map(|offset| offset + 1)
-        };
-        let Some(index) = index else {
-            break;
-        };
-        let body = &rest[index..];
-        let end = match body[1..].find("\n## ") {
-            Some(offset) => offset + 1,
-            None => body.len(),
-        };
-        sections.push(&body[..end]);
-        rest = &body[end..];
-    }
-    sections
+/// A changelog section: its heading line and the body that follows it.
+struct Section<'a> {
+    /// The section's heading line, including its `## ` prefix.
+    heading: &'a str,
+    /// The section's body: everything after the heading line.
+    body: &'a str,
 }
 
-/// Extracts the next release a changelog's `Unreleased` section declares.
-fn declared_next_release(section: &str) -> Option<Version> {
-    let index = section.find(NEXT_RELEASE_MARKER)?;
-    let after = &section[index + NEXT_RELEASE_MARKER.len()..];
-    let open = after.find('`')?;
-    let rest = &after[open + 1..];
-    let close = rest.find('`')?;
-    Version::parse(rest[..close].trim())
+/// Splits a changelog into its `##` sections, in the order they appear.
+fn sections(changelog: &str) -> Vec<Section<'_>> {
+    let mut found: Vec<Section<'_>> = Vec::new();
+    let mut heading: Option<&str> = None;
+    let mut start = 0usize;
+    let mut offset = 0usize;
+    for line in changelog.split_inclusive('\n') {
+        let trimmed = line.trim();
+        if trimmed.starts_with(HEADING) {
+            if let Some(previous) = heading {
+                found.push(Section {
+                    heading: previous,
+                    body: &changelog[start..offset],
+                });
+            }
+            heading = Some(trimmed);
+            start = offset;
+        }
+        offset += line.len();
+    }
+    if let Some(previous) = heading {
+        found.push(Section {
+            heading: previous,
+            body: &changelog[start..],
+        });
+    }
+    found
+}
+
+/// The version a section heading declares, when it declares one. A heading
+/// that is not a `## X.Y.Z` release heading — `## Unreleased`, for one —
+/// declares no version.
+fn section_version(heading: &str) -> Option<Version> {
+    let title = heading.trim().strip_prefix(HEADING)?;
+    let token = title.split_whitespace().next()?;
+    Version::parse(token)
+}
+
+/// The version headings a changelog declares, in the order they appear.
+fn version_headings(changelog: &str) -> Vec<Version> {
+    sections(changelog)
+        .iter()
+        .filter_map(|section| section_version(section.heading))
+        .collect()
+}
+
+/// The highest version heading a changelog declares: the version it has
+/// published.
+fn published_version(changelog: &str) -> Option<Version> {
+    version_headings(changelog).into_iter().max()
+}
+
+/// The seam's published version, or a loud failure when the seam's changelog
+/// declares no release version at all. A changelog whose shape the guard does
+/// not understand is a failure, never an assumption.
+fn seam_published_version() -> Version {
+    published_version(SEAM_CHANGELOG).unwrap_or_else(|| {
+        panic!(
+            "the seam's changelog must declare at least one `## X.Y.Z` version heading; the \
+             guard reads the published version from the changelog, never from a literal"
+        )
+    })
+}
+
+/// The sections that describe the current coupling: the section that stages
+/// the next release, and the most recent published release. Older sections
+/// are frozen records of what was true when they were written, so they are
+/// not re-judged against the current release.
+fn current_sections(changelog: &str) -> Vec<Section<'_>> {
+    let published = published_version(changelog);
+    sections(changelog)
+        .into_iter()
+        .filter(|section| {
+            section.heading.trim() == UNRELEASED
+                || published
+                    .is_some_and(|version| section_version(section.heading) == Some(version))
+        })
+        .collect()
+}
+
+/// The number of `## Unreleased` sections a changelog carries.
+fn unreleased_count(changelog: &str) -> usize {
+    sections(changelog)
+        .iter()
+        .filter(|section| section.heading.trim() == UNRELEASED)
+        .count()
 }
 
 /// Extracts the value of a `version = "…"` entry.
@@ -280,6 +356,33 @@ fn recorded_requirements(line: &str, dependency: &str) -> Vec<String> {
     found
 }
 
+/// The requirements a changelog records for the dependency, read from every
+/// section that carries one. The scan is section-agnostic on purpose: the
+/// requirement a changelog records lives in the release section that published
+/// it, not only in a staging section.
+fn changelog_requirements(changelog: &str, dependency: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for section in sections(changelog) {
+        for line in section.body.lines() {
+            found.extend(recorded_requirements(line, dependency));
+        }
+    }
+    found
+}
+
+/// The requirements the seam's changelog records for the named dependent.
+fn seam_requirements_for(changelog: &str, dependent: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    for section in sections(changelog) {
+        for line in section.body.lines() {
+            if line.contains(dependent) {
+                found.extend(recorded_requirements(line, DEPENDENCY));
+            }
+        }
+    }
+    found
+}
+
 /// Extracts the versions a line claims a republication would be
 /// "non-breaking" at. The scan is line-scoped on purpose: a claim is only
 /// read when the version sits on the same line as the claim itself.
@@ -305,46 +408,37 @@ fn non_breaking_claims(line: &str) -> Vec<String> {
 }
 
 /// True when a changelog records, for the dependent, a requirement that
-/// accepts the seam's declared next release.
-fn widening_is_recorded(
-    dependent: &Dependent,
-    next: Version,
-    seam_section: &str,
-) -> Result<bool, String> {
-    let mut candidates: Vec<String> = Vec::new();
-    for line in seam_section.lines() {
-        if line.contains(dependent.name) {
-            candidates.extend(recorded_requirements(line, DEPENDENCY));
-        }
-    }
+/// accepts the seam's published version. The record may live in the seam's
+/// own changelog or in the dependent's changelog; either one discharges the
+/// obligation, because the guard protects against a **silent** coupling, not
+/// against a recorded one.
+fn widening_is_recorded(dependent: &Dependent, published: Version) -> Result<bool, String> {
+    let mut candidates = seam_requirements_for(SEAM_CHANGELOG, dependent.name);
     if let Some(changelog) = dependent.changelog {
-        for section in unreleased_sections(changelog) {
-            for line in section.lines() {
-                candidates.extend(recorded_requirements(line, DEPENDENCY));
-            }
-        }
+        candidates.extend(changelog_requirements(changelog, DEPENDENCY));
     }
     for candidate in &candidates {
         let requirement = Requirement::parse(candidate)
             .map_err(|error| format!("{}: {error}", dependent.name))?;
-        if requirement.accepts(next) {
+        if requirement.accepts(published) {
             return Ok(true);
         }
     }
     Ok(false)
 }
 
-/// The republication versions a changelog claims are non-breaking while their
-/// dependency range excludes the seam's declared next release.
-fn contradicted_claims(changelog: &str, next: Version) -> Vec<String> {
+/// The republication versions a changelog's current sections claim are
+/// non-breaking while their dependency range excludes the seam's published
+/// release.
+fn contradicted_claims(changelog: &str, published: Version) -> Vec<String> {
     let mut contradicted = Vec::new();
-    for section in unreleased_sections(changelog) {
-        for line in section.lines() {
+    for section in current_sections(changelog) {
+        for line in section.body.lines() {
             for claim in non_breaking_claims(line) {
                 let Ok(requirement) = Requirement::parse(&claim) else {
                     continue;
                 };
-                if !requirement.accepts(next) {
+                if !requirement.accepts(published) {
                     contradicted.push(claim);
                 }
             }
@@ -353,49 +447,33 @@ fn contradicted_claims(changelog: &str, next: Version) -> Vec<String> {
     contradicted
 }
 
-/// The seam's changelog carries exactly one `Unreleased` section, at the top,
-/// and that section declares the next release.
+/// The seam's changelog declares the published version this guard checks, and
+/// carries exactly one `## Unreleased` section.
 #[test]
 fn seam_changelog_declares_exactly_one_unreleased_section_with_a_next_release() {
-    let sections = unreleased_sections(SEAM_CHANGELOG);
+    let published = seam_published_version();
+    let unreleased = unreleased_count(SEAM_CHANGELOG);
     assert_eq!(
-        sections.len(),
-        1,
-        "the seam's changelog must carry exactly one `## Unreleased` section, found {}",
-        sections.len()
+        unreleased, 1,
+        "the seam's changelog must carry exactly one `## Unreleased` section, found {unreleased}"
     );
-    let first_heading = SEAM_CHANGELOG
-        .lines()
-        .map(str::trim)
-        .find(|line| line.starts_with("## "))
-        .unwrap_or("");
-    assert_eq!(
-        first_heading, "## Unreleased",
-        "the `## Unreleased` section must be the first section of the seam's changelog"
-    );
-    let declared = declared_next_release(sections[0]);
+    let headings = version_headings(SEAM_CHANGELOG);
     assert!(
-        declared.is_some(),
-        "the seam's `## Unreleased` section must declare its next release as \
-         `{NEXT_RELEASE_MARKER} `0.2.0``"
+        !headings.is_empty(),
+        "the seam's changelog must declare at least one `## X.Y.Z` version heading"
+    );
+    assert_eq!(
+        headings[0], published,
+        "the seam's changelog must list its releases newest-first, so that its first version \
+         heading is the published version the guard checks"
     );
 }
 
-/// Every in-workspace dependent either already accepts the seam's declared
-/// next release, or a changelog records the widening it requires.
+/// Every in-workspace dependent either already accepts the seam's published
+/// version, or a changelog records the widening it requires.
 #[test]
 fn dependent_requirements_accept_the_next_release_or_record_the_widening() {
-    let sections = unreleased_sections(SEAM_CHANGELOG);
-    assert_eq!(
-        sections.len(),
-        1,
-        "the seam's changelog must carry exactly one `## Unreleased` section, found {}",
-        sections.len()
-    );
-    let section = sections[0];
-    let Some(next) = declared_next_release(section) else {
-        panic!("the seam's `## Unreleased` section must declare its next release");
-    };
+    let published = seam_published_version();
     for dependent in DEPENDENTS {
         let raw = declared_requirement(dependent.manifest, DEPENDENCY).unwrap_or_else(|| {
             panic!(
@@ -405,35 +483,26 @@ fn dependent_requirements_accept_the_next_release_or_record_the_widening() {
         });
         let requirement =
             Requirement::parse(&raw).unwrap_or_else(|error| panic!("{}: {error}", dependent.name));
-        if requirement.accepts(next) {
+        if requirement.accepts(published) {
             continue;
         }
-        let recorded = widening_is_recorded(dependent, next, section)
+        let recorded = widening_is_recorded(dependent, published)
             .unwrap_or_else(|error| panic!("{}: {error}", dependent.name));
         assert!(
             recorded,
-            "{} declares `{DEPENDENCY}` = `{}`, which does not accept the seam's declared \
-             next release `{next}`; no changelog records the required widening for it",
+            "{} declares `{DEPENDENCY}` = `{}`, which does not accept the seam's published \
+             version `{published}`; no changelog records the required widening for it",
             dependent.name, requirement.raw
         );
     }
 }
 
-/// The two published adapters' changelogs record the required widening, and
-/// neither claims a republication version whose dependency range excludes the
-/// seam's declared next release.
+/// The two published adapters' changelogs record the requirement they publish,
+/// and neither claims a republication version whose dependency range excludes
+/// the seam's published version.
 #[test]
 fn adapter_changelogs_record_the_widening_and_assert_no_contradicted_republication_version() {
-    let sections = unreleased_sections(SEAM_CHANGELOG);
-    assert_eq!(
-        sections.len(),
-        1,
-        "the seam's changelog must carry exactly one `## Unreleased` section, found {}",
-        sections.len()
-    );
-    let Some(next) = declared_next_release(sections[0]) else {
-        panic!("the seam's `## Unreleased` section must declare its next release");
-    };
+    let published = seam_published_version();
     for name in PUBLISHED_ADAPTERS {
         let dependent = DEPENDENTS
             .iter()
@@ -442,28 +511,26 @@ fn adapter_changelogs_record_the_widening_and_assert_no_contradicted_republicati
         let changelog = dependent
             .changelog
             .unwrap_or_else(|| panic!("{name} must carry a changelog"));
-        let mut recorded = false;
-        for section in unreleased_sections(changelog) {
-            for line in section.lines() {
-                for candidate in recorded_requirements(line, DEPENDENCY) {
-                    let requirement = Requirement::parse(&candidate)
-                        .unwrap_or_else(|error| panic!("{name}: {error}"));
-                    if requirement.accepts(next) {
-                        recorded = true;
-                    }
-                }
+        let recorded = changelog_requirements(changelog, DEPENDENCY);
+        let mut accepts = false;
+        for candidate in &recorded {
+            let requirement =
+                Requirement::parse(candidate).unwrap_or_else(|error| panic!("{name}: {error}"));
+            if requirement.accepts(published) {
+                accepts = true;
             }
         }
         assert!(
-            recorded,
-            "{name}'s changelog must record the required widening of its `{DEPENDENCY}` \
-             requirement, because `{next}` does not satisfy the requirement it declares today"
+            accepts,
+            "{name}'s changelog must record the `{DEPENDENCY}` requirement it publishes, and \
+             that requirement must accept the seam's published version `{published}`; the \
+             changelog records {recorded:?}"
         );
-        let contradicted = contradicted_claims(changelog, next);
+        let contradicted = contradicted_claims(changelog, published);
         assert!(
             contradicted.is_empty(),
             "{name}'s changelog claims a republication at {contradicted:?}, whose dependency \
-             range excludes the seam's declared next release `{next}`"
+             range excludes the seam's published version `{published}`"
         );
     }
 }

@@ -1,5 +1,180 @@
 # Changelog
 
+## 0.2.0 — 2026-10-23, in progress
+
+The 0.2.0 source version is being published to crates.io as one lockstep train.
+`version.workspace = true` makes every crate in the tree claim the same
+version, and `eggup-acquisition`'s next release is source-breaking —
+`AcquisitionError::Io(String)` became `Io { operation, source }`, and because
+`std::io::Error` implements neither `Clone` nor `PartialEq`/`Eq` the enum now
+derives `Debug` only — so the seam's version had to advance to `0.2.0` and the
+lockstep workspace carried every crate with it.
+
+The crates publish in dependency order, because `cargo package` resolves a
+dependency from the registry rather than from the in-tree path dependency:
+`eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-curl`,
+`eggup-eggfetch`, `eggup-service`, `eggup-eggpack`. All seven publish from one
+shared source commit, so the `v0.2.0` tag points at that commit.
+
+The published `0.1.x` versions are not replaced or withdrawn. `eggup-curl` is on
+crates.io through `0.1.2` and the other six through `0.1.3`; `eggup-curl` never
+had a `0.1.3` at all. The `v0.1.1`, `v0.1.2`, and `v0.1.3` tags are not moved.
+
+Integrity remains SHA-256 checksum evidence only; no authenticity or signature
+claims are made by any of these crates. Per-crate release notes live in
+`crates/*/CHANGELOG.md`; this section aggregates them, it does not replace
+them, and the milestone-by-milestone detail of this release is in the five
+publication closure records under `plans/closure/`.
+
+- `eggup-core 0.2.0` (published 2026-10-23, Verified Update Core M019): the
+  `Error` enum keeps exactly the seven variants `0.1.3` published, so an
+  exhaustive `match` on it compiles unchanged, and `FailureCategory` stays
+  `#[non_exhaustive]`. Four corrections ship together. **Fixed:** `run_bounded`
+  evaluated its documented wall-clock deadline only while the direct child was
+  still alive, so a descendant that inherited the output pipe and held it open
+  pinned the call indefinitely, and the timeout path left both reader threads
+  unjoined; the deadline is now an unconditional maximum bound on the whole
+  bounded execution (M014). **Fixed:** the unreachable
+  `FailureCategory::RetainedEvidence` variant and its `retained-evidence`
+  string are removed, so every remaining category describes a failure that can
+  actually occur, and every public fallible item now carries an `# Errors`
+  section (M015). **Added:** `CommandSpec::stdin_data` attaches a payload to the
+  bounded execution and `MAX_STDIN_BYTES` (1 MiB, inclusive) bounds it; an
+  over-bound payload is rejected with `Error::InvalidInput` before any child is
+  spawned, and the payload is written on a dedicated thread whose failure —
+  including the broken pipe from a child that exits without reading — kills and
+  reaps the child and returns a typed `Error::Io` rather than hanging (M017).
+  **Changed:** the deadline now has priority over the stdin writer's verdict,
+  classified by the instant the writer observed the write: a failure observed
+  before the deadline is an `Err`, one observed at or after it is the deadline
+  outcome (`Ok`, `timed_out` set), and an undelivered payload is never reported
+  as success (M018). **One consumer action:** `eggup-core 0.1.3` does publish
+  `FailureCategory::RetainedEvidence`, so a downstream crate that named it
+  explicitly — a match arm, an equality assertion, a constant `as_str()` call
+  — stops compiling against `0.2.0`; deleting the name reference is the whole
+  of the required work. The dependency surface remains `sha2` plus a
+  **Windows-only** `self-replace`, so the Unix/macOS graph is unchanged.
+
+- `eggup-archive 0.2.0` (published 2026-10-23, Archive Extraction M006): no
+  public API change and no new dependency. The `cleanup()` success path is now
+  reachable — the four entry points documented that they "remove" the
+  extraction directory, but the shared implementation emptied the owned tree
+  through the retained handle and then unconditionally returned
+  `Err(ExtractionErrorKind::CleanupFailed)`, leaving the `Ok` path unreachable
+  in a published crate. All four now share one truthful contract: `Ok(())`
+  means the owned root held no entries at the final handle-relative listing,
+  `Err(..)` with `kind() == CleanupFailed` means it could not be fully emptied,
+  and `residue_path()` names the recorded root path. The crate still never
+  removes the root directory itself and never traverses the root pathname; the
+  residual empty directory remains the caller's to remove. **Behaviour change:**
+  a caller that wrote `cleanup().unwrap_err()` will panic and must match on the
+  result instead; capture the residual path from `root()` before the consuming
+  call. The tar.gz and zip member-write bodies are now one shared helper,
+  behaviour-preserving.
+
+- `eggup-acquisition 0.2.0` (published 2026-10-23, Acquisition Transport M017):
+  **source-breaking**, and in exactly two ways. `AcquisitionError::Io(String)`
+  became `AcquisitionError::Io { operation, source }` with a live `source()`
+  chain, so a consumer that matched `AcquisitionError::Io(_)` must match the
+  struct-shaped variant; and the enum now derives `Debug` only, because
+  `std::io::Error` implements neither `Clone` nor `PartialEq`/`Eq`, so a
+  consumer that cloned or compared whole error values must match on the variant
+  and its fields instead. The `Display` rendering stays bounded at 512 bytes
+  and is truncated only at a UTF-8 character boundary, `Io` stays terminal under
+  every `CompositionPolicy`, and the crate keeps **zero** `[dependencies]`.
+
+- `eggup-curl 0.2.0` (published 2026-10-23, Acquisition Transport M017): no
+  source-breaking change of its own, but it is **transitively source-breaking**
+  because it depends on `eggup-acquisition ^0.2` and the seam's `0.2.0` is
+  source-breaking — the break is inherited from the seam, not introduced here,
+  so a consumer must make the same two changes a consumer of the seam makes.
+  The crate's own public API is additive: the caller-settable `User-Agent`
+  control that the other adapter already had is now present
+  (`CurlTransport::with_executable_and_user_agent` and
+  `CurlTransport::user_agent`), validated as an HTTP field value and emitted as
+  a literal `--user-agent` argv element ahead of the `--` separator that
+  isolates the URL; a rejected value is a terminal
+  `AcquisitionError::InvalidInput` and never `Unavailable`, so a malformed
+  value can never trigger a composed-transport fallback. `CurlConfig` is
+  untouched, so the observable wire behaviour of the published adapter does not
+  change. The transport semantics qualified under Acquisition M005-M008 were
+  published at `0.1.2` and are unchanged in substance.
+
+- `eggup-eggfetch 0.2.0` (published 2026-10-23, Acquisition Transport M017): no
+  source-breaking change of its own, but it is **transitively source-breaking**
+  through the same seam requirement. Its own public API is unchanged and
+  `EggfetchTransport` remains shareable across threads. No new runtime or API
+  feature; the M011-era behaviour — a runtime-build failure returning
+  `AcquisitionError::Unavailable` instead of panicking, the current-thread
+  runtime cached per calling thread without making the transport `!Sync`, and
+  `TooLarge` reporting the enforced bound instead of `0` — was published at
+  `0.1.3` and is unchanged in substance.
+
+- `eggup-service 0.2.0` (published 2026-10-23, Service Lifecycle M017): the
+  first publication that carries the fix for the stdin-verdict defect the
+  published `0.1.3` still has — the crate's bounded executor consumed the
+  stdin writer's verdict with `try_recv`, discarding a successful write and
+  then reading the now-empty channel as a failure, so a consumer of `0.1.3`
+  receives a typed `Spawn` failure where a successful `crontab -` install was
+  intended. **Two source breaks.** `ServiceError::Manager(detail)` is now
+  `ServiceError::Manager { kind, detail, os_code }` carrying a
+  `ManagerFailureKind` (`Spawn | Timeout | Permission | NotFound | Protocol |
+  LocalFilesystem`); a consumer must match the struct form and branch on
+  `kind`, not on the message text. And `LifecycleUpdateReceipt` gained the
+  public field `engine_policy` (`CommitEnginePolicy`); the struct has no
+  `Default` impl, so a consumer that constructs it with a **struct literal**
+  must add the field and stops compiling until it does, while a consumer that
+  only reads the receipt's fields is unaffected. **Behaviour change:** the cron
+  managed block body must embed the absolute executable path of the spec, so a
+  consumer whose `desired_block` omits `spec.executable()` now receives
+  `ServiceError::InvalidInput` from `inspect`, `install`, and `uninstall`.
+  **Behaviour change, fail-closed:** every adapter now spends exactly one
+  `OperationDeadline` per public operation, so an operation that previously
+  overran its declared budget now fails with a `Timeout` kind instead of
+  overrunning. The three structurally identical ownership enums became one type
+  (`eggup_service::Ownership` re-exports `eggup_core::Ownership`,
+  `eggup_service::CronOwnership` is a public alias), `CommandOutput` survives
+  as a non-deprecated alias of `ManagerCommandOutput`, and manager-output
+  diagnostics have one declared ceiling, `MAX_DIAGNOSTIC_BYTES` (512 bytes) —
+  none of which requires a consumer change. The `eggup-core` requirement
+  widened to `^0.2`, and that is load-bearing rather than cosmetic:
+  `eggup-core 0.1.3` has neither `CommandSpec::stdin_data` nor core's
+  unconditional execution deadline and cannot compile this release.
+
+- `eggup-eggpack 0.2.0` (published 2026-10-23, Eggpack Manifest Interoperability
+  M007): its three exact pins move from `=0.1.3` to `=0.2.0`, which is the
+  mechanism by which the seam's `0.2.0` and this release's fixes reach adapter
+  consumers at all. The adapter delegates to `eggup_core::hash_file` instead of
+  running its own inline SHA-256 loop, so the workspace holds exactly one
+  file-digest implementation; the symlink rejection and the exact-size check
+  still run and are still ordered before the digest computation, and the direct
+  `sha2` runtime dependency that existed only for that one call site is
+  removed. The digest value, the error variant, and the error payload are
+  unchanged. The adapter still stops at extraction-required evidence: it
+  selects no release, verifies no authenticity, and authorizes no filesystem
+  destination. `eggpack-manifest` is an external crate and is not republished
+  here.
+
+- `eggup-transport-footprint` remains `publish = false` and has no registry
+  version; it is never published. Its three requirements widened to `0.2` only
+  so the workspace still resolves. Its three isolated transport configurations
+  are built by the `stable` and `macos` lanes and checked at the 1.89 MSRV
+  floor by the `msrv` lane, with a source-level linkage-discipline guard that
+  rejects a sibling-adapter reference in every configuration.
+
+- Two repository-level milestones close with this release and are not part of
+  any published crate. The documentation-truth gate now reads the crate
+  manifests and the per-crate changelogs, covers the architecture deep dives,
+  and reads three-cell registry rows, each change red-first proven against a
+  documented false negative (Planning / Closure Hygiene C014). The architecture
+  deep dives are re-anchored: 179 stale `path:line` citations were re-derived
+  across the five deep dives whose source crates were stable, and eleven
+  substantive claims were corrected (Planning / Closure Hygiene C015). The
+  gate's published-version check was generalized in this release so that it is
+  not pinned to a single version number and keeps policing the crates that are
+  actually on the registry.
+
+
 ## 0.1.2 — 2026-09-28, completed 2026-10-04
 
 The 0.1.2 source version was published to crates.io in four steps. On 2026-09-28
@@ -119,13 +294,19 @@ claims are made by any of these crates.
   `eggup-core = ^0.1.0` requirement is unchanged and resolves from the registry.
   No migration is required for consumers of `0.1.1`. Published 2026-10-05.
 
-## 0.1.3 — 2026-10-06, in progress
+## 0.1.3 — 2026-10-06, completed 2026-10-09
 
-The 0.1.3 source version is being published to crates.io crate-by-crate, because
+The 0.1.3 source version was published to crates.io crate-by-crate, because
 `version.workspace = true` forces the local tree to claim `0.1.3` for all seven
 published crates while each crate is published only when its own milestone
 closes. Every entry below states which crate is actually on the registry; no
 crate is implied to be published by the mere presence of this section.
+
+**`eggup-curl` was never published at `0.1.3`.** Its `0.1.3` publication was
+not attempted, because the seam's next release had to be the source-breaking
+`0.2.0` and the workspace is version-lockstep; the adapter's next release after
+`0.1.2` is therefore `0.2.0`. The six crates below are all on crates.io at
+`0.1.3`.
 
 Integrity remains SHA-256 checksum evidence only; no authenticity or signature
 claims are made by any of these crates.
@@ -221,367 +402,9 @@ claims are made by any of these crates.
 
 ## Unreleased
 
-The entries below are **unpublished** work. The current published baselines are
-`0.1.3` for `eggup-core`, `eggup-acquisition`, `eggup-eggfetch`,
-`eggup-archive`, `eggup-eggpack` and `eggup-service`; `0.1.2` for
-`eggup-curl`; `eggup-transport-footprint` is `publish = false`. Nothing here
-has been published: each entry names the published version that still carries
-the defect it corrects, and republication is a separate milestone.
-
-The whole 2026-10-23 corrective batch is hosted-qualified. CI run
-`40008039843` is green on all five lanes (`stable`, `msrv`, `service-systemd`,
-`macos`, `windows-check`) for the first eleven milestones, and CI run
-`40062299630` is green on all five lanes for the five that followed it
-(`eggup-curl` User-Agent parity, `eggup-core` bounded stdin, `eggup-service`
-bounded-executor consolidation, the `eggup-transport-footprint` isolated
-configuration coverage, and the architecture-anchor repair). The first of those
-two runs, `40061134915`, was red in four lanes and is the evidence behind the
-packaged-crate deferral recorded below.
-
-A read-only audit of that batch followed, and its findings are closed by five
-further milestones recorded below — acquisition M016, core M018, service M016,
-planning C014, and planning C015. CI run `40067964510` is green on all five
-lanes for those (stable 528 passed, msrv check-only, service-systemd 9 passed,
-macOS 528 passed, windows-check 650 passed). The run immediately before it,
-`40067739294`, was red in the `stable` lane on a transient `ETXTBSY` in a
-pre-existing core unit test — recorded as a re-observation of finding 1, and
-it did not reproduce in 25 consecutive local runs.
-
-Work published by the 0.1.3 train is recorded in the `0.1.3` section above,
-not here. Per-crate release notes live in `crates/*/CHANGELOG.md`; this
-section aggregates them, it does not replace them.
-
-- `eggup-core` corrects the bounded candidate deadline (Verified Update Core
-  M014): `run_bounded` evaluated its documented wall-clock deadline only while
-  the direct child was still alive, so a descendant that inherited the output
-  pipe and held it open pinned the call indefinitely, and the timeout path left
-  both reader threads unjoined. The deadline is now an unconditional maximum
-  bound on the whole bounded execution and `run_bounded` always returns: a
-  still-running direct child is killed and reaped exactly as before, an
-  already-exited child is not killed again, and the call no longer waits for
-  pipe EOF. The descendant case is bounded and fail-closed — `timed_out` is
-  set, `output_limited` is clear, `success()` is false, and the direct child's
-  exit code stays observable through `exit_code`. Reader-thread lifecycle is
-  explicit: a reader that delivered its result is joined, and a reader still
-  blocked at the deadline is abandoned, because core has no `libc`, `nix`, or
-  `windows-sys` dependency and `unsafe` is denied. The public surface is
-  unchanged: `Error` keeps exactly the seven published `0.1.2` variants, the
-  output bound stays per stream, the ownership model, transaction state
-  machine, lock, receipts, and failure taxonomy are untouched, and the
-  dependency surface remains `sha2` only. **Unpublished** — `eggup-core 0.1.3`
-  on crates.io still carries the defect, and `eggup-eggpack`'s `=0.1.3` pin
-  blocks propagation until a separate adapter republication. No consumer
-  migration is required.
-
-- `eggup-core` corrects the published failure taxonomy and documents its
-  public failure surface (Verified Update Core M015): the unreachable
-  `FailureCategory::RetainedEvidence` variant and its `retained-evidence`
-  string are removed, so every remaining category describes a failure that can
-  actually occur; the remaining seven `as_str()` strings are byte-identical to
-  the published ones. Every public fallible item now carries an `# Errors`
-  section stating which `Error` variants it can return, that a receipt — not
-  an `Err` — is how a post-lock outcome is reported, that `Owned` is never
-  inferred, and that a member without verified integrity evidence is rejected
-  with no escape hatch. `clippy::missing_errors_doc` is enabled crate-locally so
-  the existing gate keeps that documentation honest; the workspace lint table
-  is unchanged and no other crate is affected. `Error` keeps exactly the seven
-  published variants and `FailureCategory` stays `#[non_exhaustive]`, so
-  downstream matchers keep compiling; the only downstream break is an explicit
-  reference to the removed variant name. **Unpublished** — `eggup-core 0.1.3`
-  still carries the defect, and `eggup-eggpack`'s `=0.1.3` pin blocks
-  propagation. No consumer migration is required beyond deleting such a name
-  reference.
-
-- `eggup-archive` corrects its public cleanup contract and removes a duplicated
-  member-write path (Archive Extraction M005): the four `cleanup()` entry
-  points documented that they "remove" the extraction directory, but the shared
-  implementation emptied the owned tree through the retained handle and then
-  unconditionally returned `Err(ExtractionErrorKind::CleanupFailed)`, leaving
-  the `Ok` path unreachable in a published crate. All four now share one
-  truthful contract — `Ok(())` means the owned root held no entries at the
-  final handle-relative listing, `Err(..)` with `kind() == CleanupFailed` means
-  it could not be fully emptied, and `residue_path()` names the recorded root
-  path — while the crate still never removes the root directory itself and
-  never traverses the root pathname; the residual empty directory remains the
-  caller's to remove. The tar.gz and zip member-write bodies are now one shared
-  helper, behaviour-preserving. **Behaviour change:** the success path of
-  `cleanup()` is now reachable, so a caller that wrote `cleanup().unwrap_err()`
-  will panic and must match on the result instead; capture the residual path
-  from `root()` before the consuming call. No new dependency and no public
-  signature change. **Unpublished** — `eggup-archive 0.1.3` on crates.io still
-  carries the defect, and `eggup-eggpack`'s `=0.1.3` archive pin blocks
-  propagation. Integrity remains SHA-256 checksum evidence only.
-
-- `eggup-service` collapses two divergent copies of the destructive
-  commit/rollback engine into one (Service Lifecycle M012): `disposition.rs`
-  and `lifecycle_update.rs` each carried a full orchestrator that had already
-  drifted apart in safety-relevant ways — the disposition copy did not
-  re-inspect after a transition, tolerated an ownership that was no longer
-  `Owned`, swallowed a rollback-quiesce `inspect()` error and could stop an
-  unproven target, and left its rollback restore unpanic-guarded, while the
-  lifecycle copy could panic on an `unreachable!()` for a desired state outside
-  `{Running, Stopped}`. There is now one engine (`commit_engine`) reached by
-  both public orchestrators, and the stricter behaviour wins everywhere: a
-  manager's `completed` flag is a self-report and is re-verified by
-  observation, an ownership that is no longer `Owned` is always a typed
-  failure, an unobservable or non-owned service is never stopped before a
-  rollback, and an invalid desired state produces a typed bounded failure
-  instead of a panic. The two former behavioural differences survive as named,
-  separately testable policy inputs (`CommitEnginePolicy::post_transition_verification`,
-  `CommitEnginePolicy::ownership_loss_tolerance`), both defaulting to the
-  stricter behaviour, with the selection observable in the returned receipt.
-  Three structurally identical ownership enums become one type:
-  `eggup_service::Ownership` re-exports `eggup_core::Ownership` and
-  `eggup_service::CronOwnership` is a public alias of it. The manager command
-  output type is renamed `ManagerCommandOutput`, with the old spelling kept as
-  a non-deprecated type alias, and manager-output diagnostic text is now
-  bounded by one declared ceiling, `MAX_DIAGNOSTIC_BYTES` (512 bytes).
-  **Unpublished** — `eggup-service 0.1.3` remains the published version and
-  the `v0.1.3` tag is unmoved; republication is a separate milestone. No
-  consumer migration is required: every affected spelling still resolves.
-
-- `eggup-service` corrects its manager failure taxonomy, its timeout model,
-  and its cron ownership rule (Service Lifecycle M013): `ServiceError::Manager`
-  now carries a machine-readable `ManagerFailureKind` (`Spawn`, `Timeout`,
-  `Permission`, `NotFound`, `Protocol`, `LocalFilesystem`) alongside the
-  bounded detail and the platform OS code, and the crate no longer classifies
-  its own failures by substring-matching its own error text — `permission_hint`
-  and its call sites are gone. Every adapter now creates exactly one
-  `OperationDeadline` per operation, so a single systemd `install` no longer
-  spends several times its declared budget across chained operations.
-  `CronManager` lists the crontab once per `inspect` instead of twice, states
-  its ownership rule once instead of applying two disagreeing rules, and
-  refuses inconsistent request material with `InvalidInput` before any listing
-  or mutation. Manager-derived free text has one 512-byte ceiling instead of
-  two competing ones. The public surface gains an `# Errors`/`# Panics`
-  documentation sweep, with the Windows SCM surface excluded because it is
-  reserved by Service M014. **Behaviour change:** a published-behaviour
-  tightening applies to cron consumers whose block body omits the spec
-  executable, which now fail closed instead of proceeding. **Not published by
-  this milestone** — `eggup-service 0.1.3` remains the published version, the
-  `v0.1.3` tag is unmoved, and no consumer migration is required until a
-  republication milestone ships it; at that point a consumer matching
-  `ServiceError::Manager` positionally must match
-  `ServiceError::Manager { kind, detail, os_code }` and branch on `kind`.
-
-- `eggup-curl` makes its two scheduler-sensitive deadline assertions
-  deterministic (Acquisition Transport M012): the connect deadline stays
-  sub-second at 250 ms and is still proven end-to-end through a real spawn,
-  but the total budget moves from 750 ms to 30 s, so the assertion can no
-  longer expire for scheduling reasons. The sub-second `--connect-timeout` /
-  `--max-time` serialization is now proven at the layer where the rule lives,
-  with no subprocess, no network, and no wall clock, and the prompt-kill test
-  asserts the elapsed time against the short total timeout instead of an
-  absolute ceiling. The change is test-only: no production code, no
-  dependency, and no public surface changed. **Unpublished** — `eggup-curl
-  0.1.2` remains the published version and still carries the exposure, and
-  the `eggup-acquisition 0.1.3` seam it resolves against is unchanged. The
-  milestone is conditionally closed: the hosted lane re-observed registry
-  finding 1 in the spawn mode, so the finding stays open and narrowed.
-
-- `eggup-acquisition` types its I/O failure surface, and `eggup-curl` stops
-  reporting a pass it did not earn (Acquisition Transport M013):
-  `AcquisitionError::Io(String)` becomes `Io { operation, source }` with a
-  live `source()` chain, and the nine `eggup-curl` tests that returned early
-  when their fixture was unavailable now fail loudly with an actionable
-  message instead of asserting nothing. The UTF-8-safe truncation helper is
-  consolidated inside each reachable dependency group, the curl adapter's
-  bounded subprocess runner keeps its own boundary-constrained copy, and the
-  adapter-capability-parity decision is recorded rather than silently
-  resolved. **Unpublished and source-breaking** — `eggup-acquisition 0.1.3`
-  still carries the flat `Io(String)` shape, and because `std::io::Error`
-  implements neither `Clone` nor `PartialEq`/`Eq` the enum now derives only
-  `Debug`; a consumer matching `AcquisitionError::Io(_)` must match the
-  struct-shaped variant, which makes `0.2.0` the consequence.
-
-- `eggup-curl` makes a failed spawn attributable (Acquisition Transport
-  M015): `Command::spawn()`'s `io::Error` was discarded, so a missing
-  executable, a non-executable file, and a transient resource exhaustion were
-  indistinguishable in the diagnostic. The `Unavailable` detail now names the
-  `ErrorKind` and the raw OS code, rendered only from the discriminant and the
-  numeric code so no path, URL, or credential material can leak. The variant
-  stays `Unavailable` and the `ComposedTransport` fallback contract is
-  unchanged. **Unpublished** — `eggup-curl 0.1.2` remains the published
-  version and still carries the cause-free detail, and the `eggup-acquisition
-  0.1.3` seam is unchanged. This narrows registry finding 1 rather than
-  closing it: the cause is attributable, not prevented.
-
-- `eggup-service` executes its Windows SCM path and pins its public surface
-  (Service Lifecycle M014): the five former `unreachable!()` sites in the SCM
-  adapter become typed errors built from the crate's existing constructors, so
-  the `1060`/`1072` mapping stays lossless and a service that disappears
-  before an operation is a reported failure rather than a panic. A Windows
-  fixture registers a disposable service through the crate's public API and
-  drives install, inspect, ownership, start, stop, and uninstall against the
-  genuine Service Control Manager, self-cleaning on every exit path and
-  skippable only with a recorded reason. The public surface is pinned by a
-  dependency-free compile-only signature guard plus a committed snapshot, and
-  the per-variant dead-code gating replaces the two enum-wide suppressions.
-  **Unpublished** — `eggup-service 0.1.3` still carries the panic sites, and
-  the `v0.1.3` tag is unmoved; republication is a separate milestone.
-
-- `eggup-eggpack` leaves exactly one file-digest implementation in the
-  workspace (Eggpack Manifest Interoperability M006): the adapter delegates
-  to `eggup_core::hash_file` instead of running its own inline SHA-256 loop,
-  the symlink rejection and the exact-size check still run and are still
-  ordered before the digest computation, and the direct `sha2` runtime
-  dependency that existed only for that one call site is removed. The digest
-  value, the error variant, and the error payload are unchanged, and no pin
-  cascade is required because the pinned `eggup-core 0.1.3` already exports
-  the capability. **Unpublished** — `eggup-eggpack 0.1.3` still carries the
-  duplicate implementation and the redundant dependency edge.
-
-- `eggup-curl` gains the caller-settable `User-Agent` control the other
-  adapter already had (Acquisition Transport M014): the curl adapter now
-  accepts an outbound `User-Agent`, validates it as an HTTP field value (no
-  C0 or C1 control character, no leading or trailing space, a 512-byte
-  bound), and emits it as a literal `--user-agent` argv element ahead of the
-  `--` separator that isolates the URL. The control lives on `CurlTransport`,
-  not on `CurlConfig`, because `CurlConfig`'s public fields would make any
-  added field a source-breaking change for a consumer of the published
-  crate; the default stays unset, so the observable wire behavior of the
-  published adapter does not change. A rejected value is a terminal
-  `AcquisitionError::InvalidInput` and never `Unavailable`, so a malformed
-  value can never trigger a composed-transport fallback. The parity this
-  closes is capability parity, not placement parity and not default-value
-  parity. **Unpublished** — `eggup-curl 0.1.2` remains the published version
-  and still carries the missing control, the `eggup-acquisition 0.1.3` seam
-  it resolves against is unchanged, and the `v0.1.2` tag is unmoved;
-  republication is a separate milestone.
-- The two transport adapters record their publication coupling with the seam
-  (Acquisition Transport M016): the seam's next release is
-  `eggup-acquisition 0.2.0` and is source-breaking, because
-  `AcquisitionError::Io(String)` became `Io { operation, source }` and the enum
-  derives `Debug` only. Both adapters call seam capabilities —
-  `__adapter_io` and `__adapter_bound_detail` — that exist only in the
-  unpublished seam, and the `^0.1.0` requirement they declare does not accept
-  `0.2.0`, so neither adapter can be packaged against the registry today. The
-  adapters' changelogs had stated that a future republication would keep them
-  at `0.1.3` and require no consumer migration; both halves are false once the
-  seam goes to `0.2.0`, and they are now corrected. The seam's changelog
-  declares its next release and records the widening each dependent needs —
-  the two adapters to `0.2`, `eggup-eggpack` to `=0.2.0`, and
-  `eggup-transport-footprint` to `0.2` — and a guard fails when a dependent
-  neither accepts that version nor records the widening. **Unpublished** — no
-  manifest, version, or publication changed; the widening belongs to the
-  publication milestone, which needs explicit maintainer authorization. The
-  published `eggup-acquisition 0.1.3` still carries the pre-coupling seam
-  surface, and the published `eggup-curl 0.1.2` and `eggup-eggfetch 0.1.3`
-  still carry the pre-coupling adapter state — the seam's `Io(String)` variant
-  and the adapters' `eggup-acquisition = "0.1.0"` requirement — and the tags are
-  unmoved. The
-  `User-Agent` grammar in the curl adapter's public documentation is also
-  corrected: interior spaces may repeat, as RFC 7230's `field-content`
-  permits, which is what the implementation has always accepted.
-
-- `eggup-core` bounds the stdin a child may receive (Verified Update Core
-  M017): `CommandSpec::stdin_data` attaches a payload to the bounded
-  execution and `MAX_STDIN_BYTES` (1 MiB, inclusive) bounds it, a payload
-  over that bound is rejected with `Error::InvalidInput` before any child is
-  spawned, and the payload is written on a dedicated thread whose failure —
-  including the broken pipe from a child that exits without reading — kills
-  and reaps the child and returns a typed `Error::Io` rather than hanging.
-  The unconditional deadline bounds that writer exactly as it bounds the
-  output readers, and the three `Error::Io` operation strings (`spawning
-  bounded candidate`, `polling bounded candidate`, `writing bounded stdin`)
-  are documented as a stable classification surface, so a downstream adapter
-  can re-classify a core failure without matching on error text. `Error`
-  keeps exactly the seven published variants, no dependency was added, and
-  the dependency surface remains `sha2` only. **Unpublished** — `eggup-core
-  0.1.3` still carries the null stdin and lacks `stdin_data` and
-  `MAX_STDIN_BYTES`, and `eggup-eggpack`'s `=0.1.3` pin blocks propagation
-  until a separate adapter republication. No consumer migration is required.
-
-- `eggup-transport-footprint` gains CI coverage for the configurations it
-  exists to represent (Transport Footprint M001): the crate's central claim
-  — that a consumer can link exactly one transport stack — was verified by
-  no machine, because every lane built only the dual configuration. The
-  curl-only, eggfetch-only, and both-adapters configurations are now built by
-  the `stable` and `macos` lanes and checked at the 1.89 MSRV floor, and a
-  linkage-discipline guard rejects a sibling-adapter reference in every
-  configuration, with a negative control that shows the guard discriminates.
-  The recorded dependency counts 3 / 92 / 93 still reproduce exactly. The
-  crate remains `publish = false` with no registry version; no published
-  crate's dependency graph changed, and no consumer migration is required.
-
-- `eggup-service` runs manager commands through `eggup_core::run_bounded`, so
-  the workspace holds one bounded-process-runner implementation instead of two
-  (Service Lifecycle M015). The crate's own safety policy — allowlisted
-  absolute program paths, a cleared child environment with only the explicit
-  user-scoped systemd session-bus variables, bounded stdin, and the timeout
-  range check — is unchanged, as are the `ManagerFailureKind` taxonomy, the
-  public API, and every manager's argv. The consolidation also fixes a
-  defect the replaced runner had: it consumed the stdin writer's verdict with
-  `try_recv`, discarding a successful write, and then read the now-empty
-  channel as a failure. The affected path is `crontab -`, the crate's only
-  production stdin caller. **Unpublished** — `eggup-service 0.1.3` still
-  carries that defect and the previous runner until a republication; the
-  `v0.1.3` tag is unmoved. The crate's packaged-source verification against
-  the registry is deferred for the same reason and is restored by the
-  `eggup-core` republication. No consumer migration is required.
-- `eggup-service` states its own published-change record accurately (Service
-  Lifecycle M016). The crate's `CHANGELOG.md` omitted the release note for the
-  **eighth** behaviour difference of the consolidation — the one that is a
-  **defect fix, not a cost**: the replaced runner consumed the stdin writer's
-  verdict with `try_recv`, so a successful `crontab -` write was reported as a
-  failure. The difference count was corrected from "seven" to eight and the
-  missing release note added. The changelog's compatibility call-out named only
-  one source-breaking change; the unflagged `LifecycleUpdateReceipt::engine_policy`
-  field addition — which stops a consumer that constructs the receipt with a
-  struct literal from compiling — is now stated in the entry that introduces the
-  field. The service M015 closure's test inventory is corrected: **14** tests in
-  `bounded_executor_consolidation.rs` (not 12), the three current argv guards
-  replace the deleted `the_managers_argv_is_byte_identical`, the total is **16**
-  new tests (not 15), and the hosted `windows-check` lane runs **ten**
-  `cargo test` steps (not nine). **Unpublished** — documentation only; no
-  production code, test code, manifest, lockfile, CI file, or architecture
-  document changed, nothing published, and the `v0.1.3` tag is unmoved.
-  `eggup-service 0.1.3` still carries the stdin-verdict defect until a
-  republication.
-- `eggup-core` gives the bounded-stdin deadline priority over the writer's
-  verdict, and classifies that verdict by its own observation instant (Verified
-  Update Core M018). The M017 entry promised that "a write failure detected
-  after the deadline was reached does not retroactively turn the deadline
-  outcome into an `Err`", but the implementation evaluated the stdin arm
-  before the deadline arm, so the same input at the same timeout could be
-  classified either way depending on the runner's poll phase. The deadline now
-  has priority: the writer stamps its verdict with the instant it observed the
-  write, a failure observed **before** the deadline is an `Err`, and one
-  observed **at or after** it is the deadline outcome (`Ok`, `timed_out` set).
-  An undelivered payload is never reported as a success, and the unconditional
-  deadline guarantee is unchanged. Two overstated statements are corrected: the
-  child's stdin pipe is only broken by the kill **unless a surviving descendant
-  inherited it**, and the `FailureCategory` mapping has five producers in a
-  shipped build, not six — `Injected` is test-only. The M015 closure record's
-  **U1** is closed on the evidence of commit `ab90688`, which did add the four
-  type-level rustdocs the finding said were missing. **Unpublished** — `Error`
-  keeps exactly its seven published variants, no new dependency was added, and
-  `eggup-core 0.1.3` still carries the old behaviour until a republication; the
-  `v0.1.3` tag is unmoved.
-- The documentation-truth gate now checks what it claims to check (Planning /
-  Closure Hygiene C014). `scripts/check-docs-truth.sh` previously opened only
-  `docs/`, `README.md`, `AGENTS.md`, the root `CHANGELOG.md`, and
-  `plans/registry.md` — it never read a `Cargo.toml`, did not cover
-  `architecture/*.md` at all, and skipped every registry table row with fewer
-  than four cells, which hid the stale "Recently closed foundation" table
-  entirely. It now reads the crate manifests and the per-crate changelogs,
-  covers the architecture deep dives, and reads three-cell rows; each change is
-  red-first proven against a documented false negative. The
-  `architecture/transport-footprint.md` deep dive is corrected: it still said
-  that no CI job builds the isolated single-adapter configurations, that the gap
-  the crate exists to close "is still open", that the crate has "no subsystem
-  roadmap", and that it has "zero `#[test]` functions" — all four contradicted
-  the branch's own work. The dependency counts 3 / 92 / 93 are unchanged and
-  still reproduce exactly.
-- The architecture deep dives are re-anchored and their claims re-checked
-  (Planning / Closure Hygiene C015). 179 stale `path:line` citations were
-  re-derived across the five deep dives whose source crates were stable, and
-  eleven substantive claims were corrected — among them a table row that still
-  documented `permission_hint`, an API service M013 removed from the crate, a
-  citation to a line past the end of the file, and three stale `=0.1.2` pins
-  where the manifest says `=0.1.3`. **Unpublished** — documentation only; no
-  production code, test code, manifest, lockfile, CI file, or script changed,
-  and no tag moved.
+Nothing in this section has been published. The current published baselines
+are `0.2.0` for all seven published crates; `eggup-transport-footprint` is
+`publish = false` and has no registry version.
 
 ## 0.1.1
 

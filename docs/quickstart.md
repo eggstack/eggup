@@ -15,7 +15,7 @@ and the printed line is its real output.
 
 ```toml
 [dependencies]
-eggup-core = "0.1.3"
+eggup-core = "0.2.0"
 ```
 
 Inside this workspace, use a path dependency instead:

@@ -21,7 +21,7 @@ exclude = [
 workspace = true
 
 [dependencies]
-eggup-acquisition = { version = "0.1.0", path = "../eggup-acquisition" }
+eggup-acquisition = { version = "0.2", path = "../eggup-acquisition" }
 eggfetch-core = { version = "0.2.0", default-features = false, features = ["http1", "tls-rustls", "tls-native-roots", "proxy"] }
 tokio = { version = "1", default-features = false, features = ["rt", "time", "fs", "io-util", "net"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }

@@ -1,92 +1,50 @@
 # Changelog
 
-`eggup-service` is on crates.io at `0.1.0`, `0.1.1` (the lockstep `0.1.1` patch),
-and `0.1.2`. The `0.1.2` release below was published manually from a later source
-commit than the shared `v0.1.2` tag, which denotes the `eggup-core`/
-`eggup-archive` publication; the tag was not moved.
+## 0.2.0 — 2026-10-23
 
-## 0.1.2 — 2026-10-05
+Published to crates.io (`plans/closure/service-lifecycle/017-status.md`) as part
+of the lockstep `0.2.0` train of the seven publishable crates, from one shared
+publication source commit. Publication order is load-bearing: this crate is
+published after `eggup-core`, `eggup-archive`, `eggup-acquisition`,
+`eggup-curl`, and `eggup-eggfetch`, and before `eggup-eggpack`.
 
-This release publishes the already-qualified M001-M008 service substrate. No
-service runtime behavior changed for the publication: the working tree carried
-these entries, and they are released as-is.
+The dependency surface is `eggup-core` (`^0.2`), `windows-args` (`=0.2.0`), and
+`windows-service` (`=0.8.1`) on Windows only. The `eggup-core` requirement is
+widened from `^0.1.0`: the published `eggup-core 0.1.3` carries neither
+`CommandSpec::stdin_data` nor core's unconditional execution deadline, and the
+consolidated runner below depends on both. Integrity evidence remains SHA-256
+checksum evidence only; no authenticity or signature claims are made.
 
-- **Fixed: a panicking service transition was reported as a post-install check
-  failure.** In the commit-restore path, `transition_to` ran inside the
-  post-commit `catch_unwind`, whose panic arm was labelled `PostInstallCheck`. A
-  panicking `start`/`stop` during `RestoreNew` was therefore recorded under the
-  wrong phase, and the receipt claimed the service state was restored. Each
-  transition now catches its own panics at the phase actually executing
-  (`safe_restore_state` in the lifecycle path, `safe_transition_owned_to` and a
-  nested catch in the direct-runtime path), so the outer arm can only be reached
-  by the check itself. Covered by
-  `panicking_restore_transition_is_recorded_as_restore_new_not_a_check`.
-- **Fixed: a destructive `stop` could run against an unproven target.** The
-  rollback quiesce paths swallowed an `inspect()` error with `.ok()` / `if let
-  Ok(..)`, treating "could not observe" as "no information, proceed". An inspect
-  failure is now `Unknown` and fails closed, matching the fail-closed posture
-  used for genuinely unproven ownership. The `DirectRuntimeControl` seam is a
-  caller-supplied trait with no second ownership check inside `stop`, so this
-  path had no defence in depth. Covered by
-  `unobservable_direct_runtime_is_not_stopped_before_rollback` and
-  `unobservable_service_is_not_stopped_before_rollback`.
-- **Fixed: the stdin write in `SystemExecutor::run` was unbounded.** The write
-  ran on the calling thread before the stdout/stderr reader threads were spawned,
-  so a child that filled its output pipes before draining stdin would deadlock
-  both sides and the caller's deadline could not be enforced. The readers are now
-  attached first, and the write runs on its own thread driven by the same
-  deadline-checked wait loop; the deadline is enforced by killing the child,
-  which closes the pipe and unblocks the writer. A completed write that failed
-  still fails closed, and its verdict is collected before output is trusted.
-- Removed an unreachable Windows `AlreadyExists` fallback in the service
-  definition write. `std::fs::rename` is `MoveFileEx(MOVEFILE_REPLACE_EXISTING)`
-  on Windows and already replaces the destination, so the arm could never run; had
-  it run it would have deleted the destination before the promotion, leaving a
-  data-loss window.
-- Removed a dead ownership gate in `CronManager::install`. `cron_merge`
-  classifies the same crontab with the same marker and desired block and already
-  rejects `Foreign`/`Unknown`, so the second check was unreachable — and would
-  have misattributed a `Foreign` failure to `spec.id()` instead of the synthetic
-  `cron:{marker}` id that owns the block.
-- Service M007: make service diagnostic byte bounds UTF-8 safe while preserving
-  existing 256/512-byte ceilings and lifecycle behavior.
-
-The published dependency requirement is unchanged (`eggup-core ^0.1.0`), so
-consumers of `0.1.1` need no migration and pick up the corrected behavior by
-upgrading within the `0.1.x` range. No public API was added, removed, or
-changed by this release.
-
-## 0.1.3 — 2026-10-09
-
-- **Fixed: owned failed systemd units could never complete `stop`.** The
-  adapter now recognizes the specific `ActiveState=failed` case without
-  changing the public `LifecycleState` enum, revalidates the exact `ExecStart`
-  identity around the stop, and reports completion only after manager job,
-  process IDs, active-state output, and cgroup evidence agree that the unit is
-  quiescent. Unknown states and remaining cgroup tasks fail closed. No
-  `reset-failed`, privilege escalation, or new dependency is introduced.
-  The runtime implementation is Service M010 source commit
-  `0bde3fefbda07019529ad7566c02e6e4ec141fd6`; the package's exact source
-  revision is recorded by `.cargo_vcs_info.json` as
-  `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`. The published crate checksum is
-  `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`.
-
-## Unreleased
-
-**Not published by this milestone.** The changes below are on the source line
-only; `eggup-service 0.1.3` remains the published version and the `v0.1.3` tag
-is unmoved. Republication is a separate, later milestone. **No consumer
-migration is required for the type-identity changes**: `eggup_service::Ownership`,
+**Compatibility, stated precisely.** Two changes are source breaks.
+`ServiceError::Manager` is a struct variant, so a consumer that matched
+`ServiceError::Manager(detail)` must now match
+`ServiceError::Manager { kind, detail, os_code }` and branch on `kind` — or on
+`ServiceError::manager_kind()` — rather than on the message text.
+`LifecycleUpdateReceipt` gained the public field `engine_policy`
+(`CommitEnginePolicy`); the struct has no `Default` impl, so a consumer that
+constructs it with a struct literal must add the field and stops compiling
+until it does, while a consumer that only reads the receipt's fields is
+unaffected. Two behavioural changes have consumer impact. The cron managed
+block body must embed the absolute executable path of the spec, so a consumer
+whose `desired_block` does not contain `spec.executable()` now receives
+`ServiceError::InvalidInput` from `inspect`, `install`, and `uninstall`, where
+it previously received success (`install`) or a normal result. And every
+adapter now spends exactly one `OperationDeadline` per public operation, so an
+operation that previously overran its budget now fails with a `Timeout` kind
+instead of overrunning — a fail-closed tightening. No consumer migration is
+required for the type-identity changes: `eggup_service::Ownership`,
 `eggup_service::CronOwnership`, and `eggup_service::CommandOutput` all keep
-resolving under their existing spellings.
+resolving under their existing spellings, `CommandOutput` remains an
+undeprecated alias of `ManagerCommandOutput`, and no conversion is needed
+anywhere. This release is also the first publication that carries the fix for
+the stdin-verdict defect the published `0.1.3` still carries.
 
-The milestone entries below are also **not published** and require **no
-consumer migration until a republication milestone ships them**. **Two** of
-them are source-breaking changes for a consumer that matches
-`ServiceError::Manager` positionally, branches on its message text, or
-constructs `LifecycleUpdateReceipt` with a struct literal; those migrations
-become necessary only at republication, and the exact replacement is named in
-each entry below.
+The entries below are **published by this release**. **Two** of them are
+source-breaking changes for a consumer that matches `ServiceError::Manager`
+positionally, branches on its message text, or constructs
+`LifecycleUpdateReceipt` with a struct literal; those migrations are
+**necessary at this republication**, and the exact replacement is named in each
+entry below.
 
 - **Changed: `SystemExecutor`'s bounded runner now delegates to
   `eggup_core::run_bounded`.** The hand-rolled spawn, reader threads, writer
@@ -114,9 +72,9 @@ each entry below.
   passes with its snapshot's **public surface** unmodified. The snapshot's
   per-item *locations* were re-anchored when M015 rewrote `src/lib.rs`; no
   item was added, removed, or re-signed. **No new dependency, no manifest
-  change, and no lockfile change.** This entry is **unpublished**: the
-  published `eggup-service 0.1.3` keeps the hand-rolled runner until a
-  separate republication milestone, and **no consumer migration is
+  change, and no lockfile change** in this milestone's change set. The
+  published `eggup-service 0.1.3` keeps the hand-rolled runner; `0.2.0` is the
+  first publication of the consolidated runner, and **no consumer migration is
   required**.
 - **Fixed: a successful stdin write is no longer reported as a stdin
   failure.** The replaced runner polled its stdin-writer channel with
@@ -133,8 +91,9 @@ each entry below.
   `crontab -` install, the crate's only production stdin caller, so a
   consumer that installs a cron block through the published `0.1.3` receives
   a typed `Spawn` failure instead of a successful install. **The published
-  `eggup-service 0.1.3` still carries the defect**: the fix is on the source
-  line only and reaches consumers at the next republication.
+  `eggup-service 0.1.3` still carries the defect**; `0.2.0` is the first
+  publication that carries the fix, so the defect reaches no consumer that
+  resolves this version.
 - **Fixed: two divergent copies of the destructive commit/rollback engine.**
   `disposition.rs` and `lifecycle_update.rs` each carried a full orchestrator
   and their own copies of the transition, rollback-quiesce, panic-safe-inspect,
@@ -164,11 +123,11 @@ each entry below.
   `commit_with_lifecycle` and `commit_with_disposition` keep their existing
   signatures and run the engine under the default policy. **Consumer impact:**
   `LifecycleUpdateReceipt` gains one public field, `engine_policy`
-  (`CommitEnginePolicy`), so a consumer of the published `0.1.3` that
-  constructs that struct with a **struct literal** — the struct has no
-  `Default` impl, so a literal is its only construction path — must add the
-  field and stops compiling until it does. A consumer that only *reads* the
-  receipt's fields is unaffected.
+  (`CommitEnginePolicy`), so a consumer upgrading from `0.1.3` that constructs
+  that struct with a **struct literal** — the struct has no `Default` impl, so
+  a literal is its only construction path — must add the field and stops
+  compiling until it does. A consumer that only *reads* the receipt's fields
+  is unaffected.
 - **Fixed: three structurally identical ownership enums.** `eggup_service::Ownership`
   is now a re-export of `eggup_core::Ownership`, and `eggup_service::CronOwnership`
   is a public type alias of it, so all three denote **one** type and no
@@ -177,8 +136,9 @@ each entry below.
 - **Renamed: the manager command output type.** `CommandOutput` is now
   `ManagerCommandOutput`; the old spelling survives as a type alias, so existing
   `CommandExecutor` implementations written against either spelling still
-  satisfy the trait. The alias is deliberately **not** deprecated — that is a
-  publication-policy decision owned by the later republication milestone.
+  satisfy the trait. The alias is deliberately **not** deprecated: this release
+  is the intentional `0.2` API boundary, and the former spelling keeps
+  resolving.
 - **Fixed: two byte ceilings for one data class.** Manager-output diagnostic
   text is now bounded by one declared ceiling, `MAX_DIAGNOSTIC_BYTES` (512
   bytes), which the crate doc now names. The former second, smaller 256-byte
@@ -233,7 +193,8 @@ each entry below.
   now carries a `# Errors` rustdoc section naming the concrete error variants
   and the condition for each, and the `FakeExecutor` methods that can panic
   carry `# Panics` sections. The Windows SCM public surface is deliberately
-  excluded: service milestone `014` owns it.
+  excluded from that sweep: service milestone `014` owns it, and its own
+  documentation is recorded in the milestone 014 subsection below.
 
 ### Service milestone 014 — Windows SCM execution and public-API surface
 
@@ -291,3 +252,79 @@ each entry below.
   "the service disappeared before the operation" case. **No `# Panics` section
   is added**: the absence of panics on those paths is the outcome of the
   typed-error conversion above, not an independent claim.
+
+## Unreleased
+
+Nothing in this section has been published. `0.2.0` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
+
+## 0.1.3 — 2026-10-09
+
+- **Fixed: owned failed systemd units could never complete `stop`.** The
+  adapter now recognizes the specific `ActiveState=failed` case without
+  changing the public `LifecycleState` enum, revalidates the exact `ExecStart`
+  identity around the stop, and reports completion only after manager job,
+  process IDs, active-state output, and cgroup evidence agree that the unit is
+  quiescent. Unknown states and remaining cgroup tasks fail closed. No
+  `reset-failed`, privilege escalation, or new dependency is introduced.
+  The runtime implementation is Service M010 source commit
+  `0bde3fefbda07019529ad7566c02e6e4ec141fd6`; the package's exact source
+  revision is recorded by `.cargo_vcs_info.json` as
+  `feb6ae5aea4c9b61c4051957f3662ca49d845f9e`. The published crate checksum is
+  `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`.
+
+`eggup-service` is on crates.io at `0.1.0`, `0.1.1` (the lockstep `0.1.1` patch),
+and `0.1.2`. The `0.1.2` release below was published manually from a later source
+commit than the shared `v0.1.2` tag, which denotes the `eggup-core`/
+`eggup-archive` publication; the tag was not moved.
+
+## 0.1.2 — 2026-10-05
+
+This release publishes the already-qualified M001-M008 service substrate. No
+service runtime behavior changed for the publication: the working tree carried
+these entries, and they are released as-is.
+
+- **Fixed: a panicking service transition was reported as a post-install check
+  failure.** In the commit-restore path, `transition_to` ran inside the
+  post-commit `catch_unwind`, whose panic arm was labelled `PostInstallCheck`. A
+  panicking `start`/`stop` during `RestoreNew` was therefore recorded under the
+  wrong phase, and the receipt claimed the service state was restored. Each
+  transition now catches its own panics at the phase actually executing
+  (`safe_restore_state` in the lifecycle path, `safe_transition_owned_to` and a
+  nested catch in the direct-runtime path), so the outer arm can only be reached
+  by the check itself. Covered by
+  `panicking_restore_transition_is_recorded_as_restore_new_not_a_check`.
+- **Fixed: a destructive `stop` could run against an unproven target.** The
+  rollback quiesce paths swallowed an `inspect()` error with `.ok()` / `if let
+  Ok(..)`, treating "could not observe" as "no information, proceed". An inspect
+  failure is now `Unknown` and fails closed, matching the fail-closed posture
+  used for genuinely unproven ownership. The `DirectRuntimeControl` seam is a
+  caller-supplied trait with no second ownership check inside `stop`, so this
+  path had no defence in depth. Covered by
+  `unobservable_direct_runtime_is_not_stopped_before_rollback` and
+  `unobservable_service_is_not_stopped_before_rollback`.
+- **Fixed: the stdin write in `SystemExecutor::run` was unbounded.** The write
+  ran on the calling thread before the stdout/stderr reader threads were spawned,
+  so a child that filled its output pipes before draining stdin would deadlock
+  both sides and the caller's deadline could not be enforced. The readers are now
+  attached first, and the write runs on its own thread driven by the same
+  deadline-checked wait loop; the deadline is enforced by killing the child,
+  which closes the pipe and unblocks the writer. A completed write that failed
+  still fails closed, and its verdict is collected before output is trusted.
+- Removed an unreachable Windows `AlreadyExists` fallback in the service
+  definition write. `std::fs::rename` is `MoveFileEx(MOVEFILE_REPLACE_EXISTING)`
+  on Windows and already replaces the destination, so the arm could never run; had
+  it run it would have deleted the destination before the promotion, leaving a
+  data-loss window.
+- Removed a dead ownership gate in `CronManager::install`. `cron_merge`
+  classifies the same crontab with the same marker and desired block and already
+  rejects `Foreign`/`Unknown`, so the second check was unreachable — and would
+  have misattributed a `Foreign` failure to `spec.id()` instead of the synthetic
+  `cron:{marker}` id that owns the block.
+- Service M007: make service diagnostic byte bounds UTF-8 safe while preserving
+  existing 256/512-byte ceilings and lifecycle behavior.
+
+The published dependency requirement is unchanged (`eggup-core ^0.1.0`), so
+consumers of `0.1.1` need no migration and pick up the corrected behavior by
+upgrading within the `0.1.x` range. No public API was added, removed, or
+changed by this release.

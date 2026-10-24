@@ -15,7 +15,7 @@ Requires Rust **1.89**+ (edition 2021). The only dependency is `sha2`.
 
 ```toml
 [dependencies]
-eggup-core = "0.1.3"
+eggup-core = "0.2.0"
 ```
 
 ```rust
@@ -125,11 +125,12 @@ user-facing guidance and never overrides them.
 
 ## Publication state
 
-`eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
-`eggup-eggpack`, and `eggup-service` are published at `0.1.3`; `eggup-curl` is
-published at `0.1.2`. `eggup-service` was published later, on 2026-10-09, from a
-different source commit than the shared `v0.1.3` tag, which denotes the
-`eggup-core`/`eggup-archive` publication; the tag was not moved.
+`eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-curl`,
+`eggup-eggfetch`, `eggup-eggpack`, and `eggup-service` are published at
+`0.2.0`. The 0.2.0 line is one lockstep train published from a single source
+commit, because the acquisition seam's next release is source-breaking and the
+workspace shares one version. The `v0.1.1`, `v0.1.2`, and `v0.1.3` tags were
+not moved and the published `0.1.x` versions were not withdrawn.
 `eggup-transport-footprint` is `publish = false` by design. CI never
 publishes; releases are manual and milestone-gated.
 
