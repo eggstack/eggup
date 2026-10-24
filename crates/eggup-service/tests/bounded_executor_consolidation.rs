@@ -12,6 +12,17 @@
 //! The child program is the test binary itself, re-executed with a mode
 //! argument; see `common/fixture_child.rs`. That keeps every fixture
 //! portable: the Windows lane runs this whole suite.
+//!
+//! Platform gate note: the manager-argv guard is split into one test per
+//! manager and the gate is applied **per test**, so the Windows lane still
+//! compiles and still runs the launchd and cron guards. The systemd guard is
+//! Unix-scoped, and it is the only one of the three that is: the crate's
+//! `ExecStart` grammar is Unix-path-shaped by construction — it rejects any
+//! `argv` containing a backslash and then requires the path to be absolute —
+//! and a Windows executable path contains a backslash, so no Windows spelling
+//! can satisfy both rules at once and the unit could never be classified as
+//! `Owned` there. The Unix-only helpers carry the same gate, so the Windows
+//! build stays warning-free.
 
 #[path = "common/fixture_child.rs"]
 mod fixture_child;
@@ -19,9 +30,12 @@ mod fixture_child;
 use eggup_service::{
     CommandExecutor, CronManager, FakeExecutor, LaunchdDomain, LaunchdInstall, LaunchdManager,
     ManagerCommandOutput, ManagerFailureKind, ServiceError, ServiceId, ServiceManager, ServiceSpec,
-    SystemExecutor, SystemdInstall, SystemdManager, SystemdScope, MAX_CRONTAB_BYTES,
-    MAX_TRANSITION_TIMEOUT,
+    SystemExecutor, MAX_CRONTAB_BYTES, MAX_TRANSITION_TIMEOUT,
 };
+// The systemd adapter types are used only by the Unix-gated systemd argv
+// guard: the crate's `ExecStart` grammar is Unix-path-shaped.
+#[cfg(unix)]
+use eggup_service::{SystemdInstall, SystemdManager, SystemdScope};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
@@ -102,11 +116,20 @@ fn spec(id: &str) -> ServiceSpec {
 }
 
 /// The `systemctl show` observation for an absent unit.
+///
+/// Unix-scoped: only the Unix-gated systemd argv guard reads this.
+#[cfg(unix)]
 fn show_absent() -> String {
     "LoadState=not-found\nActiveState=inactive\n".to_string()
 }
 
 /// The `systemctl show` observation for an exactly owned unit.
+///
+/// Unix-scoped: the scripted `ExecStart` payload carries the spec executable
+/// verbatim, and the crate's narrow `ExecStart` grammar rejects a backslash —
+/// a Windows executable path contains one — so the unit could not be
+/// classified as `Owned` there.
+#[cfg(unix)]
 fn show_owned(active: &str) -> String {
     format!(
         "LoadState=loaded\nActiveState={active}\nExecStart={{ path={exe} ; argv[]={exe} --serve ; ignore_errors=no }}\n",
@@ -399,14 +422,20 @@ fn a_nonzero_exit_is_ok_with_the_observed_status() {
     assert_eq!(out.status, Some(3));
 }
 
-/// T8 — the argv every manager builds is byte-identical.
+/// T8 — the argv the systemd manager builds is byte-identical.
 ///
-/// The guard is a golden table: the argv the adapters build is compared with
+/// The guard is a golden table: the argv the adapter builds is compared with
 /// the exact vectors below. The `FakeExecutor` refuses any argv that differs
 /// from the scripted one, so a drift fails the operation as well as this
 /// comparison.
+///
+/// Unix-scoped: the scripted `ExecStart` observation carries the spec
+/// executable verbatim, and the crate's narrow `ExecStart` grammar rejects a
+/// backslash — a Windows executable path contains one — so the unit could not
+/// be classified as `Owned` there and `start` would be denied instead.
+#[cfg(unix)]
 #[test]
-fn the_managers_argv_is_byte_identical() {
+fn the_systemd_managers_argv_is_byte_identical() {
     let show = [
         "systemctl",
         "--user",
@@ -564,9 +593,21 @@ fn the_managers_argv_is_byte_identical() {
         ]
     );
     assert!(!unit.exists());
+}
 
-    // ---- launchctl ----
-
+/// T8 — the argv the launchd manager builds is byte-identical.
+///
+/// The guard is a golden table: the argv the adapter builds is compared with
+/// the exact vectors below. The `FakeExecutor` refuses any argv that differs
+/// from the scripted one, so a drift fails the operation as well as this
+/// comparison.
+///
+/// Platform-neutral: the plist observation is compared against the spec
+/// executable as text and as a path, and both come from the platform-native
+/// absolute executable, so the same comparison holds on every platform. The
+/// launchd argv itself carries no POSIX-only absolute path.
+#[test]
+fn the_launchd_managers_argv_is_byte_identical() {
     let list = ["launchctl", "list", "com.example.daemon"];
 
     // `list`.
@@ -703,9 +744,22 @@ fn the_managers_argv_is_byte_identical() {
             ],
         ]
     );
+}
 
-    // ---- crontab ----
-
+/// T8 — the argv the cron manager builds is byte-identical.
+///
+/// The guard is a golden table: the argv the adapter builds is compared with
+/// the exact vectors below. The recorder refuses any argv that differs from
+/// the scripted one, so a drift fails the operation as well as this
+/// comparison.
+///
+/// Platform-neutral: the crontab body is compared to the spec executable
+/// verbatim, and the spec executable is the platform-native absolute
+/// executable, so the same comparison holds on every platform. The cron
+/// ownership rule never applies the systemd-style `ExecStart` rules to the
+/// crontab text.
+#[test]
+fn the_cron_managers_argv_is_byte_identical() {
     // `-l` and `-`.
     let recorder = RecordingExecutor::default();
     let observer = recorder.clone();
@@ -808,6 +862,9 @@ fn make_executable(path: &std::path::Path) {
 }
 
 /// Builds a systemd manager over the fake executor.
+///
+/// Unix-scoped: only the Unix-gated systemd argv guard builds one.
+#[cfg(unix)]
 fn systemd_manager(
     fake: FakeExecutor,
     unit_path: PathBuf,

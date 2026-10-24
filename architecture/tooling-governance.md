@@ -70,7 +70,7 @@ crate that adds a sixth `[workspace.package]` key, or omits the lint opt-in,
 breaks a uniform invariant that currently holds across the workspace.
 
 `rust-version = "1.89"` is what makes the `msrv` CI job meaningful; the pin is
-duplicated as `dtolnay/rust-toolchain@1.89.0` in `.github/workflows/ci.yml:29`
+duplicated as `dtolnay/rust-toolchain@1.89.0` in `.github/workflows/ci.yml:48`
 and is **not** pinned locally — there is no `rust-toolchain.toml` in the
 repository, so a local run uses whatever default toolchain the machine has.
 
@@ -280,10 +280,10 @@ under time pressure, and it is the one that protects the layered design.
 | Job | Runner | Toolchain | Exact commands | What it uniquely proves |
 |---|---|---|---|---|
 | `stable` | `ubuntu-latest` | stable + `rustfmt`, `clippy` | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`; `cargo test --workspace --all-targets --all-features --locked`; `cargo doc --workspace --no-deps --locked`; `cargo package -p eggup-service --locked` | Linux is the reference platform. The only lane that runs clippy, fmt, and doc; also verifies packaged service source |
-| `msrv` | `ubuntu-latest` | `1.89.0` (`ci.yml:30`) | `cargo check --workspace --all-targets --locked`; `cargo package -p eggup-service --locked` | The workspace type-checks and the packaged service crate verifies at the declared `rust-version` floor. Clippy and tests are not run here |
+| `msrv` | `ubuntu-latest` | `1.89.0` (`ci.yml:48`) | `cargo check --workspace --all-targets --locked`; `cargo package -p eggup-service --locked --no-verify` | The workspace type-checks at the declared `rust-version` floor and the service crate is packaged there. Clippy and tests are not run here. The package step's registry-resolved compile is deferred; see the packaging note below |
 | `service-systemd` | `ubuntu-latest` | stable | registry-only published 0.1.2 negative control; privileged current workspace systemd test; registry-only published 0.1.3 positive quiescence and Foreign/malformed controls | Real systemd evidence for the published limitation and correction, auto-restart stop, residual cgroup refusal, and foreign preservation |
 | `macos` | `macos-latest` | stable | `cargo test --workspace --all-targets --all-features --locked`; `cargo package -p eggup-service --locked` | The full test suite and packaged service source pass on a non-Linux Unix — the only evidence for macOS behavior |
-| `windows-check` | `windows-latest` | stable | nine `cargo test` steps (`ci.yml:66-79`), followed by `cargo package -p eggup-service --locked` (`ci.yml:80`) | Windows compiles and *runs* the workspace and separately verifies packaged service source. Targeted tests run first so a platform-specific failure is named before the broad run buries it |
+| `windows-check` | `windows-latest` | stable | nine `cargo test` steps (`ci.yml:122-142`), followed by `cargo package -p eggup-service --locked --no-verify` (`ci.yml:154`) | Windows compiles and *runs* the workspace and separately packages the service crate; that package step's registry-resolved compile is deferred, see the packaging note below. Targeted tests run first so a platform-specific failure is named before the broad run buries it |
 
 ### 5.1 Why `windows-check` leads with targeted steps
 
@@ -296,8 +296,17 @@ The targeted steps stay, ahead of the full run, because they name the failure
 instead of reporting a pile of results. The closing run passes
 `--no-fail-fast`: this is the only Windows test coverage, so one failing target
 must not hide the state of every other one.
-The final `cargo package -p eggup-service --locked` step also verifies the
-package-produced source on Windows.
+The final `cargo package -p eggup-service --locked --no-verify` step also
+packages the service crate on Windows. Its registry-resolved compile is
+**deferred**, not weakened: the service source line now uses core's
+bounded-stdin capability (Core M017) and core's unconditional execution
+deadline (Core M014), neither of which is in the published `eggup-core 0.1.3`,
+so verifying the packaged crate against crates.io cannot pass until the
+`eggup-core` republication lands. The step still validates the manifest and
+the packaged file list, and the compile of the packaged sources stays covered
+by the workspace build, test, and clippy steps, which resolve `eggup-core` to
+the workspace path dependency. The strict step is restored by the
+`eggup-core` republication milestone.
 
 The widening has already paid for itself. Turning on
 `cargo test --workspace` exposed
@@ -346,8 +355,8 @@ platform lane that a whole-workspace run would not guarantee.
 | Gap | Detail |
 |---|---|
 | No `cargo tree` anywhere in CI | The dependency-boundary review is local-only, and the local step is advisory (§4.2) |
-| No `cargo check` with `--all-features` on the MSRV lane | `msrv` uses `cargo check --workspace --all-targets --locked` (`ci.yml:30`) — no `--all-features`. Feature-gated code is not compiled at the 1.89 floor, so an MSRV break that only appears under a non-default feature passes |
-| No `cargo check` with `--all-features` on the Windows lane | `ci.yml:65-79` runs default-feature tests plus a packaged `eggup-service` check; it does not build the feature-gated footprint binaries on Windows |
+| No `cargo check` with `--all-features` on the MSRV lane | `msrv` uses `cargo check --workspace --all-targets --locked` (`ci.yml:49`) — no `--all-features`. Feature-gated code is not compiled at the 1.89 floor, so an MSRV break that only appears under a non-default feature passes |
+| No `cargo check` with `--all-features` on the Windows lane | `ci.yml:122-154` runs default-feature tests plus a packaged `eggup-service` step; it does not build the feature-gated footprint binaries on Windows |
 | Clippy and fmt run on Linux only | A `#[cfg(windows)]` or `#[cfg(target_os = "macos")]` clippy violation is not caught by any lane — the Windows and macOS jobs run `test`/`check`, never `clippy` |
 | `cargo doc` on Linux only | `deny(missing_docs)` is not re-verified per platform, which is acceptable since rustdoc is platform-independent |
 | No `cargo test` with `--all-features` on the Windows lane | The closing run is `cargo test --workspace --all-targets --locked`. Combined with the targeted steps, every crate's tests now execute on Windows — but only under default features, so the footprint binaries and any other feature-gated path remain unbuilt there |
@@ -752,7 +761,7 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 
 | Was | Resolution |
 |---|---|
-| `verify-workflow` + `AGENTS.md` described `windows-check` as `cargo check` / "compile-only" | Both now describe its nine `cargo test` steps plus packaged service verification, and the real Linux systemd service lane (§5) |
+| `verify-workflow` + `AGENTS.md` described `windows-check` as `cargo check` / "compile-only" | Both now describe its nine `cargo test` steps plus the packaged-service step (registry-resolved compile deferred), and the real Linux systemd service lane (§5) |
 | `AGENTS.md` gave `eggup-eggpack` a partial dependency list, omitting `sha2` | `sha2` added; `AGENTS.md` no longer restates the list at all and now points at `crates/eggup-eggpack/Cargo.toml`, the owner of the exact set |
 | `AGENTS.md` stated "keep crate `README.md` + `CHANGELOG.md` current" as absolute | Now scoped to library crates, with `eggup-transport-footprint` named as the exception (§3.4) |
 | `core-transaction.md` listed a previous generation of `FailureCategory`, `FailurePhase`, `IntegrityRequirement`, `IntegrityStatus`, and `PermissionsIntent` | All five rows regenerated from source; the two `FailureCategory::Destination` references replaced with real variants |

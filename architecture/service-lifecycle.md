@@ -1260,7 +1260,7 @@ The integration test targets under `crates/eggup-service/tests/`:
 
 The three tests CI runs individually on Windows are pinned because they assert
 UTF-8 boundary behavior that a differently-configured default run would not
-exercise (`.github/workflows/ci.yml:50-53`):
+exercise (`.github/workflows/ci.yml:124-126`):
 
 ```sh
 cargo test -p eggup-service --lib diagnostic_byte_bounds_preserve_utf8_at_256_and_512_edges --locked
@@ -1298,7 +1298,7 @@ The full gate is `./scripts/check-local.sh`; see
 ## Known doc/code drift
 
 - **Three UTF-8 boundary tests, not two.** CI runs three individually
-  (`ci.yml:50-52`) — the third, `lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free`,
+  (`ci.yml:124-126`) — the third, `lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free`,
   lives in `lifecycle_update.rs` rather than `lib.rs`. Two are in `lib.rs`.
 - **`ServiceId` length is bytes, not characters.** `lib.rs:43` uses
   `value.len() > 256`, which is a UTF-8 byte count. A 200-character non-ASCII

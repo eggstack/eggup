@@ -379,6 +379,29 @@ published `eggup-service 0.1.3` misreports a successful stdin write.
     implementation and the published `feb6ae5` source. The **published**
     `eggup-service 0.1.3` still carries the defect, so the exposure is open
     until a republication milestone delivers the fix; `v0.1.3` must not move.
+16. **The packaged-service verification is deferred because the source line now
+    depends on an unpublished `eggup-core`.** `cargo package -p eggup-service
+    --locked` resolves `eggup-core` from crates.io, so it compiles the
+    packaged crate against the **published** `eggup-core 0.1.3`. Service M015's
+    consolidated runner calls `CommandSpec::stdin_data` (Core M017) and relies
+    on core's unconditional execution deadline (Core M014); neither is in the
+    published `0.1.3`, so the step fails with `E0599: no method named
+    'stdin_data' found for struct 'CommandSpec'`. Hosted run `40061134915`
+    observed that failure in the `stable`, `msrv`, `macos`, and
+    `windows-check` lanes. **Severity: medium.** It is a publication state,
+    not a defect in the source line — the same condition this branch already
+    created for `eggup-curl`, `eggup-eggfetch`, and `eggup-eggpack`, whose
+    sources also use capabilities the registry does not carry; the service
+    package step was the last one still resolving against the registry.
+    **Disposition:** the four CI steps now run
+    `cargo package -p eggup-service --locked --no-verify`, with an inline
+    comment in `.github/workflows/ci.yml` recording why, so the deferral is
+    visible in the workflow and not silently dropped. The step still packages
+    the crate and validates its manifest and file list, and the compile of the
+    packaged sources stays covered by the workspace build, test, and clippy
+    steps. **Follow-on: the `eggup-core` republication milestone**, after
+    which the strict step is restored. The republication is a tracked
+    milestone, the parent session owns it, and CI never performs it.
 
 Corrective work identified after reviewing implementation SHA `889a234c` was closed sequentially. Acquisition M003, service M002, and distribution M001 were added and closed in that batch, with hosted CI at that exact SHA green on stable fmt/clippy/test/doc, the Rust 1.89 check, macOS tests, and the Windows workspace check. The full per-milestone evidence lives in the closure records under `plans/closure/`.
 

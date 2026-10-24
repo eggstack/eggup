@@ -57,10 +57,12 @@ to stay correct.
 Each has occurred at least once — check for them explicitly:
 
 1. **CI lane understatement.** Windows runs nine `cargo test` steps
-   (`ci.yml:66-79`) plus packaged service verification. There is also a
-   privileged Linux `service-systemd` lane. Count commands, not bullets: three
-   named `eggup-service` diagnostic tests are three steps. The MSRV lane runs a
-   workspace check and packaged service verification; it does not run tests.
+   (`ci.yml:122-142`) plus the packaged-service step, whose registry-resolved
+   compile is deferred. There is also a privileged Linux `service-systemd`
+   lane. Count commands, not bullets: three named `eggup-service` diagnostic
+   tests are three steps. The MSRV lane runs a workspace check and the
+   packaged-service step; it does not run tests, and that step's
+   registry-resolved compile is deferred too.
 2. **Publication status.** `eggup-service 0.1.3` is published (2026-10-09);
    `eggup-curl` is published only at `0.1.2`. Check crates.io rather than
    inferring from a `publish = false` key or a plan.
@@ -84,9 +86,9 @@ Each has occurred at least once — check for them explicitly:
    arity silently drops cells. Check column counts.
 9. **Counting steps, not bullets.** A CI lane that runs three separately-named
    tests is three steps, not one. `windows-check` is nine `cargo test` steps
-   (`ci.yml:66-79`): one combined three-crate run, eggpack, three named service
-   tests, SCM, two Core integration fixtures, and the full workspace run. It
-   then verifies the packaged service crate. Count the `- run:` lines.
+   (`ci.yml:122-142`): one combined three-crate run, eggpack, three named
+   service tests, SCM, two Core integration fixtures, and the full workspace
+   run. It then packages the service crate. Count the `- run:` lines.
 10. **A quoted phrase that was never written.** A governance section attributed
     a quoted comment to a skill file that did not contain it. When a doc quotes
     another doc, `grep` the quoted string — a paraphrase presented as a

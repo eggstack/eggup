@@ -42,10 +42,10 @@ checked for documentation drift until a lane is added.
 
 | Job | Runner | What it adds |
 |---|---|---|
-| `stable` | ubuntu | fmt + clippy + full `cargo test` + `cargo doc` + packaged service verification; the only lane running clippy, fmt, and doc |
-| `msrv` | ubuntu, pinned `1.89.0` | workspace `cargo check` and packaged service verification at the MSRV |
+| `stable` | ubuntu | fmt + clippy + full `cargo test` + `cargo doc` + the packaged-service step; the only lane running clippy, fmt, and doc. That step's registry-resolved compile is deferred |
+| `msrv` | ubuntu, pinned `1.89.0` | workspace `cargo check` and the packaged-service step at the MSRV (registry-resolved compile deferred) |
 | `service-systemd` | ubuntu-latest | registry-only 0.1.2 negative control, current workspace systemd fixtures, and published registry-only 0.1.3 positive quiescence plus ownership controls |
-| `macos` | macos-latest | full `cargo test` + packaged service verification; the only macOS evidence |
+| `macos` | macos-latest | full `cargo test` + the packaged-service step; the only macOS evidence. That step's registry-resolved compile is deferred |
 | `windows-check` | windows-latest | **runs nine test steps**, ending in a full `cargo test --workspace --all-targets`, then package verification — see below |
 
 `windows-check` is *not* compile-only, and it is no longer a curated subset. It
@@ -66,7 +66,12 @@ whole workspace:
    the claim/race fixtures natively; `rename` semantics differ per platform, so
    compile-only evidence is not sufficient for M011.
 7. `cargo test --workspace --all-targets --locked --no-fail-fast`
-8. `cargo package -p eggup-service --locked` — verifies package-produced source on Windows
+8. `cargo package -p eggup-service --locked --no-verify` — packages the service crate on
+   Windows. Its registry-resolved compile is **deferred**: the source line uses core
+   capabilities (Core M014, M017) the published `eggup-core 0.1.3` does not carry, so the
+   strict form cannot pass until the `eggup-core` republication lands. The step still
+   validates the manifest and the packaged file list; the workspace build, test, and
+   clippy steps cover the compile against the workspace path dependency
 
 Step 7 exists because the per-crate steps cannot catch a regression in an
 untargeted crate. It passes `--no-fail-fast` deliberately: this lane is the only

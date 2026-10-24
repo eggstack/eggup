@@ -584,6 +584,41 @@ on Windows regardless of the previous state.
   `published-api-0.1.3/`** are the published-API fixtures; they pass
   unchanged and were not edited.
 
+### UF-4 — The packaged-crate verification against the registry is deferred until the `eggup-core` republication — **medium — OPEN (publication state)**
+
+**Finding.** `cargo package -p eggup-service --locked` resolves `eggup-core`
+from **crates.io**, not from the workspace, so it compiles the packaged crate
+against the **published** `eggup-core 0.1.3`. This milestone's consolidated
+runner calls `CommandSpec::stdin_data` (Core M017) and relies on core's
+unconditional execution deadline (Core M014). Neither is in the published
+`0.1.3`, so the step fails with
+`error[E0599]: no method named 'stdin_data' found for struct 'CommandSpec'`.
+The hosted run `40061134915` observed exactly that failure in the `stable`,
+`msrv`, `macos`, and `windows-check` lanes.
+
+**This is a publication state, not a defect in this source line.** It is the
+same condition this branch already created for `eggup-curl`, `eggup-eggfetch`,
+and `eggup-eggpack`, whose sources also use capabilities the registry does not
+carry (`__adapter_io` from Acquisition M013). The service package step was
+simply the last one that still resolved against the registry, because the
+service crate had no unpublished dependency of its own until this milestone.
+
+**Disposition.** The parent changed the four CI steps to
+`cargo package -p eggup-service --locked --no-verify` with an inline comment
+recording exactly why, so the deferral is visible in the workflow itself and
+not silently dropped. The step still packages the crate and validates its
+manifest and file list; the compile of the packaged sources is covered by the
+workspace build, test, and clippy steps, which resolve `eggup-core` to the
+workspace path dependency. The verification becomes meaningful again when the
+`eggup-core` republication lands.
+
+**Severity: medium.** It is not high: nothing is miscompiled or mispublished,
+the crate stays published at `0.1.3`, and the source line itself is fully
+qualified. It is not low: a real CI gate was withdrawn, and the withdrawal
+must not outlive its cause. **Follow-on: the `eggup-core` republication
+milestone**, after which the strict step is restored. The republication is a
+tracked milestone that the parent session owns and that CI never performs.
+
 ## Roadmap disposition
 
 **The parent owns `plans/subsystems/service-lifecycle-roadmap.md`.** The

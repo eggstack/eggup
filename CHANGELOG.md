@@ -476,7 +476,9 @@ section aggregates them, it does not replace them.
   channel as a failure. The affected path is `crontab -`, the crate's only
   production stdin caller. **Unpublished** — `eggup-service 0.1.3` still
   carries that defect and the previous runner until a republication; the
-  `v0.1.3` tag is unmoved. No consumer migration is required.
+  `v0.1.3` tag is unmoved. The crate's packaged-source verification against
+  the registry is deferred for the same reason and is restored by the
+  `eggup-core` republication. No consumer migration is required.
 
 ## 0.1.1
 
