@@ -361,3 +361,28 @@ wants the finding's text to point at the release note, the optional addition is:
 > "**Fixed: a successful stdin write is no longer reported as a stdin
 > failure.**" entry) as difference **D8**. The published crate is unchanged;
 > the fix reaches consumers at the next republication.
+
+## Parent-session addendum (2026-10-24, public-API surface snapshot re-anchoring)
+
+The parent session added one correction to this milestone's scope after the
+milestone's own work was closed: the public-API surface snapshot
+`crates/eggup-service/tests/public-api-surface.txt` still carried **19 stale
+per-item `location` references** out of 80. The snapshot was authored at
+service M014, and the M015 consolidation rewrote
+`crates/eggup-service/src/lib.rs` (a net shift of 109 lines for most items and
+5 for one), so the listed locations no longer pointed at the items they name.
+
+This was **not** a public-API change. The snapshot's *public surface* — the set
+of items, their kinds, and their signatures — is unchanged: the pinning test
+`tests/public_api_surface.rs` still passes, and its count assertions (75
+top-level public items, 5 `pub use` re-exports) still hold. Only the
+`location` column was re-derived, by symbol, against the current source.
+
+- **Changed:** `crates/eggup-service/tests/public-api-surface.txt` — 19 location
+  references re-derived; the header's provenance paragraph corrected, which
+  still described milestones 012 and 013 as "uncommitted in the working tree"
+  and named only the M009-era baseline.
+- **Verified:** `cargo test -p eggup-service --locked --offline --test public_api_surface`
+  → 5 passed, 0 failed.
+- **Not run:** Linux, Windows — the snapshot is platform-neutral text and the
+  pinning test is compile-only; hosted qualification is the parent's F1.

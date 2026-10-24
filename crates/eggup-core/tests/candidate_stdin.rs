@@ -65,10 +65,15 @@ const SWEEP_DEADLINE: Duration = Duration::from_millis(120);
 ///
 /// The child's exit instant is the child's own start plus its lifetime, and
 /// the deadline is the spawn's return plus the timeout, so the child's exit
-/// crosses the deadline at a lifetime close to the timeout itself. The ladder
-/// walks across that crossing in two-millisecond steps, from well before it to
-/// just after it.
+/// crosses the deadline at a lifetime close to the timeout itself, less the
+/// helper's own startup. The ladder walks across that crossing in
+/// two-millisecond steps, from well before it to just after it, so the sweep
+/// covers both sides of the deadline on a machine whose helper starts
+/// promptly.
 const SWEEP_OFFSETS_MS: std::ops::RangeInclusive<i64> = -25..=1;
+
+/// The step, in milliseconds, between two ladder samples.
+const SWEEP_STEP_MS: i64 = 2;
 
 /// How long a fixture waits for a helper's start marker.
 ///
@@ -625,7 +630,11 @@ fn candidate_stdin_write_failure_at_or_after_the_deadline_is_not_an_error() {
 #[test]
 fn candidate_stdin_write_failure_classification_is_stable_across_the_deadline() {
     let mut samples_without_a_started_helper = 0usize;
-    for offset_ms in SWEEP_OFFSETS_MS {
+    let mut samples_with_a_pre_deadline_failure = 0usize;
+    let mut samples_with_a_post_deadline_failure = 0usize;
+    let mut samples_decided_at_the_deadline = 0usize;
+    let mut samples_taken = 0usize;
+    for offset_ms in SWEEP_OFFSETS_MS.step_by(SWEEP_STEP_MS as usize) {
         let lifetime_ms = (SWEEP_DEADLINE.as_millis() as i64 + offset_ms).max(0) as u64;
         let fixture = Fixture::new(&format!("sweep-{lifetime_ms}"));
         let payload = vec![b'x'; MAX_STDIN_BYTES];
@@ -634,6 +643,7 @@ fn candidate_stdin_write_failure_classification_is_stable_across_the_deadline() 
             .stdin_data(payload);
 
         let result = run_bounded_within(&spec, GENEROUS_BOUND);
+        samples_taken += 1;
 
         // The helper writes its start marker as its first act. A helper binary
         // can start after the sweep deadline on a loaded host, and the runner
@@ -654,6 +664,7 @@ fn candidate_stdin_write_failure_classification_is_stable_across_the_deadline() 
                 );
                 match result {
                     Err(Error::Io { operation, .. }) => {
+                        samples_with_a_pre_deadline_failure += 1;
                         assert_eq!(
                             operation, "writing bounded stdin",
                             "the operation string must classify the failure"
@@ -665,6 +676,7 @@ fn candidate_stdin_write_failure_classification_is_stable_across_the_deadline() 
                     }
                     Err(other) => panic!("the failure must be a typed I/O error: {other:?}"),
                     Ok(output) => {
+                        samples_with_a_post_deadline_failure += 1;
                         assert!(
                             !output.success(),
                             "an undelivered payload must never be reported as a success: {output:?}"
@@ -680,6 +692,7 @@ fn candidate_stdin_write_failure_classification_is_stable_across_the_deadline() 
             // never started at all. Either way the payload was not delivered
             // and the deadline decided the outcome.
             None => {
+                samples_decided_at_the_deadline += 1;
                 let output = result.expect(
                     "a helper that delivered no verdict cannot have produced a write failure",
                 );
@@ -694,13 +707,14 @@ fn candidate_stdin_write_failure_classification_is_stable_across_the_deadline() 
             }
         }
     }
-    if samples_without_a_started_helper > 0 {
-        eprintln!(
-            "note: {samples_without_a_started_helper} of {} sweep samples had a helper binary that \
-             did not start before the sweep deadline; those samples prove only the deadline outcome",
-            SWEEP_OFFSETS_MS.count()
-        );
-    }
+    eprintln!(
+        "note: the classification sweep took {samples_taken} samples: \
+         {samples_with_a_pre_deadline_failure} observed a write failure before the deadline, \
+         {samples_with_a_post_deadline_failure} observed one at or after the deadline, \
+         {samples_decided_at_the_deadline} were decided at the deadline, and \
+         {samples_without_a_started_helper} had a helper binary that did not start before the \
+         sweep deadline (those samples prove only the deadline outcome)."
+    );
 }
 
 /// Reads the lifetime instants the helper recorded, in microseconds since the

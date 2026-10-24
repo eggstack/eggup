@@ -111,7 +111,9 @@ each entry below.
   `SystemExecutor` (including its public `max_output_bytes` field),
   `ManagerCommandOutput`, and the `ServiceError` / `ManagerFailureKind`
   taxonomies all keep their exact shapes, and the public-API guard still
-  passes with its snapshot unmodified. **No new dependency, no manifest
+  passes with its snapshot's **public surface** unmodified. The snapshot's
+  per-item *locations* were re-anchored when M015 rewrote `src/lib.rs`; no
+  item was added, removed, or re-signed. **No new dependency, no manifest
   change, and no lockfile change.** This entry is **unpublished**: the
   published `eggup-service 0.1.3` keeps the hand-rolled runner until a
   separate republication milestone, and **no consumer migration is

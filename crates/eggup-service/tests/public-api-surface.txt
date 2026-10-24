@@ -1,10 +1,12 @@
 eggup-service — public API surface snapshot
 ============================================
 
-Milestone: service-lifecycle 014 (M014), work package WP3.
+Milestone: service-lifecycle 014 (M014), work package WP3. Locations
+re-anchored by service-lifecycle 016 (M016) after the M015 consolidation
+rewrote `crates/eggup-service/src/lib.rs`; the public surface itself did not
+change — no item was added, removed, or re-signed.
 Baseline reviewed: c4805411f74b85158e0ae5d0a219a32c4209d98e, plus the
-already-closed service milestones 012 and 013 that are uncommitted in the
-working tree.
+service milestones 012, 013, 014, and 015 that landed after it.
 
 WHAT THIS FILE IS
 -----------------
@@ -37,10 +39,12 @@ Enumeration command (R-B5)
         crates/eggup-service/src/*.rs | wc -l
 
 At the reviewed baseline this yields 68 top-level public items and 3 `pub use`
-re-exports (plan §3.5). In the working tree that carries the already-closed
-milestones 012 and 013, it yields 75 top-level public items and 5 `pub use`
+re-exports (plan §3.5). In the tree that carries the milestones closed since,
+it yields 75 top-level public items and 5 `pub use`
 re-exports. The guard covers *every* item that exists now; the counts differ
-from the plan's baseline figures only because 012 and 013 landed in between.
+from the plan's baseline figures only because 012, 013, 014, and 015 landed in
+between. The pinning test asserts both counts, so a new or removed public item
+fails the gate rather than silently drifting from this list.
 
 Update process (R-B7)
 ---------------------
@@ -103,25 +107,25 @@ TOP-LEVEL PUBLIC ITEMS
  43  struct  crates/eggup-service/src/lib.rs:921  pub struct ManagerCommandOutput {
  44  type    crates/eggup-service/src/lib.rs:953  pub type CommandOutput = ManagerCommandOutput;
  45  trait   crates/eggup-service/src/lib.rs:961  pub trait CommandExecutor: fmt::Debug
- 46  struct  crates/eggup-service/src/lib.rs:984  pub struct SystemExecutor {
- 47  struct  crates/eggup-service/src/lib.rs:1339  pub struct FakeCall {
- 48  struct  crates/eggup-service/src/lib.rs:1348  pub struct FakeExecutor {
- 49  fn      crates/eggup-service/src/lib.rs:1489  pub fn atomic_write_definition(path: &Path, bytes: &[u8], allow_overwrite: bool) -> Result<(), ServiceError>
- 50  enum    crates/eggup-service/src/lib.rs:1670  pub enum SystemdScope {
- 51  struct  crates/eggup-service/src/lib.rs:1688  pub struct SystemdInstall {
- 52  struct  crates/eggup-service/src/lib.rs:1768  pub struct SystemdManager<E: CommandExecutor = SystemExecutor> {
- 53  enum    crates/eggup-service/src/lib.rs:2606  pub enum LaunchdDomain {
- 54  struct  crates/eggup-service/src/lib.rs:2615  pub struct LaunchdInstall {
- 55  struct  crates/eggup-service/src/lib.rs:2716  pub struct LaunchdManager<E: CommandExecutor = SystemExecutor> {
- 56  type    crates/eggup-service/src/lib.rs:3231  pub type CronOwnership = Ownership;
- 57  fn      crates/eggup-service/src/lib.rs:3291  pub fn cron_classify(crontab: &str, marker: &str, desired: &str) -> CronOwnership
- 58  fn      crates/eggup-service/src/lib.rs:3331  pub fn cron_merge(crontab: &str, marker: &str, desired: &str) -> Result<(String, bool), ServiceError>
- 59  fn      crates/eggup-service/src/lib.rs:3386  pub fn cron_remove(crontab: &str, marker: &str, desired: &str) -> Result<(String, bool), ServiceError>
- 60  struct  crates/eggup-service/src/lib.rs:3438  pub struct CronManager<E: CommandExecutor = SystemExecutor> {
- 61  enum    crates/eggup-service/src/lib.rs:3737  pub enum CandidateManager {
- 62  struct  crates/eggup-service/src/lib.rs:3748  pub struct HostFacts {
- 63  fn      crates/eggup-service/src/lib.rs:3808  pub fn inspect_host(executor: &impl CommandExecutor) -> Result<HostFacts, ServiceError>
- 64  fn      crates/eggup-service/src/lib.rs:3871  pub fn candidate_managers(facts: &HostFacts) -> Vec<CandidateManager>
+ 46  struct  crates/eggup-service/src/lib.rs:989  pub struct SystemExecutor {
+ 47  struct  crates/eggup-service/src/lib.rs:1230  pub struct FakeCall {
+ 48  struct  crates/eggup-service/src/lib.rs:1239  pub struct FakeExecutor {
+ 49  fn      crates/eggup-service/src/lib.rs:1380  pub fn atomic_write_definition(path: &Path, bytes: &[u8], allow_overwrite: bool) -> Result<(), ServiceError>
+ 50  enum    crates/eggup-service/src/lib.rs:1561  pub enum SystemdScope {
+ 51  struct  crates/eggup-service/src/lib.rs:1579  pub struct SystemdInstall {
+ 52  struct  crates/eggup-service/src/lib.rs:1659  pub struct SystemdManager<E: CommandExecutor = SystemExecutor> {
+ 53  enum    crates/eggup-service/src/lib.rs:2497  pub enum LaunchdDomain {
+ 54  struct  crates/eggup-service/src/lib.rs:2506  pub struct LaunchdInstall {
+ 55  struct  crates/eggup-service/src/lib.rs:2607  pub struct LaunchdManager<E: CommandExecutor = SystemExecutor> {
+ 56  type    crates/eggup-service/src/lib.rs:3122  pub type CronOwnership = Ownership;
+ 57  fn      crates/eggup-service/src/lib.rs:3182  pub fn cron_classify(crontab: &str, marker: &str, desired: &str) -> CronOwnership
+ 58  fn      crates/eggup-service/src/lib.rs:3222  pub fn cron_merge(crontab: &str, marker: &str, desired: &str) -> Result<(String, bool), ServiceError>
+ 59  fn      crates/eggup-service/src/lib.rs:3277  pub fn cron_remove(crontab: &str, marker: &str, desired: &str) -> Result<(String, bool), ServiceError>
+ 60  struct  crates/eggup-service/src/lib.rs:3329  pub struct CronManager<E: CommandExecutor = SystemExecutor> {
+ 61  enum    crates/eggup-service/src/lib.rs:3628  pub enum CandidateManager {
+ 62  struct  crates/eggup-service/src/lib.rs:3639  pub struct HostFacts {
+ 63  fn      crates/eggup-service/src/lib.rs:3699  pub fn inspect_host(executor: &impl CommandExecutor) -> Result<HostFacts, ServiceError>
+ 64  fn      crates/eggup-service/src/lib.rs:3762  pub fn candidate_managers(facts: &HostFacts) -> Vec<CandidateManager>
  65  enum    crates/eggup-service/src/lifecycle_update.rs:18  pub enum LifecycleRestorationStatus {
  66  struct  crates/eggup-service/src/lifecycle_update.rs:29  pub struct LifecycleUpdatePolicy {
  67  struct  crates/eggup-service/src/lifecycle_update.rs:66  pub struct LifecycleUpdateReceipt {
