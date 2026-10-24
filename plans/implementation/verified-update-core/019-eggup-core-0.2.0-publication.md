@@ -208,13 +208,63 @@ Stop before the upload, and raise a corrective, when any of the following holds:
 - The publication source commit does not carry the `0.2.0` version bump, so the packaged crate would resolve to `0.1.3`.
 - Any registry-only fixture fails, or a fixture resolves `eggup-core` from a path, git, or patch source.
 - The packaged public API differs materially from the surface stated in §2 and §3 (G4) — in particular if the packaged build contains `Error::Injected`, still contains `FailureCategory::RetainedEvidence`, or lacks `CommandSpec::stdin_data` or `MAX_STDIN_BYTES`.
-- The hosted matrix is not green on the publication source commit.
+- The hosted matrix is not green on the publication source commit, **except for the train-order exception recorded in §9.1**.
 - `eggup-core 0.2.0` is already present on crates.io, whether published by this milestone, by a prior run, or by another actor.
 - The upload would require moving, deleting, or re-pointing an existing tag.
 - A dependency named by the package is not yet on the registry.
 - The package file list shows a `docs/` entry, or the package manifest carries a `git`, `path`, or `patch` dependency.
 - Any file under `crates/eggup-core/src/**` differs from the qualified baseline without a closed corrective of its own.
 - Publish authority for the `eggup-core` crate name cannot be confirmed.
+
+### 9.1 Train-order exception — the first crate of the train
+
+This milestone publishes the **first** crate of the 0.2.0 train, and that
+position creates a structural circularity that the stop condition above cannot
+resolve on its own. It is recorded here rather than left for a reader to
+discover.
+
+**The circularity.** The hosted lanes run
+`cargo package -p eggup-service --locked --no-verify`. That step resolves the
+packaged service crate's `eggup-core = "^0.2"` against **crates.io**, so it
+cannot succeed until `eggup-core 0.2.0` is on the registry. Publishing
+`eggup-core 0.2.0` requires a green matrix. A green matrix requires the
+publication. The condition is unsatisfiable as literally written, for the one
+crate whose publication discharges it.
+
+**What was observed.** On the publication source commit the hosted run recorded
+in the closure failed in exactly one step, in exactly four lanes, with the same
+error in each: `failed to select a version for the requirement
+`eggup-core = "^0.2"`` / `candidate versions found which didn't match: 0.1.3,
+0.1.2, 0.1.1, ...` / `location searched: crates.io index`. The fifth lane,
+which does not run the packaged-service step, was green. Every other step in
+every lane — the workspace build, the test suites, clippy, rustdoc, the MSRV
+check, the footprint configurations, the systemd fixtures — was green. The
+failure is a **publication state**, the same class the repository already
+recorded as finding 16, and it is discharged by this milestone's own upload.
+
+**What qualifies in place of a fully green matrix for this upload only.** All
+of the following must hold, and the closure record must carry the evidence:
+
+- The local gate is green in full: `cargo fmt --all -- --check`,
+  `cargo clippy --workspace --all-targets --all-features --locked -- -D
+  warnings`, `cargo test --workspace --all-targets --all-features --locked`,
+  `cargo doc --workspace --no-deps --locked`, the `1.89.0` check and test, and
+  `cargo package -p eggup-core --locked` plus
+  `cargo publish -p eggup-core --dry-run --locked`.
+- The hosted run on the publication source commit is green in **every** step
+  except the single registry-resolved packaged-service step, and the failing
+  step's error is the registry-selection error above. A failure in any other
+  step, or a different error in that step, stops the upload.
+- The packaged crate's own dependency surface resolves entirely against
+  versions already on the registry — `sha2`, plus `self-replace` on Windows —
+  so `eggup-core 0.2.0` is publishable on its own terms and does not depend
+  on another crate in the train.
+
+**What this exception does not authorise.** It does not authorise any other
+upload in the train. Every later crate in the train is published only after the
+full hosted matrix is green, which is possible only because this upload has
+already put `eggup-core 0.2.0` on the registry. Once it has, the
+packaged-service step resolves and the four lanes pass unchanged.
 
 After an accepted upload, registry state is immutable: a defect in the published `0.2.0` requires a **new patch version** (`0.2.1`), never an overwrite, a re-upload, or a yank-and-republish of `0.2.0`.
 
