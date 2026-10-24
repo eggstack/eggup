@@ -27,18 +27,16 @@ jobs:
       - run: cargo build -p eggup-transport-footprint --no-default-features --features eggfetch --locked
       - run: cargo build -p eggup-transport-footprint --no-default-features --features curl,eggfetch --locked
       - run: cargo doc --workspace --no-deps --locked
-      # The registry-resolved compile of the packaged service crate is
-      # DEFERRED, not weakened. The service source line now uses core's
-      # bounded-stdin capability (Core M017) and core's unconditional
-      # execution deadline (Core M014); neither is in the published
-      # `eggup-core 0.1.3`, so verifying the packaged crate against the
-      # registry cannot pass until the `eggup-core` republication cascade
-      # lands. That is a publication state, not a defect of this source
-      # line. This step still packages the crate and validates its manifest
-      # and file list; the compile of the packaged sources is covered by the
-      # workspace build, test, and clippy steps, which resolve `eggup-core`
-      # to the workspace path dependency.
-      - run: cargo package -p eggup-service --locked --no-verify
+      # The packaged service crate is verified against the REGISTRY, strictly:
+      # the packaged sources are compiled, not merely packaged. The earlier
+      # deferral is DISCHARGED. It was needed because the service source line
+      # uses core's bounded-stdin capability (Core M017) and core's
+      # unconditional execution deadline (Core M014), neither of which was in
+      # the published `eggup-core 0.1.3`, so the packaged crate's
+      # `eggup-core = "^0.2"` requirement had nothing to resolve against.
+      # `eggup-core 0.2.0` is now on the registry, so the requirement resolves
+      # and the strict verification passes. See registry finding 16.
+      - run: cargo package -p eggup-service --locked
 
   msrv:
     name: MSRV check
@@ -54,18 +52,16 @@ jobs:
       - run: cargo check -p eggup-transport-footprint --no-default-features --features curl --locked
       - run: cargo check -p eggup-transport-footprint --no-default-features --features eggfetch --locked
       - run: cargo check -p eggup-transport-footprint --no-default-features --features curl,eggfetch --locked
-      # The registry-resolved compile of the packaged service crate is
-      # DEFERRED, not weakened. The service source line now uses core's
-      # bounded-stdin capability (Core M017) and core's unconditional
-      # execution deadline (Core M014); neither is in the published
-      # `eggup-core 0.1.3`, so verifying the packaged crate against the
-      # registry cannot pass until the `eggup-core` republication cascade
-      # lands. That is a publication state, not a defect of this source
-      # line. This step still packages the crate and validates its manifest
-      # and file list; the compile of the packaged sources is covered by the
-      # workspace build, test, and clippy steps, which resolve `eggup-core`
-      # to the workspace path dependency.
-      - run: cargo package -p eggup-service --locked --no-verify
+      # The packaged service crate is verified against the REGISTRY, strictly:
+      # the packaged sources are compiled, not merely packaged. The earlier
+      # deferral is DISCHARGED. It was needed because the service source line
+      # uses core's bounded-stdin capability (Core M017) and core's
+      # unconditional execution deadline (Core M014), neither of which was in
+      # the published `eggup-core 0.1.3`, so the packaged crate's
+      # `eggup-core = "^0.2"` requirement had nothing to resolve against.
+      # `eggup-core 0.2.0` is now on the registry, so the requirement resolves
+      # and the strict verification passes. See registry finding 16.
+      - run: cargo package -p eggup-service --locked
 
   service-systemd:
     name: Linux systemd service qualification
@@ -100,18 +96,16 @@ jobs:
       # dual configuration is already built by the lane's --all-features step.
       - run: cargo build -p eggup-transport-footprint --no-default-features --features curl --locked
       - run: cargo build -p eggup-transport-footprint --no-default-features --features eggfetch --locked
-      # The registry-resolved compile of the packaged service crate is
-      # DEFERRED, not weakened. The service source line now uses core's
-      # bounded-stdin capability (Core M017) and core's unconditional
-      # execution deadline (Core M014); neither is in the published
-      # `eggup-core 0.1.3`, so verifying the packaged crate against the
-      # registry cannot pass until the `eggup-core` republication cascade
-      # lands. That is a publication state, not a defect of this source
-      # line. This step still packages the crate and validates its manifest
-      # and file list; the compile of the packaged sources is covered by the
-      # workspace build, test, and clippy steps, which resolve `eggup-core`
-      # to the workspace path dependency.
-      - run: cargo package -p eggup-service --locked --no-verify
+      # The packaged service crate is verified against the REGISTRY, strictly:
+      # the packaged sources are compiled, not merely packaged. The earlier
+      # deferral is DISCHARGED. It was needed because the service source line
+      # uses core's bounded-stdin capability (Core M017) and core's
+      # unconditional execution deadline (Core M014), neither of which was in
+      # the published `eggup-core 0.1.3`, so the packaged crate's
+      # `eggup-core = "^0.2"` requirement had nothing to resolve against.
+      # `eggup-core 0.2.0` is now on the registry, so the requirement resolves
+      # and the strict verification passes. See registry finding 16.
+      - run: cargo package -p eggup-service --locked
 
   windows-check:
     name: Windows archive, acquisition, and service tests and check
@@ -140,15 +134,13 @@ jobs:
       # --no-fail-fast: this lane is the only Windows test coverage, so a single
       # failing target must not hide the state of every other one.
       - run: cargo test --workspace --all-targets --locked --no-fail-fast
-      # The registry-resolved compile of the packaged service crate is
-      # DEFERRED, not weakened. The service source line now uses core's
-      # bounded-stdin capability (Core M017) and core's unconditional
-      # execution deadline (Core M014); neither is in the published
-      # `eggup-core 0.1.3`, so verifying the packaged crate against the
-      # registry cannot pass until the `eggup-core` republication cascade
-      # lands. That is a publication state, not a defect of this source
-      # line. This step still packages the crate and validates its manifest
-      # and file list; the compile of the packaged sources is covered by the
-      # workspace build, test, and clippy steps, which resolve `eggup-core`
-      # to the workspace path dependency.
-      - run: cargo package -p eggup-service --locked --no-verify
+      # The packaged service crate is verified against the REGISTRY, strictly:
+      # the packaged sources are compiled, not merely packaged. The earlier
+      # deferral is DISCHARGED. It was needed because the service source line
+      # uses core's bounded-stdin capability (Core M017) and core's
+      # unconditional execution deadline (Core M014), neither of which was in
+      # the published `eggup-core 0.1.3`, so the packaged crate's
+      # `eggup-core = "^0.2"` requirement had nothing to resolve against.
+      # `eggup-core 0.2.0` is now on the registry, so the requirement resolves
+      # and the strict verification passes. See registry finding 16.
+      - run: cargo package -p eggup-service --locked
