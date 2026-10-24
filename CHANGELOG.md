@@ -238,6 +238,15 @@ configuration coverage, and the architecture-anchor repair). The first of those
 two runs, `40061134915`, was red in four lanes and is the evidence behind the
 packaged-crate deferral recorded below.
 
+A read-only audit of that batch followed, and its findings are closed by five
+further milestones recorded below — acquisition M016, core M018, service M016,
+planning C014, and planning C015. CI run `40067964510` is green on all five
+lanes for those (stable 528 passed, msrv check-only, service-systemd 9 passed,
+macOS 528 passed, windows-check 650 passed). The run immediately before it,
+`40067739294`, was red in the `stable` lane on a transient `ETXTBSY` in a
+pre-existing core unit test — recorded as a re-observation of finding 1, and
+it did not reproduce in 25 consecutive local runs.
+
 Work published by the 0.1.3 train is recorded in the `0.1.3` section above,
 not here. Per-crate release notes live in `crates/*/CHANGELOG.md`; this
 section aggregates them, it does not replace them.

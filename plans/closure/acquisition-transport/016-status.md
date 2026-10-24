@@ -526,3 +526,36 @@ bytes, limit 481):
 ```markdown
 | M016 | conditionally closed 2026-10-24 | `plans/implementation/acquisition-transport/016-adapter-publication-coupling-corrective.md` | `plans/closure/acquisition-transport/016-status.md` | Records the seam's `0.2.0` publication coupling and corrects the false "non-breaking `0.1.3`" consequence in the adapters' changelogs. The seam's next release is source-breaking, so both adapters must widen `eggup-acquisition` to `0.2`, `eggup-eggpack` must re-pin to `=0.2.0`, and `eggup-transport-footprint` must widen to `0.2`; the workspace is version-lockstep, so the adapters' next versions are `0.2.0`, not `0.1.3`, and a consumer of the seam inherits the source break. A guard reads the declared next release and every dependent's requirement and fails when a dependent neither accepts it nor records the widening. No manifest, version, or publication; the adapters still cannot be packaged, and the publication milestone owns that |
 ```
+
+## Parent-session verification addendum (2026-10-24, hosted qualification)
+
+This milestone is hosted-qualified. CI run `40067964510` (commit `a431aaa`) is
+**green on all five lanes**. The per-platform results are reported separately,
+and a lane that runs no test says so rather than inferring a result:
+
+| Lane | Runner | Result |
+|---|---|---|
+| `stable` | ubuntu | **pass** — 528 passed, 0 failed |
+| `msrv` | ubuntu, pinned `1.89.0` | **pass** — `cargo check` only; the lane runs no test by design |
+| `service-systemd` | ubuntu, privileged | **pass** — 9 passed, 0 failed |
+| `macos` | macos-latest | **pass** — 528 passed, 0 failed |
+| `windows-check` | windows-latest | **pass** — 650 passed, 0 failed |
+| local gate | this machine (macOS, arm64) | **pass** — `./scripts/check-local.sh` exit 0; 528 passed, 0 failed |
+
+**The earlier hosted run of this branch was red, and the evidence is recorded
+here rather than dropped.** Run `40067739294` (commit `3d91ab1`) failed the
+`stable` lane: the core crate's pre-existing unit test
+`bounded_candidates_are_exact_and_environment_is_cleared` failed with
+`Io { operation: "spawning bounded candidate", source: Os { code: 26, kind:
+ExecutableFileBusy, message: "Text file busy" } }`. That test existed at
+baseline `c480541` and this branch did not modify it; the failure is an
+`ETXTBSY` on the script the fixture had just written, which the kernel raises
+while the file is momentarily open for writing. It did not reproduce in 25
+consecutive local runs of `cargo test -p eggup-core --lib`, and the very next
+hosted run was green on all five lanes. It is recorded as a re-observation of
+registry finding **1** — the load-sensitive-test class — which is low severity
+and blocks nothing.
+
+**Windows and Linux evidence for the new fixtures in this milestone is native,
+not compile-only**: the `windows-check` lane executes the workspace test
+targets directly, and the `stable` and `macos` lanes run the same suite.

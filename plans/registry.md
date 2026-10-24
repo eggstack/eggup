@@ -159,6 +159,22 @@ against the registry. Finding 17 was registered by Acquisition M016.
    intermittent spawn failure under host resource pressure can still occur.
    Acquisition M012 is **conditionally closed** on exactly that re-observation,
    and this finding stays open.
+   **Re-observed 2026-10-24 on the hosted Ubuntu lane in run `40067739294`**, in
+   a different crate and with an attributable cause: the core crate's
+   pre-existing unit test `bounded_candidates_are_exact_and_environment_is_cleared`
+   failed with `Io { operation: "spawning bounded candidate", source: Os {
+   code: 26, kind: ExecutableFileBusy, message: "Text file busy" } }` — an
+   `ETXTBSY` on the script the fixture had just written. The test existed at
+   baseline `c480541` and the branch did not modify it; the branch's added core
+   test load made the race easier to reach. It did not reproduce in 25
+   consecutive local runs of `cargo test -p eggup-core --lib`, and the next
+   hosted run, `40067964510`, was **green on all five lanes**. This is the same
+   class as the two modes already recorded here — a load-sensitive test whose
+   host-level cause is not the crate's semantics — and it is recorded here
+   rather than registered separately, so that the class stays in one place.
+   `ETXTBSY` is transient by construction: the kernel refuses to execute a file
+   that is momentarily open for writing, which is what a host package
+   replacement does to the interpreter a `#!/bin/sh` script names.
 2. **`CleanupDisposition::DeferredToProcessExit` is a source-visible addition to
    a closed enum.** Required by M010 for truthful Windows self-update reporting;
    no truthful value exists in the `0.1.2` two-variant set, and marking the enum
@@ -759,6 +775,20 @@ architecture-anchor repair — qualified by CI run `40062299630`, also green on
 all five lanes, with the local gate now passing 518 tests with 0 failures. None
 of them publishes, and none moves a tag; the published
 crates still carry every defect they carry today.
+- **Fourth implementation pass (2026-10-24, same branch): a read-only audit of
+  the whole batch registered three release-blocking items and a set of
+  documentation claims that contradicted the branch's own work, and all of them
+  are now closed by five more milestones** — acquisition M016 (the seam's
+  `0.2.0` publication coupling), core M018 (the bounded-stdin outcome
+  priority), service M016 (the published-change release note), planning C014
+  (the documentation-truth gate), and planning C015 (the architecture anchor
+  and claim corrective). CI run `40067964510` is green on **all five** lanes
+  (stable 528 passed, msrv check-only, service-systemd 9 passed, macOS 528
+  passed, windows-check 650 passed), and the local gate exits 0 with **528**
+  tests passing and 0 failures. The immediately preceding run `40067739294`
+  was **red in the `stable` lane** on a transient `ETXTBSY` in a pre-existing
+  core unit test; it is recorded as a re-observation of finding **1** and did
+  not reproduce. None of this publishes, and no tag moved.
 
 What is **not** done. **Acquisition M012 is conditionally closed, not
 closed**: the hosted Stable lane re-observed registry finding 1 in the same
