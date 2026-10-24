@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.2.0 — 2026-10-23, in progress
+## 0.2.0 — 2026-10-24, completed 2026-10-24
 
-The 0.2.0 source version is being published to crates.io as one lockstep train.
+The 0.2.0 source version was published to crates.io as one lockstep train.
 `version.workspace = true` makes every crate in the tree claim the same
 version, and `eggup-acquisition`'s next release is source-breaking —
 `AcquisitionError::Io(String)` became `Io { operation, source }`, and because
@@ -10,11 +10,12 @@ version, and `eggup-acquisition`'s next release is source-breaking —
 derives `Debug` only — so the seam's version had to advance to `0.2.0` and the
 lockstep workspace carried every crate with it.
 
-The crates publish in dependency order, because `cargo package` resolves a
+The crates published in dependency order, because `cargo package` resolves a
 dependency from the registry rather than from the in-tree path dependency:
 `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-curl`,
-`eggup-eggfetch`, `eggup-service`, `eggup-eggpack`. All seven publish from one
-shared source commit, so the `v0.2.0` tag points at that commit.
+`eggup-eggfetch`, `eggup-service`, `eggup-eggpack`. All seven published from
+one shared source commit, `b612608`, so the `v0.2.0` tag points at that
+commit.
 
 The published `0.1.x` versions are not replaced or withdrawn. `eggup-curl` is on
 crates.io through `0.1.2` and the other six through `0.1.3`; `eggup-curl` never
@@ -26,7 +27,7 @@ claims are made by any of these crates. Per-crate release notes live in
 them, and the milestone-by-milestone detail of this release is in the five
 publication closure records under `plans/closure/`.
 
-- `eggup-core 0.2.0` (published 2026-10-23, Verified Update Core M019): the
+- `eggup-core 0.2.0` (published 2026-10-24, Verified Update Core M019): the
   `Error` enum keeps exactly the seven variants `0.1.3` published, so an
   exhaustive `match` on it compiles unchanged, and `FailureCategory` stays
   `#[non_exhaustive]`. Four corrections ship together. **Fixed:** `run_bounded`
@@ -55,7 +56,7 @@ publication closure records under `plans/closure/`.
   of the required work. The dependency surface remains `sha2` plus a
   **Windows-only** `self-replace`, so the Unix/macOS graph is unchanged.
 
-- `eggup-archive 0.2.0` (published 2026-10-23, Archive Extraction M006): no
+- `eggup-archive 0.2.0` (published 2026-10-24, Archive Extraction M006): no
   public API change and no new dependency. The `cleanup()` success path is now
   reachable — the four entry points documented that they "remove" the
   extraction directory, but the shared implementation emptied the owned tree
@@ -72,7 +73,7 @@ publication closure records under `plans/closure/`.
   call. The tar.gz and zip member-write bodies are now one shared helper,
   behaviour-preserving.
 
-- `eggup-acquisition 0.2.0` (published 2026-10-23, Acquisition Transport M017):
+- `eggup-acquisition 0.2.0` (published 2026-10-24, Acquisition Transport M017):
   **source-breaking**, and in exactly two ways. `AcquisitionError::Io(String)`
   became `AcquisitionError::Io { operation, source }` with a live `source()`
   chain, so a consumer that matched `AcquisitionError::Io(_)` must match the
@@ -83,7 +84,7 @@ publication closure records under `plans/closure/`.
   and is truncated only at a UTF-8 character boundary, `Io` stays terminal under
   every `CompositionPolicy`, and the crate keeps **zero** `[dependencies]`.
 
-- `eggup-curl 0.2.0` (published 2026-10-23, Acquisition Transport M017): no
+- `eggup-curl 0.2.0` (published 2026-10-24, Acquisition Transport M017): no
   source-breaking change of its own, but it is **transitively source-breaking**
   because it depends on `eggup-acquisition ^0.2` and the seam's `0.2.0` is
   source-breaking — the break is inherited from the seam, not introduced here,
@@ -100,7 +101,7 @@ publication closure records under `plans/closure/`.
   change. The transport semantics qualified under Acquisition M005-M008 were
   published at `0.1.2` and are unchanged in substance.
 
-- `eggup-eggfetch 0.2.0` (published 2026-10-23, Acquisition Transport M017): no
+- `eggup-eggfetch 0.2.0` (published 2026-10-24, Acquisition Transport M017): no
   source-breaking change of its own, but it is **transitively source-breaking**
   through the same seam requirement. Its own public API is unchanged and
   `EggfetchTransport` remains shareable across threads. No new runtime or API
@@ -110,7 +111,7 @@ publication closure records under `plans/closure/`.
   `TooLarge` reporting the enforced bound instead of `0` — was published at
   `0.1.3` and is unchanged in substance.
 
-- `eggup-service 0.2.0` (published 2026-10-23, Service Lifecycle M017): the
+- `eggup-service 0.2.0` (published 2026-10-24, Service Lifecycle M017): the
   first publication that carries the fix for the stdin-verdict defect the
   published `0.1.3` still has — the crate's bounded executor consumed the
   stdin writer's verdict with `try_recv`, discarding a successful write and
@@ -141,7 +142,7 @@ publication closure records under `plans/closure/`.
   `eggup-core 0.1.3` has neither `CommandSpec::stdin_data` nor core's
   unconditional execution deadline and cannot compile this release.
 
-- `eggup-eggpack 0.2.0` (published 2026-10-23, Eggpack Manifest Interoperability
+- `eggup-eggpack 0.2.0` (published 2026-10-24, Eggpack Manifest Interoperability
   M007): its three exact pins move from `=0.1.3` to `=0.2.0`, which is the
   mechanism by which the seam's `0.2.0` and this release's fixes reach adapter
   consumers at all. The adapter delegates to `eggup_core::hash_file` instead of

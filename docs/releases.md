@@ -127,7 +127,7 @@ Eggup is pre-1.0, so a minor bump can break you. Before upgrading:
 
 ### Upgrading to `0.2.0`
 
-`0.2.0` is source-breaking in three places. Nothing else in the line is.
+`0.2.0` is source-breaking in four places. Nothing else in the line is.
 
 - **`eggup-acquisition`: `AcquisitionError::Io(String)` became
   `AcquisitionError::Io { operation, source }`.** Match the struct-shaped
@@ -145,6 +145,15 @@ Eggup is pre-1.0, so a minor bump can break you. Before upgrading:
   constructs it with a **struct literal** must add the field and stops
   compiling until it does. A consumer that only reads the receipt's fields is
   unaffected.
+- **`eggup-core`: `FailureCategory::RetainedEvidence` was removed.** The
+  published `eggup-core 0.1.3` carries that variant; `0.2.0` does not — the
+  seven remaining categories are `LockContention`, `OwnershipConflict`,
+  `Verification`, `Filesystem`, `InvalidInput`, `Injected`, and
+  `PostCommitCheck`. `FailureCategory` is `#[non_exhaustive]`, so a wildcard
+  arm still compiles, but a consumer that names
+  `FailureCategory::RetainedEvidence` explicitly — a match arm, an equality
+  assertion, or an `as_str()` call — stops compiling against `0.2.0`. Deleting
+  the name reference is the whole of the required work.
 
 Two behavioural changes are worth reading about even though they do not stop
 you compiling:
@@ -158,11 +167,12 @@ you compiling:
   that wrote `cleanup().unwrap_err()` will panic and must match on the result
   instead; capture the residual path from `root()` before the consuming call.
 
-`eggup-core` is additive at `0.2.0`: `Error` keeps exactly the same seven
-variants, so an exhaustive `match` on it compiles unchanged. `MAX_STDIN_BYTES`
-and `CommandSpec::stdin_data` are added, and `run_bounded`'s outcome
-classification changed — the deadline now has priority over the stdin writer's
-verdict.
+`eggup-core`'s `Error` enum is unchanged at `0.2.0`: it keeps exactly the same
+seven variants, so an exhaustive `match` on it compiles unchanged.
+`MAX_STDIN_BYTES` and `CommandSpec::stdin_data` are added, and `run_bounded`'s
+outcome classification changed — the deadline now has priority over the stdin
+writer's verdict. The one removal in the crate is
+`FailureCategory::RetainedEvidence`, listed above as the fourth source break.
 
 A note on the `Error` enum specifically: it is **not**
 `#[non_exhaustive]`, so adding a variant is a breaking change for an exhaustive

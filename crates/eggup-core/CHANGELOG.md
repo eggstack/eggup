@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — 2026-10-23
+## 0.2.0 — 2026-10-24
 
 Published to crates.io (`plans/closure/verified-update-core/019-status.md`) as
 the first crate of the lockstep 0.2.0 train: `eggup-archive`,

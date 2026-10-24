@@ -57,15 +57,16 @@ to stay correct.
 Each has occurred at least once — check for them explicitly:
 
 1. **CI lane understatement.** Windows runs ten `cargo test` steps
-   (`ci.yml:122-142`) plus the packaged-service step, whose registry-resolved
-   compile is deferred. There is also a privileged Linux `service-systemd`
-   lane. Count commands, not bullets: three named `eggup-service` diagnostic
-   tests are three steps. The MSRV lane runs a workspace check and the
-   packaged-service step; it does not run tests, and that step's
-   registry-resolved compile is deferred too.
-2. **Publication status.** `eggup-service 0.1.3` is published (2026-10-09);
-   `eggup-curl` is published only at `0.1.2`. Check crates.io rather than
-   inferring from a `publish = false` key or a plan.
+   (`ci.yml:116-136`) plus the packaged-service step, whose registry-resolved
+   compile is **strict** — the packaged sources are compiled against the
+   registry copy of `eggup-core 0.2.0`. There is also a privileged Linux
+   `service-systemd` lane. Count commands, not bullets: three named
+   `eggup-service` diagnostic tests are three steps. The MSRV lane runs a
+   workspace check and the packaged-service step; it does not run tests, and
+   that step's registry-resolved compile is strict too.
+2. **Publication status.** All seven publishable crates are published at
+   `0.2.0` (2026-10-24); `eggup-transport-footprint` is not published at all.
+   Check crates.io rather than inferring from a `publish = false` key or a plan.
 3. **Enum tables lagging the source.** `architecture/core-transaction.md` once
    described a whole earlier generation of `eggup-core`'s enums. When a variant
    is added, renamed, or removed, update every table that lists variants.
@@ -86,7 +87,7 @@ Each has occurred at least once — check for them explicitly:
    arity silently drops cells. Check column counts.
 9. **Counting steps, not bullets.** A CI lane that runs three separately-named
    tests is three steps, not one. `windows-check` is ten `cargo test` steps
-   (`ci.yml:122-142`): one combined three-crate run, eggpack, three named
+   (`ci.yml:116-136`): one combined three-crate run, eggpack, three named
    service tests, SCM, the live SCM fixture, two Core integration fixtures, and
    the full workspace run. It then packages the service crate. Count the
    `- run:` lines.

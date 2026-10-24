@@ -1,13 +1,18 @@
 # curl Adapter Deep Dive (`crates/eggup-curl`)
 
-> Source: `crates/eggup-curl/src/lib.rs` (2523 lines, single file, 34 `#[test]`
+> Source: `crates/eggup-curl/src/lib.rs` (2532 lines, single file, 34 `#[test]`
 > functions), `examples/curl_fetch.rs`, `README.md`, `CHANGELOG.md`, `Cargo.toml`.
 > Dependency position: `eggup-curl -> eggup-acquisition` **only** — no HTTP client,
 > no TLS stack, no `tokio`, no `eggup-core`
-> (`Cargo.toml:23-24`). Published to crates.io at `0.1.2` with the requirement
-> `eggup-acquisition = { version = "0.1.0", path = "../eggup-acquisition" }`;
-> the caret was deliberately **not** tightened to `=0.1.2`
-> (`plans/closure/acquisition-transport/009-status.md`, "Metadata decision").
+> (`Cargo.toml:23-24`). Published to crates.io at `0.2.0` with the requirement
+> `eggup-acquisition = { version = "0.2", path = "../eggup-acquisition" }`;
+> the caret remains deliberately **not** tightened to an exact pin
+> (`plans/closure/acquisition-transport/009-status.md`, "Metadata decision"), so
+> the adapter inherits a seam fix on the next resolve. The `0.1.0` caret became
+> `0.2` in the `0.2.0` publication train (Acquisition Transport M017): the
+> seam's `0.2.0` is source-breaking, so a caret left at `^0.1.0` would let a
+> consumer's lockfile resolve a seam the `0.2.0` adapter cannot compile
+> against.
 > Crate attributes: `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`
 > (`lib.rs:1-2`).
 
@@ -908,9 +913,13 @@ struct literal, and marking it `#[non_exhaustive]` would itself be
 source-breaking. `CurlTransport`'s fields are private and its only
 construction path is a constructor, so a private field is **not**
 source-breaking. The consequence for a consumer of the published
-`eggup-curl 0.1.2` is therefore **none**: the change is purely additive, and a
-future republication would be a non-breaking `0.1.3`. **No republication is
-performed by M014.**
+`eggup-curl 0.1.2` was therefore **none**: the change was purely additive, and
+a republication would have been a non-breaking `0.1.3`. M014 performed no
+republication. The republication that did happen was the `0.2.0` train
+(Acquisition Transport M017), and it is `0.2.0` rather than `0.1.3` because the
+seam's own `0.2.0` is source-breaking and the workspace is version-lockstep:
+the adapter inherits that break transitively. The User-Agent control itself
+remains additive and source-compatible within `0.2.0`.
 
 **The default does not change.** By default the adapter emits **no**
 `--user-agent` element, so `curl` applies its own default and the bytes a
@@ -919,7 +928,7 @@ consumer of the published crate sends are unchanged. Defaulting to
 every existing consumer for no concrete benefit.
 
 **Parity is capability parity, not placement parity.** The two controls live
-in different types — `EggfetchConfig` (published `0.1.3`, whose `user_agent` is
+in different types — `EggfetchConfig` (published `0.2.0`, whose `user_agent` is
 a public field and cannot be moved without a source break) versus
 `CurlTransport` (private field, additive). Each adapter keeps the placement
 its own publication history allows, and neither may be changed to match the

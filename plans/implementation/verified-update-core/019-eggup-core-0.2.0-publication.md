@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 019 — eggup-core 0.2.0 publication
 
-Status: ready for handoff
+Status: closed 2026-10-24; `eggup-core 0.2.0` published from `b612608` (run `40079833945` green on all five lanes); closure record: `plans/closure/verified-update-core/019-status.md`
 
 Repository baseline: `b75f73b`
 

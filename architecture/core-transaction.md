@@ -1,8 +1,9 @@
 # `eggup-core` — Verified Update Transaction Deep Dive
 
-Status: current as of `eggup-core` 0.1.3 (published to crates.io).
+Status: current as of `eggup-core` 0.2.0 (published to crates.io).
 The failure-taxonomy and public-failure-mode material reflects Verified Update Core
-M015, which is an unpublished source change; `0.1.3` remains the published baseline.
+M015, and the bounded-stdin and deadline-priority material reflects Core M017 and
+Core M018; all of it is published in `0.2.0`, which is the published baseline.
 
 This is a review reference. Every behavioral claim below is grounded in source, and
 `file:line` references are relative to the workspace root. Where code and crate
@@ -52,7 +53,7 @@ eggup-acquisition ──▶ eggup-eggfetch        (transport adapters, no core d
         └──────────▶ eggup-curl
 
 eggup-core (sha2 only)
-   ├──▶ eggup-service      (manager-neutral lifecycle; published, lagging)
+   ├──▶ eggup-service      (manager-neutral lifecycle; published)
    ├──▶ eggup-archive      (dev-dependency only, for qualification tests)
    └──▶ eggup-eggpack      (published leaf adapter; producer types live there)
 ```
@@ -976,4 +977,22 @@ Planning and closure:
 - [008](../plans/closure/verified-update-core/008-status.md) core/archive consumer
   package qualification
 - [009](../plans/closure/verified-update-core/009-status.md) core/archive 0.1.2
+  publication
+- [010](../plans/closure/verified-update-core/010-status.md) current-executable
+  transaction parity corrective
+- [011](../plans/closure/verified-update-core/011-status.md) proof-authorized
+  stale-lock recovery
+- [012](../plans/closure/verified-update-core/012-status.md) 0.1.x public-error
+  compatibility corrective
+- [013](../plans/closure/verified-update-core/013-status.md) core 0.1.3
+  publication
+- [014](../plans/closure/verified-update-core/014-status.md) bounded execution
+  deadline corrective
+- [015](../plans/closure/verified-update-core/015-status.md) public-API contract
+  truthfulness corrective
+- [017](../plans/closure/verified-update-core/017-status.md) bounded stdin
+  execution corrective
+- [018](../plans/closure/verified-update-core/018-status.md) bounded stdin outcome
+  priority corrective
+- [019](../plans/closure/verified-update-core/019-status.md) core 0.2.0
   publication

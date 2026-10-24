@@ -466,7 +466,7 @@ here as well as in [acquisition.md](acquisition.md) §11.1.
   makes. The finding is closed at the capability level.
 - **Parity is capability parity, not placement parity.** This adapter's control
   lives in `EggfetchConfig`, whose `user_agent` is a public field of a public,
-  non-`#[non_exhaustive]` struct in a crate published at `0.1.3`; moving it
+  non-`#[non_exhaustive]` struct in a crate published at `0.2.0`; moving it
   would be a source break for published consumers, so it stays where it is.
   The curl adapter's control lives on `CurlTransport` because `CurlConfig`'s
   fields are public and **not** `#[non_exhaustive]`, so adding a field there

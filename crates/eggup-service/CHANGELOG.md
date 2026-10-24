@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — 2026-10-23
+## 0.2.0 — 2026-10-24
 
 Published to crates.io (`plans/closure/service-lifecycle/017-status.md`) as part
 of the lockstep `0.2.0` train of the seven publishable crates, from one shared

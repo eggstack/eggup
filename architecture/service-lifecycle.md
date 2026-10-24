@@ -69,20 +69,23 @@ eggup-service   ->  windows-args (=0.2.0)
                   ->  windows-service (=0.8.1)   [cfg(windows) only]
 ```
 
-- `Cargo.toml`: `eggup-core = { version = "0.1.0", path = "../eggup-core" }`,
+- `Cargo.toml`: `eggup-core = { version = "0.2", path = "../eggup-core" }`,
   `windows-args = "=0.2.0"`, and a `cfg(windows)`-gated `windows-service = "=0.8.1"`.
 - `windows-service` is the safe wrapper around the SCM handle; it is a
   **Windows-target dependency**, so the Linux/macOS build never links it.
 - `windows-args` is cross-platform and is used for the SCM command-line parser,
   so the ownership tests in `windows_scm.rs` run on every host.
 - **The crate is current with the workspace.** It is on crates.io at
-  `0.1.0`, `0.1.1`, `0.1.2`, and `0.1.3`; the `0.1.2` service publication came
+  `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3`, and `0.2.0`; the `0.1.2` service publication came
   from `7fb84bc`, after the shared `v0.1.2` tag, which remains the core/archive
   source tag. Service M011 published the `0.1.3` owned failed-systemd
   quiescence correction from source `feb6ae5`; its exact checksum and registry
-  qualification are in the M011 closure.
+  qualification are in the M011 closure. Service M017 published `0.2.0` from
+  the train's shared source commit `b612608` — the first publication that
+  carries the stdin-verdict fix the published `0.1.3` lacks; its checksum and
+  registry qualification are in the M017 closure record.
   `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
-  `eggup-eggpack`, and `eggup-curl` are also published at `0.1.2` or later.
+  `eggup-eggpack`, and `eggup-curl` are also published at `0.2.0`.
   `eggup-transport-footprint` is `publish = false`
   ([registry.md](../plans/registry.md)).
 - Dependency order position: 5th deepest in
@@ -1266,7 +1269,7 @@ The integration test targets under `crates/eggup-service/tests/`:
 
 The three tests CI runs individually on Windows are pinned because they assert
 UTF-8 boundary behavior that a differently-configured default run would not
-exercise (`.github/workflows/ci.yml:124-126`):
+exercise (`.github/workflows/ci.yml:118-120`):
 
 ```sh
 cargo test -p eggup-service --lib diagnostic_byte_bounds_preserve_utf8_at_256_and_512_edges --locked
@@ -1304,7 +1307,7 @@ The full gate is `./scripts/check-local.sh`; see
 ## Known doc/code drift
 
 - **Three UTF-8 boundary tests, not two.** CI runs three individually
-  (`ci.yml:124-126`) — the third, `lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free`,
+  (`ci.yml:118-120`) — the third, `lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free`,
   lives in `lifecycle_update.rs` rather than `lib.rs`. Two are in `lib.rs`.
 - **`ServiceId` length is bytes, not characters.** `lib.rs:52` uses
   `value.len() > 256`, which is a UTF-8 byte count. A 200-character non-ASCII

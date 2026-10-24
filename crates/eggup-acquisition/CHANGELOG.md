@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — 2026-10-23
+## 0.2.0 — 2026-10-24
 
 Published to crates.io from the workspace `0.2.0` source version
 (`plans/closure/acquisition-transport/017-status.md`). The crate has **zero

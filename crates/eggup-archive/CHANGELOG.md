@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — 2026-10-23
+## 0.2.0 — 2026-10-24
 
 Published to crates.io (`plans/closure/archive-extraction/006-status.md`).
 Dependency surface at publication: `flate2`, `fs_at`, `sha2`, `tar`, and `zip`.

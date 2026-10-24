@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — 2026-10-23
+## 0.2.0 — 2026-10-24
 
 Published to crates.io (`plans/closure/eggpack-manifest-interoperability/007-status.md`).
 Published **last** in the workspace's lockstep `0.2.0` train, because this

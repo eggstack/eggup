@@ -19,7 +19,9 @@ Do not publish because code changed. Publication requires its own plan under
 Precedent: Verified Core M009 (`eggup-core` → `eggup-archive` 0.1.2),
 Eggpack Interop M004 (`eggup-acquisition` → `eggup-eggfetch` → `eggup-eggpack`
 0.1.2), Acquisition M009 (`eggup-curl` 0.1.2), Acquisition M010
-(`eggup-acquisition` 0.1.3, published 2026-10-06).
+(`eggup-acquisition` 0.1.3, published 2026-10-06), and the `0.2.0` lockstep
+train (published 2026-10-24 from one source commit `b612608`: all seven
+publishable crates, in seam → adapter → leaf order).
 
 ## Order matters: publish dependencies first
 
@@ -29,7 +31,7 @@ to ship in seam → adapter → leaf order.
 
 ## The exact-pin cascade
 
-`eggup-eggpack` pins its Eggup dependencies exactly (`=0.1.3`). Every other
+`eggup-eggpack` pins its Eggup dependencies exactly (`=0.2.0`). Every other
 crate uses a caret requirement. Consequence:
 
 - A fix published to a caret consumer (`eggup-curl`, `eggup-eggfetch`,
@@ -39,7 +41,7 @@ crate uses a caret requirement. Consequence:
   both the seam and an adapter inherits the seam's source break only after the
   adapter's own requirement is widened. Widening a requirement is a manifest
   change that belongs to the publication milestone, not to the fix milestone.
-- The same fix **cannot** reach `eggup-eggpack 0.1.3` consumers. The adapter
+- The same fix **cannot** reach `eggup-eggpack 0.2.0` consumers. The adapter
   needs a **separate republication** to inherit a seam fix.
 
 So a single seam fix can become a two-publication event. Name that follow-on
@@ -48,13 +50,14 @@ explicitly in the plan and in the registry, or it will be discovered late.
 ## Never
 
 - Do not re-publish a version that already exists on crates.io. A fix needs a new
-  version (`0.1.3` → `0.1.4`).
-- Do not move `v0.1.1` / `v0.1.2` / `v0.1.3` tags. Extend release notes instead.
+  version (`0.1.3` → `0.1.4`, or `0.2.0` → `0.2.1`).
+- Do not move `v0.1.1` / `v0.1.2` / `v0.1.3` / `v0.2.0` tags. Extend release
+  notes instead.
 - Do not publish `eggup-transport-footprint` — it is `publish = false`.
 - Do not publish `eggup-service` without explicit maintainer authorization for
-  the next service milestone. It is published through `0.1.3` (M011, published
-  2026-10-09); the unpublished work sits in the crate's `Unreleased` section and
-  needs a publication milestone of its own.
+  the next service milestone. It is published through `0.2.0` (Service M017,
+  published 2026-10-24); unpublished work sits in the crate's `Unreleased`
+  section and needs a publication milestone of its own.
 - Do not add release CI. Manual publication is a recorded decision.
 
 ## Qualification before publishing

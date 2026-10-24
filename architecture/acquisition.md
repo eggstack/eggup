@@ -44,15 +44,19 @@ Crates that depend on it:
 
 | Dependent | Declared requirement | How it uses the seam |
 |---|---|---|
-| `eggup-eggfetch` | `0.1.0` (caret) + path | native HTTP adapter; implements `AcquisitionTransport` |
-| `eggup-curl` | `0.1.0` (caret) + path | external-process adapter; implements `AcquisitionTransport` |
-| `eggup-eggpack` | `=0.1.3` exact pin + path | `use eggup_acquisition::{AcquisitionRequest, FetchLimits}` only (`eggup-eggpack/src/lib.rs:6`) — binds requests, never transports |
-| `eggup-transport-footprint` | `0.1.0` (caret) + path | `curl_only.rs` / `eggfetch_only.rs` use `AcquisitionRequest` + `FetchLimits`; `dual.rs` uses `ComposedTransport` + `CompositionPolicy` |
+| `eggup-eggfetch` | `0.2` (caret) + path | native HTTP adapter; implements `AcquisitionTransport` |
+| `eggup-curl` | `0.2` (caret) + path | external-process adapter; implements `AcquisitionTransport` |
+| `eggup-eggpack` | `=0.2.0` exact pin + path | `use eggup_acquisition::{AcquisitionRequest, FetchLimits}` only (`eggup-eggpack/src/lib.rs:6`) — binds requests, never transports |
+| `eggup-transport-footprint` | `0.2` (caret) + path | `curl_only.rs` / `eggfetch_only.rs` use `AcquisitionRequest` + `FetchLimits`; `dual.rs` uses `ComposedTransport` + `CompositionPolicy` |
 
 The caret/exact-pin split is deliberate: adapters inherit a seam fix on the next
 resolve, `eggup-eggpack` does not
 ([acquisition-transport-roadmap.md](../plans/subsystems/acquisition-transport-roadmap.md#m010--eggup-acquisition-013-publication),
-M010).
+M010). The `0.1.0` caret became `0.2` in the `0.2.0` publication train
+(Acquisition Transport M017): the seam's `0.2.0` is source-breaking
+(`AcquisitionError::Io { operation, source }`, and the enum derives `Debug`
+only), so a caret left at `^0.1.0` would let a consumer's lockfile resolve the
+`0.1.x` seam, which the `0.2.0` adapters cannot compile against.
 
 See [overview.md](overview.md) for the full graph, the two orthogonal axes (data flow
 vs the verification ladder), and the cross-cutting invariant table this crate
@@ -577,7 +581,7 @@ makes:
 
 | Adapter | User-agent surface | Default | Placement |
 |---|---|---|---|
-| `eggup-eggfetch` | Caller-settable: `EggfetchConfig::user_agent` (`eggfetch/src/lib.rs:52-87`) | `DEFAULT_USER_AGENT` (`eggup-eggfetch`) | `EggfetchConfig` (published `0.1.3`) |
+| `eggup-eggfetch` | Caller-settable: `EggfetchConfig::user_agent` (`eggfetch/src/lib.rs:52-87`) | `DEFAULT_USER_AGENT` (`eggup-eggfetch`) | `EggfetchConfig` (published `0.2.0`) |
 | `eggup-curl` | Caller-settable: `CurlTransport::with_executable_and_user_agent` (`curl/src/lib.rs:238-257`) | **none sent**; curl's own default applies | `CurlTransport` (private field, `curl/src/lib.rs:174-179`) |
 
 **Parity means capability parity, not placement parity.** Both adapters let a
@@ -585,7 +589,7 @@ caller set a `User-Agent`; that is the claim, and it is what M014 delivers.
 It is explicitly **not** placement parity: the two controls live in different
 types and are deliberately not aligned. `eggup-eggfetch`'s control lives in
 `EggfetchConfig`, whose `user_agent` is a public field of a public,
-non-`#[non_exhaustive]` struct in a crate published at `0.1.3`; moving it
+non-`#[non_exhaustive]` struct in a crate published at `0.2.0`; moving it
 would be a source break for published consumers. `eggup-curl`'s control lives
 on `CurlTransport` because `CurlConfig`'s fields are public and **not**
 `#[non_exhaustive]` (`curl/src/lib.rs:58-76`), so adding a field there would
@@ -600,7 +604,10 @@ adapter default to `eggup-curl` would have changed the observable
 `User-Agent` header of every consumer of the published `eggup-curl 0.1.2`, for
 no concrete benefit. The default wire behavior of the published adapter is
 therefore unchanged, and the default-value difference is recorded here as a
-deliberate choice rather than a gap.
+deliberate choice rather than a gap. The caller-settable control itself reached
+the registry with `eggup-curl 0.2.0` (Acquisition Transport M017); it was
+additive and changed no default, so `eggup-curl 0.1.2` consumers are unaffected
+by its absence and `0.2.0` consumers gain it without a migration.
 
 **Validation is the adapter's own responsibility.** The curl adapter validates
 the value against a stated grammar (`1*( VCHAR / SP / obs-text )`, at most

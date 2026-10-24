@@ -250,43 +250,62 @@ for path in ALL_SURFACES:
         offset += len(line) + 1
 
 # ---------------------------------------------------------------- assertion 2
-# No docs/ file states the current version as 0.1.2.
-#   - "workspace version" must not name 0.1.2
-#   - "published at `0.1.2`" may survive exactly once: docs/crates.md's
-#     eggup-curl entry, which is correct
-#   - "=0.1.2" may survive only as the docs/releases.md history reference that
-#     describes what eggup-eggpack 0.1.2 pinned
+# The published-state claims in the checked surfaces must name the current
+# workspace version.
+#   - a "workspace version" paragraph must not name any other version
+#   - "published at `X`" must name the current version, except in docs/crates.md,
+#     which is the one surface that records each crate's published history and
+#     may name an older version as a crate's first publication
+#   - "=X" (an exact pin) may survive only where it states the eggpack
+#     exact-pin policy
+#
+# Re-based from the `0.1.2` literal when the `0.2.0` train landed, and made
+# version-agnostic against WORKSPACE_VERSION so the next train needs no further
+# edit of this clause. The shape of the rule is unchanged; only the version it
+# is anchored to moved.
+CURRENT = WORKSPACE_VERSION
+
+if not CURRENT:
+    fail("2", "the workspace manifest declares no version, so the published-state "
+              "claims cannot be checked against one")
+
 for path in DOC_FILES + ["README.md", "AGENTS.md"]:
     text = read(path)
     for paragraph in re.split(r"\n\s*\n", text):
-        if "workspace version" in paragraph and "0.1.2" in paragraph:
-            fail("2", "%s: a 'workspace version' paragraph names 0.1.2" % path)
+        if "workspace version" not in paragraph:
+            continue
+        for literal in sorted(set(re.findall(r"0\.\d+\.\d+", paragraph))):
+            if literal != CURRENT:
+                fail("2", "%s: a 'workspace version' paragraph names %s, not the current %s"
+                     % (path, literal, CURRENT))
 
 published_hits = []
 for path in DOC_FILES:
     for number, line in enumerate(lines(path), 1):
-        if re.search(r"published at `0\.1\.2`", line):
-            published_hits.append((path, number, line))
-if len(published_hits) > 1:
-    for path, number, line in published_hits:
-        fail("2", "%s:%d: 'published at `0.1.2`' is not the single legitimate eggup-curl occurrence: %s"
-             % (path, number, line.strip()))
-elif len(published_hits) == 1:
-    path, number, line = published_hits[0]
+        for match in re.finditer(r"published at `(0\.\d+\.\d+)`", line):
+            published_hits.append((path, number, line, match.group(1)))
+for path, number, line, literal in published_hits:
+    if literal == CURRENT:
+        continue
     if path != "docs/crates.md":
-        fail("2", "%s:%d: the surviving 'published at `0.1.2`' must be docs/crates.md (eggup-curl)" % (path, number))
-    if "eggup-curl" not in read(path):
-        fail("2", "docs/crates.md no longer names eggup-curl, so the 0.1.2 occurrence is not the legitimate one")
+        fail("2", "%s:%d: 'published at `%s`' names a version other than the current %s, "
+                  "and only docs/crates.md may record an older published version"
+             % (path, number, literal, CURRENT))
+    if literal not in KNOWN_VERSIONS:
+        fail("2", "%s:%d: 'published at `%s`' names a version outside the known set %s"
+             % (path, number, literal, sorted(KNOWN_VERSIONS)))
 
 for path in DOC_FILES + ["README.md", "AGENTS.md", "architecture/overview.md",
                          "architecture/tooling-governance.md"]:
     text = read(path)
     for paragraph in re.split(r"\n\s*\n", text):
-        if "=0.1.2" not in paragraph:
+        if ("=%s" % CURRENT) not in paragraph:
             continue
-        if path == "docs/releases.md" and "eggup-eggpack 0.1.2" in paragraph:
-            continue  # allowlisted: the history of what eggup-eggpack 0.1.2 pinned
-        fail("2", "%s: '=0.1.2' survives outside the allowlisted history reference" % path)
+        if not any(subject in paragraph
+                   for subject in ("eggup-eggpack", "eggpack-manifest",
+                                   "eggpack-adapter")):
+            fail("2", "%s: '=%s' survives outside the eggpack exact-pin policy"
+                 % (path, CURRENT))
 
 # ---------------------------------------------------------------- assertion 3
 # No normative rule leaked into a non-owner document: a file that states a rule

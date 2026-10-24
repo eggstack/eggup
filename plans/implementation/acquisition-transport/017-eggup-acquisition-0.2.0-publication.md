@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 017 — eggup-acquisition 0.2.0 publication
 
-Status: ready for handoff
+Status: closed 2026-10-24; `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch 0.2.0` published from `b612608` (run `40079833945` green on all five lanes); closure record: `plans/closure/acquisition-transport/017-status.md`
 
 Repository baseline: `b75f73b`
 

@@ -8,9 +8,9 @@ file and a contract disagree, the contract wins.
 | | |
 |---|---|
 | Source | `crates/eggup-eggpack/src/lib.rs` (single file, 855 lines) |
-| Tests | 7 inline `#[test]` + 4 integration files (64 tests) |
+| Tests | 7 inline `#[test]` + 4 integration files (71 tests) |
 | Crate docs | [`README.md`](../crates/eggup-eggpack/README.md), [`CHANGELOG.md`](../crates/eggup-eggpack/CHANGELOG.md) |
-| Status | Published to crates.io at `0.1.3` |
+| Status | Published to crates.io at `0.2.0` |
 | Boundary ADR | [ADR-0004](../plans/adrs/ADR-0004-eggpack-producer-eggup-consumer-boundary.md) |
 
 ## Purpose and ownership boundary
@@ -70,9 +70,9 @@ Runtime dependencies ([`Cargo.toml`](../crates/eggup-eggpack/Cargo.toml)):
 
 | Dependency | Constraint | Source |
 |---|---|---|
-| `eggup-core` | `=0.1.3` | local path `../eggup-core` |
-| `eggup-archive` | `=0.1.3` | local path `../eggup-archive` |
-| `eggup-acquisition` | `=0.1.3` | local path `../eggup-acquisition` |
+| `eggup-core` | `=0.2.0` | local path `../eggup-core` |
+| `eggup-archive` | `=0.2.0` | local path `../eggup-archive` |
+| `eggup-acquisition` | `=0.2.0` | local path `../eggup-acquisition` |
 | `eggpack-manifest` | `=0.1.0` | crates.io registry |
 
 The three Eggup edges are exact-pinned so the published crate cannot silently
@@ -255,7 +255,7 @@ as the enforcement point:
   ([`tests/interoperability.rs:972`](../crates/eggup-eggpack/tests/interoperability.rs))
   asserts the manifest contains `eggpack-manifest = "=0.1.0"` and that it
   contains no `git =`, `rev =`, `branch =`, or `tag =` edge; asserts all three
-  Eggup edges stay `=0.1.3` — derived from the adapter's own
+  Eggup edges stay `=0.2.0` — derived from the adapter's own
   `env!("CARGO_PKG_VERSION")` rather than a hardcoded literal, so the invariant
   is "pinned to *our* version" and survives the next workspace bump; and asserts
   `eggpack-core`, `eggpack-contract`, and `eggpack-bootstrap` appear nowhere.
@@ -844,25 +844,25 @@ See [tooling-governance.md](tooling-governance.md).
 | Bounded allowlisted extraction, `ArchivePlan`, `BoundMember`, deferred cleanup | [archive-extraction.md](archive-extraction.md) |
 | Service lifecycle composition (downstream, optional) | [service-lifecycle.md](service-lifecycle.md) |
 | Lints, CI matrix, planning and closure process | [tooling-governance.md](tooling-governance.md) |
-| Closure records: `001`, `001a`, `002`, `002a`, `003`, `003a`, `004`, `004a`, `005`, `006` | [`plans/closure/eggpack-manifest-interoperability/`](../plans/closure/eggpack-manifest-interoperability/) |
+| Closure records: `001`, `001a`, `002`, `002a`, `003`, `003a`, `004`, `004a`, `005`, `006`, `007` | [`plans/closure/eggpack-manifest-interoperability/`](../plans/closure/eggpack-manifest-interoperability/) |
 | Planning registry | [plans/registry.md](../plans/registry.md) |
 | Crate README / CHANGELOG | [`crates/eggup-eggpack/`](../crates/eggup-eggpack/) |
 
 **Published-crate status.** `eggup-eggpack` is published to crates.io at
-`0.1.3` (`docs.rs/eggup-eggpack`); `0.1.2` was the registry promotion, whose
+`0.2.0` (`docs.rs/eggup-eggpack`); `0.1.2` was the registry promotion, whose
 published `src/lib.rs` is recorded in the 0.1.2 CHANGELOG entry as
 byte-identical to the previously pinned revision
 `678bbf04f5a02827003a1d9ab83ba4f0e6360e41`, so that promotion was byte-faithful
 rather than merely version-compatible. `AdapterError` is `#[non_exhaustive]`, so
 adding variants remains source-compatible for downstream `match` callers.
 
-The published `0.1.3` manifest carries a direct `sha2` runtime dependency and
-the adapter's own inline digest loop. The current tree delegates the digest to
-`eggup_core::hash_file` and no longer declares that runtime edge, so the
-**next** publication of this crate would ship a runtime dependency list one
-entry shorter, with an unchanged transitive closure and no consumer migration.
-Nothing has been published under this change, and the `v0.1.3` tag has not
-moved.
+The published `0.1.3` manifest carried a direct `sha2` runtime dependency and
+the adapter's own inline digest loop. The published `0.2.0` manifest drops that
+runtime edge: the adapter delegates the digest to `eggup_core::hash_file`, so
+its runtime dependency list is one entry shorter than `0.1.3`'s, with an
+unchanged transitive closure and no consumer migration. The `0.2.0` publication
+re-pins all three Eggup edges to `=0.2.0`; the `0.1.x` line is not withdrawn,
+and the `v0.1.1`, `v0.1.2`, and `v0.1.3` tags have not moved.
 
 ## Known doc/code drift
 
@@ -888,10 +888,11 @@ workstream can act on it:
 - `overview.md`'s `849 / 63` figure was stale: the crate is 855 source lines
   with 7 inline plus 28 + 13 + 15 + 8 integration tests, i.e. 71 in total.
   Corrected in `overview.md` by the architecture-anchor corrective.
-- `docs/crates.md` previously carried `=0.1.2` for the Eggup pins, which are
-  `=0.1.3`. That drift has been **repaired**: `docs/crates.md:119-120` now
-  states `=0.1.3` and names `crates/eggup-eggpack/Cargo.toml` as the source of
-  truth. `docs/crates.md:117` is the separate `cargo tree --workspace` review
+- `docs/crates.md` previously carried `=0.1.2` for the Eggup pins, which were
+  then `=0.1.3`. That drift was **repaired**, and the `0.2.0` train moved the pins
+  again: `docs/crates.md:125-126` now states `=0.2.0` and names
+  `crates/eggup-eggpack/Cargo.toml` as the source of truth.
+  `docs/crates.md:122-123` is the separate `cargo tree --workspace` review
   rule and never carried a version pin. `docs/` is non-normative, so this
   document does not restate its wording.
 

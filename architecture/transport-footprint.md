@@ -113,9 +113,9 @@ The `curl`-only tree is three crates deep in total — the fixture, the seam, an
 because its only dependency is the seam:
 
 ```text
-eggup-transport-footprint v0.1.3
-├── eggup-acquisition v0.1.3
-└── eggup-curl v0.1.3
+eggup-transport-footprint v0.2.0
+├── eggup-acquisition v0.2.0
+└── eggup-curl v0.2.0
 ```
 
 The `eggfetch` tree is 92 crates, because a native HTTP + TLS stack is linked
@@ -123,9 +123,9 @@ into the process. The top level looks identical, which is precisely the point �
 the difference is entirely transitive and invisible at the source level:
 
 ```text
-eggup-transport-footprint v0.1.3
-├── eggup-acquisition v0.1.3
-└── eggup-eggfetch v0.1.3
+eggup-transport-footprint v0.2.0
+├── eggup-acquisition v0.2.0
+└── eggup-eggfetch v0.2.0
     ├── eggfetch-core v0.2.0
     │   └── hyper-rustls ─ rustls ─ tokio-rustls ─ rustls-webpki
     │       rustls-pki-types ─ rustls-native-certs ─ webpki_roots
@@ -221,8 +221,8 @@ by CI. Each is its own step, so a failure names itself instead of hiding in a lo
 |---|---|---|
 | `scripts/check-local.sh` | `cargo clippy --workspace --all-targets --all-features --locked` | No — `--all-features` puts both adapters in the package |
 | CI `stable` | three `cargo build -p eggup-transport-footprint` steps (`ci.yml:26-28`) | **Yes** — `curl` (`ci.yml:26`) and `eggfetch` (`ci.yml:27`), plus the dual configuration (`ci.yml:28`) |
-| CI `msrv` | three `cargo check -p eggup-transport-footprint` steps (`ci.yml:54-56`) | **Yes** — `curl` (`ci.yml:54`) and `eggfetch` (`ci.yml:55`), plus the dual configuration (`ci.yml:56`) |
-| CI `macos` | two `cargo build -p eggup-transport-footprint` steps (`ci.yml:101-102`) | **Yes** — `curl` (`ci.yml:101`) and `eggfetch` (`ci.yml:102`); the dual configuration is covered by the lane's workspace `--all-features` test step (`ci.yml:97`) |
+| CI `msrv` | three `cargo check -p eggup-transport-footprint` steps (`ci.yml:52-54`) | **Yes** — `curl` (`ci.yml:52`) and `eggfetch` (`ci.yml:53`), plus the dual configuration (`ci.yml:54`) |
+| CI `macos` | two `cargo build -p eggup-transport-footprint` steps (`ci.yml:97-98`) | **Yes** — `curl` (`ci.yml:97`) and `eggfetch` (`ci.yml:98`); the dual configuration is covered by the lane's workspace `--all-features` test step (`ci.yml:93`) |
 | CI `windows-check` | `cargo check --workspace --all-targets --locked` | No — the lane passes no `--all-features` and names no footprint step |
 
 **The gap this crate exists to close is closed.** The claim that `curl_only` links no

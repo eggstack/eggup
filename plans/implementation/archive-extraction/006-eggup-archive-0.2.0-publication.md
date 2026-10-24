@@ -1,6 +1,6 @@
 # Archive Extraction Milestone 006 — eggup-archive 0.2.0 publication
 
-Status: ready for handoff
+Status: closed 2026-10-24; `eggup-archive 0.2.0` published from `b612608` (run `40079833945` green on all five lanes); closure record: `plans/closure/archive-extraction/006-status.md`
 
 Repository baseline: `b75f73b`
 
