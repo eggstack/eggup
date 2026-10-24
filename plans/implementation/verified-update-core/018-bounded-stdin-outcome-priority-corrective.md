@@ -443,13 +443,20 @@ No shell, no `cmd.exe`, and no external tool is used.
    `output_limited` false, and `success()` false: an undelivered payload is
    never reported as a success.
 4. **The classification is stable across the deadline.** A sweep walks the
-   child's lifetime across the deadline in one-millisecond steps. Every sample
+   child's lifetime across the deadline in two-millisecond steps. Every sample
    must never report an undelivered payload as a success; a reported write
    failure must come from a child that exited on its own (only the child's own
    exit breaks the pipe before the deadline — the runner's kill happens at the
    deadline); and a child that recorded no exit was killed at the deadline, so
-   the deadline outcome must stand.
-5. **The existing core test suite still passes**, including
+   the deadline outcome must stand. The sweep reports its coverage counts on
+   stderr, so a run states what it actually observed instead of only asserting.
+5. **The fixtures must not depend on the host's load.** A helper binary can
+   start after a short deadline, be killed at the deadline before it writes
+   anything, and never produce its start marker. Every fixture that waits for
+   that marker must therefore poll for it for a bounded time and must treat
+   "the marker never appeared" as a distinct condition that asserts only the
+   deadline outcome. No fixture may assert that a helper started.
+6. **The existing core test suite still passes**, including
    `crates/eggup-core/tests/candidate_deadline.rs`, which encodes the M014
    deadline guarantees, and `crates/eggup-core/tests/candidate_stdin.rs`'s
    existing fixtures. **No existing assertion may be weakened or deleted.**
