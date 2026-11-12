@@ -19,7 +19,23 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo test --workspace --all-targets --all-features --locked
+      # The isolated single-adapter configurations are the crate's entire
+      # purpose. Without these steps, "curl_only links no Eggfetch code" is
+      # never checked by any machine. Each configuration is its own step so a
+      # failure names itself instead of hiding in a loop.
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features curl --locked
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features eggfetch --locked
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features curl,eggfetch --locked
       - run: cargo doc --workspace --no-deps --locked
+      # The packaged service crate is verified against the REGISTRY, strictly:
+      # the packaged sources are compiled, not merely packaged. The earlier
+      # deferral is DISCHARGED. It was needed because the service source line
+      # uses core's bounded-stdin capability (Core M017) and core's
+      # unconditional execution deadline (Core M014), neither of which was in
+      # the published `eggup-core 0.1.3`, so the packaged crate's
+      # `eggup-core = "^0.2"` requirement had nothing to resolve against.
+      # `eggup-core 0.2.0` is now on the registry, so the requirement resolves
+      # and the strict verification passes. See registry finding 16.
       - run: cargo package -p eggup-service --locked
 
   msrv:
@@ -29,6 +45,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.89.0
       - run: cargo check --workspace --all-targets --locked
+      # `cargo check --workspace --all-targets --locked` enables no feature
+      # (default = []), so it compiled none of the three footprint binaries.
+      # The MSRV floor must apply to the feature-gated paths too, and the
+      # dual configuration is where two independent adapter graphs meet.
+      - run: cargo check -p eggup-transport-footprint --no-default-features --features curl --locked
+      - run: cargo check -p eggup-transport-footprint --no-default-features --features eggfetch --locked
+      - run: cargo check -p eggup-transport-footprint --no-default-features --features curl,eggfetch --locked
+      # The packaged service crate is verified against the REGISTRY, strictly:
+      # the packaged sources are compiled, not merely packaged. The earlier
+      # deferral is DISCHARGED. It was needed because the service source line
+      # uses core's bounded-stdin capability (Core M017) and core's
+      # unconditional execution deadline (Core M014), neither of which was in
+      # the published `eggup-core 0.1.3`, so the packaged crate's
+      # `eggup-core = "^0.2"` requirement had nothing to resolve against.
+      # `eggup-core 0.2.0` is now on the registry, so the requirement resolves
+      # and the strict verification passes. See registry finding 16.
       - run: cargo package -p eggup-service --locked
 
   service-systemd:
@@ -59,6 +91,20 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo test --workspace --all-targets --all-features --locked
+      # macOS is the platform on which the published 3 / 92 / 93 counts were
+      # captured, so the isolated configurations are built here as well. The
+      # dual configuration is already built by the lane's --all-features step.
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features curl --locked
+      - run: cargo build -p eggup-transport-footprint --no-default-features --features eggfetch --locked
+      # The packaged service crate is verified against the REGISTRY, strictly:
+      # the packaged sources are compiled, not merely packaged. The earlier
+      # deferral is DISCHARGED. It was needed because the service source line
+      # uses core's bounded-stdin capability (Core M017) and core's
+      # unconditional execution deadline (Core M014), neither of which was in
+      # the published `eggup-core 0.1.3`, so the packaged crate's
+      # `eggup-core = "^0.2"` requirement had nothing to resolve against.
+      # `eggup-core 0.2.0` is now on the registry, so the requirement resolves
+      # and the strict verification passes. See registry finding 16.
       - run: cargo package -p eggup-service --locked
 
   windows-check:
@@ -73,6 +119,13 @@ jobs:
       - run: cargo test -p eggup-service --lib service_errors_output_and_permission_remediation_stay_utf8_bounded --locked
       - run: cargo test -p eggup-service --lib lifecycle_failure_detail_is_utf8_safe_bounded_and_control_free --locked
       - run: cargo test -p eggup-service --lib windows_scm::tests --locked
+      # The real Windows SCM fixture registers a disposable service through the
+      # crate's public API and drives it against the genuine Service Control
+      # Manager. It needs a hosted Windows runner with administrator rights,
+      # and it records a skip reason on stdout when those rights are absent --
+      # so it runs with --nocapture, and the reason is never swallowed by the
+      # test harness's output capture.
+      - run: cargo test -p eggup-service --test windows_scm_live --locked -- --nocapture
       # Core self-update and stale-lock fixtures exercise real running-image and
       # filesystem-race behaviour, so they run natively here rather than only
       # being compiled.
@@ -81,4 +134,13 @@ jobs:
       # --no-fail-fast: this lane is the only Windows test coverage, so a single
       # failing target must not hide the state of every other one.
       - run: cargo test --workspace --all-targets --locked --no-fail-fast
+      # The packaged service crate is verified against the REGISTRY, strictly:
+      # the packaged sources are compiled, not merely packaged. The earlier
+      # deferral is DISCHARGED. It was needed because the service source line
+      # uses core's bounded-stdin capability (Core M017) and core's
+      # unconditional execution deadline (Core M014), neither of which was in
+      # the published `eggup-core 0.1.3`, so the packaged crate's
+      # `eggup-core = "^0.2"` requirement had nothing to resolve against.
+      # `eggup-core 0.2.0` is now on the registry, so the requirement resolves
+      # and the strict verification passes. See registry finding 16.
       - run: cargo package -p eggup-service --locked

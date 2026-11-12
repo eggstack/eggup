@@ -1,5 +1,7 @@
 use crate::{
-    LifecycleSnapshot, LifecycleState, Ownership, RestoreIntent, ServiceManager, ServiceSpec,
+    commit_engine::{quiesce_for_rollback, restore_and_check, safe_inspect, safe_transition_to},
+    CommitEnginePolicy, LifecycleFailure, LifecycleSnapshot, LifecycleState, LifecycleUpdatePhase,
+    Ownership, PostInstallCheck, PostInstallCheckError, RestoreIntent, ServiceManager, ServiceSpec,
 };
 use eggup_core::{
     CommitOwnership, Error as CoreError, PostCommitFailurePolicy, TransactionDisposition,
@@ -10,60 +12,6 @@ use std::{
     panic::{catch_unwind, AssertUnwindSafe},
     time::{Duration, Instant},
 };
-
-/// Phase that produced lifecycle-specific update evidence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum LifecycleUpdatePhase {
-    /// Initial state observation.
-    Inspect,
-    /// Stop the prior generation before artifact mutation.
-    Quiesce,
-    /// Core transaction returned before a terminal receipt.
-    Commit,
-    /// Restore the successful new generation's desired state.
-    RestoreNew,
-    /// Caller-owned post-install validation.
-    PostInstallCheck,
-    /// Stop the new generation before Core rollback.
-    QuiesceForRollback,
-    /// Restore the prior generation's lifecycle state after rollback.
-    RestoreOld,
-    /// Optional final read-only observation.
-    FinalInspect,
-}
-
-/// Bounded service-specific failure evidence, separate from Core artifact evidence.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LifecycleFailure {
-    /// Orchestration phase.
-    pub phase: LifecycleUpdatePhase,
-    /// Service identifier.
-    pub service_id: String,
-    /// Bounded detail. Implementations must not include secrets.
-    pub detail: String,
-    /// Ownership observed when applicable.
-    pub ownership: Option<Ownership>,
-    /// State observed when applicable.
-    pub state: Option<LifecycleState>,
-}
-
-impl LifecycleFailure {
-    fn new(
-        spec: &ServiceSpec,
-        phase: LifecycleUpdatePhase,
-        detail: impl fmt::Display,
-        snapshot: Option<&LifecycleSnapshot>,
-    ) -> Self {
-        Self {
-            phase,
-            service_id: spec.id().as_str().to_owned(),
-            detail: bounded_detail(detail.to_string()),
-            ownership: snapshot.map(|s| s.ownership),
-            state: snapshot.map(|s| s.state),
-        }
-    }
-}
 
 /// Terminal service restoration status for a composite update.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,6 +41,12 @@ pub struct LifecycleUpdatePolicy {
 
 impl LifecycleUpdatePolicy {
     /// Rejects zero or overlong timeouts before any manager mutation.
+    ///
+    /// # Errors
+    ///
+    /// [`LifecycleUpdateError::InvalidPolicy`] when `quiesce_timeout`,
+    /// `post_commit_timeout`, or `rollback_restore_timeout` is zero or above
+    /// [`crate::MAX_TRANSITION_TIMEOUT`]. The error names the offending field.
     pub fn validate(&self) -> Result<(), LifecycleUpdateError> {
         for (field, value) in [
             ("quiesce_timeout", self.quiesce_timeout),
@@ -103,53 +57,6 @@ impl LifecycleUpdatePolicy {
                 return Err(LifecycleUpdateError::InvalidPolicy { field });
             }
         }
-        Ok(())
-    }
-}
-
-/// Bounded caller-owned post-install check failure.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PostInstallCheckError(String);
-
-impl PostInstallCheckError {
-    /// Creates bounded, non-secret failure evidence.
-    pub fn new(detail: impl Into<String>) -> Self {
-        Self(bounded_detail(detail.into()))
-    }
-}
-
-impl fmt::Display for PostInstallCheckError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-impl std::error::Error for PostInstallCheckError {}
-
-/// Caller-controlled post-install check. Implementations must honor `remaining`.
-pub trait PostInstallCheck: fmt::Debug {
-    /// Check the installed generation within the supplied remaining-time budget.
-    ///
-    /// Synchronous user code cannot be forcibly cancelled safely. This method
-    /// must return within `remaining` and must not include secrets in its error.
-    fn check(
-        &self,
-        spec: &ServiceSpec,
-        snapshot: &LifecycleSnapshot,
-        remaining: Duration,
-    ) -> Result<(), PostInstallCheckError>;
-}
-
-/// No-op check for consumers that require lifecycle restoration only.
-#[derive(Debug, Default)]
-pub struct NoPostInstallCheck;
-
-impl PostInstallCheck for NoPostInstallCheck {
-    fn check(
-        &self,
-        _spec: &ServiceSpec,
-        _snapshot: &LifecycleSnapshot,
-        _remaining: Duration,
-    ) -> Result<(), PostInstallCheckError> {
         Ok(())
     }
 }
@@ -175,6 +82,12 @@ pub struct LifecycleUpdateReceipt {
     pub rollback_restore_failure: Option<LifecycleFailure>,
     /// Failure to obtain the optional final read-only observation.
     pub observation_failure: Option<LifecycleFailure>,
+    /// The commit-engine policy that governed this transaction.
+    ///
+    /// This makes the selected [`CommitEnginePolicy`] inputs observable in the
+    /// returned evidence, including the permissive ownership-loss tolerance,
+    /// which otherwise has no failure to attach itself to.
+    pub engine_policy: CommitEnginePolicy,
 }
 
 impl LifecycleUpdateReceipt {
@@ -251,6 +164,19 @@ impl std::error::Error for LifecycleUpdateError {}
 /// `RecoveryRequired` suppresses automatic service starts. No registration
 /// install/refresh is performed. The service adapter uses Core's transaction
 /// rollback rather than maintaining artifact backups of its own.
+///
+/// This entry point runs the unified commit engine under
+/// [`CommitEnginePolicy::default`], the stricter of the two former engine
+/// copies' behaviours. Use [`commit_with_lifecycle_with_engine_policy`] to
+/// select the named policy inputs explicitly.
+///
+/// # Errors
+///
+/// [`LifecycleUpdateError`] when the update cannot be completed safely: the
+/// policy is invalid, the service is not `Owned`, the commit engine could
+/// not commit, roll back, or restore the service to its pre-update state. The
+/// error carries the transaction disposition, the observed lifecycle state,
+/// and whether manual artifact recovery is required.
 pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
     manager: &mut M,
     spec: &ServiceSpec,
@@ -258,6 +184,41 @@ pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
     ownership: CommitOwnership<'_>,
     policy: LifecycleUpdatePolicy,
     check: &C,
+) -> Result<LifecycleUpdateReceipt, LifecycleUpdateError> {
+    commit_with_lifecycle_with_engine_policy(
+        manager,
+        spec,
+        transaction,
+        ownership,
+        policy,
+        check,
+        CommitEnginePolicy::default(),
+    )
+}
+
+/// Quiesce an owned service under an explicitly selected commit-engine policy.
+///
+/// Identical to [`commit_with_lifecycle`] except that the two named
+/// commit-engine inputs — post-transition verification and ownership-loss
+/// tolerance — are chosen by the caller instead of taking their stricter
+/// defaults. The selected policy is observable in the returned receipt's
+/// `engine_policy` field.
+///
+/// # Errors
+///
+/// [`LifecycleUpdateError`] when the update cannot be completed safely: the
+/// policy is invalid, the service is not `Owned`, the commit engine could
+/// not commit, roll back, or restore the service to its pre-update state. The
+/// error carries the transaction disposition, the observed lifecycle state,
+/// and whether manual artifact recovery is required.
+pub fn commit_with_lifecycle_with_engine_policy<M: ServiceManager, C: PostInstallCheck>(
+    manager: &mut M,
+    spec: &ServiceSpec,
+    transaction: ValidatedTransaction,
+    ownership: CommitOwnership<'_>,
+    policy: LifecycleUpdatePolicy,
+    check: &C,
+    engine: CommitEnginePolicy,
 ) -> Result<LifecycleUpdateReceipt, LifecycleUpdateError> {
     policy.validate()?;
     let before = safe_inspect(manager, spec, LifecycleUpdatePhase::Inspect)
@@ -280,52 +241,17 @@ pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
 
     let mut pre_commit_quiesced = false;
     if before.state == LifecycleState::Running {
-        let stop_result = catch_unwind(AssertUnwindSafe(|| {
-            manager.stop(spec, policy.quiesce_timeout)
-        }));
-        let stop_failure = match stop_result {
-            Ok(Err(e)) => Some(LifecycleFailure::new(
-                spec,
-                LifecycleUpdatePhase::Quiesce,
-                e,
-                Some(&before),
-            )),
-            Err(_) => Some(LifecycleFailure::new(
-                spec,
-                LifecycleUpdatePhase::Quiesce,
-                "service manager panicked while stopping",
-                Some(&before),
-            )),
-            Ok(Ok(result)) if !result.completed => Some(LifecycleFailure::new(
-                spec,
-                LifecycleUpdatePhase::Quiesce,
-                "stop did not complete",
-                Some(&before),
-            )),
-            Ok(Ok(_)) => match safe_inspect(manager, spec, LifecycleUpdatePhase::Quiesce) {
-                Ok(after)
-                    if after.ownership == Ownership::Owned
-                        && after.state == LifecycleState::Stopped =>
-                {
-                    pre_commit_quiesced = true;
-                    None
-                }
-                Ok(after) => Some(LifecycleFailure::new(
-                    spec,
-                    LifecycleUpdatePhase::Quiesce,
-                    "ownership/state changed after stop",
-                    Some(&after),
-                )),
-                Err(failure) => Some(failure),
-            },
-        };
+        let stop_failure =
+            crate::commit_engine::quiesce_service(manager, spec, &before, policy.quiesce_timeout)
+                .err();
         if let Some(failure) = stop_failure {
-            let restore_failure = safe_restore_state(
+            let restore_failure = safe_transition_to(
                 manager,
                 spec,
                 LifecycleState::Running,
                 policy.rollback_restore_timeout,
                 LifecycleUpdatePhase::Quiesce,
+                &engine,
             )
             .err();
             return Err(LifecycleUpdateError::Quiesce {
@@ -333,6 +259,7 @@ pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
                 restore_failure,
             });
         }
+        pre_commit_quiesced = true;
     }
 
     let mut post_commit_failure = None;
@@ -341,7 +268,15 @@ pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
         transaction.commit_with_post_commit(ownership, policy.post_commit_failure, || {
             let deadline = Instant::now() + policy.post_commit_timeout;
             let work = catch_unwind(AssertUnwindSafe(|| {
-                restore_success_state(manager, spec, &before, policy.restore, check, deadline)
+                restore_success_state(
+                    manager,
+                    spec,
+                    &before,
+                    policy.restore,
+                    check,
+                    deadline,
+                    &engine,
+                )
             }));
             let failure = match work {
                 Ok(Ok(())) => return Ok(()),
@@ -375,12 +310,13 @@ pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
         Ok(receipt) => receipt,
         Err(core) => {
             let restore_failure = if pre_commit_quiesced {
-                safe_restore_state(
+                safe_transition_to(
                     manager,
                     spec,
                     before.state,
                     policy.rollback_restore_timeout,
                     LifecycleUpdatePhase::RestoreOld,
+                    &engine,
                 )
                 .err()
             } else {
@@ -405,12 +341,13 @@ pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
             }
         }
         TransactionDisposition::RolledBack => {
-            if let Err(failure) = safe_restore_state(
+            if let Err(failure) = safe_transition_to(
                 manager,
                 spec,
                 before.state,
                 policy.rollback_restore_timeout,
                 LifecycleUpdatePhase::RestoreOld,
+                &engine,
             ) {
                 rollback_restore_failure = Some(failure);
                 restoration = LifecycleRestorationStatus::Failed;
@@ -435,6 +372,7 @@ pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
                 rollback_quiesce_failure,
                 rollback_restore_failure,
                 observation_failure: Some(observation_failure),
+                engine_policy: engine,
             });
         }
     };
@@ -449,6 +387,7 @@ pub fn commit_with_lifecycle<M: ServiceManager, C: PostInstallCheck>(
         rollback_quiesce_failure,
         rollback_restore_failure,
         observation_failure: None,
+        engine_policy: engine,
     })
 }
 
@@ -459,237 +398,30 @@ fn restore_success_state<M: ServiceManager, C: PostInstallCheck>(
     intent: RestoreIntent,
     check: &C,
     deadline: Instant,
+    engine: &CommitEnginePolicy,
 ) -> Result<(), LifecycleFailure> {
     let wanted = match intent {
         RestoreIntent::Preserve => before.state,
         RestoreIntent::EnsureRunning => LifecycleState::Running,
         RestoreIntent::EnsureStopped => LifecycleState::Stopped,
     };
-    // `safe_restore_state` catches a panicking `start`/`stop`/`inspect` and
-    // records it under the phase that was actually executing. The enclosing
-    // `catch_unwind` cannot do this: it wraps the transition *and* the
-    // post-install check together, so labelling its panic arm
-    // `PostInstallCheck` would misreport a panicking service transition as a
-    // check failure and let the receipt claim `Restored`.
-    safe_restore_state(
-        manager,
-        spec,
-        wanted,
-        remaining(deadline),
-        LifecycleUpdatePhase::RestoreNew,
-    )?;
-    let snapshot = safe_inspect(manager, spec, LifecycleUpdatePhase::RestoreNew)?;
-    validate_observed(spec, &snapshot, wanted, LifecycleUpdatePhase::RestoreNew)?;
-    let budget = remaining(deadline);
-    if budget.is_zero() {
-        return Err(LifecycleFailure::new(
-            spec,
-            LifecycleUpdatePhase::PostInstallCheck,
-            "post-commit deadline exhausted before post-install check",
-            Some(&snapshot),
-        ));
-    }
-    check.check(spec, &snapshot, budget).map_err(|e| {
-        LifecycleFailure::new(
-            spec,
-            LifecycleUpdatePhase::PostInstallCheck,
-            e,
-            Some(&snapshot),
-        )
-    })
-}
-
-fn transition_to<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    wanted: LifecycleState,
-    timeout: Duration,
-    phase: LifecycleUpdatePhase,
-) -> Result<(), LifecycleFailure> {
-    if timeout.is_zero() {
-        return Err(LifecycleFailure::new(
-            spec,
-            phase,
-            "lifecycle operation deadline exhausted",
-            None,
-        ));
-    }
-    let current = manager
-        .inspect(spec)
-        .map_err(|e| LifecycleFailure::new(spec, phase, e, None))?;
-    if current.ownership != Ownership::Owned {
-        return Err(LifecycleFailure::new(
-            spec,
-            phase,
-            "service ownership is no longer Owned",
-            Some(&current),
-        ));
-    }
-    let result = match (wanted, current.state) {
-        (LifecycleState::Running, LifecycleState::Running)
-        | (LifecycleState::Stopped, LifecycleState::Stopped) => return Ok(()),
-        (LifecycleState::Running, LifecycleState::Stopped) => manager.start(spec, timeout),
-        (LifecycleState::Stopped, LifecycleState::Running) => manager.stop(spec, timeout),
-        (_, LifecycleState::Transitioning | LifecycleState::Unknown) => {
-            return Err(LifecycleFailure::new(
-                spec,
-                phase,
-                "service state is Unknown or Transitioning",
-                Some(&current),
-            ))
-        }
-        _ => unreachable!("only Running and Stopped are valid desired states"),
-    }
-    .map_err(|e| LifecycleFailure::new(spec, phase, e, Some(&current)))?;
-    if !result.completed {
-        return Err(LifecycleFailure::new(
-            spec,
-            phase,
-            "service transition did not complete",
-            Some(&current),
-        ));
-    }
-    let after = manager
-        .inspect(spec)
-        .map_err(|e| LifecycleFailure::new(spec, phase, e, None))?;
-    validate_observed(spec, &after, wanted, phase)
-}
-
-fn validate_observed(
-    spec: &ServiceSpec,
-    snapshot: &LifecycleSnapshot,
-    wanted: LifecycleState,
-    phase: LifecycleUpdatePhase,
-) -> Result<(), LifecycleFailure> {
-    if snapshot.ownership != Ownership::Owned || snapshot.state != wanted {
-        return Err(LifecycleFailure::new(
-            spec,
-            phase,
-            "service ownership/state does not match the requested state",
-            Some(snapshot),
-        ));
-    }
-    Ok(())
-}
-
-fn restore_state<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    wanted: LifecycleState,
-    timeout: Duration,
-    phase: LifecycleUpdatePhase,
-) -> Result<(), LifecycleFailure> {
-    transition_to(manager, spec, wanted, timeout, phase)
-}
-
-fn safe_inspect<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    phase: LifecycleUpdatePhase,
-) -> Result<LifecycleSnapshot, LifecycleFailure> {
-    match catch_unwind(AssertUnwindSafe(|| manager.inspect(spec))) {
-        Ok(Ok(snapshot)) => Ok(snapshot),
-        Ok(Err(error)) => Err(LifecycleFailure::new(spec, phase, error, None)),
-        Err(_) => Err(LifecycleFailure::new(
-            spec,
-            phase,
-            "service manager panicked while inspecting",
-            None,
-        )),
-    }
-}
-
-fn safe_restore_state<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    wanted: LifecycleState,
-    timeout: Duration,
-    phase: LifecycleUpdatePhase,
-) -> Result<(), LifecycleFailure> {
-    match catch_unwind(AssertUnwindSafe(|| {
-        restore_state(manager, spec, wanted, timeout, phase)
-    })) {
-        Ok(result) => result,
-        Err(_) => Err(LifecycleFailure::new(
-            spec,
-            phase,
-            "service manager panicked while restoring state",
-            None,
-        )),
-    }
-}
-
-fn quiesce_for_rollback<M: ServiceManager>(
-    manager: &mut M,
-    spec: &ServiceSpec,
-    deadline: Instant,
-) -> Option<LifecycleFailure> {
-    let budget = remaining(deadline);
-    if budget.is_zero() {
-        return Some(LifecycleFailure::new(
-            spec,
-            LifecycleUpdatePhase::QuiesceForRollback,
-            "post-commit deadline exhausted before rollback quiescence",
-            None,
-        ));
-    }
-    let observed = manager.inspect(spec).ok();
-    if observed
-        .as_ref()
-        .is_some_and(|s| s.ownership == Ownership::Owned && s.state == LifecycleState::Stopped)
-    {
-        return None;
-    }
-    let stop = manager.stop(spec, budget);
-    match stop {
-        Err(error) => Some(LifecycleFailure::new(
-            spec,
-            LifecycleUpdatePhase::QuiesceForRollback,
-            error,
-            observed.as_ref(),
-        )),
-        Ok(result) if !result.completed => Some(LifecycleFailure::new(
-            spec,
-            LifecycleUpdatePhase::QuiesceForRollback,
-            "stop did not complete before artifact rollback",
-            observed.as_ref(),
-        )),
-        Ok(_) => match manager.inspect(spec) {
-            Ok(after)
-                if after.ownership == Ownership::Owned
-                    && after.state == LifecycleState::Stopped =>
-            {
-                None
-            }
-            Ok(after) => Some(LifecycleFailure::new(
-                spec,
-                LifecycleUpdatePhase::QuiesceForRollback,
-                "stopped state could not be confirmed before artifact rollback",
-                Some(&after),
-            )),
-            Err(error) => Some(LifecycleFailure::new(
-                spec,
-                LifecycleUpdatePhase::QuiesceForRollback,
-                error,
-                None,
-            )),
-        },
-    }
-}
-
-fn remaining(deadline: Instant) -> Duration {
-    deadline.saturating_duration_since(Instant::now())
-}
-
-fn bounded_detail(mut detail: String) -> String {
-    detail = detail.chars().filter(|c| !c.is_control()).collect();
-    crate::truncate_utf8_bytes(detail, 512)
+    // `restore_and_check` delegates the transition to the unified engine's
+    // panic-safe transition mechanic, which catches a panicking
+    // `start`/`stop`/`inspect` and records it under the phase that was
+    // actually executing. The enclosing `catch_unwind` cannot do this: it
+    // wraps the transition *and* the post-install check together, so labelling
+    // its panic arm `PostInstallCheck` would misreport a panicking service
+    // transition as a check failure and let the receipt claim `Restored`.
+    restore_and_check(manager, spec, wanted, check, deadline, engine)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ServiceError, ServiceId, ServiceOperation, TestDoubleManager, TransitionResult};
+    use crate::{
+        ManagerFailureKind, NoPostInstallCheck, ServiceError, ServiceId, ServiceOperation,
+        TestDoubleManager, TransitionResult,
+    };
     use eggup_core::{
         AbsentOnlyVerifier, AbsentPolicy, AllValidators, ArtifactMember, ArtifactSet,
         CommitOwnership as CoreCommitOwnership, InstallPlan, MemberId, Ownership as CoreOwnership,
@@ -768,7 +500,10 @@ mod tests {
             {
                 // The final observation is the first inspect after the check returns.
                 self.final_inspect_failed.set(true);
-                return Err(ServiceError::manager("injected final inspection failure"));
+                return Err(ServiceError::manager(
+                    ManagerFailureKind::Protocol,
+                    "injected final inspection failure",
+                ));
             }
             self.inner.inspect(spec)
         }
@@ -789,7 +524,10 @@ mod tests {
                 thread::sleep(self.start_delay);
             }
             if self.fail_start_calls.contains(&self.start_calls) {
-                return Err(ServiceError::manager("injected start failure"));
+                return Err(ServiceError::manager(
+                    ManagerFailureKind::Protocol,
+                    "injected start failure",
+                ));
             }
             if self.panic_start_calls.contains(&self.start_calls) {
                 panic!("test panic payload must not escape");
@@ -805,7 +543,10 @@ mod tests {
             self.events.borrow_mut().push("stop");
             self.stop_calls += 1;
             if self.fail_stop {
-                return Err(ServiceError::manager("injected stop failure"));
+                return Err(ServiceError::manager(
+                    ManagerFailureKind::Protocol,
+                    "injected stop failure",
+                ));
             }
             if self.incomplete_stop {
                 return Ok(TransitionResult {

@@ -13,6 +13,11 @@ pub struct ProductId(String);
 
 impl ProductId {
     /// Creates a product identifier after rejecting empty or unsafe control-character input.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the identifier is empty or
+    /// contains a control character.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         Ok(Self(validate_identifier("product", value.into())?))
     }
@@ -35,6 +40,11 @@ pub struct ReleaseId(String);
 
 impl ReleaseId {
     /// Creates a release identifier after rejecting empty or unsafe control-character input.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the identifier is empty or
+    /// contains a control character.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         Ok(Self(validate_identifier("release", value.into())?))
     }
@@ -57,6 +67,11 @@ pub struct MemberId(String);
 
 impl MemberId {
     /// Creates a member identifier after rejecting empty or unsafe control-character input.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the identifier is empty or
+    /// contains a control character.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         Ok(Self(validate_identifier("member", value.into())?))
     }
@@ -139,6 +154,14 @@ pub enum IntegrityRequirement {
 }
 
 /// Consumer-supplied proof that a live destination belongs to this deployment.
+///
+/// The verifier is the *only* way a destination can be classified as
+/// [`Ownership::Owned`]: core never infers ownership from an
+/// [`InstallPlan`], from a member's presence, or from anything else. It is
+/// also infallible by design — [`verify`](OwnershipVerifier::verify) returns
+/// an [`Ownership`] value, never a `Result`, so a verifier cannot fail the
+/// transaction by erroring; it reports trouble as [`Ownership::Unknown`], and
+/// `Unknown` denies mutation.
 ///
 /// Implementations MUST be synchronous, deterministic for a fixed filesystem
 /// state, free of application-specific version types, and treat verifier
@@ -293,6 +316,12 @@ pub struct ArtifactMember {
 
 impl ArtifactMember {
     /// Creates a regular-file member from an acquired source and relative destination.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the destination is empty, is
+    /// absolute, contains a control character, or escapes the installation
+    /// root.
     pub fn new(
         id: MemberId,
         source: impl Into<PathBuf>,
@@ -362,6 +391,11 @@ pub struct ArtifactSet(Vec<ArtifactMember>);
 
 impl ArtifactSet {
     /// Creates a set and rejects an empty input or duplicate member identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the set is empty or contains two
+    /// members with the same identity.
     pub fn new(members: Vec<ArtifactMember>) -> Result<Self> {
         if members.is_empty() {
             return Err(Error::invalid(
@@ -381,6 +415,12 @@ impl ArtifactSet {
     }
 
     /// Creates a one-member set.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the member's destination is
+    /// empty, is absolute, contains a control character, or escapes the
+    /// installation root.
     pub fn single(member: ArtifactMember) -> Result<Self> {
         Self::new(vec![member])
     }
@@ -478,6 +518,15 @@ pub struct InstallPlan {
 
 impl InstallPlan {
     /// Validates an installation root, destination containment, sources, and member uniqueness.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the installation root is not an
+    /// absolute directory, when two members share a destination, or when a
+    /// member's source is not an absolute regular file, lies inside the
+    /// installation root, or aliases its own destination; and [`Error::Io`]
+    /// when the installation root or a member source cannot be read or
+    /// canonicalized.
     pub fn new(
         product: ProductId,
         release: ReleaseId,
@@ -544,6 +593,14 @@ impl InstallPlan {
     /// exactly as for any other member. Nothing here selects a release, infers a
     /// version, or reads product identity from the executable: `product`,
     /// `release`, and `integrity` are all caller-supplied.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when the installation root is not an
+    /// absolute directory, when the candidate is not an absolute regular file,
+    /// when the candidate lies inside the executable's own directory, or when
+    /// the candidate aliases its destination; and [`Error::Io`] when the
+    /// installation root or the candidate cannot be read or canonicalized.
     pub fn for_current_executable(
         product: ProductId,
         release: ReleaseId,
@@ -607,6 +664,11 @@ impl InstallPlan {
     }
 
     /// Resolves a member destination beneath the exact installation root.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnknownMember`] when `member` is not part of this
+    /// plan's artifact set.
     pub fn destination(&self, member: &MemberId) -> Result<PathBuf> {
         let artifact = self
             .artifacts
@@ -617,6 +679,13 @@ impl InstallPlan {
     }
 
     /// Copies every member into private owned stage state without mutating a destination.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] when the private stage cannot be created or a
+    /// member cannot be copied into it. Preparation never mutates a live
+    /// destination and never creates a live destination parent: a missing
+    /// parent is a commit-time failure, not a preparation failure.
     pub fn prepare(self) -> Result<PreparedTransaction> {
         Stage::prepare(self)
     }
@@ -634,6 +703,12 @@ impl InstallPlan {
     /// fail closed and no staged byte is ever obtained by reopening a member
     /// name as fallback. A failed bound stage copy never falls back to the
     /// recorded path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidInput`] when a bound identity does not name a
+    /// member of this plan, and [`Error::Io`] when the private stage cannot
+    /// be created or a member cannot be copied into it.
     pub fn prepare_with_bound_sources(self, bound: BoundSources) -> Result<PreparedTransaction> {
         Stage::prepare_bound(self, bound)
     }

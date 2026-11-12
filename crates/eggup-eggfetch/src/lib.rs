@@ -349,7 +349,7 @@ impl AcquisitionTransport for EggfetchTransport {
             AcquisitionError::InvalidInput(bound("destination has no parent".into()))
         })?;
         let parent_meta = fs::symlink_metadata(parent)
-            .map_err(|e| AcquisitionError::Io(bound(format!("reading artifact parent: {e}"))))?;
+            .map_err(|e| AcquisitionError::__adapter_io("reading artifact parent", e))?;
         if !parent_meta.is_dir() || parent_meta.file_type().is_symlink() {
             return Err(AcquisitionError::InvalidInput(bound(
                 "artifact parent must be an existing real directory".into(),
@@ -430,11 +430,11 @@ impl AcquisitionTransport for EggfetchTransport {
                 }
                 file.write_all(&chunk)
                     .await
-                    .map_err(|e| AcquisitionError::Io(bound(format!("writing part file: {e}"))))?;
+                    .map_err(|e| AcquisitionError::__adapter_io("writing part file", e))?;
             }
             file.flush()
                 .await
-                .map_err(|e| AcquisitionError::Io(bound(format!("flushing part file: {e}"))))?;
+                .map_err(|e| AcquisitionError::__adapter_io("flushing part file", e))?;
             drop(file);
             if cancel.is_cancelled() {
                 return Err(AcquisitionError::Cancelled);
@@ -457,16 +457,14 @@ impl AcquisitionTransport for EggfetchTransport {
     }
 }
 
+/// Bounds a diagnostic detail to 512 bytes, truncating only at a UTF-8
+/// character boundary.
+///
+/// The implementation lives in the seam (`eggup-acquisition`), which owns the
+/// bounded-detail rule. This adapter deliberately keeps no local copy of the
+/// truncation logic; it only delegates.
 fn bound(s: String) -> String {
-    let mut s = s;
-    if s.len() > 512 {
-        let mut end = 512;
-        while !s.is_char_boundary(end) {
-            end -= 1;
-        }
-        s.truncate(end);
-    }
-    s
+    eggup_acquisition::__adapter_bound_detail(s)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1143,7 +1141,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             err,
-            AcquisitionError::InvalidInput(_) | AcquisitionError::Io(_)
+            AcquisitionError::InvalidInput(_) | AcquisitionError::Io { .. }
         ));
         assert_eq!(fs::read(&dest).unwrap(), b"FOREIGN-EGGFETCH");
         let leftovers: Vec<_> = fs::read_dir(&dir)

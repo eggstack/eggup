@@ -7,10 +7,10 @@ file and a contract disagree, the contract wins.
 
 | | |
 |---|---|
-| Source | `crates/eggup-eggpack/src/lib.rs` (single file, 849 lines) |
-| Tests | 7 inline `#[test]` + 3 integration files (56 tests) |
+| Source | `crates/eggup-eggpack/src/lib.rs` (single file, 855 lines) |
+| Tests | 7 inline `#[test]` + 4 integration files (71 tests) |
 | Crate docs | [`README.md`](../crates/eggup-eggpack/README.md), [`CHANGELOG.md`](../crates/eggup-eggpack/CHANGELOG.md) |
-| Status | Published to crates.io at `0.1.2` |
+| Status | Published to crates.io at `0.2.0` |
 | Boundary ADR | [ADR-0004](../plans/adrs/ADR-0004-eggpack-producer-eggup-consumer-boundary.md) |
 
 ## Purpose and ownership boundary
@@ -52,7 +52,7 @@ into runtime consumers.
 | Release selection, version ordering, whether/when to update | `project` requires an already-chosen `canonical_target` (`lib.rs:333-335`) |
 | Release-origin and fallback policy | `PlannedAcquisition.request` is the caller's `AcquisitionRequest`, passed through verbatim (`lib.rs:211`) |
 | Archive artifact selection and format | `archive_format_for_name` classifies a name the caller already chose; it takes no projection argument (`lib.rs:458`) |
-| Install-root / destination selection | Destinations and `destination_root` are caller parameters (`lib.rs:238-243`, `lib.rs:583-589`) |
+| Install-root / destination selection | Destinations and `destination_root` are caller parameters (`lib.rs:238-243`, `lib.rs:589-595`) |
 | Replacement authorization | No helper proves control of a live destination; that is `eggup-core` ownership verification at commit |
 | Ownership and privilege decisions | Not represented in any type here |
 | Permissions intent | Caller supplies `PermissionsIntent` per member; the adapter only maps it |
@@ -70,11 +70,10 @@ Runtime dependencies ([`Cargo.toml`](../crates/eggup-eggpack/Cargo.toml)):
 
 | Dependency | Constraint | Source |
 |---|---|---|
-| `eggup-core` | `=0.1.2` | local path `../eggup-core` |
-| `eggup-archive` | `=0.1.2` | local path `../eggup-archive` |
-| `eggup-acquisition` | `=0.1.2` | local path `../eggup-acquisition` |
+| `eggup-core` | `=0.2.0` | local path `../eggup-core` |
+| `eggup-archive` | `=0.2.0` | local path `../eggup-archive` |
+| `eggup-acquisition` | `=0.2.0` | local path `../eggup-acquisition` |
 | `eggpack-manifest` | `=0.1.0` | crates.io registry |
-| `sha2` | `0.10.9` | crates.io registry |
 
 The three Eggup edges are exact-pinned so the published crate cannot silently
 resolve a different published seam; the producer edge is registry-only so the
@@ -82,14 +81,24 @@ published crate has no VCS source requirement. Both facts are asserted as
 tests, not just comments — see
 [Testing approach](#testing-approach).
 
+The adapter has **no direct `sha2` runtime dependency**. The archive digest is
+computed by `eggup_core::hash_file`, which `eggup-core` already exposes
+(`lib.rs:522-523`). `sha2` therefore reaches the adapter only transitively,
+through `eggup-core` and `eggup-archive`. The published crate's runtime
+dependency list shortens by that one entry; the transitive closure is
+unchanged.
+
 Dev-dependencies (`serde`, `serde_json`, `flate2`, `tar`, `zip`, `sha2`) exist
 so integration tests can build real producer documents and real tar.gz/zip
-bytes rather than asserting against hand-rolled fakes.
+bytes rather than asserting against hand-rolled fakes. The `sha2`
+dev-dependency is deliberately retained: the integration fixtures compute their
+own digests independently of the crate under test, which is test-design
+independence rather than the runtime duplication the adapter no longer carries.
+A dev-dependency creates no runtime supply-chain edge.
 
 The crate is published (`publish = false` was removed in the 0.1.2 registry
-promotion). `eggup-archive` and `sha2` became runtime dependencies only in
-0.1.2, for the archive handoff; `eggup-core` remains Eggpack- and
-archive-independent.
+promotion). `eggup-archive` became a runtime dependency only in 0.1.2, for the
+archive handoff; `eggup-core` remains Eggpack- and archive-independent.
 
 ## Public surface
 
@@ -143,11 +152,11 @@ unless stated otherwise.
 | `project_json` | `lib.rs:409` | Bounded UTF-8 + strict-parse + project. Takes `&[u8]`, so no producer type is in its signature. Parser diagnostics are discarded. |
 | `install_ids` | `lib.rs:422` | Returns `(&ProductId, &ReleaseId)` for an installable projection. |
 | `archive_format_for_name` | `lib.rs:458` | Maps a caller-selected artifact file name to `ArchiveFormat` (`.tar.gz`/`.tgz` → `TarGz`, `.zip` → `Zip`). No I/O, no projection argument. |
-| `validate_acquired_archive` | `lib.rs:481` | Continuity gate for a caller-acquired archive file: absolute, regular, exact size, streamed SHA-256 equal to the manifest digest. The only place the adapter hashes bytes itself. |
-| `archive_plan_for` | `lib.rs:534` | Translates the archive member list into a validated `eggup_archive::ArchivePlan` with per-member expected size and digest. No I/O; does not re-validate the archive. |
-| `core_plan_for_archive_with_destinations` | `lib.rs:583` | Builds the core `InstallPlan` with caller-bound destinations, recording advisory paths as `extraction_root.join(manifest install)`. Bound sources are still empty. |
-| `core_plan_for_archive` | `lib.rs:650` | Compatibility wrapper: builds `default_destinations()` and delegates. The single archive plan implementation. |
-| `bind_archive_members` | `lib.rs:681` | Pairs `BoundMember` handles to declared members by declaration order **with an identity cross-check**, returning `BoundSources`. |
+| `validate_acquired_archive` | `lib.rs:497` | Continuity gate for a caller-acquired archive file: absolute, regular, exact size, streamed SHA-256 equal to the manifest digest. The digest is computed by `eggup_core::hash_file` (`lib.rs:522-523`); the adapter no longer hashes bytes itself. |
+| `archive_plan_for` | `lib.rs:540` | Translates the archive member list into a validated `eggup_archive::ArchivePlan` with per-member expected size and digest. No I/O; does not re-validate the archive. |
+| `core_plan_for_archive_with_destinations` | `lib.rs:589` | Builds the core `InstallPlan` with caller-bound destinations, recording advisory paths as `extraction_root.join(manifest install)`. Bound sources are still empty. |
+| `core_plan_for_archive` | `lib.rs:656` | Compatibility wrapper: builds `default_destinations()` and delegates. The single archive plan implementation. |
+| `bind_archive_members` | `lib.rs:687` | Pairs `BoundMember` handles to declared members by declaration order **with an identity cross-check**, returning `BoundSources`. |
 
 ## The projection boundary — the review focus
 
@@ -213,7 +222,7 @@ ManifestProjection                                   lib.rs:93   (adapter-owned 
 Three translation facts worth checking during review:
 
 - **Hex digests are decoded inside `project`, not downstream.** Every
-  `sha256_bytes()` call site (`lib.rs:349`, `:368`, `:384`, `:395`) maps failure
+  `sha256_bytes()` call site (`lib.rs:350`, `:369`, `:385`, `:396`) maps failure
   to `InvalidManifest`. By the time a `ManifestProjection` exists, all digests
   are `[u8; 32]` values that Eggup can compare. A projection can never carry an
   undecodable or half-validated digest.
@@ -246,10 +255,12 @@ as the enforcement point:
   ([`tests/interoperability.rs:972`](../crates/eggup-eggpack/tests/interoperability.rs))
   asserts the manifest contains `eggpack-manifest = "=0.1.0"` and that it
   contains no `git =`, `rev =`, `branch =`, or `tag =` edge; asserts all three
-  Eggup edges stay `=0.1.2`; and asserts `eggpack-core`, `eggpack-contract`,
-  and `eggpack-bootstrap` appear nowhere.
+  Eggup edges stay `=0.2.0` — derived from the adapter's own
+  `env!("CARGO_PKG_VERSION")` rather than a hardcoded literal, so the invariant
+  is "pinned to *our* version" and survives the next workspace bump; and asserts
+  `eggpack-core`, `eggpack-contract`, and `eggpack-bootstrap` appear nowhere.
 - `adapter_source_claims_no_producer_or_service_authority`
-  ([`tests/interoperability.rs:1019`](../crates/eggup-eggpack/tests/interoperability.rs))
+  ([`tests/interoperability.rs:1023`](../crates/eggup-eggpack/tests/interoperability.rs))
   splits `src/lib.rs` at `#[cfg(test)]` and asserts 24 authority tokens are
   absent from production code: `api.github.com`, `reqwest`, `hyper`, `tokio`,
   `mirror`, `fallback`, `latest`, `base_url`, `base-origin`, `install_root`,
@@ -336,7 +347,7 @@ pins all four fields.
 constructs, rewrites, normalizes, or ranks a URL, and never reads a
 release-origin hint out of the manifest. Unit test
 `exact_request_binding_preserves_url_and_tightens_byte_limit`
-(`lib.rs:797`) binds a request whose URL embeds credentials and a query token
+(`lib.rs:803`) binds a request whose URL embeds credentials and a query token
 and asserts field equality afterwards, which is the concrete statement that
 URL policy is the caller's.
 
@@ -346,8 +357,8 @@ For `Installable`, `member_id` is the installed member identity
 (`MemberId::new(install)`). For `Archive`, `bind_requests` sets it to
 `MemberId::new(artifact_name)` (`lib.rs:194`) — the *archive file* identity, not
 any archive member identity. Archive member identities are derived later, in
-`core_plan_for_archive_with_destinations` (`lib.rs:608`) and
-`bind_archive_members` (`lib.rs:701`), from `MemberId::new(m.install)`.
+`core_plan_for_archive_with_destinations` (`lib.rs:614`) and
+`bind_archive_members` (`lib.rs:707`), from `MemberId::new(m.install)`.
 
 This divergence is not exploitable, because `materialize_artifact_set*` is
 gated to `Installable` and returns `ArchiveExtractionRequired` for an archive
@@ -389,8 +400,8 @@ This is the distinction a reviewer most often gets wrong:
   `IntegrityRequirement`, and `eggup-core` compares it during
   `verify_integrity`. The adapter is a translator here, not a verifier.
 - **Verified in the adapter, on the archive path only:** `validate_acquired_archive`
-  does hash — streamed, 16 KiB chunks (`lib.rs:506-520`) — because the archive
-  must be proven before *any* extraction happens. See
+  does hash — streamed, through `eggup_core::hash_file` (`lib.rs:522-523`) — because
+  the archive must be proven before *any* extraction happens. See
   [Archives: the extraction-required path](#archives-the-extraction-required-path).
 
 The diagnostic is `InvalidAcquiredFile`, which is slightly broader than its
@@ -444,14 +455,14 @@ destination that differs from the manifest default.
 ### What the adapter does and does not decide
 
 **Decides:** that the caller's destination map must be exactly the projected
-member set, in count and in keys (`lib.rs:252-258`, `:599-604`); that no two
-resolved destinations collide (`lib.rs:283-288`, `:623-628`); that each
+member set, in count and in keys (`lib.rs:252-258`, `:605-610`); that no two
+resolved destinations collide (`lib.rs:283-288`, `:629-634`); that each
 destination string passes Eggup's own destination validation
-(`ArtifactMember::new` at `lib.rs:277` and `:617`, failure → `Eggup`).
+(`ArtifactMember::new` at `lib.rs:277` and `:623`, failure → `Eggup`).
 
 **Does not decide:** the destination root. `core_plan_for_archive_with_destinations`
 takes `destination_root: &Path` from the caller and forwards it to
-`InstallPlan::new` (`lib.rs:630`); Eggup validates the root. The adapter
+`InstallPlan::new` (`lib.rs:636`); Eggup validates the root. The adapter
 performs no filesystem mutation, creates no parent directories, and never
 inspects a live destination.
 
@@ -471,17 +482,17 @@ tests — no type signature forces the sequence.
 ```text
 caller-selected archive artifact
   |
-  1. validate_acquired_archive(&projection, &path)        lib.rs:481
+  1. validate_acquired_archive(&projection, &path)        lib.rs:497
   |     projection must be Archive, else ArchiveExtractionRequired
   |     absolute? -> symlink_metadata -> is_file? -> len == exact_size
-  |     streamed SHA-256 == manifest archive digest
+  |     streamed SHA-256 (via eggup_core::hash_file) == manifest archive digest
   |     => no unverified byte is ever handed to an extractor
   |
   2. archive_format_for_name(caller_name)                  lib.rs:458
   |     ".tar.gz" | ".tgz" -> TarGz ; ".zip" -> Zip ; else UnsupportedArchiveFormat
   |     no projection argument: classifies the name the caller already chose
   |
-  3. archive_plan_for(&projection, format, &path, limits) lib.rs:534
+  3. archive_plan_for(&projection, format, &path, limits) lib.rs:540
   |     per member: ArchiveMember::new(source, install, Some(size), Some(sha256))
   |     => eggup_archive::ArchivePlan   [no I/O, no re-validation of the archive]
   |
@@ -492,14 +503,14 @@ caller-selected archive artifact
   |
   6. core_plan_for_archive[_with_destinations](
   |        &projection, &captured_root, &destination_root, destinations, permissions)
-  |     member id     = MemberId::new(manifest install)          lib.rs:608
-  |     advisory path = captured_root.join(manifest install)     lib.rs:612
-  |     integrity     = IntegrityRequirement::Sha256(m.sha256)  lib.rs:620
+  |     member id     = MemberId::new(manifest install)          lib.rs:614
+  |     advisory path = captured_root.join(manifest install)     lib.rs:618
+  |     integrity     = IntegrityRequirement::Sha256(m.sha256)  lib.rs:626
   |     => eggup_core::InstallPlan  with EMPTY BoundSources
   |
   7. extracted.persist().into_bound_sources()?.into_members()  -> Vec<BoundMember>
   |
-  8. bind_archive_members(&projection, bound_members)          lib.rs:681
+  8. bind_archive_members(&projection, bound_members)          lib.rs:687
   |     count equality                       -> MapMismatch("archive bound members")
   |     per-pair identity cross-check        -> MapMismatch("archive bound member identity")
   |     => eggup_core::BoundSources keyed by MemberId::new(install)
@@ -507,32 +518,64 @@ caller-selected archive artifact
   9. InstallPlan::prepare_with_bound_sources(plan, sources)
 ```
 
+### The symlink guard, and the TOCTOU window it does not close
+
+`validate_acquired_archive` rejects a symlinked acquired path **before** any
+open: `fs::symlink_metadata` (`lib.rs:513-514`) does not follow links, the
+`!meta.file_type().is_file()` test (`lib.rs:515-517`) rejects a link, a
+directory, a FIFO, and a device, and the exact-size test shares that guard.
+The digest is computed only afterwards, by `eggup_core::hash_file`
+(`lib.rs:522-523`), which **does** follow symlinks when it opens the path. The
+guard is therefore the only link rejection on this path, and it must not be
+moved, weakened, or merged into the hash call.
+
+Ordering is proven, not asserted. Test
+`symlink_guard_precedes_the_open_so_a_fifo_target_never_blocks`
+([`tests/digest_reuse.rs`](../crates/eggup-eggpack/tests/digest_reuse.rs))
+points the acquired path at a FIFO: an implementation that opened the path
+before rejecting the link would block forever, so the fixture runs the call on
+a worker thread behind a bounded wait and fails the test rather than hanging
+the lane.
+
+**Known limitation, carried forward:** the guard and the open are not atomic.
+`symlink_metadata` (`lib.rs:513`) and the open inside `hash_file`
+(`lib.rs:522`) are separate pathname operations, so a path replaced by a
+symlink in that window is followed and the target is hashed. The adapter
+neither introduces nor closes this window. Closing it needs
+`O_NOFOLLOW`-style handle-relative opening, which `eggup-core` does not expose
+on this path today (`eggup-archive` uses `fs_at` for its own handle-relative
+work; core does not). This is recorded as a **low**-severity finding; fixing it
+is a separate milestone with its own design. The digest comparison at
+`lib.rs:524-526` remains the authoritative check, so a concurrent writer is
+still caught and still fails closed.
+
 ### Why `core_plan_for_archive*` sits at step 6, before persistence
 
 `ArtifactMember::new` requires a source path, and at step 6 the extracted
 bytes do not yet have an open handle bound to them. The adapter therefore
 records `extraction_root.join(manifest install)` as an **advisory** path
-(`lib.rs:612`). The doc at `lib.rs:576-578` states the consequence precisely:
+(`lib.rs:618`). The doc at `lib.rs:582-584` states the consequence precisely:
 advisory paths are never opened during staging when a bound handle is
 supplied; the string exists to satisfy `ArtifactMember::new`'s validation and
 to support diagnostics. `eggup-core` documents the same rule independently
-(`domain.rs:415-416`: the recorded source path is advisory diagnostics only
-once a handle is supplied).
+(`crates/eggup-core/src/domain.rs:696-700`: the recorded source path is advisory
+diagnostics only and is never opened, even if it now names foreign state).
 
 This is why the caller must capture `ExtractedArchive::root()`
-(`eggup-archive` `lib.rs:328`) before `persist()` consumes the guard. After
+(`eggup-archive` `crates/eggup-archive/src/lib.rs:349`) before `persist()`
+consumes the guard. After
 persistence the caller holds a `PersistedExtraction`, and the adapter's
 advisory path must still be meaningful for as long as the plan exists.
 
 Test `advisory_member_entry_replacement_does_not_redirect_staged_bytes`
-([`tests/archive_handoff.rs:586`](../crates/eggup-eggpack/tests/archive_handoff.rs))
+([`tests/archive_handoff.rs:593`](../crates/eggup-eggpack/tests/archive_handoff.rs))
 exercises the exact attack this design forecloses: replacing the file at the
 advisory path after extraction must not change which bytes get staged, because
 staging reads the bound handle.
 
 ### The identity cross-check in `bind_archive_members`
 
-`bind_archive_members` (`lib.rs:681`) pairs `BoundMember` handles to declared
+`bind_archive_members` (`lib.rs:687`) pairs `BoundMember` handles to declared
 members by declaration order, then verifies each pair's own recorded identity:
 
 ```rust
@@ -541,7 +584,7 @@ if bound.source_path() != declared.source || bound.output_name() != declared.ins
 }
 ```
 
-`lib.rs:698-700`. The rationale is in the doc comment at `lib.rs:675-680` and
+`lib.rs:704-706`. The rationale is in the doc comment at `lib.rs:681-686` and
 in the `Unreleased` [CHANGELOG](../crates/eggup-eggpack/CHANGELOG.md) entry:
 count-only pairing would let a `BoundExtraction` produced from a *different*
 `ArchivePlan`, or reused after a re-projection that reordered members, commit
@@ -551,12 +594,12 @@ identical content — the case where it matters most.
 
 `archive_plan_for` is what makes the check sound: it sets
 `source_path = declared.source` and `output_name = declared.install`
-(`lib.rs:546-551`), so a correctly-produced extraction always carries exactly
+(`lib.rs:552-557`), so a correctly-produced extraction always carries exactly
 the identities the projection declares. Tests:
 `bind_archive_members_cross_checks_bound_identity_not_just_count`
-(`archive_handoff.rs:482`) and
+(`archive_handoff.rs:489`) and
 `bind_archive_members_rejects_an_extraction_of_a_different_projection`
-(`archive_handoff.rs:554`).
+(`archive_handoff.rs:561`).
 
 ### Two caller obligations the types do not enforce
 
@@ -565,7 +608,7 @@ two places most likely to be got wrong in review:
 
 1. `validate_acquired_archive` is not required by any signature.
    `archive_plan_for` accepts no proof that it ran, and performs no I/O
-   (`lib.rs:531-533`). A caller who skips it gets a valid `ArchivePlan` for
+   (`lib.rs:537-539`). A caller who skips it gets a valid `ArchivePlan` for
    unverified bytes; the failure then surfaces inside `eggup-archive::extract`
    as a per-member digest or size mismatch, which is later but not equivalent.
 2. `archive_format_for_name` takes a name, not the projection
@@ -596,7 +639,7 @@ a form.
 The asymmetry is deliberate and is the shape of the extraction boundary: the
 direct helpers refuse archive projections (`lib.rs:135`, reached from `:244`
 and `:425`), and the archive helpers refuse installable projections
-(`lib.rs:542`, `:597`, `:687`). `bind_requests` and `default_destinations`
+(`lib.rs:548`, `:603`, `:693`). `bind_requests` and `default_destinations`
 serve both variants, because an archive still needs exactly one acquisition
 request for the archive file.
 
@@ -613,32 +656,34 @@ Every `AdapterError` variant, what triggers it, and where.
 | JSON input exceeds `MAX_MANIFEST_BYTES` (1 MiB) | `InvalidManifest` | `lib.rs:413-415` |
 | Input is not valid UTF-8 | `InvalidManifest` | `lib.rs:416` |
 | `ReleaseManifest::from_json` parse or schema failure | `InvalidManifest`; producer diagnostic discarded | `lib.rs:417` |
-| Hex digest fails to decode (artifact or member) | `InvalidManifest` | `lib.rs:349`, `:368`, `:384`, `:395` |
+| Hex digest fails to decode (artifact or member) | `InvalidManifest` | `lib.rs:350`, `:369`, `:385`, `:396` |
 | Exact canonical target absent, or an alias is used | `TargetNotFound` | `lib.rs:333-335` |
 | Request map missing or has extra entries | `MapMismatch("acquisition request")` | `lib.rs:198-202` |
 | Acquired-path map missing or has extra entries | `MapMismatch("acquired path")` | `lib.rs:245-251` |
-| Destination map missing or has extra entries | `MapMismatch("destinations")` | `lib.rs:252-258`, `:599-604` |
-| Permission map missing or has extra entries | `MapMismatch("permissions")` | `lib.rs:259-263`, `:602-604` |
-| Two members resolve to the same destination | `MapMismatch("destinations")` | `lib.rs:283-288`, `:623-628` |
-| Bound member count ≠ declared member count | `MapMismatch("archive bound members")` | `lib.rs:689-691` |
-| Bound member `source_path`/`output_name` ≠ declared identity | `MapMismatch("archive bound member identity")` | `lib.rs:698-700` |
+| Destination map missing or has extra entries | `MapMismatch("destinations")` | `lib.rs:252-258`, `:605-610` |
+| Permission map missing or has extra entries | `MapMismatch("permissions")` | `lib.rs:259-263`, `:608-610` |
+| Two members resolve to the same destination | `MapMismatch("destinations")` | `lib.rs:283-288`, `:629-634` |
+| Bound member count ≠ declared member count | `MapMismatch("archive bound members")` | `lib.rs:695-697` |
+| Bound member `source_path`/`output_name` ≠ declared identity | `MapMismatch("archive bound member identity")` | `lib.rs:704-706` |
 | Caller `max_artifact_bytes` < manifest exact size | `CallerLimitTooSmall(name)` | `lib.rs:206-208` |
-| Acquired path is relative | `InvalidAcquiredFile(name)` | `lib.rs:267-269`, `:496-498` |
-| Acquired path missing (`symlink_metadata` errors) | `InvalidAcquiredFile(name)` | `lib.rs:270-271`, `:499-500`, `:504-505`, `:509-511` |
-| Acquired path is a symlink, directory, or other non-regular | `InvalidAcquiredFile(name)` | `lib.rs:272-274`, `:501-503` |
-| Acquired file size ≠ declared exact size | `InvalidAcquiredFile(name)` | `lib.rs:272-274`, `:501-503` |
-| Acquired archive SHA-256 ≠ manifest digest | `InvalidAcquiredFile(artifact_name)` | `lib.rs:518-520` |
+| Acquired path is relative | `InvalidAcquiredFile(name)` | `lib.rs:267-269`, `:510-512` |
+| Acquired path missing (`symlink_metadata` errors) | `InvalidAcquiredFile(name)` | `lib.rs:270-271`, `:513-514` |
+| Acquired path is a symlink, directory, or other non-regular | `InvalidAcquiredFile(name)` | `lib.rs:272-274`, `:515-517` |
+| Acquired file size ≠ declared exact size | `InvalidAcquiredFile(name)` | `lib.rs:272-274`, `:515-517` |
+| Digest step cannot open the acquired file | `InvalidAcquiredFile(artifact_name)` | `:522-523` (core's `hash_file` open failure) |
+| Digest step cannot read the acquired file | `InvalidAcquiredFile(artifact_name)` | `:522-523` (core's `hash_file` read failure) |
+| Acquired archive SHA-256 ≠ manifest digest | `InvalidAcquiredFile(artifact_name)` | `lib.rs:524-526` |
 | Installable-only helper used on an `Archive` projection | `ArchiveExtractionRequired` | `lib.rs:135` (from `:244`, `:425`) |
-| Archive-only helper used on an `Installable` projection | `ArchiveExtractionRequired` | `lib.rs:494`, `:542`, `:597`, `:687` |
+| Archive-only helper used on an `Installable` projection | `ArchiveExtractionRequired` | `lib.rs:508`, `:548`, `:603`, `:693` |
 | Name is empty, non-ASCII, or not `.tar.gz`/`.tgz`/`.zip` | `UnsupportedArchiveFormat` | `lib.rs:459-469` |
 | `FetchLimits::validate` fails on the baseline | `Eggup(detail)` | `lib.rs:170-172` |
-| `MemberId::new` / `ProductId::new` / `ReleaseId::new` rejects an identifier | `Eggup(detail)` | `lib.rs:156`, `:195`, `:337`, `:339`, `:353`, `:372`, `:608`, `:701` |
-| `ArtifactMember::new` rejects a destination | `Eggup(detail)` | `lib.rs:277-278`, `:617-618` |
-| `ArtifactSet::new` rejects empty input or duplicate identity | `Eggup(detail)` | `lib.rs:289`, `:629` |
-| `InstallPlan::new` rejects the root or the set | `Eggup(detail)` | `lib.rs:630-631` |
-| `ArchiveMember::new` or `ArchivePlan::new` rejects a declaration or limits | `Eggup(detail)` | `lib.rs:552`, `:556` |
+| `MemberId::new` / `ProductId::new` / `ReleaseId::new` rejects an identifier | `Eggup(detail)` | `lib.rs:156`, `:195`, `:337`, `:339`, `:353`, `:372`, `:614`, `:707` |
+| `ArtifactMember::new` rejects a destination | `Eggup(detail)` | `lib.rs:277-278`, `:623-624` |
+| `ArtifactSet::new` rejects empty input or duplicate identity | `Eggup(detail)` | `lib.rs:289`, `:635` |
+| `InstallPlan::new` rejects the root or the set | `Eggup(detail)` | `lib.rs:636-637` |
+| `ArchiveMember::new` or `ArchivePlan::new` rejects a declaration or limits | `Eggup(detail)` | `lib.rs:558`, `:562` |
 
-Two properties of this table that a reviewer should hold onto:
+Three properties of this table that a reviewer should hold onto:
 
 - **Fail-closed, not fail-open, and structurally.** Every mismatch between
   caller-supplied maps and manifest-derived requirements is a distinct named
@@ -652,9 +697,20 @@ Two properties of this table that a reviewer should hold onto:
   ([`tests/caller_destinations.rs:625`](../crates/eggup-eggpack/tests/caller_destinations.rs))
   asserts this for destinations; the projection-side equivalent is
   `bounded_json_projection_rejects_invalid_documents_without_leaking_input`
-  (`lib.rs:734`), which feeds a document containing `https://user:super-secret@example.invalid/?token=hidden`
+  (`lib.rs:740`), which feeds a document containing `https://user:super-secret@example.invalid/?token=hidden`
   and asserts the formatted `Display` + `Debug` output contains none of
   `private`, `super-secret`, or `token=hidden`.
+- **The archive continuity gate collapses its digest-step failures.** The
+  digest is computed by `eggup_core::hash_file` (`lib.rs:522-523`); its open
+  failure, its read failure, and the digest mismatch all report the same
+  `InvalidAcquiredFile(artifact_name)`. The collapse is preserved from the
+  adapter's own inline routine and is a deliberate, documented limitation
+  rather than an oversight: `AdapterError` carries only the artifact name and
+  has no `source()` chain, so the underlying `io::Error` could not be surfaced
+  through the adapter's error type even if a variant were added. Narrowing the
+  surface — distinguishing "the acquired file is invalid" from "the acquired
+  file could not be read" — would change what a published consumer observes
+  and belongs at an intentional API boundary, not inside this crate.
 
 ## The verification ladder
 
@@ -664,7 +720,7 @@ The adapter sits on the **integrity rung only**
 
 | Operation | What it does | Who performs the comparison |
 |---|---|---|
-| `validate_acquired_archive` | Hashes the acquired archive file, streamed in 16 KiB chunks | **The adapter**, against the manifest-declared digest (`lib.rs:506-520`) |
+| `validate_acquired_archive` | Hashes the acquired archive file, streamed through `eggup_core::hash_file` (`lib.rs:522-523`) | **The adapter**, against the manifest-declared digest (`lib.rs:524-526`) |
 | `materialize_artifact_set*` | Attaches `IntegrityRequirement::Sha256` | `eggup-core`, at `verify_integrity` |
 | `archive_plan_for` | Passes `Some(size)` and `Some(sha256)` per member | `eggup-archive`, during extraction |
 | `bind_archive_members` | Compares identities, not digests | Identity only; no hash involved |
@@ -685,7 +741,7 @@ vocabulary for trust because it has no trust decisions to make.
 
 Consequences a reviewer should confirm hold:
 
-- Digest comparison uses `!=` on `[u8; 32]` (`lib.rs:518`), not a
+- Digest comparison uses `!=` on `[u8; 32]` (`lib.rs:524`), not a
   constant-time comparison. For a public hash of a public artifact, the timing
   profile carries no information the caller does not already have.
 - The adapter never re-hashes a direct/bundle artifact. It is not a
@@ -699,18 +755,19 @@ Consequences a reviewer should confirm hold:
 
 ## Testing approach
 
-63 tests total: 7 inline in `src/lib.rs:711-849`, 56 across three integration
-files. The 3:1 ratio is the right shape for a conformance adapter — the inline
+71 tests total: 7 inline in `src/lib.rs:717-855`, 64 across four integration
+files. The 4:1 ratio is the right shape for a conformance adapter — the inline
 tests check the adapter's own arithmetic in isolation, while the integration
 tests check composition against the *real* producer schema and the *real*
 lower crates, which is where a translation bug actually lives.
 
 | File | Lines | Tests | What it establishes |
 |---|---|---|---|
-| `src/lib.rs` inline | 839 | 7 | Boundary at exactly `MAX_MANIFEST_BYTES`; invalid-input redaction; exact-target selection and alias rejection; corrected-fixture projection across all three forms; request binding and cap tightening; size and permission gate on materialization. |
-| `tests/interoperability.rs` | 1058 | 28 | Producer-schema conformance plus a numbered rejection matrix. |
-| `tests/archive_handoff.rs` | 663 | 13 | The full eight-step archive chain against real `tar.gz` and `zip` bytes. |
+| `src/lib.rs` inline | 855 | 7 | Boundary at exactly `MAX_MANIFEST_BYTES`; invalid-input redaction; exact-target selection and alias rejection; corrected-fixture projection across all three forms; request binding and cap tightening; size and permission gate on materialization. |
+| `tests/interoperability.rs` | 1062 | 28 | Producer-schema conformance plus a numbered rejection matrix. |
+| `tests/archive_handoff.rs` | 670 | 13 | The full eight-step archive chain against real `tar.gz` and `zip` bytes. |
 | `tests/caller_destinations.rs` | 666 | 15 | Destination binding, defaults, wrapper equivalence, and failure closure. |
+| `tests/digest_reuse.rs` | 317 | 8 | The archive continuity gate's digest behavior: known-artifact digest value, symlink rejection, symlink-before-open ordering (FIFO), size-mismatch rejection, digest-mismatch fail-closed, the core open failure's error mapping, the core read path's error shape, and the manifest's absence of a direct runtime `sha2` dependency. |
 
 ### `interoperability.rs`
 
@@ -743,6 +800,23 @@ destination keys, rejection of invalid destinations by Eggup's own validation,
 independence of the permission and acquired maps, archive-projection
 destination failures, and diagnostic sanitization.
 
+### `digest_reuse.rs`
+
+Eight tests that pin the archive continuity gate across the move from an
+inline SHA-256 loop to `eggup_core::hash_file`: the digest value for a known
+artifact, the symlink rejection, the symlink-before-open ordering proven with a
+FIFO target behind a bounded wait, the size-mismatch rejection, the
+digest-mismatch fail-closed path, the mapping of the core routine's open
+failure onto `AdapterError::InvalidAcquiredFile`, the core routine's read-path
+error shape, and the manifest's absence of a direct runtime `sha2` dependency.
+
+The first seven are pass-to-pass: they assert behavior that is correct both
+before and after the routine swap, so they are regression guards rather than
+red-first proofs. The manifest assertion is the only red-first fixture — it
+fails against the pre-M006 manifest, where `sha2 = "0.10.9"` was a
+`[dependencies]` entry. The Unix-only fixtures (symlink, FIFO ordering, and the
+mode-`000` open failure) do not run on Windows.
+
 ### Focused commands
 
 ```sh
@@ -751,6 +825,7 @@ cargo test -p eggup-eggpack --test interoperability
 cargo test -p eggup-eggpack --test archive_handoff
 cargo test -p eggup-eggpack --test caller_destinations
 cargo test -p eggup-eggpack <test_name>
+cargo test -p eggup-eggpack --test digest_reuse
 cargo clippy -p eggup-eggpack --all-targets --locked -- -D warnings
 ```
 
@@ -769,18 +844,25 @@ See [tooling-governance.md](tooling-governance.md).
 | Bounded allowlisted extraction, `ArchivePlan`, `BoundMember`, deferred cleanup | [archive-extraction.md](archive-extraction.md) |
 | Service lifecycle composition (downstream, optional) | [service-lifecycle.md](service-lifecycle.md) |
 | Lints, CI matrix, planning and closure process | [tooling-governance.md](tooling-governance.md) |
-| Closure records: `001`, `001a`, `002`, `002a`, `003`, `003a`, `004`, `004a` | [`plans/closure/eggpack-manifest-interoperability/`](../plans/closure/eggpack-manifest-interoperability/) |
+| Closure records: `001`, `001a`, `002`, `002a`, `003`, `003a`, `004`, `004a`, `005`, `006`, `007` | [`plans/closure/eggpack-manifest-interoperability/`](../plans/closure/eggpack-manifest-interoperability/) |
 | Planning registry | [plans/registry.md](../plans/registry.md) |
 | Crate README / CHANGELOG | [`crates/eggup-eggpack/`](../crates/eggup-eggpack/) |
 
 **Published-crate status.** `eggup-eggpack` is published to crates.io at
-`0.1.2` (`docs.rs/eggup-eggpack`). The published `src/lib.rs` is recorded in
-the 0.1.2 CHANGELOG entry as byte-identical to the previously pinned revision
-`678bbf04f5a02827003a1d9ab83ba4f0e6360e41`, so the registry promotion is
-byte-faithful rather than merely version-compatible. The `Unreleased`
-CHANGELOG entry records the `bind_archive_members` identity cross-check as a
-security fix with no API change. `AdapterError` is `#[non_exhaustive]`, so
+`0.2.0` (`docs.rs/eggup-eggpack`); `0.1.2` was the registry promotion, whose
+published `src/lib.rs` is recorded in the 0.1.2 CHANGELOG entry as
+byte-identical to the previously pinned revision
+`678bbf04f5a02827003a1d9ab83ba4f0e6360e41`, so that promotion was byte-faithful
+rather than merely version-compatible. `AdapterError` is `#[non_exhaustive]`, so
 adding variants remains source-compatible for downstream `match` callers.
+
+The published `0.1.3` manifest carried a direct `sha2` runtime dependency and
+the adapter's own inline digest loop. The published `0.2.0` manifest drops that
+runtime edge: the adapter delegates the digest to `eggup_core::hash_file`, so
+its runtime dependency list is one entry shorter than `0.1.3`'s, with an
+unchanged transitive closure and no consumer migration. The `0.2.0` publication
+re-pins all three Eggup edges to `=0.2.0`; the `0.1.x` line is not withdrawn,
+and the `v0.1.1`, `v0.1.2`, and `v0.1.3` tags have not moved.
 
 ## Known doc/code drift
 
@@ -789,20 +871,38 @@ verified against the code rather than assumed:
 
 - The README's claim that `materialize_artifact_set` and `core_plan_for_archive`
   are compatibility wrappers over caller-bound variants is accurate
-  (`lib.rs:292-305`, `:634-664`); there is one implementation of each.
+  (`lib.rs:292-305`, `:640-670`); there is one implementation of each.
 - The 0.1.2 CHANGELOG's claim that `materialize_artifact_set` still returns
   `ArchiveExtractionRequired` for archive projections is accurate
   (`lib.rs:135` via `:244`; test `negative_17`).
-- `overview.md`'s `849 / 63` figure is accurate: 849 source lines, 7 inline
-  plus 28 + 13 + 15 integration tests.
 - `MAX_MANIFEST_BYTES` is the producer's bound re-exported, not a
   separately-chosen value.
+- The adapter's manifest declares no direct runtime `sha2` dependency
+  (`crates/eggup-eggpack/Cargo.toml`), and the digest is computed by
+  `eggup_core::hash_file` (`lib.rs:522-523`). The `sha2` dev-dependency is
+  retained for independent fixture digests.
+
+Drift **outside** this document's ownership, recorded here so the owning
+workstream can act on it:
+
+- `overview.md`'s `849 / 63` figure was stale: the crate is 855 source lines
+  with 7 inline plus 28 + 13 + 15 + 8 integration tests, i.e. 71 in total.
+  Corrected in `overview.md` by the architecture-anchor corrective.
+- `docs/crates.md` previously carried `=0.1.2` for the Eggup pins, which were
+  then `=0.1.3`. That drift was **repaired**, and the `0.2.0` train moved the pins
+  again: `docs/crates.md:125-126` now states `=0.2.0` and names
+  `crates/eggup-eggpack/Cargo.toml` as the source of truth.
+  `docs/crates.md:122-123` is the separate `cargo tree --workspace` review
+  rule and never carried a version pin. `docs/` is non-normative, so this
+  document does not restate its wording.
 
 Two items that read as imprecision but are not drift, recorded here so a
 future reviewer does not re-raise them:
 
 - `AdapterError::InvalidAcquiredFile` covers digest mismatch and wrong size,
-  which is broader than its name suggests (`lib.rs:272-274`, `:518-520`).
+  which is broader than its name suggests (`lib.rs:272-274`, `:524-526`). It
+  also covers the digest step's open and read failures, which are collapsed
+  into it deliberately.
 - `PlannedAcquisition.member_id` denotes an archive *file* identity for
   `Archive` projections and an *installed member* identity for `Installable`
   ones (`lib.rs:194` versus `:352`/`:371`). Not reachable across the routing

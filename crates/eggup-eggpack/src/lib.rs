@@ -6,8 +6,8 @@ use eggpack_manifest::{ArtifactForm, ReleaseManifest, MAX_DOCUMENT_BYTES};
 use eggup_acquisition::{AcquisitionRequest, FetchLimits};
 use eggup_archive::{ArchiveFormat, ArchiveLimits, ArchiveMember, ArchivePlan, BoundMember};
 use eggup_core::{
-    ArtifactMember, ArtifactSet, BoundSources, InstallPlan, IntegrityRequirement, MemberId,
-    PermissionsIntent, ProductId, ReleaseId,
+    hash_file, ArtifactMember, ArtifactSet, BoundSources, InstallPlan, IntegrityRequirement,
+    MemberId, PermissionsIntent, ProductId, ReleaseId,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -478,12 +478,26 @@ pub fn archive_format_for_name(file_name: &str) -> Result<ArchiveFormat, Adapter
 /// direct/bundle files, moved ahead of extraction so no unverified byte is
 /// ever extracted. Performs bounded streaming reads only; no network, no
 /// alternate-source retry, no provenance claim.
+///
+/// # Errors
+///
+/// Returns [`AdapterError::InvalidAcquiredFile`] for every failure on this
+/// path: a relative path, a missing path, a path that is not a regular file
+/// (a symlink, directory, FIFO, or device), a size that differs from the
+/// declared exact size, a digest that differs from the manifest digest, and
+/// a digest step that cannot open or read the file.
+///
+/// The digest is computed by [`eggup_core::hash_file`]. Its open and read
+/// failures are collapsed into the same variant and payload as the digest
+/// mismatch, exactly as the adapter's own inline digest routine reported
+/// them. The collapse is deliberate: [`AdapterError`] carries only the
+/// artifact name and has no `source()` chain, so distinguishing "the acquired
+/// file is invalid" from "the acquired file could not be read" would change
+/// what a published consumer observes and belongs to a separate API decision.
 pub fn validate_acquired_archive(
     projection: &ManifestProjection,
     acquired_archive_path: &Path,
 ) -> Result<(), AdapterError> {
-    use sha2::{Digest, Sha256};
-    use std::io::Read;
     let (artifact_name, exact_size, sha256) = match projection {
         ManifestProjection::Archive {
             artifact_name,
@@ -501,20 +515,12 @@ pub fn validate_acquired_archive(
     if !meta.file_type().is_file() || meta.len() != exact_size {
         return Err(AdapterError::InvalidAcquiredFile(artifact_name.clone()));
     }
-    let mut file = fs::File::open(acquired_archive_path)
+    // The guard above runs first: `hash_file` follows symlinks when it opens
+    // the path, so this is the only link rejection on the path. The digest
+    // step's own failures collapse into the same variant and payload as the
+    // mismatch below, preserving the adapter's published error surface.
+    let digest: [u8; 32] = hash_file(acquired_archive_path)
         .map_err(|_| AdapterError::InvalidAcquiredFile(artifact_name.clone()))?;
-    let mut hasher = Sha256::new();
-    let mut chunk = [0u8; 16 * 1024];
-    loop {
-        let read = file
-            .read(&mut chunk)
-            .map_err(|_| AdapterError::InvalidAcquiredFile(artifact_name.clone()))?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&chunk[..read]);
-    }
-    let digest: [u8; 32] = hasher.finalize().into();
     if digest != sha256 {
         return Err(AdapterError::InvalidAcquiredFile(artifact_name.clone()));
     }

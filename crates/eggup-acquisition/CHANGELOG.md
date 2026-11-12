@@ -1,5 +1,109 @@
 # Changelog
 
+## 0.2.0 — 2026-10-24
+
+Published to crates.io from the workspace `0.2.0` source version
+(`plans/closure/acquisition-transport/017-status.md`). The crate has **zero
+`[dependencies]`**, before and after: the seam carries no transport, service, or
+producer dependency. The seam selects no release, verifies no authenticity, and
+authorizes no destination.
+
+This version is **source-breaking**, and it is source-breaking in exactly two
+ways. A consumer must change these two things, and nothing else:
+
+- `AcquisitionError::Io` is no longer a tuple variant. A consumer that wrote
+  `AcquisitionError::Io(_)` must write `AcquisitionError::Io { .. }` (or
+  `AcquisitionError::Io { operation, source }`).
+- `AcquisitionError` now derives **only** `Debug`. `Clone`, `PartialEq`, and
+  `Eq` are **removed**, because the retyped variant carries a
+  `std::io::Error`, which implements none of them — the same trade-off
+  `eggup-core`'s published `Error` makes for the same reason. A consumer that
+  cloned or compared whole `AcquisitionError` values must match on the variant
+  and its fields instead.
+
+No other consumer-visible behaviour changes: the `Display` rendering stays
+bounded at 512 bytes and is truncated only at a UTF-8 character boundary, `Io`
+stays terminal under every `CompositionPolicy`, and no dependency is added. The
+two `#[doc(hidden)]` adapter-facing entry points below are source-compatible
+additions and are not consumer contract. A consumer that neither matches on
+`AcquisitionError::Io` nor clones or compares the error needs no migration at
+all.
+
+**Published release: `0.2.0`** — source-breaking. The workspace is
+version-lockstep, so every crate moved from `0.1.3` to `0.2.0` with this
+release, and this is the publication of that source version. `0.1.3` was the
+previous published baseline on crates.io.
+
+**Publication coupling with the seam's `0.2.0` release (Acquisition Transport
+M016).** The seam's `0.2.0` release did **not** satisfy the `^0.1.0`
+requirement the two adapters declared, nor the `=0.1.3` pin the leaf adapter
+declared. Every in-workspace dependent's requirement therefore widened, in the
+same publication milestone, to:
+
+- `eggup-curl`: `eggup-acquisition` = "0.2" (widened from "0.1.0").
+- `eggup-eggfetch`: `eggup-acquisition` = "0.2" (widened from "0.1.0").
+- `eggup-eggpack`: `eggup-acquisition` = "=0.2.0" (re-pinned from "=0.1.3").
+- `eggup-transport-footprint`: `eggup-acquisition` = "0.2" (widened from "0.1.0").
+
+**This release performs the coupling.** The workspace version moved to `0.2.0`
+(the workspace is version-lockstep, so all eight crates moved with it), the
+widenings above were applied, `eggup-eggpack`'s other exact pins (`eggup-core`,
+`eggup-archive`) were re-pinned to the new version, and the crates were
+published in dependency order: the seam, then the adapters, then the leaf.
+`eggup-transport-footprint` is `publish = false` and is never published; its
+requirement widens only so the workspace still resolves.
+
+**Typed I/O failure surface (Acquisition Transport M013).** `AcquisitionError::Io`
+no longer flattens the underlying `std::io::Error` into a string. The variant is
+retyped in place as `Io { operation: &'static str, source: std::io::Error }`,
+mirroring `eggup-core`'s published `Error::Io { operation, source }`, and
+`impl std::error::Error for AcquisitionError` now overrides `source()` to return
+the underlying `io::Error`. A consumer can match on `std::io::ErrorKind`
+(`NotFound` vs `PermissionDenied` vs `AlreadyExists`) and walk the `source()`
+chain instead of parsing `Display` text.
+
+**Compatibility, stated precisely.** This is a **source-breaking** change:
+
+- `AcquisitionError::Io(_)` no longer compiles against the struct-shaped
+  variant; consumers must write `AcquisitionError::Io { .. }` (or
+  `AcquisitionError::Io { operation, source }`).
+- `AcquisitionError` now derives **only** `Debug`. `Clone`, `PartialEq`, and
+  `Eq` are **removed**, because `std::io::Error` implements none of them — the
+  same trade-off `eggup-core`'s published `Error` makes for the same reason.
+  Consumers that cloned or compared whole `AcquisitionError` values must match
+  on the variant and its fields instead.
+- The publication of this crate is therefore a source-breaking release
+  (`0.2.0`, or the 0.2/1.0 boundary release), **not** a `0.1.4`.
+
+Unchanged by this change: `Io` remains **terminal** under every
+`CompositionPolicy` (it is never reclassified as `Unavailable` or `Transport`,
+so it never triggers transport fallback); the rendered `Display` keeps the
+seam's bounded form (at most 512 bytes, truncated only at a UTF-8 character
+boundary); and the typed path carries **no** URL, credential, or proxy material
+in the variant, in `source()`, or in `Display`.
+
+**Public API addition (adapter-facing, source-compatible).** Two `#[doc(hidden)]`
+adapter-facing entry points are added. They are not part of the consumer
+contract and exist only so the verified adapters can build seam values:
+
+- `__adapter_io(operation, source)` — builds the typed `Io` variant.
+- `__adapter_bound_detail(detail)` — applies the seam's 512-byte
+  UTF-8-safe bounding rule, so adapters no longer keep their own truncation
+  copy.
+
+**Truncation consolidation.** The two inlined UTF-8-safe truncation walks inside
+`redact_url` (256-byte cap plus the trailing `…`) and `__scrub_upstream_text`
+(512-byte cap, no ellipsis) are replaced by this crate's own
+`truncate_utf8_bytes` primitive. Output is **byte-identical**; the redaction
+tests that pin the 256/512-byte edges remain unchanged and green.
+
+The crate still has **zero `[dependencies]`**, before and after.
+
+## Unreleased
+
+Nothing in this section has been published. `0.2.0` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
+
 ## 0.1.3 — 2026-10-06
 
 Published to crates.io from the workspace `0.1.3` source version
@@ -40,11 +144,6 @@ stays terminal for the requested URL. Diagnostic redaction is unchanged, and no
 raw upstream, command-line, or credential material is ever embedded. The part
 file is still created exclusively, owner-private (`0600` on Unix), never
 symlink-followed, and promoted with race-safe no-clobber semantics.
-
-## Unreleased
-
-Nothing in this section has been published. `0.1.3` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
 
 ## 0.1.2 — 2026-10-02
 

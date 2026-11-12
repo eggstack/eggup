@@ -2,7 +2,7 @@
 
 Status: active
 
-Last implementation/closure baseline reviewed: `2fbb3c6f75ae536b53a7d30087c0b0edef7c74ec` (Service M011 post-publication fixture and test-harness correction; final hosted run `37883703334` green; package source `feb6ae5`, checksum `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`). Downstream handoff refreshed 2026-10-09 against `dbowm91/wg-basic@ff40f85`.
+Last implementation/closure baseline reviewed: `2d6e08924fa5d7a9e147595c2f76fc7cc0e9d219` (Core M019 / Service M017 post-publication packaged-service qualification; hosted run `40100087952` green on all five lanes; published package source `b612608`). Downstream handoff refreshed 2026-10-09 against `dbowm91/wg-basic@ff40f85`.
 
 Superseded baseline: `44d7fdf6d31d67a2e2c8b0f62aa4f00ec365daeb` (Core M010/M011 final hosted-qualified line; run `37376971555` green on Stable/MSRV/macOS/Windows; subsequent `44d7fdf6` is docs-only governance correction)
 
@@ -12,7 +12,7 @@ Latest reviewed pre-C003 planning/status baseline: `da1b4a8048bf863e6a653c25f1ba
 
 Latest registration reconciliation before this header refresh: `8f1d10db370c0fda2b84f2665751c00b15c2adb2` (service 0.1.2 authorization wording reconciled after the new M009 registration)
 
-Newest qualified Eggup runtime delta with fully green hosted qualification is the Core M010/M011 corrective line, final run `37376971555` green on Stable/MSRV/macOS/Windows. M010/M011 implementation began at `95f75678` and the Windows qualification wave fixed the missing cross-platform current-executable identity proof plus portability defects before final closure. Earlier M003a implementation `39ff6260` remains historical adapter evidence. Runtime commits have landed after `39ff626`: `git log 39ff626..HEAD -- crates/` returns `e548b64` (eggpack 0.1.2 registry promotion), `0b8cb98` (workspace bug-audit fixes across `eggup-acquisition`/`eggup-archive`/`eggup-core`), `b485228` (eggup-curl 0.1.2 changelog cut), and `4a95e4d` (docs reconciliation touching `crates/eggup-service/CHANGELOG.md` only). The two `0b8cb98` acquisition fixes were **published on 2026-10-06** as `eggup-acquisition 0.1.3`; `^0.1.0` consumers (curl, eggfetch) and, since `eggup-eggpack 0.1.3`, adapter consumers now receive them automatically. The historical note that they were unpublished is superseded; the 0.1.2-era caveat remains recorded for readers of that version. M003 Eggsact real-consumer adoption is closed at consumer `eggstack/eggsact@65c916ba3b0f02916203ec1aad09d7e5c023c278` on Eggup pin `e336b32` (hosted CI run `36902758482` + drift run `36902758396` green). The M009 release-prep head `e8e07eb538d0eef18ea4cb4ace3bb905c316da72` (run `36487099388` green) remains the provenance for the published `eggup-core`/`eggup-archive 0.1.2` pair, not the latest qualified runtime. Code qualification was established at `9a5500e` (M002a clippy + Windows-adapter head; run `36477024102` green, superseding failed run `36463041223`); Core M008a reran the exact clean-tree package/publish-dry-run evidence on the post-M002a tree with no material delta. Planning-hygiene C009 corrected the stale Consumer M006 claim: current `eggstack/eggress@03134f8` has both the updater surface and registered Delivery M003 plan. Eggup M009 published the compatible 0.1.2 pair on 2026-09-28; Egress M006 subsequently closed on 2026-09-29 after Egress Delivery M003 landed with hosted Linux/macOS/Windows updater evidence. The prior Eggpack cross-repo drift is now reconciled: Eggpack interoperability M003 records the downstream closure, and Eggpack Release Manifest M003 is closed: `eggpack-manifest 0.1.0` is published to crates.io from Eggpack `8d661e4` (checksum `2a08f24b…b629`, tag `eggpack-manifest-v0.1.0`, closure `eggstack/eggpack: plans/closure/release-manifest/003-status.md`).
+Newest qualified runtime delta: the Core M010/M011 corrective line, final run `37376971555` green on all four lanes. M003a (`39ff6260`) is historical adapter evidence; `git log 39ff626..HEAD -- crates/` returns `e548b64`, `0b8cb98`, `b485228`, `4a95e4d`. The two `0b8cb98` acquisition fixes published 2026-10-06 as `eggup-acquisition 0.1.3`. Baseline provenance, the code-qualification head `9a5500e`, and the consumer closures are recorded under `plans/closure/`.
 
 The newest service runtime correction is M010 at `0bde3fe`, with run
 `37875012280` green including Linux systemd. M011 published `eggup-service
@@ -46,20 +46,21 @@ This file is the compact control surface for active Eggup planning. Detailed req
 
 Eggup owns consumer-side acquisition, verification, candidate validation, local extraction required for installation, ownership/staging/locking/commit/rollback/recovery, install receipts, and service lifecycle. Producer release contracts, release conformance, package/archive construction, final release manifests, bootstrap-installer generation, generated release CI, staging/publication, and producer provenance belong to `eggstack/eggpack`.
 
-`eggup-core` must remain usable without Eggpack. The optional manifest adapter translates stable Eggpack release evidence into Eggup deployment inputs without importing producer build/CI machinery. Eggpack interoperability M001a is closed at `eggstack/eggpack@678bbf04f5a02827003a1d9ab83ba4f0e6360e41`; Eggup adapter M001 is historically closed and M001a qualification/closure hardening is closed at `plans/closure/eggpack-manifest-interoperability/001a-status.md`. Bounded Eggup adapter/API qualification for M003 is complete. The producer-evidence gate that previously stopped real Eggsact adoption has been resolved externally: Eggpack Ecosystem M001 and Eggsact Distribution M005 closed on the real `v1.2.7` producer contract (`release/eggpack/distribution.toml` authority for the unversioned asset names; `release-manifest.json` published alongside the binaries, checksum sidecars, and installers); the consumer-path half of M003 has now closed via consumer `eggstack/eggsact@65c916b` on Eggup pin `e336b32` (hosted CI run `36902758482` + drift run `36902758396` green; see `plans/closure/eggpack-manifest-interoperability/003-status.md`).
+Eggpack's producer evidence is a separate upstream publication: `eggpack-manifest 0.1.0` published from Eggpack `8d661e4` (checksum `bb8b9341…0e179`); closure at `plans/closure/eggpack-manifest-interoperability/003-status.md`. The 0.1.2 adapter set consumes that manifest, and the `eggsact` consumer closes the Eggpack→Eggup chain on the registry (`65c916b`, pin `e336b32`; runs `36902758482` + `36902758396` green). `eggup-dist` was unpublished predecessor evidence only.
 
 ## Recently closed foundation
 
 | Workstream | Closed work | Evidence |
 |---|---|---|
-| Verified update core | M001-M013 closed; `eggup-core 0.1.3` published 2026-10-06; hosted runs `37376971555` and `37527706900` green on Stable/MSRV/macOS/Windows | `plans/closure/verified-update-core/` |
-| Acquisition transport | M001-M011 closed; M009 published `eggup-curl 0.1.2` (2026-10-04), M010 published `eggup-acquisition 0.1.3` (2026-10-06), M011 published `eggup-eggfetch 0.1.3` (2026-10-06); M012 registered, `ready for handoff` | `plans/closure/acquisition-transport/` |
-| Service lifecycle | M001–M011 closed; `eggup-service 0.1.3` published 2026-10-09 | `plans/closure/service-lifecycle/` |
-| Archive extraction | M001 lineage + M001d closed; M004 published `eggup-archive 0.1.3` 2026-10-06 | `plans/closure/archive-extraction/` |
-| Eggpack manifest interoperability | M001-M005 all closed; M004 published the 0.1.2 triple, M005 published `eggup-eggpack 0.1.3` 2026-10-06 with the member-identity cross-check | `plans/closure/eggpack-manifest-interoperability/` |
+| Verified update core | M001-M015 and M017-M019 closed; `eggup-core 0.2.0` published 2026-10-24 from `b612608`, hosted run `40079833945` green on all five lanes | `plans/closure/verified-update-core/` |
+| Acquisition transport | M001-M017 closed, M012 conditionally; M017 published `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` 0.2.0 (2026-10-24) from `b612608` | `plans/closure/acquisition-transport/` |
+| Service lifecycle | M001-M017 closed; `eggup-service 0.2.0` published 2026-10-24 from `b612608`, carrying the stdin-verdict fix the published `0.1.3` lacks | `plans/closure/service-lifecycle/` |
+| Archive extraction | M001 lineage + M001d + M005 + M006 closed; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608` | `plans/closure/archive-extraction/` |
+| Eggpack manifest interoperability | M001-M007 all closed; M007 published `eggup-eggpack 0.2.0` 2026-10-24 from `b612608`, re-pinning all three in-workspace deps at `=0.2.0` | `plans/closure/eggpack-manifest-interoperability/` |
+| Transport footprint | M001 closed; the three isolated transport configurations are built or checked in the `stable`, `msrv`, and `macos` lanes | `plans/closure/transport-footprint/` |
 | Distribution/bootstrap (archived/transferred) | M001-M004 | `plans/closure/distribution-bootstrap/` |
 | Consumer adoption | M001 eggsact + M002 stegoeggo + M003 eggsearch + M005 CodeGG + M006 Egress (closed 2026-09-29) | `plans/closure/consumer-adoption/` |
-| Planning/closure hygiene corrective | C001-C012 all closed (docs-only reconciliation track) | `plans/closure/planning-closure-hygiene-corrective/` |
+| Planning/closure hygiene corrective | C001-C015 all closed (docs-only reconciliation track); C014 documentation-truth and C015 architecture-anchor correctives closed concurrently | `plans/closure/planning-closure-hygiene-corrective/` |
 
 Implementation wave `889a234c` added/closed acquisition M003, service M002, and distribution M001. Hosted CI at that exact SHA passed stable fmt/clippy/test/doc, Rust 1.89 check, macOS tests, and Windows workspace check.
 
@@ -70,7 +71,8 @@ Published 0.1.1 crates (lockstep patch superseding 0.1.0):
 - `eggup-eggfetch`
 - `eggup-service`
 
-Published `0.1.2` set on crates.io — **all seven published crates**, in four steps: `eggup-core`, `eggup-archive` (2026-09-28); `eggup-acquisition`, `eggup-eggfetch`, `eggup-eggpack` (2026-10-02); `eggup-curl` (2026-10-04); `eggup-service` (2026-10-05, from `7fb84bc`, registry id `3411496`, checksum `c6288eb1…50e3f`). `eggup-service` was published later from a different source commit than the shared `v0.1.2` tag; the tag still denotes the core/archive publication source and was not moved. `eggup-transport-footprint` is `publish = false` by design and has no registry version.
+Published `0.1.2` set on crates.io — **all seven published crates**, in four steps: `eggup-core`, `eggup-archive` (2026-09-28); `eggup-acquisition`, `eggup-eggfetch`, `eggup-eggpack` (2026-10-02); `eggup-curl` (2026-10-04); `eggup-service` (2026-10-05, from `7fb84bc`, registry id `3411496`, checksum `c6288eb1…50e3f`). `eggup-service` was published later from a different source commit than the shared `v0.1.2` tag; the tag still denotes the core/archive publication source
+and was not moved. `eggup-transport-footprint` is `publish = false` by design and has no registry version.
 
 Initial `0.1.3` train — **five crates, two source commits**, published 2026-10-06:
 
@@ -93,6 +95,48 @@ GitHub Release `0.1.3` without moving the shared tag `v0.1.3`. `v0.1.1`/`v0.1.2`
 and release `0.1.2` were not moved. `eggup-transport-footprint` remains
 `publish = false`.
 
+`0.2.0` train — **all seven published crates, one source commit**, published
+2026-10-24:
+
+| Package | Published from | Registry checksum |
+|---|---|---|
+| `eggup-core 0.2.0` | `b612608` | `2c86a0eb…eb23b8` |
+| `eggup-archive 0.2.0` | `b612608` | `ce35edd5…ff57ad` |
+| `eggup-acquisition 0.2.0` | `b612608` | `2ef74b4d…299fc3` |
+| `eggup-curl 0.2.0` | `b612608` | `15cf536f…90d3f7` |
+| `eggup-eggfetch 0.2.0` | `b612608` | `9fc8f648…658721` |
+| `eggup-service 0.2.0` | `b612608` | `31dd2e22…fe1b4a` |
+| `eggup-eggpack 0.2.0` | `b612608` | `33dc1da4…14f1f6` |
+
+The version is `0.2.0`, not `0.1.4`: the workspace is version-lockstep and
+`eggup-acquisition`'s next release is source-breaking — `AcquisitionError::Io(String)`
+became `Io { operation, source }` and the enum derives `Debug` only — so the
+seam had to advance and carried every crate with it. Published in dependency
+order — core, archive, seam, curl, eggfetch, service, eggpack — because a crate
+is packaged only after every in-workspace dependency it names is on the
+registry. The `v0.2.0` tag and GitHub Release `0.2.0` point at `b612608`, the
+publication source commit; the `v0.1.1`/`v0.1.2`/`v0.1.3` tags and the published
+`0.1.x` versions were not moved or withdrawn. `eggup-transport-footprint`
+remains `publish = false`.
+
+One line differs between the published packages and this repository. The seven
+`.crate` files were uploaded on 2026-10-24 and their `CHANGELOG.md` carries the
+heading `## 0.2.0 — 2026-10-23`, the date the release was cut; the repository's
+copy carries `## 0.2.0 — 2026-10-24`, the date it was published, which is the
+convention every earlier per-crate release section follows. Registry state is
+immutable, so the published heading is not corrected there.
+
+The close-out that follows the publication is qualified separately, because it
+is documentation-only and cannot change what was published. Commit `fd60b4b`
+("close out the 0.2.0 publication train") is green on all five lanes in run
+`40102904892`, and commit `390c224` (the registry's publication-row correction)
+was **red in the `stable` lane** in run `40103357142` on a transient `ETXTBSY`
+in the pre-existing core unit test `bounded_candidates_are_exact_and_environment_is_cleared`;
+`git diff fd60b4b 390c224 -- crates/ scripts/ .github/` is empty, so the code was
+byte-identical to the green run, and the rerun on the same source SHA (attempt
+2) was green on all five lanes. That is the third recorded re-observation of
+registry finding 1, and it is recorded there rather than here.
+
 `eggup-dist` was unpublished and existed only as migration predecessor evidence. It was removed after Eggpack Contract M002 qualified the complete M003 behavior; see `plans/closure/distribution-bootstrap/004-status.md`.
 
 Existing simple consumers:
@@ -102,13 +146,27 @@ Existing simple consumers:
 
 ## Post-closure review findings
 
-The core remains qualified with no newly identified medium-or-higher defect.
+The core remains qualified. The 2026-10-23 workspace audit registered new
+medium-or-higher findings, each with a corrective; they are recorded below
+rather than in this summary.
 
 ### Post-0.1.3 open findings
 
-Two **low**-severity findings remain. Neither blocks further work, and per the
-repository's own gate, "medium-or-higher" issues are what force a corrective
-before a milestone closes.
+Findings 1 and 2 are **low**-severity and block nothing. Per the repository's own
+gate, "medium-or-higher" issues are what force a corrective before a milestone
+closes. Findings 3-14 were registered by a read-only audit of the whole
+workspace at baseline `c4805411f74b85158e0ae5d0a219a32c4209d98e`; each carries a
+registered corrective, except 12, 13, and 14, which are recorded as follow-on
+work for the reasons stated. **No production failure was reported for any of them.**
+All were found by reading the code, so the severities below are the assessed
+severities, not observed ones, and each corrective states the same limitation.
+Findings 3, 4, 5, 7, 10, and 11 have since been implemented and closed by their
+registered correctives; finding 11 is retained here, marked closed, so that its
+number is never reused. Finding 15 was registered later, by Service M015, and
+finding 16 by the same pass; both are entries here whose defect was
+**observed** rather than assessed — the published `eggup-service 0.1.3`
+misreports a successful stdin write, and the packaged-service step fails
+against the registry. Finding 17 was registered by Acquisition M016.
 
 1. **`eggup-curl` sub-second-deadline tests are load-sensitive on a busy host.**
    `build_curl_args_passes_sub_second_deadlines_to_fake_curl` and
@@ -124,7 +182,51 @@ before a milestone closes.
    (14 cores, loadavg 62–68): **3/40 failures** on
    `build_curl_args_passes_sub_second_deadlines_to_fake_curl`, panicking with
    `Timeout { phase: "total" }` at a reported `0.77s` against a 750 ms budget.
-   This finding closes when M012 closes.
+   **Re-observed 2026-10-23** during the five-milestone implementation pass, on
+   an unmodified `crates/eggup-curl/`: the same test failed once under a load
+   average of 95.33 and then passed 8/8 in isolation and across a
+   `--no-fail-fast` whole-workspace run. This is new evidence for M012's
+   plan and confirms the finding is unrelated to the 0.1.3 corrective work.
+   **Re-observed again on the hosted Ubuntu lane** in run `40005168760`, where
+   the same test failed with a *spawn* failure rather than a timeout —
+   `Unavailable("curl spawn failed for https://example.com/x")` — while the
+   identical code had passed the same lane in run `40004604594`. The cause was
+   not diagnosable, because `Command::spawn()`'s `io::Error` was discarded and
+   a missing executable, a non-executable file, and a transient resource
+   exhaustion were indistinguishable. Acquisition M015 was authored and
+   implemented: the `Unavailable` detail now names the `ErrorKind` and the raw
+   OS code, so the cause is attributable.
+   The finding is therefore **narrowed, not closed**: M012 closed the
+   *timeout-coupling* mode and M015 made the *spawn* mode attributable, but an
+   intermittent spawn failure under host resource pressure can still occur.
+   Acquisition M012 is **conditionally closed** on exactly that re-observation,
+   and this finding stays open.
+   **Re-observed 2026-10-24 on the hosted Ubuntu lane in run `40067739294`**, in
+   a different crate and with an attributable cause: the core crate's
+   pre-existing unit test `bounded_candidates_are_exact_and_environment_is_cleared`
+   failed with `Io { operation: "spawning bounded candidate", source: Os {
+   code: 26, kind: ExecutableFileBusy, message: "Text file busy" } }` — an
+   `ETXTBSY` on the script the fixture had just written. The test existed at
+   baseline `c480541` and the branch did not modify it; the branch's added core
+   test load made the race easier to reach. It did not reproduce in 25
+   consecutive local runs of `cargo test -p eggup-core --lib`, and the next
+   hosted run, `40067964510`, was **green on all five lanes**. This is the same
+   class as the two modes already recorded here — a load-sensitive test whose
+   host-level cause is not the crate's semantics — and it is recorded here
+   rather than registered separately, so that the class stays in one place.
+   `ETXTBSY` is transient by construction: the kernel refuses to execute a file
+   that is momentarily open for writing, which is what a host package
+   replacement does to the interpreter a `#!/bin/sh` script names.
+   **Re-observed again 2026-10-24 on the hosted Ubuntu lane in run `40103357142`**,
+   with the identical `ETXTBSY` in the identical pre-existing core unit test
+   `bounded_candidates_are_exact_and_environment_is_cleared`. The failing
+   commit `390c224` changed `plans/registry.md` only — `git diff fd60b4b
+   390c224 -- crates/ scripts/ .github/` is empty, so the code was byte-identical
+   to the green run `40102904892` — and the rerun on the same source SHA
+   (attempt 2) was **green on all five lanes**. This is the third recorded
+   re-observation of the same class and the same test; the transient host-level
+   cause is unchanged, so the class stays in this one place rather than being
+   registered separately.
 2. **`CleanupDisposition::DeferredToProcessExit` is a source-visible addition to
    a closed enum.** Required by M010 for truthful Windows self-update reporting;
    no truthful value exists in the `0.1.2` two-variant set, and marking the enum
@@ -132,8 +234,311 @@ before a milestone closes.
    `eggstack` consumers reference the type. Revisit at the intentional 0.2/1.0
    API boundary together with `Error` extensibility. See
    `plans/closure/verified-update-core/012-status.md`.
+3. **`eggup-core` bounded candidate execution can exceed its documented
+   wall-clock deadline.** `run_bounded` (`crates/eggup-core/src/candidate.rs:125`)
+   evaluates its deadline only while the direct child is still alive (`:187`),
+   and joins its reader threads only on the success path (`:199`). A descendant
+   holding the inherited stdout/stderr pipe pins the call past the stated
+   maximum; the timeout path additionally leaks both reader threads.
+   **Severity: high** — a published library can hang indefinitely and violates a
+   documented safety bound. **Core M014 is registered for this** —
+   `plans/implementation/verified-update-core/014-bounded-execution-deadline-corrective.md`,
+   `ready for handoff`. **Implemented and closed** at
+   `plans/closure/verified-update-core/014-status.md`: the deadline is now an
+   unconditional maximum wall-clock bound on the whole bounded execution, the
+   descendant case is bounded and fail-closed, and the reader-thread lifecycle
+   is explicit. The public surface is unchanged. Linux, Windows, and the hosted
+   CI matrix were **not run** from the implementation machine.
+4. **`eggup-archive`'s public cleanup contract is mis-documented and can never
+   succeed.** Three of the four `cleanup()` entry points
+   (`crates/eggup-archive/src/lib.rs:353`, `:392`, `:580`) document that they
+   "remove" the extraction directory, but the shared implementation at `:1287`
+   only empties it and unconditionally returns
+   `Err(ExtractionErrorKind::CleanupFailed)`. **Severity: high** — a published
+   API whose `Result` success path is unreachable, documented as doing something
+   it does not do. **Archive M005 is registered for this** —
+   `plans/implementation/archive-extraction/005-cleanup-contract-and-member-write-corrective.md`,
+   `ready for handoff`. **Implemented and conditionally closed** at
+   `plans/closure/archive-extraction/005-status.md`: all four entry points now
+   share one truthful contract with a reachable `Ok` path, the crate still never
+   removes the root directory or traverses the root pathname, and the duplicated
+   tar/zip member-write body is now one shared helper. One downstream
+   consequence — the `eggup-eggpack` test helper encoding the removed
+   expectation — was migrated by the parent session. The remaining condition is
+   the outstanding hosted qualification: Linux, Windows, and the hosted CI
+   matrix were **not run** from the implementation machine.
+5. **`eggup-service` carries two divergent copies of the commit/rollback
+   engine.** `disposition.rs:321` and `lifecycle_update.rs:254` implement the same
+   orchestrator, and the copies already differ in safety-relevant ways:
+   post-transition verification at `lifecycle_update.rs:552` against
+   `disposition.rs:918`, and a typed error at `disposition.rs:946` against an
+   `unreachable!()` at `lifecycle_update.rs:541`. Three structurally identical
+   ownership enums also exist across two crates
+   (`crates/eggup-core/src/domain.rs:116`, `crates/eggup-service/src/lib.rs:132`,
+   `crates/eggup-service/src/lib.rs:2773`) with no conversion between them.
+   **Severity: high.** **Service M012 is registered for this** —
+   `plans/implementation/service-lifecycle/012-commit-engine-deduplication-corrective.md`,
+   `ready for handoff`. **Implemented and closed** at
+   `plans/closure/service-lifecycle/012-status.md`: there is now one engine
+   (`commit_engine`) reached by both public orchestrators, and the stricter of
+   the two former behaviours wins everywhere — the manager's `completed` flag is
+   re-verified by observation, an ownership that is no longer `Owned` is always
+   a typed failure, an unobservable or non-owned service is never stopped before
+   a rollback, and an invalid desired state produces a typed bounded failure
+   instead of a panic. The two former behavioural differences survive as named,
+   separately testable policy inputs that both default to the stricter
+   behaviour. `eggup_service::Ownership` now re-exports `eggup_core::Ownership`
+   and `CronOwnership` is a public alias of it; the manager command output type
+   is renamed `ManagerCommandOutput` with the old spelling kept as a
+   non-deprecated alias; and manager-output diagnostic text is bounded by one
+   declared ceiling. Linux, Windows, and the hosted CI matrix were **not run**
+   from the implementation machine.
+6. **`eggup-service`'s real Windows SCM backend has never been executed against
+   the real SCM API, and the published API surface has no local-gate guard.**
+   `WindowsBackend` (`crates/eggup-service/src/windows_scm.rs:907`) has no test
+   call site; all 15 SCM tests drive `FakeBackend` (`:1111`), so the
+   `windows-check` lane proves compilation rather than behavior. The untested
+   surface includes the `windows-service` mapping layer and five `unreachable!()`
+   sites. Separately, the `published-api-0.1.{2,3}` fixtures are separate
+   workspaces that `scripts/check-local.sh` cannot reach, and
+   `tests/api_compatibility.rs` asserts against a helper defined in its own file.
+   **Severity: high.** **Service M014 is registered for this** —
+   `plans/implementation/service-lifecycle/014-windows-scm-execution-and-api-surface-corrective.md`,
+   `ready for handoff`.
+7. **`eggup-service` collapses manager failures into untyped strings and applies
+   three different timeout models across its adapters.** `ServiceError` has four
+   variants (`crates/eggup-service/src/lib.rs:289-303`) and the crate
+   substring-matches its own error text at `:1788`; systemd, launchd, and SCM
+   each bound a chained operation differently. **Severity: medium.** **Service
+   M013 is registered for this** —
+   `plans/implementation/service-lifecycle/013-manager-failure-taxonomy-and-deadline-contract-corrective.md`,
+   `ready for handoff`. **Implemented and conditionally closed** at
+   `plans/closure/service-lifecycle/013-status.md`: `ServiceError::Manager`
+   carries a machine-readable `ManagerFailureKind` and the crate no longer
+   classifies its own failures by substring-matching its own error text; every
+   adapter creates exactly one `OperationDeadline` per operation; and
+   `CronManager` lists the crontab once, states its ownership rule once, and
+   refuses inconsistent request material before any listing or mutation.
+   Three **low**-severity findings remain open (the plan's literal
+   "sum of recorded budgets ≤ one transition timeout" arithmetic form is
+   unachievable with a wall-clock deadline and an instant executor — the
+   substantive one-deadline contract is proven instead; the unrun platform and
+   hosted lanes; and stderr-only access denial classifying as `Protocol`
+   rather than `Permission`). Linux, Windows, and the hosted CI matrix were
+   **not run** from the implementation machine.
+8. **Nine `eggup-curl` tests pass vacuously when their fixture is unavailable,
+   and `AcquisitionError::Io` flattens the underlying `io::Error`.** The
+   `else { return }` guard appears at `crates/eggup-curl/src/lib.rs:1036`, `:1060`,
+   `:1122`, `:1149`, `:1183`, `:1394`, `:1432`, `:1454`, `:1485`; a test that
+   returns early is indistinguishable from a passing one.
+   `AcquisitionError::Io(String)` (`crates/eggup-acquisition/src/lib.rs:271`) has
+   no `source()` implementation, so `io::ErrorKind` is unrecoverable by a
+   consumer. **Severity: medium.** **Acquisition M013 is registered for this** —
+   `plans/implementation/acquisition-transport/013-adapter-assertion-and-failure-typing-corrective.md`,
+   `ready for handoff`.
+9. **`eggup-eggpack` re-implements core's file-digest routine and carries a
+   direct `sha2` dependency for that one call site.** The inline loop at
+   `crates/eggup-eggpack/src/lib.rs:504-518` duplicates `eggup_core::hash_file`
+   (`crates/eggup-core/src/integrity.rs:65`), in a crate that already depends on
+   `eggup-core = "=0.1.3"`. **Severity: medium** — the behavior is correct; the
+   defect is a redundant published-crate dependency edge and a drift site.
+   **Eggpack M006 is registered for this** —
+   `plans/implementation/eggpack-manifest-interoperability/006-canonical-digest-reuse-corrective.md`.
+   **Implemented and closed** at
+   `plans/closure/eggpack-manifest-interoperability/006-status.md` (2026-10-23):
+   the adapter delegates to `eggup_core::hash_file`, so the workspace holds one
+   file-digest implementation. That closure left the defect **unpublished** —
+   the registry's `eggup-eggpack 0.1.3` still carries `sha2 ^0.10.9` as a
+   runtime dependency. **Disposition — closed for consumers on 2026-10-24.**
+   Eggpack M007 published `eggup-eggpack 0.2.0` from `b612608`, and the
+   published manifest carries no `sha2` normal dependency — `sha2` survives only
+   as a dev-dependency for independent fixture digests. The published `0.1.x`
+   line still carries the redundant edge; registry versions are immutable, so
+   consumers pinned to `0.1.3` must move to `0.2.0` to receive the fix.
+10. **`eggup-core`'s published failure taxonomy contains a category that can
+    never be produced, and the crate's public `Result` surface documents no
+    failure modes.** `FailureCategory::RetainedEvidence`
+    (`crates/eggup-core/src/transaction.rs:116`) is never constructed — the only
+    producer, the error-to-category mapping at `:195`, cannot yield it — yet
+    `as_str()` publishes the name `retained-evidence`. The crate has zero
+    `# Errors` rustdoc sections across all of `src/`. **Severity: medium.**
+    **Core M015 is registered for this** —
+    `plans/implementation/verified-update-core/015-public-api-contract-truthfulness-corrective.md`,
+    `ready for handoff`. **Implemented and closed** at
+    `plans/closure/verified-update-core/015-status.md`: the unreachable
+    `RetainedEvidence` variant and its `retained-evidence` string are removed,
+    the remaining seven `as_str()` strings are byte-identical to the published
+    ones, and all 32 public fallible items now carry an `# Errors` section,
+    enforced by a crate-local `clippy::missing_errors_doc`. `Error` keeps
+    exactly the seven published variants and `FailureCategory` stays
+    `#[non_exhaustive]`. Linux, Windows, and the hosted CI matrix were **not
+    run** from the implementation machine.
+11. **Root `CHANGELOG.md`, the consumer-facing `docs/`, `AGENTS.md`, the
+    architecture deep dives, and this registry itself carried stale or
+    contradictory status text after the 0.1.3 train.** The root `Unreleased`
+    section asserted "Published baselines are `0.1.2` for all seven published
+    crates" and re-listed work the `0.1.3` section records as published;
+    `docs/crates.md` and `docs/quickstart.md` contradicted `docs/releases.md`;
+    `AGENTS.md` and `architecture/overview.md` /
+    `architecture/tooling-governance.md` carried the same stale pin claims.
+    Inside this registry, Acquisition M010 was "ready" in one table and "closed"
+    in another, and Gregg M004 was "blocked" in one table and "authorable" in
+    another. **Severity: medium.** **Planning C013 is registered for this** —
+    `plans/implementation/planning-closure-hygiene-corrective/013-post-audit-documentation-truth-reconciliation.md`,
+    **closed 2026-10-23** at
+    `plans/closure/planning-closure-hygiene-corrective/013-status.md`: the root
+    `Unreleased` section now names the current published baseline and holds only
+    genuinely unpublished work, the `docs/`/`README.md`/`AGENTS.md`/architecture
+    version claims match the manifests and the registry, and this registry states
+    one status per milestone with the `Dependency-ready implementation work`
+    table named as authoritative. The line references quoted above were true at
+    baseline `c480541` and are superseded by that closure record.
+12. **The `eggup-transport-footprint` crate's central claim is not verified by
+    any CI job, and the crate has no subsystem roadmap.** CI and the local gate
+    only ever build `--all-features` or no features, so the isolated
+    single-adapter configurations — the crate's entire purpose — are never
+    built. `architecture/transport-footprint.md` further claims that the
+    `required-features` split "makes an accidental cross-link a build error";
+    that is inaccurate under `--all-features`, where optional dependencies are
+    visible to every binary in the package. The crate has three binaries, 45
+    source lines, and zero tests, and its binaries perform no measurement in
+    code. Its published dependency counts (3 / 92 / 93) still reproduce
+    exactly and must not change. **Severity: medium.** **Closed by Transport
+    Footprint M001** —
+    `plans/implementation/transport-footprint/001-isolated-configuration-coverage-corrective.md`;
+    closure `plans/closure/transport-footprint/001-status.md`. The isolated
+    single-adapter configurations are now built by CI — `stable` and `macos`
+    build them with `cargo build`, `msrv` checks them at the 1.89 floor — and a
+    linkage-discipline guard rejects a sibling-adapter reference in every
+    configuration, with a discriminating negative control. The crate's
+    dependency counts 3 / 92 / 93 still reproduce exactly. The `windows-check`
+    lane still builds none of the three binaries, before and after; that is
+    recorded as `not run`, not inferred. The prerequisite that had no plan —
+    the missing subsystem roadmap — was discharged first: the roadmap is at
+    `plans/subsystems/transport-footprint-roadmap.md`.
+13. **Roadmap Phases 12 (authenticity / supply-chain hardening) and 13 (public
+    API stabilization) are unstarted, and Phase 13's fuzz/property coverage for
+    the security-critical parsers does not exist.** The workspace contains no
+    `proptest`, `quickcheck`, `arbitrary`, or `benches/` target, while the
+    parsers carrying the most security weight — tar/zip entry handling, the
+    Eggpack manifest, SHA-256 sidecar parsing — have example-based coverage
+    only. **Severity: medium.** These are roadmap capabilities rather than
+    correctives, so no implementation plan is registered here;
+    `plans/002-long-term-roadmap.md` owns their sequencing, and each requires
+    roadmap decomposition before a bounded plan can be authored.
+14. **`eggup-core`'s authoritative contract docs are not shipped to crates.io
+    consumers.** `crates/eggup-core/Cargo.toml` excludes `docs/`, so
+    `cargo package -p eggup-core --list` shows `src/`, `examples/`, `README.md`,
+    and `CHANGELOG.md` — and not `crates/eggup-core/docs/{domain,verification,transaction}.md`.
+    `AGENTS.md` calls those three files the authoritative contracts and
+    `architecture/overview.md` routes readers to them, so a consumer on crates.io
+    or docs.rs cannot read the contract they are being bound to. **Severity:
+    medium.** **Verified Update Core M016 is now registered and ready for
+    handoff** at
+    `plans/implementation/verified-update-core/016-eggup-core-contract-doc-packaging.md`.
+    The manifest change alone has no consumer effect without the `eggup-core`
+    republication that would deliver it. M016 owns the package change and its
+    qualification; a separate, recorded maintainer authorization is still
+    required before upload. C013 recorded the residual as an open drift row in
+    `architecture/tooling-governance.md` §"Known doc/code drift", naming M016
+    as the owner.
+15. **The published `eggup-service 0.1.3` reports a successful stdin write as
+    a failure.** The replaced `SystemExecutor` runner polled the stdin writer's
+    verdict with `try_recv()`, which *removes* the message, so the writer's
+    `Ok(())` was discarded and the later `recv_timeout` observed an empty,
+    disconnected channel and concluded the write had failed. The published
+    source carries it at `~/.cargo/registry/src/*/eggup-service-0.1.3/src/lib.rs:801`
+    (`if let Ok(Err(_)) = rx.try_recv()`) and again at `:819`. The affected
+    path is `crontab -`, the crate's only production stdin caller, so a
+    crontab install reports `manager(Spawn, "manager stdin failed for …")`
+    after a write that in fact succeeded. **Severity: medium** — the defect is
+    in the source line, the behavior is user-visible on the one path that
+    uses it, and the failure is not transient. **Service M015 closed the
+    source-line defect** (`plans/closure/service-lifecycle/015-status.md`):
+    the consolidated runner delegates to `eggup_core::run_bounded`, whose
+    writer protocol does not lose the verdict, and the closure's baseline
+    evidence shows the new fixture failing against the pre-change
+    implementation and the published `feb6ae5` source. The **published**
+    `eggup-service 0.1.3` still carries the defect, so the exposure is open
+    until a republication milestone delivers the fix; `v0.1.3` must not move.
+    **Disposition — closed for consumers on 2026-10-24.** Service Lifecycle
+    M017 published `eggup-service 0.2.0` from `b612608`, which carries the
+    fix, so the defect is no longer reachable by a consumer who resolves
+    `0.2.0`. The published `0.1.3` still carries it — that version is not
+    withdrawn and `v0.1.3` was not moved — so a consumer pinned to `0.1.3`
+    still carries the exposure, and the fix reaches it only by resolving
+    `0.2.0`. Closure:
+    `plans/closure/service-lifecycle/017-status.md`.
+16. **The packaged-service verification is deferred because the source line now
+    depends on an unpublished `eggup-core`.** `cargo package -p eggup-service
+    --locked` resolves `eggup-core` from crates.io, so it compiles the
+    packaged crate against the **published** `eggup-core 0.1.3`. Service M015's
+    consolidated runner calls `CommandSpec::stdin_data` (Core M017) and relies
+    on core's unconditional execution deadline (Core M014); neither is in the
+    published `0.1.3`, so the step fails with `E0599: no method named
+    'stdin_data' found for struct 'CommandSpec'`. Hosted run `40061134915`
+    observed that failure in the `stable`, `msrv`, `macos`, and
+    `windows-check` lanes. **Severity: medium.** It is a publication state,
+    not a defect in the source line — the same condition this branch already
+    created for `eggup-curl`, `eggup-eggfetch`, and `eggup-eggpack`, whose
+    sources also use capabilities the registry does not carry; the service
+    package step was the last one still resolving against the registry.
+    **Disposition at the time of the deferral:** the four CI steps were moved to
+    `cargo package -p eggup-service --locked --no-verify`, with an inline
+    comment in `.github/workflows/ci.yml` recording why, so the deferral was
+    visible in the workflow and not silently dropped. The step still packaged
+    the crate and validated its manifest and file list, and the compile of the
+    packaged sources stayed covered by the workspace build, test, and clippy
+    steps. **Follow-on: the `eggup-core` republication**, after
+    which the strict step is restored. That republication is a named follow-on,
+    not yet a numbered milestone, and it needs explicit maintainer authorization.
+    CI never performs it.
+    **Disposition — closed on 2026-10-24.** The `eggup-core` republication
+    landed: `eggup-core 0.2.0` is on crates.io, published from `b612608`, and
+    the strict step was restored in commit `2d6e089` — all four lanes that
+    carry it now run `cargo package -p eggup-service --locked`, and the
+    packaged sources are compiled against the registry copy of
+    `eggup-core 0.2.0` rather than only packaged. The registry-only fixture
+    proves the same thing from outside the repository: a consumer of
+    `eggup-service 0.2.0` resolves `eggup-core 0.2.0` from crates.io and
+    cannot resolve `0.1.3`.
 
-Corrective work identified after reviewing implementation SHA `889a234c` was closed sequentially. A 2026-09-26 review at code baseline `ee1476ef2a9e0d5569d6dc2469e780a4435cc426` opened acquisition M007 and service M007; Acquisition M007 is conditionally closed and Service M007 is closed. Archive Extraction M001 is historical. A follow-up at `ea51fe12...` implemented Acquisition M008 and Archive M001a. Review of head `4fb9d8ca...` then found M001a still had a cleanup TOCTOU and stable-Windows compilation defect; Archive M001b corrected both and closed at `0573996` with green hosted run `36222536670`, which also closed M008 hosted qualification. Review of documentation head `d46d35e...` then found a distinct archive materialization-authority gap. M001c implemented handle-relative write authority (`09c953f`) and stopped under Section 14 on path-handoff truthfulness. M001d subsequently implemented the object-bound source handoff and closed that stop with final hosted run `36335233644`; M001b/M001c historical closure evidence remains valid.
+17. **The two transport adapters cannot be packaged against the registry,
+    because the seam they depend on is not published at the version they
+    require.** `crates/eggup-curl/Cargo.toml:24` and
+    `crates/eggup-eggfetch/Cargo.toml:24` declare
+    `eggup-acquisition = { version = "0.1.0", path = "../eggup-acquisition" }`,
+    a caret requirement resolving to `^0.1.0`, while both adapters call
+    `eggup_acquisition::__adapter_io` and `__adapter_bound_detail`, which exist
+    **only** in the unpublished seam — published `eggup-acquisition 0.1.3`
+    carries neither. The seam's next release is source-breaking and is therefore
+    `0.2.0`, which `^0.1.0` does not accept. Measured: `cargo package
+    -p eggup-curl` exits 101 with 11 errors and `-p eggup-eggfetch` exits 101
+    with 4. The same cascade reaches `crates/eggup-eggpack/Cargo.toml:22`
+    (`=0.1.3`) and `crates/eggup-transport-footprint/Cargo.toml:16` (`0.1.0`).
+    **Severity: medium** — a publication state, not a source defect. **Closed
+    as a *recorded* coupling by Acquisition M016**: the seam's changelog now
+    declares its next release as `0.2.0` and records the widening each
+    dependent needs, a guard fails when a dependent neither accepts that
+    version nor records the widening, and the false "a future republication
+    would be a non-breaking `0.1.3`" claim is removed from the adapters'
+    changelogs. **Still open for the adapters themselves**, because only the
+    publication milestone may widen a manifest or bump a version.
+    **Disposition — closed on 2026-10-24.** Acquisition Transport M017 is that
+    publication milestone. The requirements were widened in the same change set
+    — `eggup-curl` and `eggup-eggfetch` to `eggup-acquisition = "0.2"`,
+    `eggup-eggpack`'s three exact pins to `=0.2.0`, and
+    `eggup-transport-footprint`'s three to `"0.2"` so the workspace still
+    resolves — and all three published crates are on crates.io at `0.2.0`
+    from `b612608`. The measured before state was real: `cargo package
+    -p eggup-curl` exited 101 with 11 errors and `-p eggup-eggfetch` exited
+    101 with 4; both now package and verify against the registry. The
+    registry-only fixtures prove it from outside the repository — the
+    eggfetch fixture depends only on `eggup-eggfetch` and its lockfile
+    resolves the seam at `0.2.0` from crates.io, and the curl fixture resolves
+    both. Closure: `plans/closure/acquisition-transport/017-status.md`.
+
+Corrective work identified after reviewing implementation SHA `889a234c` was closed sequentially. Acquisition M003, service M002, and distribution M001 were added and closed in that batch, with hosted CI at that exact SHA green on stable fmt/clippy/test/doc, the Rust 1.89 check, macOS tests, and the Windows workspace check. The full per-milestone evidence lives in the closure records under `plans/closure/`.
 
 ### Acquisition
 
@@ -156,25 +561,38 @@ M001-M003 are closed predecessor work. M003 is the terminal Eggup producer-side 
 
 Distribution M004 removed `eggup-dist` after Eggpack Contract M002 closed at `82f799f3d971b2999ac14c2d8fc1b965370e0f58`; see `plans/closure/distribution-bootstrap/004-status.md`. The subsystem is archived/transferred, with no active Eggup producer-distribution milestone.
 
-The 2026-10-05 Gregg/EggPool parity gaps are now **fully closed**. Core M010/M011 are hosted-green, Service M009 published `eggup-service 0.1.2`, and on 2026-10-06 the whole versioned handoff shipped: Acquisition M010 published the corrected seam, Core M012 preserved the published 0.1.x `Error` surface, and Core M013 published the versioned Core. Gregg M004 and EggPool M007 were intentionally unwritten only until these handoffs existed, so both are now authorable and the registry's consumer row is updated accordingly.
+The 2026-10-05 Gregg/EggPool parity gaps are now **fully closed**. Core M010/M011 are hosted-green, Service M009 published `eggup-service 0.1.2`, and on 2026-10-06 the whole versioned handoff shipped: Acquisition M010 published the corrected seam, Core M012 preserved the published 0.1.x `Error` surface, and Core M013 published the versioned Core. Gregg M004 and EggPool M007 were intentionally unwritten only until these handoffs existed, so both are now authorable and the
+registry's consumer row is updated accordingly.
 
 ## Active subsystem roadmaps
 
 | Subsystem | Status | Next milestone |
 |---|---|---|
-| Verified update core | M001-M013 closed/hosted-green (`37527706900`) | — (`eggup-core 0.1.3` published; the 0.1.x compatibility gate is discharged) |
-| Acquisition transport | M001-M011 closed; acquisition/eggfetch 0.1.3 published, curl 0.1.2 published; M012 registered | M012 sub-second deadline test-determinism corrective — test-only, no dependency and no publication; closes post-0.1.3 open finding 1 |
-| Service lifecycle | M001–M011 closed | M010 closed with a required runtime correction; M011 0.1.3 published and registry-only post-publication systemd proof passed |
-| Archive extraction | M001 lineage + M004 closed; `eggup-archive 0.1.3` published 2026-10-06 | — |
+| Verified update core | M001-M015 and M017-M019 closed; M019 published `eggup-core 0.2.0` 2026-10-24 from `b612608`, hosted run `40079833945` green on all five lanes | M016 contract-doc packaging is ready for handoff; plan targets `eggup-core 0.2.1` after registry preflight |
+| Acquisition transport | M001-M017 closed; M012 conditionally closed; M017 published `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` 0.2.0 (2026-10-24) from `b612608`, run `40079833945` green | no further acquisition milestone is registered. **Open finding 1 stays open**: M012 narrowed its timeout-coupling mode, M015 made the spawn cause attributable, and the hosted Stable lane re-observed the flake |
+| Transport footprint | M001 closed 2026-10-23 and hosted-qualified in run `40062299630`; the subsystem roadmap was created 2026-10-23, which was the prerequisite its first milestone required | no further transport-footprint milestone is registered |
+| Service lifecycle | M001–M017 closed; M012/M013/M014/M015 hosted-qualified; M017 published `eggup-service 0.2.0` 2026-10-24 from `b612608`, run `40079833945` green | no further service-lifecycle milestone is registered. The `SystemExecutor` consolidation that M012 deferred is closed by M015, and finding 16's strict packaged-service step was restored in `2d6e089` |
+| Archive extraction | M001 lineage + M004 closed; M005 closed 2026-10-23 and hosted-qualified in run `40008039843`; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608` | no further archive milestone is registered |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
-| Eggpack manifest interoperability | M001-M005 closed; `eggup-eggpack 0.1.3` carries the member-identity cross-check | — |
-| Consumer adoption | simple, eggsearch, CodeGG M005, Egress M006 closed | **Gregg M004 and EggPool M007 are now authorable** — every versioned handoff they were gated on (acquisition 0.1.3, Core 0.1.3) is published |
+| Eggpack manifest interoperability | M001-M007 closed; `eggup-eggpack 0.1.3` carries the member-identity cross-check; M006 closed 2026-10-23 and hosted-qualified in run `40008039843`; M007 published `eggup-eggpack 0.2.0` 2026-10-24 from `b612608` | no further Eggpack manifest milestone is registered |
+| Consumer adoption | simple, eggsearch, CodeGG M005, Egress M006 closed | **Gregg M004 and EggPool M007 are now authorable** — every versioned handoff they were gated on (acquisition 0.1.3, Core 0.1.3) is published, and the 0.2.0 line is published on top of it |
 
 ## Dependency-ready implementation work
 
+**`Dependency-ready implementation work` is the authoritative milestone-status
+table.** Every milestone listed here carries the path of the record that owns it
+— its closure record for a closed milestone, its plan for an open one — and each
+milestone appears in exactly one table in this registry.
+
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
-| Verified update core | M010 current-executable transaction parity corrective | closed; hosted run `37376971555` green on all four lanes | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md`; `plans/closure/verified-update-core/010-status.md` | 11 integration fixtures + 2 unit fixtures; hosted Windows lane caught a missing Windows identity check — fixed with a cross-platform SHA-256 binding; `self-replace` Windows-only dep; unpublished |
+| Verified update core | M016 eggup-core contract-doc packaging | ready for handoff | `plans/implementation/verified-update-core/016-eggup-core-contract-doc-packaging.md` | Core M019 closed; target `0.2.1` subject to registry preflight; explicit maintainer upload authorization remains a publication gate |
+| Verified update core | M019 eggup-core 0.2.0 publication | closed 2026-10-24 | `plans/implementation/verified-update-core/019-eggup-core-0.2.0-publication.md`; `plans/closure/verified-update-core/019-status.md` | published `eggup-core 0.2.0` (`2c86a0eb…eb23b8`) from `b612608`; hosted run `40079833945` green on all five lanes; the train-order exception in plan §9.1 is the only deviation; registry-only fixture green |
+| Archive extraction | M006 eggup-archive 0.2.0 publication | closed 2026-10-24 | `plans/implementation/archive-extraction/006-eggup-archive-0.2.0-publication.md`; `plans/closure/archive-extraction/006-status.md` | published `eggup-archive 0.2.0` (`ce35edd5…ff57ad`) from `b612608`; run `40079833945` green; registry-only fixture green; the packaged manifest carries no `eggup-core` edge |
+| Acquisition transport | M017 eggup-acquisition 0.2.0 publication | closed 2026-10-24 | `plans/implementation/acquisition-transport/017-eggup-acquisition-0.2.0-publication.md`; `plans/closure/acquisition-transport/017-status.md` | published `eggup-acquisition` (`2ef74b4d…299fc3`), `eggup-curl` (`15cf536f…90d3f7`), `eggup-eggfetch` (`9fc8f648…658721`) 0.2.0 from `b612608`; three registry-only fixtures green; finding 17 closed |
+| Service lifecycle | M017 eggup-service 0.2.0 publication | closed 2026-10-24 | `plans/implementation/service-lifecycle/017-eggup-service-0.2.0-publication.md`; `plans/closure/service-lifecycle/017-status.md` | published `eggup-service 0.2.0` (`31dd2e22…fe1b4a`) from `b612608`; run `40079833945` green; the registry-only fixture resolves `eggup-core 0.2.0`; findings 15 and 16 closed |
+| Eggpack manifest interoperability | M007 eggup-eggpack 0.2.0 publication | closed 2026-10-24 | `plans/implementation/eggpack-manifest-interoperability/007-eggup-eggpack-0.2.0-publication.md`; `plans/closure/eggpack-manifest-interoperability/007-status.md` | published `eggup-eggpack 0.2.0` (`33dc1da4…14f1f6`) from `b612608`, last in the train; the registry-only fixture resolves all three exact pins at `0.2.0` |
+| Verified update core | M010 current-executable transaction parity corrective | closed; hosted run `37376971555` green on all four lanes | `plans/implementation/verified-update-core/010-current-executable-transaction-parity-corrective.md`; `plans/closure/verified-update-core/010-status.md` | 11 integration + 2 unit fixtures; the Windows lane caught a missing identity check, fixed with a cross-platform SHA-256 binding; `self-replace` Windows-only dep; unpublished |
 | Verified update core | M011 proof-authorized stale-lock recovery | closed; hosted run `37376971555` green on all four lanes | `plans/implementation/verified-update-core/011-proof-authorized-stale-lock-recovery.md`; `plans/closure/verified-update-core/011-status.md` | 14 fixtures + example verifier; default `acquire` still fail-closed; unpublished |
 | Verified update core | M012 0.1.x public-error compatibility corrective | closed | `plans/implementation/verified-update-core/012-0.1x-public-error-compatibility-corrective.md`; `plans/closure/verified-update-core/012-status.md` | `Error` keeps the seven published 0.1.2 variants; `RecoveryError` added for retained evidence; byte-identical exhaustive-match fixture fails against pre-M012 main |
 | Verified update core | M013 eggup-core 0.1.3 publication | closed 2026-10-06 | `plans/implementation/verified-update-core/013-eggup-core 0.1.3-publication.md`; `plans/closure/verified-update-core/013-status.md` | published from `bd43683` (run `37527706900` green); `v0.1.3` + release created; registry-only direct fixture and the `eggup-service 0.1.2 -> eggup-core 0.1.3` graph both green |
@@ -184,7 +602,26 @@ The 2026-10-05 Gregg/EggPool parity gaps are now **fully closed**. Core M010/M01
 | Acquisition transport | M009 eggup-curl 0.1.2 publication | closed 2026-10-04 | `plans/implementation/acquisition-transport/009-eggup-curl-0.1.2-publication.md`; `plans/closure/acquisition-transport/009-status.md` | published from `b485228`, hosted run `37223895075` green on all lanes; registry-only fixture 6/6 with registry-source lockfile; no `src/` change; `v0.1.1`/`v0.1.2` unmoved, release `0.1.2` notes extended; M007 Windows live-loopback limitation retained |
 | Acquisition transport | M010 eggup-acquisition 0.1.3 publication | closed 2026-10-06 | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md`; `plans/closure/acquisition-transport/010-status.md` | published from `bb8fe41` (run `37525705132` green); registry-only fixture 4/4 and fails 2/4 against the defective 0.1.2 |
 | Acquisition transport | M011 eggup-eggfetch 0.1.3 correctness publication | closed 2026-10-06 | `plans/implementation/acquisition-transport/011-eggup-eggfetch-0.1.3-correctness-publication.md`; `plans/closure/acquisition-transport/011-status.md` | published from `bd43683` (run `37527706900` green); registry-only fixture 4/4 and **aborts the process** against 0.1.2 |
-| Acquisition transport | M012 sub-second deadline test determinism corrective | ready for handoff 2026-10-08 | `plans/implementation/acquisition-transport/012-sub-second-deadline-test-determinism-corrective.md` | test-only; no production change, no dependency, no republication of `eggup-curl 0.1.2`. Pre-change reproduction 3/40 at load ~62-65. Discriminating closure check is a **loaded** rerun, not an unloaded one |
+| Acquisition transport | M012 sub-second deadline test determinism corrective | conditionally closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/acquisition-transport/012-status.md` | Test-only; no production change, no dependency, no republication of `eggup-curl 0.1.2`. The deadline under test is decoupled from the enforced budget. **Open condition**: the hosted Stable lane re-observed registry finding 1 in the spawn mode, so this milestone is not closed |
+| Verified update core | M014 bounded-execution deadline corrective | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/verified-update-core/014-status.md` | Closes finding 3 (high). The deadline is an unconditional maximum bound and the descendant-holds-pipe case is fail-closed. `eggup-core 0.1.3` keeps the defect until republication; `eggup-eggpack`'s `=0.1.3` pin blocks propagation |
+| Verified update core | M015 public API contract truthfulness corrective | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/verified-update-core/015-status.md` | Closes finding 10 (medium). The never-constructed `FailureCategory` variant is removed (`#[non_exhaustive]`, downstream-compatible); all 32 public fallible items carry an `# Errors` section enforced by `clippy::missing_errors_doc`. `run_bounded` is untouched — M014 owns that |
+| Verified update core | M017 bounded stdin execution corrective | closed 2026-10-23; hosted-qualified (`40062299630`) | `plans/closure/verified-update-core/017-status.md` | Supplies the stdin capability Service M015 needs. `CommandSpec::stdin_data` + `MAX_STDIN_BYTES` (1 MiB, inclusive); an oversize payload is rejected before any spawn; the three `Error::Io` operation strings are a stable documented classification surface. Additive; unpublished |
+| Verified update core | M018 bounded-stdin outcome-priority corrective | closed 2026-10-24; hosted-qualification pending | `plans/closure/verified-update-core/018-status.md` | The deadline has priority over the bounded stdin writer's verdict, classified by the instant the writer observed the write. A failure observed before the deadline is an `Err`; one observed at or after it is the deadline outcome, so an undelivered payload is never a success. Closes M015 **U1** |
+| Archive extraction | M005 cleanup contract truthfulness and member-write deduplication | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/archive-extraction/005-status.md` | Closes finding 4 (high). The `eggup-archive 0.1.3` cleanup API has a reachable, truthful `Ok` path on all four entry points; `eggup-eggpack`'s `=0.1.3` pin blocks it. The hosted run also exposed and fixed a CRLF-fragile test anchor in the member-write guard |
+| Service lifecycle | M012 commit-engine dedup and ownership-type unification | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/service-lifecycle/012-status.md` | Closes finding 5 (high). One commit/rollback engine serves both orchestrators; the stricter former behaviour wins; the former differences survive as policy inputs. `eggup_service::Ownership` re-exports `eggup_core::Ownership`. The `SystemExecutor` consolidation M012 deferred is closed by M015 |
+| Service lifecycle | M013 manager failure taxonomy and deadline contract | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/service-lifecycle/013-status.md` | Closes finding 7 (medium). Typed `ManagerFailureKind` replaces `permission_hint` matching; one timeout model for systemd/launchd/SCM; one cron listing/rule. Source-breaking: `ServiceError::Manager` matchers — republication only. Three low-severity findings stay open |
+| Service lifecycle | M014 Windows SCM execution coverage and API-surface guard | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/service-lifecycle/014-status.md` | Closes open finding 6 (high). The hosted Windows lane ran the real SCM fixture (`2 passed; 0 failed; 0 ignored`, no `EGGUP-SCM-LIVE-SKIP`), discharging the plan's condition that a closure without a real hosted Windows run is not a closure |
+| Service lifecycle | M015 bounded executor consolidation corrective | closed 2026-10-23; hosted-qualified (`40062299630`) | `plans/closure/service-lifecycle/015-status.md` | Closes M012 **Finding 1** (**low**): `SystemExecutor` now delegates to `eggup_core::run_bounded`. The public API and every manager's argv are unchanged. **Also fixes finding 15** (**medium**): the old runner misreported a *successful* stdin write as a failure. No new dependency |
+| Service lifecycle | M016 published-change release-note corrective | closed 2026-10-24; hosted-qualification pending | `plans/closure/service-lifecycle/016-status.md` | Adds the missing **D8** release note — the fix for the published crate's stdin-verdict defect — and corrects the count to eight. Flags the `engine_policy` source break, corrects the M015 test inventory, re-anchors the public-API snapshot. Documentation only |
+| Acquisition transport | M013 adapter assertion strength and failure typing | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/acquisition-transport/013-status.md` | Closes open finding 8 (medium). Nine vacuously-passing `eggup-curl` tests; typed IO failure surface on the zero-dependency seam. Source-breaking: `AcquisitionError::Io(String)` became `Io { operation, source }` and the derives are `Debug` only |
+| Acquisition transport | M015 spawn failure diagnosability corrective | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/acquisition-transport/015-status.md` | The `Unavailable` detail names the `ErrorKind` and the raw OS code, so a spawn failure is attributable instead of cause-free. The variant stays `Unavailable`; the fallback contract is unchanged. **Narrows** open finding 1 rather than closing it |
+| Acquisition transport | M016 adapter publication-coupling corrective | conditionally closed 2026-10-24 | `plans/closure/acquisition-transport/016-status.md` | Records the seam's `0.2.0` coupling: both adapters must widen `eggup-acquisition` to `0.2`, `eggup-eggpack` re-pins to `=0.2.0`, footprint widens to `0.2`; publish seam then adapters then leaf. Guarded; no manifest, version, or publication |
+| Acquisition transport | M014 adapter capability parity corrective | closed 2026-10-23; hosted-qualified (`40062299630`) | `plans/closure/acquisition-transport/014-status.md` | Closes the parity finding deferred by M013: the curl adapter now exposes a caller-settable `User-Agent`. The control sits on `CurlTransport`, not `CurlConfig`, because `CurlConfig`'s public fields make any added field source-breaking for the published `eggup-curl 0.1.2`. Additive; unpublished |
+| Transport footprint | M001 isolated-configuration coverage corrective | closed 2026-10-23; hosted-qualified (`40062299630`) | `plans/closure/transport-footprint/001-status.md` | Closes open finding 12 (**medium**). CI builds the curl-only, eggfetch-only, and both-adapters configurations; a linkage-discipline guard rejects a sibling-adapter reference in every configuration, with a discriminating negative control. Counts 3 / 92 / 93 unchanged. `publish = false`; no tag moved |
+| Eggpack manifest interoperability | M006 canonical digest reuse | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/eggpack-manifest-interoperability/006-status.md` | Closes open finding 9 (medium). Removes a redundant direct `sha2` runtime dependency from a published crate. `Cargo.lock` unchanged; the resolved `sha2` is still `0.10.9`; no pin cascade |
+| Planning/closure hygiene corrective | C013 post-audit documentation truth reconciliation | closed 2026-10-23; hosted-qualified (`40008039843`) | `plans/closure/planning-closure-hygiene-corrective/013-status.md` | Closes open finding 11 (medium). Docs-only: root `CHANGELOG.md`, `docs/`, `AGENTS.md`, the architecture deep dives, and this registry's own contradictory rows. Adds the `scripts/check-docs-truth.sh` gate command |
+| Planning/closure hygiene corrective | C014 documentation-truth corrective | closed 2026-10-24; hosted-qualification pending | `plans/closure/planning-closure-hygiene-corrective/014-status.md` | The documentation-truth gate now reads the crate manifests, covers `architecture/*.md`, and reads three-cell registry rows; the transport-footprint deep dive and the CI matrix are corrected. Red-first proven against five documented false negatives |
+| Planning/closure hygiene corrective | C015 architecture anchor and claim corrective | closed 2026-10-24; hosted-qualification pending | `plans/closure/planning-closure-hygiene-corrective/015-status.md` | Docs-only: re-derived 179 stale `path:line` anchors in the five stable architecture deep dives; removed-API, `=0.1.2` pin, and `eggup-core` `self-replace` claims corrected |
 | Archive extraction | M004 eggup-archive 0.1.3 correctness publication | closed 2026-10-06 | `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md`; `plans/closure/archive-extraction/004-status.md` | published from `bd43683` (run `37527706900` green); registry-only tar.gz + zip fixtures 6/6; Windows device-alias case fails against 0.1.2 |
 | Eggpack manifest interoperability | M005 eggup-eggpack 0.1.3 security/correctness publication | closed 2026-10-06 | `plans/implementation/eggpack-manifest-interoperability/005-eggup-eggpack-0.1.3-security-publication.md`; `plans/closure/eggpack-manifest-interoperability/005-status.md` | published from `bd43683` (run `37527706900` green); member-identity cross-check ships; the `eggup-eggpack 0.1.2` acquisition-pin caveat is closed |
 | Planning/closure hygiene corrective | C012 post-M004 roadmap + registry reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/012-post-m004-roadmap-and-registry-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/012-status.md` | docs-only; Phase 9/10 + post-M004 registry/archive active surfaces reconciled |
@@ -226,50 +663,19 @@ The 2026-10-05 Gregg/EggPool parity gaps are now **fully closed**. Core M010/M01
 | Eggpack manifest interoperability | M001a adapter qualification + closure hardening | closed | `plans/implementation/eggpack-manifest-interoperability/001a-adapter-qualification-and-closure-hardening-corrective.md` | `plans/closure/eggpack-manifest-interoperability/001a-status.md`; full regression matrix qualified |
 | Eggpack manifest interoperability | M003a caller-bound destination policy corrective | closed | `plans/implementation/eggpack-manifest-interoperability/003a-caller-bound-destination-policy-corrective.md`; `plans/closure/eggpack-manifest-interoperability/003a-status.md` | implementation `39ff626`, hosted run `36890986000` green on all lanes |
 | Eggpack manifest interoperability | M003 Eggsact real-consumer manifest adoption | closed | `plans/implementation/eggpack-manifest-interoperability/003-eggsact-real-consumer-manifest-adoption.md`; `plans/closure/eggpack-manifest-interoperability/003-status.md` | consumer `eggstack/eggsact@65c916b` on Eggup pin `e336b32`; hosted CI run `36902758482` + drift run `36902758396` green |
-| Eggpack manifest interoperability | M004 package/API promotion | closed | `plans/implementation/eggpack-manifest-interoperability/004-registry-package-api-promotion-and-publication.md`; `plans/closure/eggpack-manifest-interoperability/004-status.md` | published `eggup-acquisition` 0.1.2 (`0b01deb8…f170`), `eggup-eggfetch` 0.1.2 (`2e483152…3528`), `eggup-eggpack` 0.1.2 (`9dbfdfb7…b13fef`) from `02a1d32`; hosted run `37090397398` green; adapter-only and Eggsact-shaped registry-only proofs green; publication order proven load-bearing; `v0.1.1`/`v0.1.2` unmoved, release `0.1.2` notes extended |
+| Eggpack manifest interoperability | M004 package/API promotion | closed | `plans/closure/eggpack-manifest-interoperability/004-status.md` | published `eggup-acquisition` 0.1.2 (`0b01deb8…f170`), `eggup-eggfetch` 0.1.2 (`2e483152…3528`), `eggup-eggpack` 0.1.2 (`9dbfdfb7…b13fef`) from `02a1d32`; hosted run `37090397398` green; adapter-only and Eggsact-shaped registry-only proofs green; publication order proven load-bearing; `v0.1.1`/`v0.1.2` unmoved |
 
-CodeGG M005, Verified Update Core M007, and Service Lifecycle M005-M008 remain closed. Acquisition M008 is closed via hosted run `36222536670`. Archive M001b remains closed for handle-bound cleanup and stable-Windows portability. Archive M001c is a historical write-authority predecessor whose Section 14 handoff stop was closed by M001d. Service M008 closed the deadline-test determinism gap with green hosted run `36332823865`. Archive M001d is closed with green hosted run `36335233644` (superseding `36334772510`). Verified Core M008 package qualification is closed with exact clean-tree evidence (M008a) and published by M009 on 2026-09-28 (`eggup-core 0.1.2` then `eggup-archive 0.1.2`, `v0.1.2` + GitHub Release `0.1.2`; see `plans/closure/verified-update-core/009-status.md`), and Eggpack Interop M002 archive handoff is closed with full hosted qualification (M002a). Consumer Adoption M006 is closed 2026-09-29 (Egress Delivery M003 landed on the registry 0.1.2 pair with hosted updater evidence; M003-landed addendum recorded). Planning/closure hygiene C001-C012 are closed (C009 reconciled the M006 evidence; C010 reconciled the post-Egress active-state picture and refreshed the M003 readiness surfaces; C011 reconciled the post-M003 header/registration state and closed the M004a transition). Both Gregg-reference feature milestones are closed with green hosted qualification, and M005/M006 closure evidence is reconciled. Gregg M004 prerequisites are satisfied but its plan remains intentionally unwritten; no Gregg migration is authorized. Eggpack Interop M001a is closed with the full adapter regression matrix. M003 bounded parse/project qualification is complete, and the prior producer-owned artifact/manifest convention blocker is resolved by Eggpack Ecosystem M001 / Eggsact M005 `v1.2.7`. Current contract review isolated one generic destination-authority gap: M003a closed it (implementation `39ff626`, hosted run `36890986000` green on all lanes; see `plans/closure/eggpack-manifest-interoperability/003a-status.md`) and M003 Eggsact real-consumer adoption has now closed on that seam (consumer `eggstack/eggsact@65c916b`, hosted CI run `36902758482` + drift run `36902758396` green; see `plans/closure/eggpack-manifest-interoperability/003-status.md`). M004a package/API promotion readiness preflight is closed (see `plans/closure/eggpack-manifest-interoperability/004a-status.md`): it proved the minimum registry publication set is Eggpack-owned `eggpack-manifest 0.1.0`, then Eggup-owned `eggup-acquisition 0.1.2` → `eggup-eggfetch 0.1.2` → `eggup-eggpack 0.1.2` (a new `eggup-eggfetch 0.1.2` publication IS required — `E0308` incompatibility proven). The external producer prerequisite is registered as Eggpack Release Manifest M003 at `eggstack/eggpack: plans/implementation/release-manifest/003-eggpack-manifest-0.1.0-publication-and-compatibility-baseline.md` (initial registration `b8cfce59`, active registry reconciliation `338ba642`) and is now **closed**: `eggpack-manifest 0.1.0` was published to crates.io on 2026-10-02 from Eggpack `8d661e4eb9da1806e5d7c7606939d24e9aceb2c0` with checksum `2a08f24b05e9652878dd49145cdc3cbd38c7a76032d7b01a5fe1535d9446b629`, non-yanked, tag `eggpack-manifest-v0.1.0`, Eggpack hosted run `37064833069` green, closure `eggstack/eggpack: plans/closure/release-manifest/003-status.md`. A 2026-10-02 re-audit of the M004a-proven set confirms the published `src/lib.rs` is byte-identical to the consumer-qualified Git source, so the M004a compatibility-incident branch is not triggered. M004 proper has since closed: `eggup-acquisition`/`eggup-eggfetch`/`eggup-eggpack` 0.1.2 were published in dependency order from `02a1d32` (see `plans/closure/eggpack-manifest-interoperability/004-status.md`). Planning/closure hygiene C011 is closed (see `plans/closure/planning-closure-hygiene-corrective/011-status.md`). There is no dependency-ready producer-distribution implementation work in Eggup; that subsystem is archived/transferred.
+Closed-history detail lives in the closure records under `plans/closure/`: Core M007/M008, service M005-M008, CodeGG M005, acquisition M005/M006, and planning-hygiene C001-C003 and C008-C011 carry reviewed evidence. Both Gregg-reference upstream mechanisms are closed; Gregg consumer migration is writable but not scheduled. Eggpack adapter/API work is implemented and qualified, and historical M001 remains closed evidence. No Eggup installer-generator replacement is authorized.
 
-## Planned / blocked work
+## Open, authorable, and future work
+
+This table carries only work with no milestone row elsewhere — open, authorable,
+and future work. It is not the milestone-status table; see the note above.
 
 | Subsystem | Milestone | State | Blocker / evidence |
 |---|---|---|---|
-| Acquisition transport | M009 eggup-curl 0.1.2 publication | closed 2026-10-04 | `plans/closure/acquisition-transport/009-status.md` — published from `b485228`, hosted run `37223895075` green on all lanes; registry-only fixture 6/6 with registry-source lockfile; no `src/` change; `v0.1.1`/`v0.1.2` unmoved, release `0.1.2` notes extended; M007 Windows live-loopback limitation retained |
-| Acquisition transport | M010 eggup-acquisition 0.1.3 publication | **ready** | `plans/implementation/acquisition-transport/010-eggup-acquisition-0.1.3-publication.md` — ready; M009 closed; the two `0b8cb98` acquisition fixes are implemented and green, so this is publication-only. `eggup-eggpack 0.1.2` pins `=0.1.2` and needs a separate adapter republication to inherit the fix |
-| Planning/closure hygiene corrective | C012 post-M004 roadmap + registry reconciliation | closed | `plans/closure/planning-closure-hygiene-corrective/012-status.md`; no runtime/Cargo/workflow delta |
-| Planning/closure hygiene corrective | C011 post-M003 closure + registration reconciliation | closed | docs-only; registry header/current-state bookkeeping reconciled, M004a transition registered and closed |
-| Eggpack manifest interoperability | M004a package/API promotion readiness preflight | closed | qualification only, no publication occurred; minimum publication graph proven (see closure); its Eggpack-owned item is now satisfied — `eggpack-manifest 0.1.0` published 2026-10-02 |
-| Eggpack manifest interoperability | M004 package/API promotion | closed | M004a closed; Eggpack Release Manifest M003 published `eggpack-manifest 0.1.0`; M004 published `eggup-acquisition`/`eggup-eggfetch`/`eggup-eggpack` 0.1.2 in order from `02a1d32`, with adapter-only and Eggsact-shaped registry-only proofs green; see `plans/closure/eggpack-manifest-interoperability/004-status.md` |
-| Eggpack manifest interoperability | M003a caller-bound destination policy corrective | closed | `plans/closure/eggpack-manifest-interoperability/003a-status.md` (implementation `39ff626`, run `36890986000` green) |
-| Eggpack manifest interoperability | M003 Eggsact real-consumer manifest adoption | closed | consumer `eggstack/eggsact@65c916b` (Eggup pin `e336b32`); `plans/closure/eggpack-manifest-interoperability/003-status.md` (hosted CI `36902758482` + drift `36902758396` green) |
-| Planning/closure hygiene corrective | C010 post-Egress/M003 active-status reconciliation | closed | docs-only; reconciled archive-roadmap Egress closure, registry M003 producer-gate resolution, and M003 plan stale dependency prose; `plans/implementation/planning-closure-hygiene-corrective/010-post-egress-and-m003-readiness-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/010-status.md` |
-| Archive extraction | M001c handle-relative member materialization | historical predecessor; handoff stop resolved by M001d | `plans/implementation/archive-extraction/001c-handle-relative-member-materialization-corrective.md`; `plans/closure/archive-extraction/001c-status.md` |
-| Service lifecycle | M008 OperationDeadline test determinism | closed | `plans/implementation/service-lifecycle/008-operation-deadline-test-determinism-corrective.md`; `plans/closure/service-lifecycle/008-status.md` |
-| Planning/closure hygiene corrective | C007 C006 head + current-CI reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/007-c006-head-and-current-ci-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/007-status.md` |
-| Planning/closure hygiene corrective | C006 M001d readiness + bound-source contract reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/006-m001d-readiness-and-bound-source-contract-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/006-status.md` |
-| Archive extraction | M001d handle-backed source handoff | closed | `plans/implementation/archive-extraction/001d-handle-backed-source-handoff.md`; `plans/closure/archive-extraction/001d-status.md` (run `36335233644`) |
-| Planning/closure hygiene corrective | C005 post-M001b materialization gate reconciliation | closed | `plans/implementation/planning-closure-hygiene-corrective/005-post-m001b-materialization-gate-reconciliation.md`; `plans/closure/planning-closure-hygiene-corrective/005-status.md` |
-| Archive extraction | M001b handle-bound cleanup + Windows portability | closed | `plans/closure/archive-extraction/001b-status.md` (run `36222536670`) |
-| Acquisition transport | M008 sub-second deadline truthfulness | closed | `plans/closure/acquisition-transport/008-status.md` (run `36222536670`) |
-| Archive extraction | M001a owned-root cleanup authority | historical; superseded | `plans/closure/archive-extraction/001a-status.md` |
-| Planning/closure hygiene corrective | C004 post-M007/M001 reconciliation | closed historically | `plans/closure/planning-closure-hygiene-corrective/004-status.md` |
-| Acquisition transport | M007 boundary safety hardening | conditionally closed | `plans/implementation/acquisition-transport/007-boundary-safety-hardening-corrective.md` |
-| Service lifecycle | M007 UTF-8-safe bounded diagnostics | closed | `plans/closure/service-lifecycle/007-status.md` |
-| Archive extraction | M001 bounded allowlisted extraction | closed historically; M001a superseded by M001b | `plans/closure/archive-extraction/001-status.md` |
-| Acquisition transport | M005 curl adapter + explicit transport composition | closed | `plans/closure/acquisition-transport/005-status.md` |
-| Planning/closure hygiene corrective | C001 post-batch status/evidence reconciliation | closed | `plans/closure/planning-closure-hygiene-corrective/001-status.md` |
-| Planning/closure hygiene corrective | C002 final commit/baseline bookkeeping | closed | `plans/closure/planning-closure-hygiene-corrective/002-status.md` |
-| Planning/closure hygiene corrective | C003 M003 registry/closure reconciliation | closed | `plans/closure/planning-closure-hygiene-corrective/003-status.md` |
-| Service lifecycle | M005 prepared-transaction lifecycle integration | closed | `plans/closure/service-lifecycle/005-status.md` |
-| Service lifecycle | M006 daemon update disposition/reference qualification | closed | `plans/closure/service-lifecycle/006-status.md` |
-| Distribution/bootstrap | M004 retire `eggup-dist` | closed | `plans/closure/distribution-bootstrap/004-status.md` |
-| Consumer adoption | M004 Gregg | blocked; plan intentionally unwritten | Core M012/M013 + Acquisition M010; Service M009 and Core M010/M011 already closed |
-| Consumer adoption | M005 CodeGG | closed | `plans/closure/consumer-adoption/005-status.md`; producer release mapping remains application/Eggpack-owned |
-| Verified update core | M009 core/archive 0.1.2 publication | closed 2026-09-28 | `plans/closure/verified-update-core/009-status.md` (pair published, smoke 3/3, `v0.1.2` + Release `0.1.2`) |
-| Consumer adoption | M006 Egress | closed 2026-09-29; M003-landed addendum recorded | — |
-| Consumer adoption | M007 EggPool selective | blocked/evidence-driven; plan intentionally unwritten | Core M012/M013; only StandaloneRust transaction in scope |
-| Eggpack manifest interoperability | M002 archive extraction handoff | closed with hosted qualification (M002a) | M002a green run `36477024102` (Stable clippy/tests/docs + MSRV + macOS + Windows adapter runtime) |
-| Eggpack manifest interoperability | M004 package/API promotion | closed | M004a closed; Eggpack Release Manifest M003 published `eggpack-manifest 0.1.0`; M004 then published `acquisition`/`eggfetch`/`eggpack` 0.1.2 from `02a1d32` (see M004 closure) |
+| Consumer adoption | M004 Gregg | authorable; plan intentionally unwritten | Every versioned handoff it was gated on is published: `eggup-acquisition 0.1.3` (Acquisition M010) and `eggup-core 0.1.3` (Core M013); Service M009 and Core M010/M011 are also closed |
+| Consumer adoption | M007 EggPool selective | authorable; plan intentionally unwritten | Core M012/M013 are closed and `eggup-core 0.1.3` is published; only the StandaloneRust transaction is in scope, and package-manager/provenance paths stay downstream |
 | Authenticity/signatures | future | ADR required | trust standard not selected |
 
 ## Immediate execution graph
@@ -364,9 +770,9 @@ review baseline ea51fe -> acquisition M008 deadline truthfulness [CLOSED via run
                             |
                             +-> cargo-cleanme Phase 10 M010C lightweight updater [UNBLOCKED; consumer-owned]
                             |
-                            `-> M010 eggup-acquisition 0.1.3 publication [READY; ships the 0b8cb98 seam fixes]
+                            `-> M010 eggup-acquisition 0.1.3 publication [CLOSED 2026-10-06; shipped the 0b8cb98 seam fixes]
                                      |
-                                     `-> eggup-eggpack adapter republication [NAMED FOLLOW-ON; =0.1.2 pin blocks inheritance]
+                                     `-> eggup-eggpack adapter republication [RETIRED; eggup-eggpack 0.1.3 published 2026-10-06 and inherits the seam fixes]
 
 implementation 0573996 -> archive M001b cleanup/Windows corrective [CLOSED]
                       `-> hosted run 36222536670 [STABLE/MSRV/MACOS/WINDOWS ALL PASSED]
@@ -380,26 +786,149 @@ Gregg read-only reference evidence -> acquisition M005 curl/composition [CLOSED]
                                                 `-> Gregg M004 [WRITABLE; plan intentionally unwritten]
 ```
 
-The earlier 2026-09-26 review opened acquisition M007 and service M007; those are conditionally closed and closed respectively. Archive Extraction M001 closed after hosted run 36214688691. The follow-up review opened Acquisition M008 and Archive M001a plus docs-only C004. Archive M001b then closed the remaining cleanup-authority TOCTOU and stable-Windows compilation defect with green hosted run `36222536670`, which also closed M008 hosted qualification. Post-M001b review found the separate materialization write-authority gap; M001c implemented the handle-relative write half (`09c953f`) and stopped under Section 14 on path-handoff truthfulness. M001d closed that stop with the object-bound source seam and green hosted run `36335233644`. C008 reconciled the historical M001c status. Eggpack interoperability M002 and Core M008 closed fully in this batch: M002a fixed the Stable clippy regression and added direct Windows adapter runtime evidence (green run `36477024102`, superseding failed `36463041223`), and M008a reran the exact clean-tree package/publish-dry-run evidence with no material delta. Planning-hygiene C009 corrected the stale Egress evidence in the M006 execution record: current `eggstack/eggress@03134f8` contains both the updater surface and Delivery M003. Verified Core M009 closed the publication gate on 2026-09-28 (registry-visible `eggup-core 0.1.2` + `eggup-archive 0.1.2`, smoke 3/3, `v0.1.2` + Release `0.1.2`; see `plans/closure/verified-update-core/009-status.md`), and Egress Delivery M003 subsequently landed Egress consumer M006 on 2026-09-29 with hosted Linux/macOS/Windows updater evidence (run `36639694985`; see `plans/closure/consumer-adoption/006-status.md` M003-landed addendum). Eggsearch M003, distribution M003/M004, service M004-M006, CodeGG M005, Verified Update Core M007, and Acquisition M005/M006 have reviewed closure evidence. Planning/closure hygiene C001-C003 and C008 are closed; C009 is closed (docs-only M006 evidence reconciliation); C010 is closed (docs-only post-Egress active-state reconciliation that refreshed the M003 readiness surfaces); C011 is closed (docs-only post-M003 header/registration reconciliation; see `plans/closure/planning-closure-hygiene-corrective/011-status.md`). Both Gregg-reference upstream mechanisms are closed with green hosted qualification; Gregg consumer migration is writable but not scheduled (plan intentionally unwritten). Eggpack manifest adapter/API work is structurally implemented and qualified, and adapter M001a has closed with the full regression matrix and truthful service packageability reconciliation. Historical M001 remains closed evidence; lower Eggup crates remain Eggpack-independent. M003 bounded JSON parse/project work is qualified and the former producer convention gate is resolved by Eggpack Ecosystem M001 / Eggsact M005 `v1.2.7`; M003 real-consumer adoption is closed (consumer `65c916b`), M004a readiness preflight is closed with the minimum publication set proven, and M004 promotion has since closed: the Eggup-owned `acquisition`/`eggfetch`/`eggpack` 0.1.2 chain was published in dependency order from `02a1d32` (see `plans/closure/eggpack-manifest-interoperability/004-status.md`). No Eggup installer-generator replacement is authorized.
+The 2026-09-26 review opened acquisition M007 and service M007 (both closed). The M001 archive lineage, M008, C004, and C008 closed with hosted evidence; Eggpack M002 and Core M008 closed in full (M002a run `36477024102` green, superseding failed `36463041223`). C009 corrected the stale Egress evidence; Core M009 closed the publication gate on 2026-09-28 and Egress M006 landed 2026-09-29. C001-C003 and C008-C011 are closed; per-milestone evidence is in `plans/closure/`.
 
 ## Current project state
 
 - Rust baseline: 1.89.
-- Core: M001-M009 are closed and the 0.1.2 core/archive pair remains published. Current consumer-parity research registers M010 (current-executable authority + Windows running-image rollback) and M011 (proof-authorized stale-lock recovery) as ready. A later Core package/publication milestone is intentionally unwritten until both close.
-- Acquisition: M001-M006 are closed; M007 is conditionally closed. M008 sub-second deadline truthfulness is closed via hosted run `36222536670`, which executed the Windows portable acquisition/curl tests after Archive M001b restored the Windows lane. **M009 closed 2026-10-04**: `eggup-curl 0.1.2` was published from release-prep commit `b485228` (checksum `79df200f…b465`, 17193 bytes) after hosted run `37223895075` passed Stable/MSRV/macOS/Windows. `cargo package` compiled the package against the registry-downloaded `eggup-acquisition 0.1.2`, and an external registry-only fixture passed 6/6 with one registry source per package and no git or path entry. No `src/` byte changed, no tag was moved, and the M007 Windows live-loopback limitation is retained rather than upgraded. M010 is now the next dependency-ready milestone: it republishes the seam as `eggup-acquisition 0.1.3` carrying the two `0b8cb98` fixes that published `0.1.2` lacks.
-- Service: M001-M011 are closed. `eggup-service 0.1.2` was published 2026-10-05 and its former release-order gate on Acquisition M010 is satisfied. M010's owned failed-systemd quiescence correction is published as `0.1.3` from `feb6ae5`; checksum and post-publication systemd proof are in the M011 closure. wg-basic adopted the exact `0.1.3` registry package and closed M004 technically, then closed M005/Phase 10; only production signing/publication remains externally blocked. See the downstream status addendum in the M011 closure.
+- Workspace audit (2026-10-23, baseline `c4805411f74b85158e0ae5d0a219a32c4209d98e`): a
+  read-only review of all eight crates registered nine new findings with bounded
+  corrective plans — four **high** (core M014, archive M005, service M012, service
+  M014) and five **medium** (core M015, service M013, acquisition M013, eggpack
+  M006, planning C013) — plus three findings with no plan yet (12:
+  transport-footprint CI coverage; 13: roadmap Phases 12 and 13; 14: `eggup-core`
+  contract-doc packaging). No production
+  failure was reported for any of them; every finding was made by reading the
+  code, and the workspace suite was green (387 tests) at that baseline. None of
+  the nine plans publishes and none moves a tag.
+- Implementation pass (2026-10-23, same baseline): **five** of the nine
+  correctives were implemented and closed on the native macOS lane — core
+  M014, core M015, archive M005, service M012, and service M013 — with closure
+  records under `plans/closure/`. The parent session then ran the whole-tree
+  gate: `./scripts/check-local.sh` exits 0 and the workspace suite passes 449
+  tests with 0 failures, up from 387 at the audit baseline. At that stage
+  Linux, Windows, and every hosted CI lane were **not run**, because no hosted
+  runner was reachable from the implementation machine.
+- Second implementation pass (2026-10-23, branch `plans/corrective-batch-2026-10-23`):
+  the **remaining four** correctives — service M014, acquisition M013, eggpack
+  M006, and planning C013 — are implemented and closed, together with
+  acquisition M012 and a new acquisition M015. A hosted runner **was**
+  reachable, so the qualification was executed: CI run `40008039843` is green on **all
+  five** lanes (`stable`, `msrv`, `service-systemd`, `macos`,
+  `windows-check`). The Windows lane executed the real Windows SCM fixture
+  against the genuine Service Control Manager, which discharges service M014's
+  own condition that "a closure without a real hosted Windows run is not a
+  closure". The local gate now passes **483** tests with 0 failures.
+  The hosted run also found and fixed three defects the native macOS lane
+  cannot see: a CRLF-fragile test anchor in `eggup-archive`, thirteen
+  Unix-shaped service fixtures that needed per-test `#[cfg(unix)]` gating, and
+  a discarded `spawn()` cause in `eggup-curl` (now acquisition M015). Registry
+  finding 1 stays **open and narrowed**: acquisition M012 is conditionally
+  closed because the hosted lane re-observed the flake in the spawn mode.
+- Third implementation pass (2026-10-24, same branch): **five** further
+  milestones are implemented and closed — acquisition M014 (adapter capability
+  parity), core M017 (bounded stdin), service M015 (bounded-executor
+  consolidation), transport-footprint M001 (isolated-configuration coverage,
+  plus the subsystem roadmap its first milestone required), and a
+  documentation-anchor repair that re-derived **376** stale line citations
+  across four architecture deep dives. CI run `40062299630` is green on **all
+  five** lanes. The local gate passes **518** tests with 0 failures. The first
+  hosted run of this pass, `40061134915`, was **red in four lanes** and is the
+  evidence behind two recorded consequences: the Windows argv guard needed
+  per-test `#[cfg(unix)]` gating because the systemd `ExecStart` grammar is
+  Unix-only by construction, and the packaged-service verification is
+  **deferred** until the `eggup-core` republication. The pass also registered
+  **finding 15** (**medium**), a defect the consolidation *found*: the
+  published `eggup-service 0.1.3` reports a successful `crontab -` stdin write
+  as a failure.
+- Core: M001-M015 and M017-M019 are closed. `eggup-core 0.2.0` was published 2026-10-24; it carries the M014/M015/M017/M018 corrections but still excludes the contract docs. Core M016 now has a plan ready for handoff and targets `eggup-core 0.2.1`; the upload itself still requires explicit maintainer authorization.
+  - Acquisition: M001-M015 are closed, M012 conditionally. M009 published `eggup-curl 0.1.2` (2026-10-04), M010 published `eggup-acquisition 0.1.3` (2026-10-06), M011 published `eggup-eggfetch 0.1.3` (2026-10-06). M012 (timeout coupling), M013 (typed I/O surface), M014 (adapter capability parity) and M015 (spawn-cause attribution) closed in the corrective passes; finding 1 stays **open and narrowed**.
+  - Service: M001-M015 are closed. `eggup-service 0.1.3` was published 2026-10-09 and **still carries the stdin-verdict defect recorded as finding 15**; M012 (commit-engine deduplication), M013 (failure taxonomy), M014 (Windows SCM surface) and M015 (bounded-executor consolidation) closed in the corrective passes. See
+  `plans/closure/service-lifecycle/`.
 - Distribution: M001-M003 remain historical predecessor evidence; M004 removed the producer crate after Eggpack Contract M002 closure. The subsystem is archived/transferred to Eggpack.
-- Consumer adoption: Gregg M004 remains intentionally unwritten until Acquisition M010 and Core M012/M013 close. EggPool M007 remains intentionally unwritten until Core M012/M013 close; only its StandaloneRust transaction is in scope and package-manager/provenance paths stay downstream. Egress M006 is closed 2026-09-29 (Egress Delivery M003 landed on the registry 0.1.2 pair; M003-landed addendum in `plans/closure/consumer-adoption/006-status.md`).
-- Archive extraction: the runtime/extraction line is closed through M003; M004 is registered to publish the already-implemented 0.1.3 correctness fixes once workspace 0.1.3 exists.
-- Eggpack interoperability: M001/M001a remain closed. M002 archive handoff is closed with full hosted qualification via M002a (green run `36477024102`: Stable clippy/tests/docs + MSRV + macOS + Windows adapter runtime). M003 bounded JSON adapter qualification and the former producer convention gate are satisfied. M003a caller-bound destination corrective is closed (implementation `39ff626`, green run `36890986000`); M003 Eggsact real-consumer adoption is closed (consumer `eggstack/eggsact@65c916b` on Eggup pin `e336b32`; hosted CI run `36902758482` + drift run `36902758396` green). M004 promotion is **closed** at `plans/closure/eggpack-manifest-interoperability/004-status.md`: `eggup-acquisition 0.1.2`, `eggup-eggfetch 0.1.2`, and `eggup-eggpack 0.1.2` were published in that order from publication source `02a1d32` (hosted run `37090397398` green on all four lanes). The adapter now resolves the Eggpack-owned `eggpack-manifest =0.1.0` from crates.io — published 2026-10-02 from `eggstack/eggpack@8d661e4`, checksum `2a08f24b…b629`, published `src/lib.rs` byte-identical to the consumer-qualified Git source (`eggstack/eggpack: plans/closure/release-manifest/003-status.md`). Two external registry-only graphs resolve with one registry source per package and no git/path edge and pass smoke. `eggup-curl` was subsequently published as `0.1.2` on 2026-10-04 by Acquisition M009 (the M004a graph proof correctly excluded it from M004's authorization, and it was promoted under its own plan); `eggup-service` (published only at `0.1.0`/`0.1.1`, so its `0.1.2` was never published) and `eggup-transport-footprint` (`publish = false`) were both excluded from M004a's publication authorization; `v0.1.1`/`v0.1.2` were not moved and release `0.1.2` notes were extended. Eggsact's own Git-to-registry migration is now executable but remains Eggsact-owned and separately authorized.
+  - Consumer adoption: Gregg M004 and EggPool M007 are both **authorable** now — every versioned handoff they were gated on is published (`eggup-acquisition 0.1.3` on 2026-10-06, `eggup-core 0.1.3` on 2026-10-06, Service M009 and Core M010/M011 closed), so both plans are intentionally unwritten pending an authoring decision, not blocked. EggPool's scope is still only its StandaloneRust transaction; package-manager/provenance paths stay downstream. Egress M006 is closed
+  2026-09-29 (Egress Delivery M003 landed on the registry 0.1.2 pair; M003-landed addendum in `plans/closure/consumer-adoption/006-status.md`).
+- Archive extraction: closed through M005. M004 published the already-implemented `0.1.3` correctness fixes as `eggup-archive 0.1.3` on 2026-10-06; M005 (member-write guard, made line-ending portable in `87cab50`) closed in the corrective pass.
+- Eggpack manifest interoperability: M001-M006 all closed. M003 closed — `eggpack-manifest 0.1.0` published from Eggpack `8d661e4`; M003 consumer adoption closed (`eggsact@65c916b`).
+  M004a readiness preflight closed (nothing published); M004 promotion closed — the `0.1.2` acquisition/eggfetch/eggpack chain from `02a1d32`.
+  M005 published `eggup-eggpack 0.1.3` on 2026-10-06 with the member-identity cross-check; M006 (canonical digest reuse) closed in the corrective pass.
+  Evidence: `plans/closure/eggpack-manifest-interoperability/`.
+- Transport footprint: M001 closed in the third pass. The crate's three isolated transport configurations are now built or checked in the `stable`, `msrv`, and `macos` lanes, and its subsystem roadmap exists; its published versions are unchanged.
 - Release process: manual crates.io publication only.
 - The lockstep 0.1.1 patch is published (seam-then-adapter order) now that the corrective gates are closed. Eggsearch M003 may use an immutable path/git source for local qualification until downstream adoption moves; no publication is implicit in these plans.
 
 ## Next handoff
 
-The bounded 0.1.3 release train, including Service M011 publication and closure, is complete. wg-basic Distribution M004 C001a adopted `eggup-service = "=0.1.3"` (source `feb6ae5`, checksum `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`) and now has formal technical closures for M004, M005, and Phase 10; production signing/publication remains externally blocked. Its Phase 11 work is also closed, and wg-basic's registry reports no active implementation plan (Phase 12 is deferred). No new Eggup implementation plan became ready from this downstream closure. Acquisition M012 remains independently ready and unchanged.
+The bounded 0.1.3 release train, including Service M011 publication and closure, is complete. wg-basic Distribution M004 C001a adopted `eggup-service = "=0.1.3"` (source `feb6ae5`, checksum `9f7f7ea854577158e66aa202709ab1c97a3aedcf00b06c1ab914d25b132124dc`) and now has formal technical closures for M004, M005, and Phase 10; production signing/publication remains externally blocked. Its Phase 11 work is also closed, and wg-basic's registry reports no active implementation plan
+(Phase 12 is deferred). No new Eggup implementation plan became ready from this downstream closure. Acquisition M012 remains conditionally closed; its timeout-test correction is implemented, while the separate spawn-pressure re-observation keeps registry finding 1 open and narrowed as described above.
 
-Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter. M004a is closed (qualification/package-simulation only; nothing published); M004 is implemented, qualified, and closed; do not re-open it or re-publish its `0.1.2` versions. The `eggpack-manifest` producer item was discharged by Eggpack Release Manifest M003 and consumed by M004's registry pin. Do not duplicate producer ownership in Eggup. M009 is likewise closed: do not re-publish `eggup-curl 0.1.2` or any other published `0.1.2` version, and do not move `v0.1.1`/`v0.1.2`. M010 publishes a new `0.1.3` version of the seam only; it does not re-open M009 or M004.
+A read-only workspace audit at baseline `c480541` registered nine bounded
+corrective plans; see "Dependency-ready implementation work" and the
+"Post-0.1.3 open findings" section. **All nine are now implemented; eight are
+closed and acquisition M012 is conditionally closed**, and a hosted runner was
+reachable for the qualification: CI run
+`40008039843` is green on **all five** lanes, and the local gate passes 483
+tests with 0 failures. A third implementation pass added five more milestones
+— acquisition M014, core M017, service M015, transport-footprint M001, and the
+architecture-anchor repair — qualified by CI run `40062299630`, also green on
+all five lanes, with the local gate now passing 518 tests with 0 failures. None
+of them publishes, and none moves a tag; the published
+crates still carry every defect they carry today.
+- **Fourth implementation pass (2026-10-24, same branch): a read-only audit of
+  the whole batch registered three release-blocking items and a set of
+  documentation claims that contradicted the branch's own work, and all of them
+  are now closed by five more milestones** — acquisition M016 (the seam's
+  `0.2.0` publication coupling), core M018 (the bounded-stdin outcome
+  priority), service M016 (the published-change release note), planning C014
+  (the documentation-truth gate), and planning C015 (the architecture anchor
+  and claim corrective). CI run `40067964510` is green on **all five** lanes
+  (stable 528 passed, msrv check-only, service-systemd 9 passed, macOS 528
+  passed, windows-check 650 passed), and the local gate exits 0 with **528**
+  tests passing and 0 failures. The immediately preceding run `40067739294`
+  was **red in the `stable` lane** on a transient `ETXTBSY` in a pre-existing
+  core unit test; it is recorded as a re-observation of finding **1** and did
+  not reproduce. None of this publishes, and no tag moved.
+
+What is **not** done. **Acquisition M012 is conditionally closed, not
+closed**: the hosted Stable lane re-observed registry finding 1 in the same
+test, in the *spawn* mode rather than the timeout mode M012 addressed. M012's
+substantive change is implemented and verified, but the finding stays **open
+and narrowed** — M012 decoupled the deadline under test from the enforced
+budget, and M015 made the spawn cause attributable rather than cause-free. An
+intermittent spawn failure under host resource pressure can still occur, and
+preventing it is not in scope of either milestone. **Acquisition M014**
+(adapter capability parity) is now closed, in the third implementation pass.
+
+Two consequences are now unblocked. First, service M012 deliberately deferred
+the `SystemExecutor` consolidation because core's bounded-execution primitive
+was defective; core M014 has since closed, and that consolidation is now
+authored and closed as service M015. Second, service M013's failure taxonomy retyped
+`ServiceError::Manager`, so a republication of `eggup-service` — and, through
+the `=0.1.3` pins, of `eggup-eggpack` — is the only way the fixed crates reach
+consumers. Acquisition M013's typed I/O surface is source-breaking in the same
+way, and its adapter-capability-parity decision is now closed by acquisition
+M014.
+
+The same republication cascade now has a **third** member. Service M015's
+consolidated runner calls core's bounded-stdin capability, which is not in the
+published `eggup-core 0.1.3`, so `eggup-service` can no longer be packaged
+against the registry. The four CI package steps were deferred to
+`cargo package -p eggup-service --locked --no-verify` with the reason recorded
+in the workflow itself, and registry finding **16** (**medium**) named
+the `eggup-core` republication as the follow-on that restores the
+strict step. **That republication was a named follow-on, not yet a numbered
+milestone**: it had no plan, no closure path, and no roadmap row, and it needed
+explicit maintainer authorization. CI never performs it.
+**It has since landed** — the `0.2.0` publication train published
+`eggup-core 0.2.0`, commit `2d6e089` restored the strict step in all four lanes
+that carry it, hosted run `40100087952` on that commit is green on all five
+lanes, and finding **16** is closed.
+
+The registry's own pre-existing status contradictions (Acquisition M010 "ready" versus "closed"; Gregg M004 "blocked" versus "authorable") and the stale `0.1.2` claims in `CHANGELOG.md`, `docs/`, `AGENTS.md`, and the architecture deep dives were owned by planning C013 and **are now repaired** — C013 closed 2026-10-23 at `plans/closure/planning-closure-hygiene-corrective/013-status.md`. Each milestone now has one status in this registry, and the `Dependency-ready
+implementation work` table above is the authoritative one.
+
+Do not author or implement an Eggup installer generator. Keep producer behavior in Eggpack and archive extraction outside the adapter, and do not duplicate producer ownership in Eggup. M004a and M004 are closed — do not re-open them or re-publish their `0.1.2` versions; the `eggpack-manifest` producer item was discharged by Eggpack Release Manifest M003. M009 and M010 are likewise closed: do not re-publish `eggup-curl 0.1.2`, `eggup-acquisition 0.1.3`, or any other published
+version, and do not move `v0.1.1`/`v0.1.2`.
 
 After each implementation pass:
 

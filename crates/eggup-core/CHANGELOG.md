@@ -1,32 +1,275 @@
 # Changelog
 
-## 0.1.3 — 2026-10-06
+## 0.2.0 — 2026-10-24
 
-Published to crates.io (`plans/closure/verified-update-core/013-status.md`).
+Published to crates.io (`plans/closure/verified-update-core/019-status.md`) as
+the first crate of the lockstep 0.2.0 train: `eggup-archive`,
+`eggup-acquisition`, `eggup-curl`, `eggup-eggfetch`, `eggup-service`, and
+`eggup-eggpack` are published from the same source commit, after this crate.
 Dependency surface remains `sha2` plus a **Windows-only** `self-replace`; the
-Unix/macOS package graph is unchanged. Integrity evidence is SHA-256 checksum
-only — no authenticity or signature claims. Self-update selects no release and
-infers no version.
+Unix/macOS package graph is unchanged and no new dependency was added.
+Integrity evidence is SHA-256 checksum only — no authenticity or signature
+claims. Self-update selects no release and infers no version.
 
-This version carries current-executable transaction parity (M010),
-proof-authorized stale-lock recovery (M011), the earlier Core audit fixes, and
-the M012 public-error compatibility correction. Because M010/M011 were never
-published, this is their first appearance on the registry.
+This version carries the bounded stdin execution corrective (M017), the
+bounded-stdin outcome-priority corrective (M018), the public-API contract
+truthfulness correction (M015), and the bounded candidate deadline correction
+(M014). None of them was published before: `0.1.3` still carries every one of
+them. Current-executable transaction parity (M010), proof-authorized stale-lock
+recovery (M011), the earlier Core audit fixes, and the M012 public-error
+compatibility correction were published at `0.1.3`; their entries are carried
+below unchanged in substance, and they are not new in this version.
 
 **Compatibility, stated precisely.** `Error` keeps exactly the seven variants
-`0.1.2` published, so an exhaustive `match` on it compiles unchanged against
-both versions — proven by an external fixture that is byte-identical between
-the two and fails against the pre-M012 tree. Retained evidence moved to a new
-`#[non_exhaustive] RecoveryError`. The one intentional source-visible addition
-is `CleanupDisposition::DeferredToProcessExit`, on a closed enum, required by
-M010 so a kept-installed Windows self-update does not report its still-mapped
-old generation as either cleaned or stranded. The compatibility section below
-explains why that addition is not removable.
+`0.1.3` published, so an exhaustive `match` on it compiles unchanged against
+both versions, and `Error::Injected` remains `#[cfg(test)]`-only.
+`RecoveryError` keeps its two variants and its `#[non_exhaustive]` attribute,
+and `CleanupDisposition` keeps the three members `0.1.3` published, including
+`DeferredToProcessExit`. The transaction, staging, locking, commit, rollback,
+and ownership machinery are untouched. `FailureCategory` keeps
+`#[non_exhaustive]` and the `as_str()` strings of the seven categories that
+remain; the one removal is `FailureCategory::RetainedEvidence` with its
+`retained-evidence` string, and that removal is the only source break this
+version introduces.
 
-## Unreleased
+**Additive.** `MAX_STDIN_BYTES` and `CommandSpec::stdin_data` are new public
+items, and the `operation` string of `Error::Io` is now a published
+classification surface for `run_bounded` — `"spawning bounded candidate"`,
+`"polling bounded candidate"`, and the new `"writing bounded stdin"`. Beyond
+the removal named above, nothing else in the public surface moved, and the new
+builder is optional.
 
-Nothing in this section has been published. `0.1.3` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
+**Behaviour a consumer can observe.** The deadline is now an unconditional
+maximum wall-clock bound on the whole bounded execution, so a call that could
+run past its own documented bound now returns at the deadline with `timed_out`
+set. A bounded stdin write failure observed at or after the deadline is now the
+deadline outcome — `Ok` with `timed_out` set — where `0.1.3` reported it as an
+`Err` in some runs and as the deadline outcome in others, so the same input and
+the same timeout no longer produce two different public classifications. A
+write failure observed before the deadline is still an `Err`, and an undelivered
+payload is never reported as a success.
+
+**One consumer action is required.** `eggup-core 0.1.3` on crates.io does publish
+`FailureCategory::RetainedEvidence`, so a downstream crate that named it
+explicitly — a match arm, an equality assertion, or a constant `as_str()`
+call — fails to compile against `0.2.0`. That is a compile-time break, not a
+silent behaviour change, and deleting the name reference is the whole of the
+required work. Beyond that, no consumer migration is required: no data format
+changed, no configuration changed, and no other consumer action is needed beyond
+picking up the new version.
+
+**Bounded-stdin outcome-priority corrective (Verified Update Core M018).** The
+published rule for `run_bounded`'s bounded stdin write was not the rule the
+implementation applied, and the failure taxonomy's producer count was stated
+for a test build. This corrective states one rule, implements it so the
+rustdoc is literally true, and corrects the statements that were not.
+
+- **Changed: the deadline has priority over the stdin writer's verdict, and the
+  verdict is classified by its own observation instant.** The writer now stamps
+  its verdict with the instant at which it observed the write's completion, so
+  "before or after the deadline" is a fact about the write and never a fact
+  about when `run_bounded` happened to poll for the verdict. A write failure
+  observed **before** the deadline is an `Err`
+  (`Error::Io { operation: "writing bounded stdin", source }`), as before. A
+  write failure observed **at or after** the deadline no longer turns the
+  deadline outcome into an `Err`: the deadline already decided that outcome,
+  and the call returns `Ok` with `timed_out` set. A writer that had not
+  delivered its verdict when the deadline was reached is abandoned, exactly
+  like a reader blocked on a pipe a surviving descendant holds.
+- **Behaviour change.** Before this corrective, a write failure observed after
+  the deadline was reached was reported as an `Err` in some runs and as the
+  deadline outcome in others, depending on the poll phase, so the same input
+  and the same timeout produced two different public classifications. The
+  classification is now a function of the write's own observation instant. An
+  undelivered payload is never reported as a success: the outcome is either an
+  `Err` or an `Ok` whose `timed_out` flag is set.
+- **Fixed: the deadline's effect on the writer is stated truthfully.** Killing
+  the direct child breaks the child's stdin pipe only for a child that is still
+  running and whose stdin pipe no descendant inherited. A descendant that
+  inherited the pipe keeps it open, so the writer stays blocked until that
+  descendant exits or closes the pipe; the earlier wording overstated this.
+- **Fixed: the failure taxonomy's producer count.** `FailureCategory`'s rustdoc
+  said that six categories are produced by the crate's internal
+  error-to-category mapping. Five are produced in a shipped build; the sixth,
+  `FailureCategory::Injected`, is produced by that same mapping only in this
+  crate's own test builds.
+- **Unchanged: the public surface.** `Error` keeps exactly the seven published
+  variants (plus the `#[cfg(test)]`-only `Error::Injected`), `FailureCategory`
+  keeps its members and its published `as_str()` strings, and no new public
+  item was added. The dependency surface is unchanged: `sha2` plus the
+  Windows-only `self-replace`. No new dependency and no `unsafe`.
+- **Published in `0.2.0`, and no migration required.** The published
+  `eggup-core 0.1.3` still carries the pre-correction behaviour; this
+  correction reaches consumers in `0.2.0`. No consumer needs to change
+  anything.
+
+**Bounded stdin execution corrective (Verified Update Core M017).** `run_bounded`
+gave every child a **null** stdin, so a downstream adapter whose workflow needs a
+child to read a payload — a service manager installing a unit or a crontab from
+standard input — could not delegate process execution to core without losing
+that capability, and had to keep a runner of its own. Core now owns the bounded
+stdin capability.
+
+- **Added: `CommandSpec::stdin_data`.** One infallible builder attaches a
+  bounded stdin payload. Without a payload the child's stdin stays null and
+  `run_bounded` behaves exactly as before.
+- **Added: `MAX_STDIN_BYTES`.** The inclusive bound on one payload (1 MiB). A
+  larger payload is rejected with
+  `Error::InvalidInput("stdin data exceeds the bounded stdin bound")` **before
+  any child is spawned**, so the bound fails closed and no process is created.
+- **Added: a bounded stdin write.** An attached payload is written by a
+  dedicated writer thread that starts only after the output readers are
+  attached, so a child that fills stdout or stderr before draining its stdin
+  cannot deadlock both sides.
+- **The deadline now bounds the writer too.** The wall-clock deadline remains an
+  unconditional maximum bound on the whole bounded execution. At the deadline
+  the direct child is killed, which breaks the child's stdin pipe for a child
+  that is still running and whose stdin pipe no descendant inherited; a
+  descendant that inherited the pipe keeps it open, so a writer still blocked
+  in `write` is abandoned explicitly and ends only when that descendant exits
+  or closes the pipe, exactly like a reader blocked on a pipe a surviving
+  descendant holds. A bounded execution is not reported as complete until the
+  writer has delivered its verdict, so a write failure is never lost behind a
+  "the child exited" observation.
+- **Added: a typed write failure.** A stdin payload that cannot be written —
+  including the broken pipe a child produces when it exits without reading its
+  stdin — kills and reaps the child and then fails closed with
+  `Error::Io { operation: "writing bounded stdin", source }`, when the failure
+  was observed before the deadline. A failure observed at or after the
+  deadline does not become an error: the deadline already decided that
+  outcome, and the call returns `Ok` with `timed_out` set (see the M018 entry
+  above). When a failed write and an output overflow are live at the same
+  time, the write failure wins.
+- **Added: a stable error-classification surface.** The `operation` string of
+  `Error::Io` is now a published contract for `run_bounded`: `"spawning
+  bounded candidate"`, `"polling bounded candidate"`, and `"writing bounded
+  stdin"`. A downstream adapter may branch on them, and the `run_bounded`
+  rustdoc states what each one means and what an adapter is expected to do
+  with it.
+- **Unchanged: the public error surface.** No `Error` variant was added,
+  removed, or reshaped. `Error` keeps exactly the seven published variants
+  (plus the `#[cfg(test)]`-only `Error::Injected`), so an exhaustive `match` on
+  it compiles unchanged. `FailureCategory` is untouched.
+- **Unchanged: the dependency surface.** `sha2` plus the Windows-only
+  `self-replace`. No new dependency, no `unsafe`, no process-group or
+  job-object mechanism, and no change to the transaction, staging, locking,
+  commit, rollback, or ownership machinery. SHA-256 remains integrity evidence
+  only; no authenticity or signature claim was introduced.
+- **Published in `0.2.0`, and no migration required.** The published
+  `eggup-core 0.1.3` still gives every child a null stdin and still lacks
+  `stdin_data` and `MAX_STDIN_BYTES`; the capability reaches consumers in
+  `0.2.0`. The addition is source-compatible: no consumer needs to change
+  anything, and the new builder is optional.
+
+**Public-API contract truthfulness correction (Verified Update Core M015).** The
+published failure taxonomy contained a category that could never be produced:
+`FailureCategory::RetainedEvidence` was never constructed by any producer, yet
+`as_str()` published the name `retained-evidence` to consumers. Separately, the
+crate's public fallible surface documented **no** failure modes at all — it
+carried zero `# Errors` rustdoc sections across all of `src/`.
+
+- **Removed: `FailureCategory::RetainedEvidence`.** The variant and its
+  `as_str` arm are gone. The variant was residue of M012's relocation of
+  retained-evidence reporting into `RecoveryError`; that meaning is carried by
+  `TransactionDisposition::RecoveryRequired`, by
+  `CleanupDisposition::RetainedForRecovery`, and by the real path in
+  `TransactionReceipt::recovery_path` — never by a failure category. The
+  published taxonomy is now exactly seven categories, and **every one of them
+  describes a failure that can actually occur**.
+- **Unchanged: the remaining `as_str()` strings.** `lock-contention`,
+  `ownership-conflict`, `verification`, `filesystem`, `invalid-input`,
+  `injected`, and `post-commit-check` are byte-identical to what `0.1.3`
+  published. The only string that disappears is `retained-evidence`, and no
+  runtime failure could ever carry it — no producer existed — so no consumer
+  could have observed it in a `FailureReport`, in a receipt, or in a
+  persisted category.
+- **Unchanged: the failure space.** No produced `FailureReport`, no
+  `TransactionReceipt`, no `Error`, and no `RecoveryError` differs before and
+  after. `Error` keeps **exactly** the seven variants `0.1.3` published (plus
+  the `#[cfg(test)]`-only `Error::Injected`), and `RecoveryError` keeps its
+  two variants and its `#[non_exhaustive]` attribute.
+- **Added: failure-mode documentation on the public fallible surface.** Every
+  public fallible item now carries an `# Errors` section that states which
+  `Error` variants it can return and under what condition, that a receipt —
+  not an `Err` — is how a post-lock outcome is reported, that the ownership
+  direction stays fail-closed (`Owned` is never inferred; a verifier's
+  ambiguity is `Unknown`), and that a member without verified integrity
+  evidence is rejected with no escape hatch. The wording points at
+  `crates/eggup-core/docs/{domain,verification,transaction}.md` and
+  `architecture/core-transaction.md` §8 rather than restating them. SHA-256
+  remains integrity evidence only: no authenticity or signature claim was
+  introduced anywhere.
+- **Added: a crate-local doc-accuracy check.** `clippy::missing_errors_doc` is
+  now enabled for `eggup-core` only, so the existing gate's `-D warnings` makes
+  a missing `# Errors` section a hard error for this crate. The workspace lint
+  table is unchanged and no other crate is affected.
+- **Documented, not removed: `FailureCategory::Injected` is test-only.** It is
+  produced only by this crate's own test fault harness, because its only
+  producer is the `#[cfg(test)]`-only `Error::Injected`; a shipped
+  `eggup-core` build never produces the `injected` category. This is the same
+  class of unreachable branch as the removed variant, so it is now stated
+  explicitly in the rustdoc rather than left implicit.
+- **Compatibility.** Removing a variant of the `#[non_exhaustive]`
+  `FailureCategory` does not break a downstream matcher: every downstream
+  matcher must already carry a wildcard arm, and that arm now covers one
+  fewer variant. **The one caveat**: `eggup-core 0.1.3` on crates.io *does*
+  publish `FailureCategory::RetainedEvidence`, so a downstream crate that
+  named it explicitly — a match arm, an equality assertion, or a constant
+  `as_str()` call — fails to compile against `0.2.0`. That is a compile-time
+  break, not a silent behavior change, and it is the only downstream break
+  this correction introduces. **No consumer migration is required** beyond
+  deleting such a name reference.
+- **Published in `0.2.0`.** `eggup-core 0.1.3` on crates.io still carries the
+  defect. The fix reaches consumers in `0.2.0`. The lockstep 0.2.0 train
+  repins `eggup-eggpack` to `eggup-core = "=0.2.0"` and publishes that adapter
+  after this crate, so the correction reaches it in the same train. The
+  published `0.1.3` release and its `v0.1.3` tag are not moved.
+- **No migration path** is required: no API changed shape beyond the removal
+  above, no data format changed, and no consumer action is needed beyond
+  picking up the fixed version.
+
+**Bounded candidate deadline correction (Verified Update Core M014).** `run_bounded`
+documented `CommandSpec::timeout` as the maximum wall-clock execution time of a
+candidate command, but the implementation evaluated the deadline only while the direct
+child was still alive and joined its reader threads only on the success path. A
+descendant that inherited the stdout or stderr pipe and held it open after the direct
+child exited pinned the call indefinitely, and the timeout path additionally left both
+reader threads unjoined. A published library could therefore hang past its own
+documented safety bound.
+
+- **Fixed: the deadline is now an unconditional maximum wall-clock bound** on the whole
+  bounded execution. It is evaluated on every poll whether or not the direct child has
+  already exited, so `run_bounded` always returns. When the deadline elapses, a still
+  running direct child is killed and reaped exactly as before; an already exited child
+  is not killed and not reaped again, and the call no longer waits for pipe EOF.
+- **Changed: the descendant case is now bounded and fail-closed.** When the direct
+  child exited but a descendant still held the output pipe open, the call returns at the
+  deadline with `timed_out` set, `output_limited` clear, `success()` false, and the
+  direct child's exit code still observable through `exit_code`. The stream the
+  descendant still holds contributes no bytes, because they were never captured. Core
+  terminates only the direct child it spawned; a descendant is never killed.
+- **Fixed: reader-thread lifecycle is now explicit.** A reader that delivered its
+  result is joined, which is bounded because a reader only has to return after its
+  send. A reader still blocked in `read()` at the deadline cannot be joined without
+  waiting past the deadline, and core cannot terminate a descendant it does not own —
+  it has no `libc`, `nix`, or `windows-sys` dependency and `unsafe` is denied — so such
+  a reader is abandoned explicitly and ends when the pipe reaches EOF.
+- **Unchanged: the public surface.** `CommandSpec`, `CommandOutput` and its accessors
+  keep their published shape, `Error` keeps exactly the seven published `0.1.2`
+  variants, the output bound stays per stream at the published defaults (64 KiB, 5 s),
+  and the overflow semantics stay as published: an overflowing stream is reported as
+  empty. The ownership model, the transaction state machine, the lock, the receipts,
+  and the failure taxonomy are untouched.
+- **Compatibility.** Source compatibility is unchanged. The behavior change is
+  confined to calls that never returned under `0.1.3`: such a call now returns at the deadline
+  with `timed_out == true`. No caller can depend on a hang, so this is a defect
+  correction rather than a semantic break.
+- **Published in `0.2.0`.** `eggup-core 0.1.3` on crates.io still carries the
+  defect; the fix reaches consumers in `0.2.0`. The lockstep 0.2.0 train
+  repins `eggup-eggpack` to `eggup-core = "=0.2.0"` and publishes that adapter
+  after this crate, so the correction reaches it in the same train.
+- **No migration path** is required: no API changed, no data format changed, and no
+  consumer action is needed beyond picking up the fixed version.
 
 **Compatibility correction (Verified Update Core M012).** An earlier revision of
 this file claimed that adding variants here was additive because `Error`,
@@ -43,7 +286,9 @@ The state after M012:
   classifies injected failures structurally through a `#[cfg(test)]`-only
   variant. `Error::RecoveryRequired` moved to a new `RecoveryError` type.
 - `FailureCategory` **is** `#[non_exhaustive]`, so
-  `FailureCategory::RetainedEvidence` is genuinely additive.
+  `FailureCategory::RetainedEvidence` is genuinely additive. (M015 later
+  removed that variant, because no producer ever existed for it; see the M015
+  entry above. The `#[non_exhaustive]` attribute itself is unchanged.)
 - `CleanupDisposition` is **not** `#[non_exhaustive]`, so
   `CleanupDisposition::DeferredToProcessExit` is a source-visible addition. It
   is required by M010: a kept-installed Windows self-update cannot unlink the
@@ -167,7 +412,7 @@ signature claims. Self-update selects no release and infers no version.
   the real retained path through `evidence()` without parsing `Display`, carries
   bounded detail through `detail()`, and chains as a `std::error::Error` whose
   `source()` is the inner `Error`. `From<Error>` keeps propagation ergonomic.
-  Only the three still-unpublished M011 entry points
+  Only the three M011 entry points
   (`MutationLock::acquire_with_recovery`,
   `ValidatedTransaction::commit_with_stale_lock_recovery`, and
   `commit_with_post_commit_and_stale_lock_recovery`) return it; every published
@@ -176,6 +421,34 @@ signature claims. Self-update selects no release and infers no version.
 
 The `eggup-archive` and `eggup-service` crates consume this crate; see their
 changelogs for changes that cross the boundary.
+
+## Unreleased
+
+Nothing in this section has been published. `0.2.0` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
+
+## 0.1.3 — 2026-10-06
+
+Published to crates.io (`plans/closure/verified-update-core/013-status.md`).
+Dependency surface remains `sha2` plus a **Windows-only** `self-replace`; the
+Unix/macOS package graph is unchanged. Integrity evidence is SHA-256 checksum
+only — no authenticity or signature claims. Self-update selects no release and
+infers no version.
+
+This version carries current-executable transaction parity (M010),
+proof-authorized stale-lock recovery (M011), the earlier Core audit fixes, and
+the M012 public-error compatibility correction. Because M010/M011 were never
+published, this is their first appearance on the registry.
+
+**Compatibility, stated precisely.** `Error` keeps exactly the seven variants
+`0.1.2` published, so an exhaustive `match` on it compiles unchanged against
+both versions — proven by an external fixture that is byte-identical between
+the two and fails against the pre-M012 tree. Retained evidence moved to a new
+`#[non_exhaustive] RecoveryError`. The one intentional source-visible addition
+is `CleanupDisposition::DeferredToProcessExit`, on a closed enum, required by
+M010 so a kept-installed Windows self-update does not report its still-mapped
+old generation as either cleaned or stranded. The compatibility section below
+explains why that addition is not removable.
 
 ## 0.1.2 — 2026-09-28
 

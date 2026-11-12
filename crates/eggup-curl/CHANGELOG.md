@@ -1,8 +1,240 @@
 # Changelog
 
+## 0.2.0 — 2026-10-24
+
+Published to crates.io from the workspace `0.2.0` source version
+(`plans/closure/acquisition-transport/017-status.md`). The dependency surface
+is `eggup-acquisition` (`^0.2`) only: the adapter embeds no HTTP/TLS stack and
+spawns a caller-supplied `curl` executable. Integrity remains SHA-256 checksum
+evidence only; no authenticity or signature claims. The adapter selects no
+release, verifies no authenticity, and authorizes no destination.
+
+This release is **not** a clean one. It carries **no source-breaking change of
+its own**, but it is transitively source-breaking because it depends on
+`eggup-acquisition ^0.2`, whose `0.2.0` is source-breaking. The break is
+**inherited from the seam**, not introduced by this crate. A consumer must
+therefore change the same two things a consumer of the seam must change:
+
+- `AcquisitionError::Io` is no longer a tuple variant — a consumer that wrote
+  `AcquisitionError::Io(_)` must write `AcquisitionError::Io { .. }` (or
+  `AcquisitionError::Io { operation, source }`). The seam's
+  `AcquisitionError` is part of this crate's public surface, because
+  `AcquisitionTransport::fetch` returns it.
+- `AcquisitionError` now derives **only** `Debug`. `Clone`, `PartialEq`, and
+  `Eq` are **removed**, because the retyped variant carries a
+  `std::io::Error`, which implements none of them. A consumer that cloned or
+  compared whole `AcquisitionError` values must match on the variant and its
+  fields instead.
+
+Beyond that inherited break, this crate's **own** public API is additive and
+needs no migration: `CurlTransport::with_executable_and_user_agent` and
+`CurlTransport::user_agent` are the only additions, `CurlConfig` is untouched,
+and no existing public signature, field, constructor, or error variant was
+added, removed, or retyped. The transport semantics qualified under Acquisition
+M005-M008 — the explicit connect/total ceilings, the exact-404
+`FetchOutcome::NotFound`, the bounded streaming into Eggup-owned staging, the
+cancellation/timeout child kill and reap, the race-safe no-clobber promotion,
+the credential-bearing diagnostic redaction, and the explicit
+redirect/protocol/proxy policy — were published at `0.1.2` and are unchanged in
+substance.
+
+**Publication coupling with the seam's `0.2.0` release (Acquisition Transport
+M016).**
+
+- **Corrected: the compatibility consequence of the republication.** The M014
+  entry below stated that a republication would keep this crate at `0.1.3` and
+  would require no consumer migration. Both halves are **false**. The seam's
+  release is **`eggup-acquisition 0.2.0`**, and it is **source-breaking**:
+  `AcquisitionError::Io(String)` became `Io { operation, source }`, and the
+  enum derives `Debug` only. `0.2.0` does **not** satisfy the `^0.1.0`
+  requirement this crate declared.
+- **This crate's requirement widened at publication time.** The widening is
+  `eggup-acquisition` = "0.2" (widened from "0.1.0").
+- **This crate's own published version is therefore not `0.1.3`.** The
+  workspace is version-lockstep, so the seam's `0.2.0` release moved the
+  workspace version to `0.2.0`, and this crate's publication is
+  `eggup-curl 0.2.0`.
+- **A consumer inherits the seam's source break.** A consumer that depends on
+  the seam **directly** inherits the source break when it moves to `0.2`, and a
+  consumer of this crate inherits it too, because this crate is published
+  against the widened requirement — the seam's `AcquisitionError` is part of
+  this crate's public surface, because `AcquisitionTransport::fetch` returns
+  it. Such a consumer must update its `AcquisitionError::Io` matchers, and
+  must stop cloning or comparing whole `AcquisitionError` values.
+- **What is unchanged.** This crate's own public API additions remain
+  additive, and the published `0.1.2` artifact keeps its current shape and
+  behavior: this release adds to the adapter's surface rather than altering
+  the transport semantics published at `0.1.2`. The coupling is performed
+  here — the requirement is widened and the version is bumped.
+
+**Spawn-failure diagnosability (Acquisition Transport M015).**
+
+- **Fixed: a spawn failure reported no cause.** When `Command::spawn()` failed,
+  the adapter discarded the returned `io::Error` and reported the same
+  cause-free string every time: `curl spawn failed for {redacted}`. A missing
+  executable (`ENOENT`), a non-executable file (`EACCES`), and a transient
+  resource failure (`EAGAIN`/`ENOMEM`) were therefore **indistinguishable** in
+  the only record a consumer has of the failure. A hosted CI run failed with
+  exactly that message and could not be attributed, because the diagnostic
+  carried no way to tell the causes apart. The detail now names the cause:
+  `curl spawn failed for {redacted}: {kind}[ (os error {code})]`, where
+  `{kind}` is the `std::io::ErrorKind` (`NotFound`, `PermissionDenied`,
+  `WouldBlock`, …) and the ` (os error {code})` suffix is present whenever the
+  error carries a raw OS code.
+- **Unchanged: the classification.** A spawn failure is still
+  `AcquisitionError::Unavailable`, and `Unavailable` still falls back under
+  `CompositionPolicy::UnavailableOnly`. The cause is **evidence inside the
+  detail**, never a change of variant: `Io` is terminal under every
+  composition policy and is not used for a spawn failure.
+- **Unchanged: the redaction.** The URL is still redacted exactly as before —
+  no userinfo, no query string, no fragment, and the seam's 256-byte
+  truncation. The added cause segment is derived **only** from the
+  `ErrorKind` discriminant and the numeric OS code; the OS-provided message
+  text is never rendered, so no path or credential material can enter the
+  diagnostic through it. The detail stays bounded by the seam's shared
+  512-byte UTF-8-safe rule.
+
+**Compatibility, stated precisely.** This crate's **public API is unchanged**
+and its observable behavior is unchanged: no public signature, field,
+constructor, or error variant was added, removed, or retyped, and no wire
+request changes. The `Unavailable` / `Transport` classification of every
+failure is unchanged, and the fallback contract is unchanged. The only
+consumer-visible difference is the **text** of the spawn-failure detail, which
+now carries the OS cause after the established
+`curl spawn failed for {redacted}` prefix. **No consumer migration is required
+by this crate's own API change**. This release ships that change, so the
+cause-free detail in the published `0.1.2` artifact is superseded by it. A
+consumer's obligation at this version boundary is recorded in the M016 entry
+above.
+
+**Adapter capability parity: a caller-settable `User-Agent` (Acquisition Transport
+M014).**
+
+- **Added: a caller-settable outbound `User-Agent`.**
+  `CurlTransport::with_executable_and_user_agent(executable, config, user_agent)`
+  installs a `User-Agent` used for **every** request that adapter makes, and
+  `CurlTransport::user_agent()` returns the accepted value (`None` when none was
+  installed). The value reaches `curl` as the literal argv element following
+  `--user-agent`, positioned before the `--` separator and the URL. No shell is
+  involved, so the value is never re-parsed or interpolated.
+- **Added: validation before the wire.** The accepted grammar is
+  `1*( VCHAR / SP / obs-text )` — `VCHAR` is `%x21-7E`, `SP` (`%x20`) is
+  permitted inside the value, a run of `SP` included, but a leading or trailing
+  `SP` is not, and `obs-text` is any non-ASCII scalar value (`%xA0-10FFFF`, C1
+  excluded). A value is rejected with
+  `AcquisitionError::InvalidInput` when it is empty, when its UTF-8 length
+  exceeds `MAX_USER_AGENT_BYTES` (512 bytes), when it contains any C0 control
+  character (including `CR`, `LF`, `NUL`, and `HTAB`), `DEL` (`U+007F`), or any
+  C1 control character (`U+0080`-`U+009F`), or when it begins or ends with a
+  space. A rejected value produces **no** argv. `InvalidInput` is terminal:
+  unlike `Unavailable` it never makes a composed transport fall back to another
+  adapter, so a malformed value cannot silently change which transport serves
+  the request. The control characters are refused because `curl` does not
+  sanitize `--user-agent` — a value containing `CR LF` would be written into the
+  request head verbatim and inject an additional header.
+- **Unchanged: the default wire behavior.**
+  `CurlTransport::with_executable` installs no `User-Agent`; the adapter's argv
+  contains no `--user-agent` element, so `curl` applies its own default. The
+  bytes a consumer of the published `0.1.2` sends are unchanged.
+- **Compatibility, stated precisely.** The change is **additive**. `CurlConfig`
+  is untouched — its fields are public and it is not `#[non_exhaustive]`, so
+  adding a field there would be source-breaking for every struct-literal
+  construction — and `CurlTransport` gains only a **private** field, a new
+  constructor, and a new accessor. No existing public signature was added,
+  removed, or retyped, so **no consumer migration is required by this crate's
+  own items**. The republication consequence stated here is **superseded** by
+  the M016 entry above: this publication is not `0.1.3`, because the seam's
+  release is `0.2.0` and this crate's `eggup-acquisition` requirement widened
+  with it. This release publishes the change: the published `0.1.2` artifact
+  keeps its current shape and behavior, and `0.2.0` adds the `User-Agent`
+  surface on top of it.
+
+**Test-strengthening and internal consolidation (Acquisition Transport M013).**
+
+- **Fixed: nine tests could report a pass while asserting nothing.** Each of the
+  nine `eggup-curl` tests that needs a system `curl` obtained its fixture
+  through a helper that returned `None` and exited early when no `curl` was
+  discoverable on `PATH`. On a host without `curl` they were reported as
+  **passed** while asserting nothing. All nine now obtain their fixture through
+  a helper that **fails loudly** with an actionable message naming the missing
+  prerequisite and the remedy (install `curl`, or put a curl executable on
+  `PATH`). The `#[cfg(not(windows))]` gate on the loopback-server tests is
+  **unchanged** — it is a known, deliberate platform difference, now recorded
+  in the test module — and the Windows lane still runs a smaller test set.
+- **Split: the connect/total timeout test.** The total-phase branch stays an
+  end-to-end assertion of `Timeout { phase: "total" }`. The connect-phase
+  branch needs a host that blackholes the route to the probe address; most
+  hosts and CI runners fail the connect immediately with `ENETUNREACH` /
+  `EHOSTUNREACH`, which is a transport failure rather than a timeout. That
+  branch is therefore **explicitly marked as ignored with a recorded reason**
+  and is reported as *ignored*, never as *passed*. The connect/total **label**
+  is proven deterministically, with no subprocess, no network, and no
+  sub-second wall-clock budget, by a new unit proof at the `classify_curl_result`
+  layer that injects `start`.
+- **Added: a vacuity regression guard.** A pattern guard, an ignore-reason
+  guard, and a behavior witness now make this class of defect impossible to
+  reintroduce silently. The guards read the crate's own sources at compile
+  time, so they need no filesystem discovery, no network, and no wall clock.
+- **Internal: the local truncation copy is gone.** The adapter's private
+  `bound` helper now delegates to the seam's shared 512-byte UTF-8-safe
+  bounding rule (`eggup_acquisition::__adapter_bound_detail`) instead of
+  keeping its own implementation.
+
+**Compatibility, stated precisely.** This crate's **public API is unchanged**
+and its observable behavior is unchanged: no public signature, field, or
+constructor was added, removed, or retyped, and no wire request changes. The
+`Unavailable` / `Transport` classification of every failure is unchanged, and
+the adapter gains no `User-Agent` surface **in M013** (M014 later added one;
+see the M014 entry above). The only consumer-visible
+consequence is the source break in `eggup-acquisition`'s `AcquisitionError::Io`
+variant, which this crate now builds through the seam's typed constructor
+(`eggup-acquisition` M013). **No consumer migration is required by this crate's
+own API change**. This release publishes it. A consumer's obligation at this
+version boundary is recorded in the M016 entry above.
+
+**Test determinism hardening (Acquisition Transport M012).**
+
+- **Fixed: a sub-second deadline test asserted the host's scheduler, not the
+  transport.** `build_curl_args_passes_sub_second_deadlines_to_fake_curl` used
+  one pair of sub-second `FetchLimits` values for two incompatible purposes at
+  once: the values whose serialization it asserted, *and* the live wall-clock
+  budget the parent enforced against the spawned child. The fake child ignores
+  `--connect-timeout` and `--max-time`, so the parent deadline was the only
+  enforcement and the test could fail by overrunning its own 750 ms
+  `total_timeout` while trying to succeed — reported as
+  `Timeout { phase: "total" }` against a correct transport. The connect
+  deadline stays sub-second (250 ms) and is still proven end-to-end through a
+  real spawn; the total budget is now generous, so the assertion no longer
+  depends on host scheduling.
+- **Fixed: an absolute sub-second `elapsed` ceiling.** `sub_second_total_timeout_kills_child_promptly`
+  no longer asserts `elapsed < 750 ms`, a bound that charged the test for
+  process spawn, kill, reap, and two reader-thread joins that the transport's
+  deadline contract does not govern. It now proves promptness structurally:
+  `elapsed >= total_timeout` (the deadline was actually reached — the fetch did
+  not succeed early) and `elapsed < 2 s` (the child was killed rather than
+  left to stall, against a 4000 ms server stall). The residue assertions
+  (`!dest.exists()`, empty directory) are unchanged and remain the
+  deterministic core of the test.
+- **Added: deterministic sub-second serialization coverage.** A new
+  platform-neutral proof, with no subprocess, no network, and no wall clock,
+  asserts that a sub-second connect **and** total pair (250 ms / 750 ms)
+  serializes to `--connect-timeout 0.25` and `--max-time 0.75`, that
+  `--max-time` is the *effective* total ceiling and never the raw request when
+  the adapter ceiling is lower, and that sub-microsecond positive durations are
+  still rejected as `InvalidInput`. This retains the sub-second `--max-time`
+  proof that the end-to-end test had to give up to become deterministic.
+
+**Compatibility, stated precisely.** This entry is **test-only**: no public
+API, no public field, no error variant, no dependency, no feature, and no
+observable behaviour changed. No production timeout policy, tolerance,
+`POLL_INTERVAL`, or classification rule was touched, and no deadline was
+widened. **This release publishes that test-only change**, and no consumer
+migration is required.
+
 ## Unreleased
 
-Nothing is pending beyond the published `0.1.2` release below.
+Nothing in this section has been published. `0.2.0` is the published baseline on
+crates.io, and no publication milestone authorizes these entries.
 
 ## 0.1.2 — 2026-10-04
 

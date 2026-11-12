@@ -206,7 +206,11 @@ pub enum ExtractionErrorKind {
     SizeMismatch,
     /// A member's observed SHA-256 differs from its declared digest.
     DigestMismatch,
-    /// Cleanup failed; the residue path is available from the error.
+    /// The owned root could not be fully emptied.
+    ///
+    /// The residue path is available from [`ExtractionError::residue_path`].
+    /// The residue may be partially emptied and its emptiness is **not**
+    /// guaranteed, so a caller must inspect the directory itself.
     CleanupFailed,
 }
 
@@ -225,20 +229,24 @@ impl ExtractionError {
         }
     }
 
+    /// Records residue at `path` for a cleanup that could **not** empty the
+    /// owned root.
+    ///
+    /// The residue may be partially emptied: emptiness is never promised on
+    /// this path, and the failure category is promoted to `CleanupFailed`,
+    /// which is what actually happened.
     fn with_residue(mut self, path: PathBuf) -> Self {
         self.kind = ExtractionErrorKind::CleanupFailed;
         self.residue_path = Some(path);
         self
     }
 
-    /// Records residue at `path` after a cleanup that is only *believed* to
-    /// have emptied the private root.
+    /// Records residue at `path` after the owned root was emptied.
     ///
-    /// Cleanup can fail before the root is empty, in which case the residue is
-    /// retained evidence, not leftover space. This verifies the root before
-    /// promising emptiness, so `kind()` and `residue_path()` can never report a
-    /// partial cleanup as a clean one: a non-empty root is promoted to
-    /// `CleanupFailed`, which is what actually happened.
+    /// Emptiness is verified before it is promised, so `kind()` and
+    /// `residue_path()` can never report a partial cleanup as a clean one: a
+    /// non-empty root is promoted to `CleanupFailed`, which is what actually
+    /// happened.
     fn with_empty_residue(mut self, path: PathBuf) -> Self {
         if !private_root_is_empty(&path) {
             return self.with_residue(path);
@@ -252,10 +260,20 @@ impl ExtractionError {
         self.kind
     }
 
-    /// Returns the private-root residue location when cleanup failed.
+    /// Returns the private-root residue location, when there is one.
     ///
-    /// When present, the directory is empty: `with_empty_residue` verifies that
-    /// and promotes a non-empty root to [`ExtractionErrorKind::CleanupFailed`].
+    /// The path has two proven meanings, and a caller must not read them as
+    /// one:
+    ///
+    /// - On the [`extract`] failure path, the owned root was emptied and the
+    ///   leftover directory was verified empty before the path was recorded.
+    /// - On the explicit-cleanup failure path, the owned root could **not** be
+    ///   fully emptied. The residue may be partially emptied, its emptiness is
+    ///   **not** guaranteed, and the caller must inspect the directory itself.
+    ///
+    /// The path is **advisory**: if the root was renamed or replaced by a
+    /// third party, the crate emptied the owned object and left whatever
+    /// occupies the recorded pathname untouched.
     pub fn residue_path(&self) -> Option<&Path> {
         self.residue_path.as_deref()
     }
@@ -313,7 +331,10 @@ impl ExtractedMember {
     }
 }
 
-/// Extraction output whose private directory is removed when dropped.
+/// Extraction output whose private directory is emptied when dropped.
+///
+/// The private root directory itself is never removed by this crate; it is
+/// left in place as an empty directory for the caller to remove.
 #[derive(Debug)]
 pub struct ExtractedArchive {
     guard: Option<DirectoryGuard>,
@@ -348,8 +369,31 @@ impl ExtractedArchive {
         }
     }
 
-    /// Removes the operation-owned extraction directory and reports residue
-    /// evidence if cleanup fails.
+    /// Empties the operation-owned extraction root through the retained root
+    /// handle.
+    ///
+    /// The crate empties the owned tree through the retained directory handle.
+    /// It never removes the root directory itself and never traverses the root
+    /// pathname, so a foreign directory, file, symlink, or reparse point
+    /// installed at the recorded pathname is never touched.
+    ///
+    /// # Contract
+    ///
+    /// - [`Ok`] means the owned root object held no entries at the final
+    ///   handle-relative listing: the owned tree was emptied.
+    /// - [`Err`] with [`ExtractionErrorKind::CleanupFailed`] means the owned
+    ///   root could **not** be fully emptied. The residue may be partially
+    ///   emptied, its emptiness is **not** guaranteed, and
+    ///   [`ExtractionError::residue_path`] names the recorded root path.
+    ///
+    /// The residual directory is the **caller's to remove**: this crate never
+    /// removes it and offers no convenience that removes it by pathname.
+    /// Because this call consumes the value, capture the residual path from
+    /// [`root`](Self::root) **before** calling it.
+    ///
+    /// The recorded root path is **advisory**: if the root was renamed or
+    /// replaced by a third party, the crate emptied the owned object and left
+    /// whatever occupies the recorded pathname untouched.
     pub fn cleanup(mut self) -> Result<(), ExtractionError> {
         let guard = self.guard.take().expect("active extraction guard");
         // Close member objects before emptying the root: cleanup never races
@@ -388,7 +432,31 @@ impl PersistedExtraction {
         &self.members
     }
 
-    /// Removes the retained directory when the caller no longer needs it.
+    /// Empties the retained operation-owned extraction root through the
+    /// retained root handle.
+    ///
+    /// The crate empties the owned tree through the retained directory handle.
+    /// It never removes the root directory itself and never traverses the root
+    /// pathname, so a foreign directory, file, symlink, or reparse point
+    /// installed at the recorded pathname is never touched.
+    ///
+    /// # Contract
+    ///
+    /// - [`Ok`] means the owned root object held no entries at the final
+    ///   handle-relative listing: the owned tree was emptied.
+    /// - [`Err`] with [`ExtractionErrorKind::CleanupFailed`] means the owned
+    ///   root could **not** be fully emptied. The residue may be partially
+    ///   emptied, its emptiness is **not** guaranteed, and
+    ///   [`ExtractionError::residue_path`] names the recorded root path.
+    ///
+    /// The residual directory is the **caller's to remove**: this crate never
+    /// removes it and offers no convenience that removes it by pathname.
+    /// Because this call consumes the value, capture the residual path from
+    /// [`root`](Self::root) **before** calling it.
+    ///
+    /// The recorded root path is **advisory**: if the root was renamed or
+    /// replaced by a third party, the crate emptied the owned object and left
+    /// whatever occupies the recorded pathname untouched.
     pub fn cleanup(self) -> Result<(), ExtractionError> {
         let Self {
             root,
@@ -572,11 +640,33 @@ impl BoundExtraction {
         (members, DeferredCleanup { root, root_handle })
     }
 
-    /// Removes the retained directory without staging, for abort paths.
+    /// Empties the retained operation-owned extraction root through the
+    /// retained root handle, without staging.
     ///
-    /// Member objects are closed first (see
-    /// [`ExtractedArchive::cleanup`]); residue semantics match
-    /// [`PersistedExtraction::cleanup`].
+    /// The crate empties the owned tree through the retained directory handle.
+    /// It never removes the root directory itself and never traverses the root
+    /// pathname, so a foreign directory, file, symlink, or reparse point
+    /// installed at the recorded pathname is never touched.
+    ///
+    /// # Contract
+    ///
+    /// - [`Ok`] means the owned root object held no entries at the final
+    ///   handle-relative listing: the owned tree was emptied.
+    /// - [`Err`] with [`ExtractionErrorKind::CleanupFailed`] means the owned
+    ///   root could **not** be fully emptied. The residue may be partially
+    ///   emptied, its emptiness is **not** guaranteed, and
+    ///   [`ExtractionError::residue_path`] names the recorded root path.
+    ///
+    /// The residual directory is the **caller's to remove**: this crate never
+    /// removes it and offers no convenience that removes it by pathname.
+    /// Because this call consumes the value, capture the residual path from
+    /// [`root`](Self::root) **before** calling it.
+    ///
+    /// The recorded root path is **advisory**: if the root was renamed or
+    /// replaced by a third party, the crate emptied the owned object and left
+    /// whatever occupies the recorded pathname untouched.
+    ///
+    /// Member objects are closed first (see [`ExtractedArchive::cleanup`]).
     pub fn cleanup(self) -> Result<(), ExtractionError> {
         let Self {
             members,
@@ -612,8 +702,30 @@ impl DeferredCleanup {
         &self.root
     }
 
-    /// Empties the owned root via the retained handle and reports residue
-    /// evidence if cleanup fails.
+    /// Empties the owned extraction root through the retained root handle.
+    ///
+    /// The crate empties the owned tree through the retained directory handle.
+    /// It never removes the root directory itself and never traverses the root
+    /// pathname, so a foreign directory, file, symlink, or reparse point
+    /// installed at the recorded pathname is never touched.
+    ///
+    /// # Contract
+    ///
+    /// - [`Ok`] means the owned root object held no entries at the final
+    ///   handle-relative listing: the owned tree was emptied.
+    /// - [`Err`] with [`ExtractionErrorKind::CleanupFailed`] means the owned
+    ///   root could **not** be fully emptied. The residue may be partially
+    ///   emptied, its emptiness is **not** guaranteed, and
+    ///   [`ExtractionError::residue_path`] names the recorded root path.
+    ///
+    /// The residual directory is the **caller's to remove**: this crate never
+    /// removes it and offers no convenience that removes it by pathname.
+    /// Because this call consumes the value, capture the residual path from
+    /// [`root`](Self::root) **before** calling it.
+    ///
+    /// The recorded root path is **advisory**: if the root was renamed or
+    /// replaced by a third party, the crate emptied the owned object and left
+    /// whatever occupies the recorded pathname untouched.
     pub fn cleanup(self) -> Result<(), ExtractionError> {
         remove_owned_root_via_handle(self.root, self.root_handle)
     }
@@ -627,6 +739,15 @@ impl DeferredCleanup {
 /// only that operation-owned child via its retained handle and leaves the
 /// now-empty directory as residue; call [`ExtractedArchive::persist`] to
 /// transfer that cleanup responsibility.
+///
+/// The crate never removes the private root directory on any path, including
+/// the success path: the residual empty directory is the caller's to remove.
+/// On the failure path the crate empties the owned tree through the retained
+/// handle and reports the leftover directory through
+/// [`ExtractionError::residue_path`]. The original failure category is
+/// preserved, unless the owned root could not be emptied at all — in which
+/// case the failure is reported as [`ExtractionErrorKind::CleanupFailed`] and
+/// the residue may be partially emptied.
 pub fn extract(
     plan: &ArchivePlan,
     output_parent: &Path,
@@ -647,8 +768,14 @@ pub fn extract(
             handles,
         }),
         Err(error) => match remove_owned_root_with_hook(root.clone(), handle, None) {
-            Ok(()) => Err(error),
-            Err(_) => Err(error.with_empty_residue(root)),
+            // The owned root was emptied: the leftover directory is empty, so
+            // the original failure category is preserved and the residue path
+            // names the empty directory.
+            Ok(()) => Err(error.with_empty_residue(root)),
+            // The owned root could not be emptied: the residue may be partially
+            // emptied, so the failure is reported as `CleanupFailed` and
+            // emptiness is never claimed.
+            Err(_) => Err(error.with_residue(root)),
         },
     }
 }
@@ -725,8 +852,14 @@ fn extract_with_hook(
             handles,
         }),
         Err(error) => match remove_owned_root_with_hook(root.clone(), handle, None) {
-            Ok(()) => Err(error),
-            Err(_) => Err(error.with_empty_residue(root)),
+            // The owned root was emptied: the leftover directory is empty, so
+            // the original failure category is preserved and the residue path
+            // names the empty directory.
+            Ok(()) => Err(error.with_empty_residue(root)),
+            // The owned root could not be emptied: the residue may be partially
+            // emptied, so the failure is reported as `CleanupFailed` and
+            // emptiness is never claimed.
+            Err(_) => Err(error.with_residue(root)),
         },
     }
 }
@@ -764,6 +897,74 @@ fn extract_with_hook_inner(
     Ok((ordered, handles))
 }
 
+/// The single member-write path shared by the tar.gz and zip handlers.
+///
+/// The steps, in order, are format-independent:
+///
+/// 1. look up the declared member for the normalized archive path;
+/// 2. a declared member whose entry is not regular fails closed
+///    ([`ExtractionErrorKind::NonRegularMember`]);
+/// 3. an undeclared or non-regular entry is drained under budget and is never
+///    materialized;
+/// 4. a declared regular member is created through the retained root handle,
+///    copied under budget with streaming SHA-256, flushed, verified against
+///    the declared facts, and recorded as evidence.
+///
+/// `is_regular` is the caller's per-format entry-kind predicate. The shared
+/// path never re-derives regularity from the format, so the two format
+/// handlers cannot drift apart in what they materialize.
+fn write_declared_member<R: Read>(
+    entry: &mut R,
+    plan: &ArchivePlan,
+    scope: &mut ExtractionScope<'_>,
+    total: &mut u64,
+    normalized: &str,
+    is_regular: bool,
+    extracted: &mut HashMap<String, (ExtractedMember, File)>,
+) -> Result<(), ExtractionError> {
+    let declared = plan
+        .members
+        .iter()
+        .find(|member| member.source_path == normalized);
+    if declared.is_some() && !is_regular {
+        return Err(ExtractionError::new(ExtractionErrorKind::NonRegularMember));
+    }
+    if !is_regular {
+        drain_bounded(entry, plan.limits, total)?;
+        return Ok(());
+    }
+    let Some(member) = declared else {
+        drain_bounded(entry, plan.limits, total)?;
+        return Ok(());
+    };
+    let mut output = scope.create_member(&member.output_name)?;
+    // The recorded member path is handoff evidence only; the write itself was
+    // authorized by the retained root handle, never by this pathname. If the
+    // root namespace entry is renamed/replaced during extraction, this
+    // pathname may be stale/foreign (see the M001c stop record); the bytes
+    // remain in the handle-owned directory.
+    let path = scope.member_path(&member.output_name);
+    let (bytes_written, digest) = copy_bounded(entry, Some(&mut output), plan.limits, total)?;
+    output
+        .flush()
+        .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
+    validate_expected(member, bytes_written, digest)?;
+    extracted.insert(
+        normalized.to_string(),
+        (
+            ExtractedMember {
+                source_path: normalized.to_string(),
+                output_name: member.output_name.clone(),
+                path,
+                bytes_written,
+                sha256: digest,
+            },
+            output,
+        ),
+    );
+    Ok(())
+}
+
 fn extract_tar_gz(
     plan: &ArchivePlan,
     scope: &mut ExtractionScope<'_>,
@@ -798,49 +999,16 @@ fn extract_tar_gz(
                 ExtractionErrorKind::DuplicateArchiveMember,
             ));
         }
-        let declared = plan
-            .members
-            .iter()
-            .find(|member| member.source_path == normalized);
         let is_regular = matches!(entry_type.as_byte(), 0 | b'0');
-        if declared.is_some() && !is_regular {
-            return Err(ExtractionError::new(ExtractionErrorKind::NonRegularMember));
-        }
-        if !is_regular {
-            drain_bounded(&mut entry, plan.limits, total)?;
-            continue;
-        }
-        if let Some(member) = declared {
-            let mut output = scope.create_member(&member.output_name)?;
-            // The recorded member path is handoff evidence only; the write
-            // itself was authorized by the retained root handle, never by
-            // this pathname. If the root namespace entry is renamed/replaced
-            // during extraction, this pathname may be stale/foreign (see
-            // M001c stop record); the bytes remain in the handle-owned
-            // directory.
-            let path = scope.member_path(&member.output_name);
-            let (bytes_written, digest) =
-                copy_bounded(&mut entry, Some(&mut output), plan.limits, total)?;
-            output
-                .flush()
-                .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
-            validate_expected(member, bytes_written, digest)?;
-            extracted.insert(
-                normalized.clone(),
-                (
-                    ExtractedMember {
-                        source_path: normalized,
-                        output_name: member.output_name.clone(),
-                        path,
-                        bytes_written,
-                        sha256: digest,
-                    },
-                    output,
-                ),
-            );
-        } else {
-            drain_bounded(&mut entry, plan.limits, total)?;
-        }
+        write_declared_member(
+            &mut entry,
+            plan,
+            scope,
+            total,
+            &normalized,
+            is_regular,
+            extracted,
+        )?;
     }
     // The tar iterator can stop at the tar end marker before the gzip footer
     // is consumed. Drain a strictly bounded zero-padding tail to validate gzip
@@ -891,45 +1059,16 @@ fn extract_zip(
                 ExtractionErrorKind::DuplicateArchiveMember,
             ));
         }
-        let declared = plan
-            .members
-            .iter()
-            .find(|member| member.source_path == normalized);
         let regular = zip_entry_is_regular(&entry);
-        if declared.is_some() && !regular {
-            return Err(ExtractionError::new(ExtractionErrorKind::NonRegularMember));
-        }
-        if !regular {
-            drain_bounded(&mut entry, plan.limits, total)?;
-            continue;
-        }
-        if let Some(member) = declared {
-            let mut output = scope.create_member(&member.output_name)?;
-            // Recorded path is handoff evidence only; the write was
-            // authorized by the retained root handle (see tar path note).
-            let path = scope.member_path(&member.output_name);
-            let (bytes_written, digest) =
-                copy_bounded(&mut entry, Some(&mut output), plan.limits, total)?;
-            output
-                .flush()
-                .map_err(|_| ExtractionError::new(ExtractionErrorKind::Io))?;
-            validate_expected(member, bytes_written, digest)?;
-            extracted.insert(
-                normalized.clone(),
-                (
-                    ExtractedMember {
-                        source_path: normalized,
-                        output_name: member.output_name.clone(),
-                        path,
-                        bytes_written,
-                        sha256: digest,
-                    },
-                    output,
-                ),
-            );
-        } else {
-            drain_bounded(&mut entry, plan.limits, total)?;
-        }
+        write_declared_member(
+            &mut entry,
+            plan,
+            scope,
+            total,
+            &normalized,
+            regular,
+            extracted,
+        )?;
     }
     Ok(())
 }
@@ -1284,6 +1423,19 @@ fn remove_owned_root_via_handle(path: PathBuf, handle: File) -> Result<(), Extra
     remove_owned_root_with_hook(path, handle, None)
 }
 
+/// Empties the owned root through the retained root handle and reports
+/// whether the owned root was emptied.
+///
+/// The root directory itself is never removed and the root pathname is never
+/// traversed: the emptying runs entirely through `*at` operations relative to
+/// the retained handle, so a foreign object installed at the recorded
+/// pathname is left untouched.
+///
+/// `Ok(())` means the owned root object held no entries at the final
+/// handle-relative listing. `Err` means it could not be fully emptied; the
+/// residue may be partially emptied, so the failure is reported as
+/// [`ExtractionErrorKind::CleanupFailed`] with the recorded root path
+/// attached and emptiness is never claimed.
 fn remove_owned_root_with_hook(
     path: PathBuf,
     mut handle: File,
@@ -1293,8 +1445,10 @@ fn remove_owned_root_with_hook(
     if let Some(hook) = hook {
         hook(&path);
     }
-    let _ = empty_result;
-    Err(ExtractionError::new(ExtractionErrorKind::CleanupFailed).with_residue(path))
+    match empty_result {
+        Ok(()) => Ok(()),
+        Err(_) => Err(ExtractionError::new(ExtractionErrorKind::CleanupFailed).with_residue(path)),
+    }
 }
 
 /// Retained directory authority for an extraction root.
@@ -2176,12 +2330,12 @@ mod tests {
         let root = persisted.root().to_path_buf();
         assert!(root.exists());
         // No object-bound root unlink exists on all platforms, so explicit
-        // cleanup empties only the owned tree via its handle and reports the
-        // now-empty directory as residue instead of recursively touching the
-        // pathname.
-        let error = persisted.cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        // cleanup empties only the owned tree via its handle and never touches
+        // the root pathname. The residual empty directory is the caller's to
+        // remove; the crate never removes it and reports success.
+        persisted
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert!(root.exists());
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
         fs::remove_dir(&root).unwrap();
@@ -2197,7 +2351,7 @@ mod tests {
     // the M001d bound-read races; on Windows the member-entry replacement
     // races prove no pathname re-resolution.
     #[test]
-    fn cleanup_failure_reports_residue_without_deleting_replacement() {
+    fn cleanup_after_replacement_empties_owned_root_without_deleting_replacement() {
         let dir = TestDir::new();
         let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
         let plan = make_plan(
@@ -2219,9 +2373,13 @@ mod tests {
         .unwrap();
         let root = extracted.root().to_path_buf();
 
-        let error = extracted.persist().cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        // The owned root object was emptied through the retained handle, so
+        // cleanup succeeds. The foreign replacement at the recorded pathname
+        // is never traversed and survives untouched.
+        extracted
+            .persist()
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert_eq!(fs::read(&root).unwrap(), b"foreign replacement");
         fs::remove_file(&root).unwrap();
         fs::remove_dir_all(moved).unwrap();
@@ -2244,7 +2402,7 @@ mod tests {
             Some(&|seq: usize, root: &Path| {
                 assert_eq!(seq, 0);
                 // Pre-write rename: no member object held yet (see note
-                // above `cleanup_failure_reports_residue_...`).
+                // above `cleanup_after_replacement_empties_owned_root_...`).
                 fs::rename(root, &moved).unwrap();
                 // Replace the old pathname with a foreign non-empty directory
                 // that would be catastrophic if any pathname-only recursive
@@ -2259,9 +2417,13 @@ mod tests {
         let root = extracted.root().to_path_buf();
         let foreign = root.clone();
 
-        let error = extracted.persist().cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(foreign.as_path()));
+        // The owned root object was emptied through the retained handle, so
+        // cleanup succeeds. The foreign replacement at the recorded pathname
+        // is never traversed: all six foreign files survive untouched.
+        extracted
+            .persist()
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert!(foreign.exists());
         for i in 0..6 {
             assert_eq!(
@@ -2286,7 +2448,7 @@ mod tests {
             limits(),
         );
         // Pre-write rename + foreign install (see note above
-        // `cleanup_failure_reports_residue_...`).
+        // `cleanup_after_replacement_empties_owned_root_...`).
         let moved = dir.path().join("moved-root");
         let extracted = extract_with_hook(
             &plan,
@@ -2300,12 +2462,16 @@ mod tests {
         .unwrap();
         let root = extracted.root().to_path_buf();
         let foreign = root.clone();
-        // Empty foreign directory: identity still differs, so cleanup must
-        // fail closed rather than rmdir the foreign dir.
-        let error = extracted.persist().cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(foreign.as_path()));
+        // Empty foreign directory: its identity still differs, so cleanup must
+        // not rmdir the foreign dir. The owned root object was emptied through
+        // the retained handle, so cleanup succeeds and the foreign directory
+        // survives untouched.
+        extracted
+            .persist()
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert!(foreign.exists());
+        assert_eq!(fs::read_dir(&foreign).unwrap().count(), 0);
         fs::remove_dir(&foreign).unwrap();
         fs::remove_dir_all(moved).unwrap();
     }
@@ -2322,7 +2488,7 @@ mod tests {
         );
         let root = {
             // Pre-write rename + foreign install (see note above
-            // `cleanup_failure_reports_residue_...`).
+            // `cleanup_after_replacement_empties_owned_root_...`).
             let moved = dir.path().join("moved-root");
             let extracted = extract_with_hook(
                 &plan,
@@ -2376,8 +2542,13 @@ mod tests {
         fs::write(target.join("keep"), b"keep").unwrap();
         symlink(&target, &root).unwrap();
 
-        let error = extracted.persist().cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        // The symlink is never followed: the owned root object was emptied
+        // through the retained handle, cleanup succeeds, and the link target
+        // is untouched.
+        extracted
+            .persist()
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert!(target.exists());
         assert_eq!(fs::read(target.join("keep")).unwrap(), b"keep");
         fs::remove_dir_all(moved).unwrap();
@@ -2386,7 +2557,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_cleanup_after_replacement_fails_closed_and_persists_identity() {
+    fn explicit_cleanup_after_replacement_empties_owned_root_and_preserves_identity() {
         let dir = TestDir::new();
         let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
         let plan = make_plan(
@@ -2396,7 +2567,7 @@ mod tests {
             limits(),
         );
         // Pre-write rename + foreign install (see note above
-        // `cleanup_failure_reports_residue_...`).
+        // `cleanup_after_replacement_empties_owned_root_...`).
         let moved = dir.path().join("moved-root");
         let extracted = extract_with_hook(
             &plan,
@@ -2413,10 +2584,14 @@ mod tests {
         let root = persisted.root().to_path_buf();
         let foreign = root.clone();
 
-        let error = persisted.cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(foreign.as_path()));
+        // The owned root object was emptied through the retained handle, so
+        // cleanup succeeds. The foreign directory installed at the recorded
+        // pathname keeps its identity and contents.
+        persisted
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert!(foreign.exists());
+        assert_eq!(fs::read(foreign.join("foreign")).unwrap(), b"keep");
         assert!(moved.exists());
         assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
         fs::remove_dir_all(&foreign).unwrap();
@@ -2436,7 +2611,7 @@ mod tests {
         let dir = TestDir::new();
         let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
         let moved = dir.path().join("moved-owned");
-        let error = remove_owned_root_with_hook(
+        remove_owned_root_with_hook(
             root.clone(),
             handle,
             Some(&|path: &Path| {
@@ -2447,9 +2622,7 @@ mod tests {
                 }
             }),
         )
-        .unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        .expect("the owned root was emptied through the retained handle");
         for i in 0..4 {
             assert_eq!(
                 fs::read(root.join(format!("foreign-{i}"))).unwrap(),
@@ -2467,7 +2640,7 @@ mod tests {
         let dir = TestDir::new();
         let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
         let moved = dir.path().join("moved-owned");
-        let error = remove_owned_root_with_hook(
+        remove_owned_root_with_hook(
             root.clone(),
             handle,
             Some(&|path: &Path| {
@@ -2475,9 +2648,7 @@ mod tests {
                 fs::create_dir(path).unwrap();
             }),
         )
-        .unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        .expect("the owned root was emptied through the retained handle");
         assert!(root.exists());
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
         assert!(moved.exists());
@@ -2496,7 +2667,7 @@ mod tests {
         let target = dir.path().join("hook-target");
         fs::create_dir(&target).unwrap();
         fs::write(target.join("keep"), b"keep").unwrap();
-        let error = remove_owned_root_with_hook(
+        remove_owned_root_with_hook(
             root.clone(),
             handle,
             Some(&|path: &Path| {
@@ -2504,9 +2675,7 @@ mod tests {
                 symlink(&target, path).unwrap();
             }),
         )
-        .unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        .expect("the owned root was emptied through the retained handle");
         assert_eq!(fs::read(target.join("keep")).unwrap(), b"keep");
         assert!(moved.exists());
         assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
@@ -2520,7 +2689,7 @@ mod tests {
         let dir = TestDir::new();
         let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
         let moved = dir.path().join("moved-owned");
-        let error = remove_owned_root_with_hook(
+        remove_owned_root_with_hook(
             root.clone(),
             handle,
             Some(&|path: &Path| {
@@ -2529,9 +2698,7 @@ mod tests {
                 fs::write(path.join("foreign"), b"keep").unwrap();
             }),
         )
-        .unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        .expect("the owned root was emptied through the retained handle");
         assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
         assert!(moved.exists());
         assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
@@ -2541,20 +2708,54 @@ mod tests {
 
     #[test]
     fn cleanup_remains_bounded_under_concurrent_file_creation() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
         let dir = TestDir::new();
         let (root, handle) = owned_root_with_files(dir.path(), &["owned"]);
         let root_clone = root.clone();
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop_writer = Arc::clone(&stop);
+        // The writer keeps creating files until the cleanup has returned, so
+        // the bounded pass loop always meets a non-empty listing.
         let writer = std::thread::spawn(move || {
-            for i in 0..200 {
-                let _ = fs::write(root_clone.join(format!("race-{i}")), b"x");
+            let mut index = 0u64;
+            while !stop_writer.load(Ordering::Relaxed) {
+                let _ = fs::write(root_clone.join(format!("race-{index}")), b"x");
+                index += 1;
             }
         });
         let result = remove_owned_root_with_hook(root.clone(), handle, None);
-        assert_eq!(
-            result.unwrap_err().kind(),
-            ExtractionErrorKind::CleanupFailed
-        );
+        stop.store(true, Ordering::Relaxed);
         writer.join().unwrap();
+        // Cleanup is bounded: it returned instead of chasing the writer. The
+        // contract has exactly two outcomes, and the failure one never claims
+        // the residue is empty.
+        if let Err(error) = result {
+            assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+            assert_eq!(error.residue_path(), Some(root.as_path()));
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cleanup_that_cannot_empty_the_root_fails_closed_with_residue_evidence() {
+        let dir = TestDir::new();
+        let (root, handle) = create_private_root(dir.path()).unwrap();
+        // Exceed the crate's own private cleanup depth bound, so the emptying
+        // fails deterministically on every supported platform without
+        // privileges or platform-specific behavior: the deepest nested
+        // directory is reached at a depth greater than `CLEANUP_MAX_DEPTH`.
+        let mut nested = root.clone();
+        for index in 0..=CLEANUP_MAX_DEPTH {
+            nested = nested.join(format!("d{index}"));
+            fs::create_dir(&nested).unwrap();
+        }
+        let error = remove_owned_root_with_hook(root.clone(), handle, None).unwrap_err();
+        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        assert_eq!(error.residue_path(), Some(root.as_path()));
+        // The crate never promotes a partial cleanup to success and never
+        // claims the residue is empty.
+        assert!(root.exists());
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -2575,9 +2776,7 @@ mod tests {
                 let _ = std::os::windows::fs::symlink_dir(&target, path);
             }),
         );
-        let error = result.unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        result.expect("the owned root was emptied through the retained handle");
         assert_eq!(fs::read(target.join("keep")).unwrap(), b"keep");
         let _ = fs::remove_dir_all(&root);
         let _ = fs::remove_file(&root);
@@ -2587,7 +2786,7 @@ mod tests {
     }
 
     #[test]
-    fn normal_explicit_cleanup_empties_owned_root_and_reports_empty_residue() {
+    fn normal_explicit_cleanup_empties_owned_root_and_leaves_empty_residue() {
         let dir = TestDir::new();
         let archive = zip_file(dir.path(), "bundle.zip", &[("app", b"binary")]);
         let plan = make_plan(
@@ -2600,9 +2799,11 @@ mod tests {
         let root = persisted.root().to_path_buf();
         let member_path = persisted.members()[0].path().to_path_buf();
         assert!(member_path.exists());
-        let error = persisted.cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        // The owned tree is emptied and cleanup reports success; the residual
+        // empty directory is the caller's to remove.
+        persisted
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert!(!member_path.exists());
         assert!(root.exists());
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
@@ -2658,9 +2859,9 @@ mod tests {
             b"new binary"
         );
         assert!(prepared.stage_root().exists());
-        let error = cleanup.cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(root.as_path()));
+        cleanup
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert!(root.exists());
         assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
         fs::remove_dir(&root).unwrap();
@@ -3036,11 +3237,12 @@ mod tests {
     }
 
     /// Asserts handle-authorized cleanup semantics: the owned root is emptied
-    /// via the retained handle and residue evidence names the recorded root.
-    fn assert_cleanup_reports_residue(cleanup: DeferredCleanup, residue: &Path, emptied: &Path) {
-        let error = cleanup.cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
-        assert_eq!(error.residue_path(), Some(residue));
+    /// via the retained handle and cleanup reports success. The residual empty
+    /// directory is the caller's to remove; the crate never removes it.
+    fn assert_cleanup_empties_owned_root(cleanup: DeferredCleanup, emptied: &Path) {
+        cleanup
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert_eq!(fs::read_dir(emptied).unwrap().count(), 0);
         fs::remove_dir(emptied).unwrap();
     }
@@ -3092,7 +3294,7 @@ mod tests {
             b"owned-bytes"
         );
         assert_eq!(fs::read(&advisory).unwrap(), b"foreign-bytes");
-        assert_cleanup_reports_residue(cleanup, &root, &root);
+        assert_cleanup_empties_owned_root(cleanup, &root);
     }
 
     #[test]
@@ -3130,7 +3332,7 @@ mod tests {
             b"owned-bytes"
         );
         assert_eq!(fs::read(&advisory).unwrap(), b"foreign-bytes");
-        assert_cleanup_reports_residue(cleanup, &root, &root);
+        assert_cleanup_empties_owned_root(cleanup, &root);
     }
 
     #[test]
@@ -3199,7 +3401,7 @@ mod tests {
         );
         assert_eq!(fs::read(&first_advisory).unwrap(), b"foreign-one");
         assert_eq!(fs::read(&second_advisory).unwrap(), b"foreign-two");
-        assert_cleanup_reports_residue(cleanup, &root, &root);
+        assert_cleanup_empties_owned_root(cleanup, &root);
     }
 
     // Unix-only: renames the root while member objects are held open.
@@ -3244,7 +3446,7 @@ mod tests {
         );
         assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
         assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
-        assert_cleanup_reports_residue(cleanup, &root, &moved);
+        assert_cleanup_empties_owned_root(cleanup, &moved);
         fs::remove_dir_all(&root).unwrap();
     }
 
@@ -3294,8 +3496,9 @@ mod tests {
         assert_eq!(owned, b"owned-bytes");
         assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
         assert!(!root.join("app").exists());
-        let error = cleanup.cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        cleanup
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
         fs::remove_dir(&moved).unwrap();
         fs::remove_dir_all(&root).unwrap();
@@ -3337,8 +3540,9 @@ mod tests {
         assert_eq!(owned, b"owned-bytes");
         assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
         assert!(!root.join("app").exists());
-        let error = cleanup.cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        cleanup
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
         fs::remove_dir(&moved).unwrap();
         fs::remove_dir_all(&root).unwrap();
@@ -3408,8 +3612,9 @@ mod tests {
         assert_eq!(bodies, vec![b"first".to_vec(), b"second".to_vec()]);
         assert_eq!(fs::read(root.join("foreign")).unwrap(), b"keep");
         assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
-        let error = cleanup.cleanup().unwrap_err();
-        assert_eq!(error.kind(), ExtractionErrorKind::CleanupFailed);
+        cleanup
+            .cleanup()
+            .expect("cleanup empties the owned root and reports success");
         assert_eq!(fs::read_dir(&moved).unwrap().count(), 0);
         fs::remove_dir(&moved).unwrap();
         fs::remove_dir_all(&root).unwrap();
@@ -3453,7 +3658,7 @@ mod tests {
             .unwrap(),
             b"owned-bytes"
         );
-        assert_cleanup_reports_residue(cleanup, &root, &root);
+        assert_cleanup_empties_owned_root(cleanup, &root);
     }
 
     #[cfg(unix)]
@@ -3507,6 +3712,6 @@ mod tests {
         .permissions()
         .mode();
         assert_eq!(staged_mode & 0o777, 0o600);
-        assert_cleanup_reports_residue(cleanup, &root, &root);
+        assert_cleanup_empties_owned_root(cleanup, &root);
     }
 }

@@ -21,4 +21,4 @@ exclude = [
 workspace = true
 
 [dependencies]
-eggup-acquisition = { version = "0.1.0", path = "../eggup-acquisition" }
+eggup-acquisition = { version = "0.2", path = "../eggup-acquisition" }

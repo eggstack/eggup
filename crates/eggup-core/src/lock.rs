@@ -202,6 +202,14 @@ impl MutationLock {
     ///
     /// This is the default and never recovers: an existing record always
     /// returns [`Error::UpdateInProgress`] and is left untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UpdateInProgress`] when a lock record already exists,
+    /// and [`Error::Io`] when the record cannot be created or written.
+    ///
+    /// This entry point never recovers a record: an existing record is always
+    /// contention, is never displaced, and is never deleted.
     pub fn acquire(root: &Path, product: &ProductId, release: &ReleaseId) -> Result<Self> {
         match Self::create_new(root, product, release)? {
             Some(lock) => Ok(lock),
@@ -231,6 +239,22 @@ impl MutationLock {
     /// record. If the record changes before the claim, no stale deletion happens
     /// and contention is returned. If another writer creates a new lock after the
     /// claim, that writer wins and its record is never removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RecoveryError::Core`] carrying [`Error::UpdateInProgress`]
+    /// when the record is contended, when the caller's verifier does not
+    /// return [`StaleLockDecision::ProvenStale`] for the exact record core
+    /// observed, or when another writer wins the race after a claim; and
+    /// carrying [`Error::Io`] when the record cannot be created, read, or
+    /// written.
+    ///
+    /// Returns [`RecoveryError::RecoveryRequired`] when a displaced stale
+    /// record could not be removed or verified automatically. The real
+    /// retained evidence path is in [`RecoveryError::evidence`].
+    ///
+    /// Core never decides staleness itself: PID liveness, record age,
+    /// executable name, and service state stay consumer policy.
     pub fn acquire_with_recovery(
         root: &Path,
         product: &ProductId,
@@ -303,6 +327,14 @@ impl MutationLock {
     /// regular, non-symlink, UTF-8, in-bounds record. Records that are oversized,
     /// non-UTF-8, symlinked, non-regular, or unreadable yield `Err`, because
     /// Core cannot prove what they are and must therefore never displace them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UpdateInProgress`] when a record exists that core
+    /// cannot prove safe — malformed, oversized, non-UTF-8, symlinked, or
+    /// non-regular — and [`Error::Io`] when the record cannot be read.
+    ///
+    /// An observation never acquires, displaces, or removes anything.
     pub fn observe(root: &Path) -> Result<Option<LockObservation>> {
         match Self::inspect(root)? {
             LockStatus::Available => Ok(None),
@@ -322,6 +354,14 @@ impl MutationLock {
     /// [`LockStatus::Held`] when a bounded readable record exists, and
     /// [`LockStatus::Malformed`] when the record is missing, unreadable,
     /// oversized, or non-UTF-8. This function never deletes anything.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] when the record exists but cannot be read. A
+    /// malformed, oversized, symlinked, non-regular, or non-UTF-8 record is
+    /// reported as [`LockStatus::Malformed`], not as an error.
+    ///
+    /// This function never deletes anything.
     pub fn inspect(root: &Path) -> Result<LockStatus> {
         let path = lock_path(root);
         let meta = match fs::symlink_metadata(&path) {

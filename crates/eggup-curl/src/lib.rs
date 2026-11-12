@@ -26,6 +26,15 @@ pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_TOTAL_TIMEOUT: Duration = Duration::from_secs(120);
 /// Default redirect bound when following is enabled.
 pub const DEFAULT_MAX_REDIRECTS: usize = 10;
+/// Maximum accepted outbound `User-Agent` length, in bytes.
+///
+/// The bound keeps the outbound header value a bounded HTTP field value. It
+/// matches the 512-byte magnitude this adapter already uses for bounded
+/// diagnostics. A longer value is rejected with
+/// [`AcquisitionError::InvalidInput`]; see
+/// [`CurlTransport::with_executable_and_user_agent`] for the full accepted
+/// grammar.
+pub const MAX_USER_AGENT_BYTES: usize = 512;
 /// Bound for captured curl stdout (`-w "%{http_code}"` plus slack).
 const MAX_WRITE_OUT_BYTES: u64 = 64;
 /// Parent polling granularity while waiting for the owned child.
@@ -165,6 +174,7 @@ impl CurlConfig {
 pub struct CurlTransport {
     executable: PathBuf,
     config: CurlConfig,
+    user_agent: Option<String>,
 }
 
 impl CurlTransport {
@@ -174,6 +184,10 @@ impl CurlTransport {
     /// [`discover_curl_executable`] is opt-in only. Config validation happens
     /// here; executable existence/spawn is classified per-request as
     /// `Unavailable` so composition can fall back.
+    ///
+    /// The constructed adapter sends **no** `User-Agent`: no `--user-agent`
+    /// element reaches `curl`, so `curl` applies its own default. Use
+    /// [`CurlTransport::with_executable_and_user_agent`] to set one.
     pub fn with_executable(
         executable: impl Into<PathBuf>,
         config: CurlConfig,
@@ -185,7 +199,70 @@ impl CurlTransport {
                 "curl executable path must not be empty".to_string(),
             )));
         }
-        Ok(Self { executable, config })
+        Ok(Self {
+            executable,
+            config,
+            user_agent: None,
+        })
+    }
+
+    /// Builds an adapter from an explicit executable path plus config and a
+    /// caller-supplied outbound `User-Agent` value.
+    ///
+    /// The value is validated here and is used for **every** request this
+    /// adapter makes. It reaches `curl` as the literal argv element following
+    /// `--user-agent`, positioned before the `--` separator and the URL. No
+    /// shell is involved, so the value is never re-parsed or interpolated.
+    ///
+    /// # Accepted grammar
+    ///
+    /// ```text
+    /// user-agent = 1*( VCHAR / SP / obs-text )
+    /// VCHAR      = %x21-7E          ; printable ASCII, excluding SP
+    /// SP         = %x20            ; permitted inside the value; a run of SP is
+    ///                              ; permitted, but a leading or trailing SP is not
+    /// obs-text   = %xA0-10FFFF     ; any non-ASCII scalar value (C1 excluded)
+    /// ```
+    ///
+    /// A run of interior `SP` is permitted because the HTTP field-value grammar
+    /// permits it: RFC 7230 §3.2 defines `field-content` as
+    /// `field-vchar [ 1*( SP / HTAB ) field-vchar ]`, whose interior run is
+    /// `1*`. The accepted set is therefore a subset of a well-formed HTTP field
+    /// value, and the rules that actually protect the request head — no C0 or
+    /// C1 control character, no `DEL`, no leading or trailing `SP` — are
+    /// enforced exactly.
+    ///
+    /// The value is rejected with [`AcquisitionError::InvalidInput`] when it is
+    /// empty, when its UTF-8 length exceeds [`MAX_USER_AGENT_BYTES`], when it
+    /// contains any C0 control character (including `CR`, `LF`, `NUL`, and
+    /// `HTAB`), `DEL` (`U+007F`), or any C1 control character
+    /// (`U+0080`-`U+009F`), or when it begins or ends with a space.
+    ///
+    /// `InvalidInput` is terminal: unlike `Unavailable` it never causes a
+    /// composed transport to fall back to another adapter.
+    ///
+    /// The control characters are refused because `curl` does not sanitize
+    /// `--user-agent`: a value containing `CR LF` would be written into the
+    /// request head verbatim and inject an additional header.
+    pub fn with_executable_and_user_agent(
+        executable: impl Into<PathBuf>,
+        config: CurlConfig,
+        user_agent: impl Into<String>,
+    ) -> Result<Self, AcquisitionError> {
+        config.validate()?;
+        let executable = executable.into();
+        if executable.as_os_str().is_empty() {
+            return Err(AcquisitionError::InvalidInput(bound(
+                "curl executable path must not be empty".to_string(),
+            )));
+        }
+        let user_agent = user_agent.into();
+        validate_user_agent(&user_agent)?;
+        Ok(Self {
+            executable,
+            config,
+            user_agent: Some(user_agent),
+        })
     }
 
     /// Returns the configured executable path.
@@ -197,6 +274,65 @@ impl CurlTransport {
     pub fn config(&self) -> &CurlConfig {
         &self.config
     }
+
+    /// Returns the outbound `User-Agent` value this adapter will send.
+    ///
+    /// `None` means no `--user-agent` element is emitted and `curl` applies
+    /// its own default. See
+    /// [`CurlTransport::with_executable_and_user_agent`] for the accepted
+    /// grammar.
+    pub fn user_agent(&self) -> Option<&str> {
+        self.user_agent.as_deref()
+    }
+}
+
+/// Validates a caller-supplied outbound `User-Agent` value.
+///
+/// The accepted grammar is the one documented on
+/// [`CurlTransport::with_executable_and_user_agent`]. Every rejection is
+/// `InvalidInput`, which is terminal: it never lets a composed transport fall
+/// back to another adapter because of a malformed caller input.
+fn validate_user_agent(user_agent: &str) -> Result<(), AcquisitionError> {
+    if user_agent.is_empty() {
+        return Err(AcquisitionError::InvalidInput(bound(
+            "user agent must not be empty".to_string(),
+        )));
+    }
+    if user_agent.len() > MAX_USER_AGENT_BYTES {
+        return Err(AcquisitionError::InvalidInput(bound(
+            "user agent exceeds the maximum length".to_string(),
+        )));
+    }
+    let mut chars = user_agent.chars();
+    let first = chars.next();
+    let last = user_agent.chars().next_back();
+    // An HTTP field value is delimited by optional whitespace that a recipient
+    // may strip, so a value with surrounding spaces would not be transmitted
+    // faithfully.
+    if first == Some(' ') || last == Some(' ') {
+        return Err(AcquisitionError::InvalidInput(bound(
+            "user agent must not begin or end with a space".to_string(),
+        )));
+    }
+    for ch in user_agent.chars() {
+        let permitted = match ch {
+            // VCHAR: printable ASCII, excluding SP.
+            '\u{21}'..='\u{7E}' => true,
+            // SP: interior only; the surrounding-space case is refused above.
+            '\u{20}' => true,
+            // obs-text: any non-ASCII scalar value, C1 controls excluded.
+            '\u{A0}'..='\u{10FFFF}' => true,
+            // Everything else is a C0 control (CR, LF, NUL, HTAB, ...), DEL, or
+            // a C1 control.
+            _ => false,
+        };
+        if !permitted {
+            return Err(AcquisitionError::InvalidInput(bound(
+                "user agent must not contain control characters".to_string(),
+            )));
+        }
+    }
+    Ok(())
 }
 
 impl AcquisitionTransport for CurlTransport {
@@ -237,6 +373,7 @@ impl AcquisitionTransport for CurlTransport {
         let outcome = run_curl_to_file(
             &self.executable,
             &self.config,
+            self.user_agent.as_deref(),
             request,
             &tmp,
             &mut file,
@@ -251,7 +388,7 @@ impl AcquisitionTransport for CurlTransport {
                     return Err(AcquisitionError::Cancelled);
                 }
                 let bytes = fs::read(&tmp)
-                    .map_err(|e| AcquisitionError::Io(bound(format!("reading part file: {e}"))))?;
+                    .map_err(|e| AcquisitionError::__adapter_io("reading part file", e))?;
                 eggup_acquisition::__remove_owned_temp(&tmp);
                 guard.disarm = true;
                 if bytes.len() > max {
@@ -285,7 +422,7 @@ impl AcquisitionTransport for CurlTransport {
             AcquisitionError::InvalidInput(bound("destination has no parent".into()))
         })?;
         let parent_meta = fs::symlink_metadata(parent)
-            .map_err(|e| AcquisitionError::Io(bound(format!("reading artifact parent: {e}"))))?;
+            .map_err(|e| AcquisitionError::__adapter_io("reading artifact parent", e))?;
         if !parent_meta.is_dir() || parent_meta.file_type().is_symlink() {
             return Err(AcquisitionError::InvalidInput(bound(
                 "artifact parent must be an existing real directory".into(),
@@ -317,6 +454,7 @@ impl AcquisitionTransport for CurlTransport {
         let outcome = run_curl_to_file(
             &self.executable,
             &self.config,
+            self.user_agent.as_deref(),
             request,
             &tmp,
             &mut file,
@@ -336,7 +474,7 @@ impl AcquisitionTransport for CurlTransport {
                     return Err(AcquisitionError::Cancelled);
                 }
                 let size = fs::metadata(&tmp)
-                    .map_err(|e| AcquisitionError::Io(bound(format!("reading part file: {e}"))))?
+                    .map_err(|e| AcquisitionError::__adapter_io("reading part file", e))?
                     .len();
                 if size > max_artifact {
                     eggup_acquisition::__remove_owned_temp(&tmp);
@@ -380,9 +518,8 @@ pub fn discover_curl_executable() -> Result<PathBuf, AcquisitionError> {
 }
 
 fn discover_in(path_var: Option<std::ffi::OsString>) -> Result<PathBuf, AcquisitionError> {
-    let path_var = path_var.ok_or_else(|| {
-        AcquisitionError::Unavailable(bound("curl not found: PATH is unset".to_string()))
-    })?;
+    let path_var = path_var
+        .ok_or_else(|| AcquisitionError::__adapter_unavailable("curl not found: PATH is unset"))?;
     #[cfg(windows)]
     let names = vec!["curl", "curl.exe"];
     #[cfg(not(windows))]
@@ -400,20 +537,49 @@ fn discover_in(path_var: Option<std::ffi::OsString>) -> Result<PathBuf, Acquisit
             }
         }
     }
-    Err(AcquisitionError::Unavailable(bound(
-        "curl not found on PATH".to_string(),
-    )))
+    Err(AcquisitionError::__adapter_unavailable(
+        "curl not found on PATH",
+    ))
 }
 
-fn bound(mut s: String) -> String {
-    if s.len() > 512 {
-        let mut end = 512;
-        while !s.is_char_boundary(end) {
-            end -= 1;
-        }
-        s.truncate(end);
+/// Bounds a diagnostic detail to 512 bytes, truncating only at a UTF-8
+/// character boundary.
+///
+/// The implementation lives in the seam (`eggup-acquisition`), which owns the
+/// bounded-detail rule. This adapter deliberately keeps no local copy of the
+/// truncation logic; it only delegates.
+fn bound(s: String) -> String {
+    eggup_acquisition::__adapter_bound_detail(s)
+}
+
+/// Renders the diagnostic detail for a failed `spawn()`.
+///
+/// The cause segment is derived **only** from the [`std::io::ErrorKind`]
+/// discriminant and the numeric raw OS code. The OS-provided message text is
+/// deliberately **not** rendered: it is free-form, platform-specific, and can
+/// echo a path, so rendering it would risk carrying caller-supplied material
+/// into a diagnostic that this crate's redaction rule governs.
+///
+/// Exact format:
+///
+/// ```text
+/// curl spawn failed for {redacted}: {kind}[ (os error {code})]
+/// ```
+///
+/// `{redacted}` is the **already redacted** URL; this helper must never be
+/// given the raw URL. `{kind}` is the `ErrorKind` in its `Debug` form (for
+/// example `NotFound`, `PermissionDenied`, `WouldBlock`). The ` (os error
+/// {code})` suffix is present only when the error carries a raw OS code.
+///
+/// The caller keeps the `Unavailable` classification: the cause is evidence in
+/// the detail, never a change of variant, because `Unavailable` is the only
+/// hard failure that falls back under `CompositionPolicy::UnavailableOnly`.
+fn spawn_failure_detail(redacted: &str, error: &std::io::Error) -> String {
+    let kind = format!("{:?}", error.kind());
+    match error.raw_os_error() {
+        Some(code) => format!("curl spawn failed for {redacted}: {kind} (os error {code})"),
+        None => format!("curl spawn failed for {redacted}: {kind}"),
     }
-    s
 }
 
 /// Serializes a positive Rust `Duration` as locale-independent decimal seconds
@@ -511,11 +677,18 @@ fn redirect_protocols(config: &CurlConfig, url: &str) -> Vec<String> {
 #[allow(clippy::too_many_arguments)]
 fn build_curl_args(
     config: &CurlConfig,
+    user_agent: Option<&str>,
     url: &str,
     max_bytes: u64,
     eff_connect: Duration,
     eff_total: Duration,
 ) -> Result<Vec<String>, AcquisitionError> {
+    // The caller-supplied value is re-validated here, before a single element
+    // is pushed, so an invalid value can never produce an argv and can never
+    // reach the wire.
+    if let Some(agent) = user_agent {
+        validate_user_agent(agent)?;
+    }
     // Ignore ~/.curlrc so ambient config cannot smuggle proxy/auth policy.
     let mut args: Vec<String> = vec![
         "--disable".to_string(),
@@ -547,6 +720,13 @@ fn build_curl_args(
         args.push("--noproxy".to_string());
         args.push("*".to_string());
     }
+    if let Some(agent) = user_agent {
+        // A literal argv element: the child is spawned without a shell, so the
+        // value is transmitted exactly as given and cannot be re-parsed as an
+        // option (curl takes the element after `--user-agent` as the value).
+        args.push("--user-agent".to_string());
+        args.push(agent.to_string());
+    }
     args.push("--output".to_string());
     args.push("-".to_string());
     args.push("--write-out".to_string());
@@ -573,6 +753,7 @@ fn proxy_kind(config: &CurlConfig) -> ProxyKind {
 fn run_curl_to_file(
     executable: &Path,
     config: &CurlConfig,
+    user_agent: Option<&str>,
     request: &AcquisitionRequest,
     output: &Path,
     output_file: &mut File,
@@ -583,13 +764,13 @@ fn run_curl_to_file(
 ) -> Result<CurlOutcome, AcquisitionError> {
     let url = request.url().to_string();
     let redacted = request.redacted();
-    let args = build_curl_args(config, &url, max_bytes, eff_connect, eff_total)?;
+    let args = build_curl_args(config, user_agent, &url, max_bytes, eff_connect, eff_total)?;
     let proxy_env = proxy_env_snapshot(&config.proxy);
     let start = Instant::now();
     let deadline = start + eff_total;
     let owned_file = output_file
         .try_clone()
-        .map_err(|e| AcquisitionError::Io(bound(format!("cloning owned output handle: {e}"))))?;
+        .map_err(|e| AcquisitionError::__adapter_io("cloning owned output handle", e))?;
 
     let mut cmd = Command::new(executable);
     cmd.args(&args)
@@ -600,8 +781,8 @@ fn run_curl_to_file(
     for (k, v) in &proxy_env {
         cmd.env(k, v);
     }
-    let mut child = cmd.spawn().map_err(|_| {
-        AcquisitionError::Unavailable(bound(format!("curl spawn failed for {redacted}")))
+    let mut child = cmd.spawn().map_err(|e| {
+        AcquisitionError::__adapter_unavailable(spawn_failure_detail(&redacted, &e))
     })?;
     // Curl streams the body on stdout. A duplicate of Eggup's exclusive open
     // file handle is moved to the reader thread; no pathname is reopened.
@@ -681,28 +862,46 @@ fn run_curl_to_file(
                 let _ = body_reader.join();
                 let _ = status_reader.join();
                 eggup_acquisition::__remove_owned_temp(output);
-                return Err(AcquisitionError::Io(bound(format!(
-                    "waiting for curl: {e}"
-                ))));
+                return Err(AcquisitionError::__adapter_io("waiting for curl", e));
             }
         }
     };
     let _ = child.wait();
     let bytes_written = body_reader
         .join()
-        .map_err(|_| AcquisitionError::Io(bound("curl body reader failed".into())))?
-        .map_err(|_| AcquisitionError::Io(bound("writing curl body failed".into())))?;
+        .map_err(|_| {
+            AcquisitionError::__adapter_io(
+                "joining curl body reader",
+                std::io::Error::other("curl body reader failed"),
+            )
+        })?
+        .map_err(|_| {
+            AcquisitionError::__adapter_io(
+                "writing curl body",
+                std::io::Error::other("writing curl body failed"),
+            )
+        })?;
     if bytes_written > max_bytes {
         eggup_acquisition::__remove_owned_temp(output);
         return Err(AcquisitionError::TooLarge { limit: max_bytes });
     }
     output_file
         .flush()
-        .map_err(|e| AcquisitionError::Io(bound(format!("flushing owned output: {e}"))))?;
+        .map_err(|e| AcquisitionError::__adapter_io("flushing owned output", e))?;
     let code_bytes = status_reader
         .join()
-        .map_err(|_| AcquisitionError::Io(bound("curl status reader failed".into())))?
-        .map_err(|_| AcquisitionError::Io(bound("reading curl status failed".into())))?;
+        .map_err(|_| {
+            AcquisitionError::__adapter_io(
+                "joining curl status reader",
+                std::io::Error::other("curl status reader failed"),
+            )
+        })?
+        .map_err(|_| {
+            AcquisitionError::__adapter_io(
+                "reading curl status",
+                std::io::Error::other("reading curl status failed"),
+            )
+        })?;
     classify_curl_result(
         exit_code,
         &code_bytes,
@@ -799,6 +998,14 @@ mod tests {
     #[cfg(not(windows))]
     use std::thread;
 
+    // Platform gate note (M013, Defect A): the `#[cfg(not(windows))]` gate on
+    // the loopback-server tests below is a **known, deliberate** platform
+    // difference, not a silent coverage gap. Those tests drive a real `curl`
+    // subprocess against an in-process loopback HTTP server; the Windows lane
+    // exercises the same transport paths through the real `curl.exe`
+    // integration tests instead. The gate is recorded here, at the point of
+    // use, so a reader sees the exclusion and its reason.
+
     #[test]
     fn exit_28_is_labelled_total_when_connect_and_total_ceilings_coincide() {
         let dir = temp_dir("curl-phase");
@@ -881,10 +1088,31 @@ mod tests {
         discover_curl_executable().ok()
     }
 
-    fn transport() -> Option<CurlTransport> {
-        real_curl().map(|exe| {
-            CurlTransport::with_executable(exe, CurlConfig::strict()).expect("curl transport")
-        })
+    /// Requires a discoverable system `curl` executable.
+    ///
+    /// M013, Defect A, treatment (a): the tests that use this helper drive the
+    /// **real** curl subprocess. There is no fixture or stub that can stand in
+    /// for it, so when no `curl` is discoverable the test must fail loudly with
+    /// the missing prerequisite and the remedy. It must never report a pass
+    /// while asserting nothing.
+    fn require_curl_executable() -> PathBuf {
+        match real_curl() {
+            Some(exe) => exe,
+            None => panic!(
+                "no `curl` executable was discoverable on PATH. This test drives the real curl \
+                 subprocess and has nothing to assert without one. Install curl (for example \
+                 `brew install curl`) or put a curl executable on PATH, then re-run \
+                 `cargo test -p eggup-curl`."
+            ),
+        }
+    }
+
+    /// Builds a strict transport over the discovered system `curl`, failing
+    /// loudly when no `curl` is discoverable (M013, Defect A, treatment (a)).
+    fn require_transport() -> CurlTransport {
+        let exe = require_curl_executable();
+        CurlTransport::with_executable(exe, CurlConfig::strict())
+            .expect("strict curl transport must build from a discovered curl executable")
     }
 
     #[cfg(not(windows))]
@@ -940,6 +1168,42 @@ mod tests {
             0,
             false,
         )
+    }
+
+    /// Serves one request and records the raw request head the client sent.
+    ///
+    /// `serve_once` proves the adapter's behavior; this variant additionally
+    /// captures what the peer actually received, so a header the adapter sets
+    /// can be asserted on the wire rather than only in the child's argv.
+    /// The head is written before the response is sent, so a client that has
+    /// received the response is guaranteed to find the record on disk.
+    #[cfg(not(windows))]
+    fn serve_once_recording_head(status: u16, body: Vec<u8>, record: &Path) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().unwrap();
+        let record = record.to_path_buf();
+        thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+                stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
+                let mut buf = [0u8; 8192];
+                let read = stream.read(&mut buf).unwrap_or(0);
+                let _ = fs::write(&record, &buf[..read]);
+                let reason = match status {
+                    200 => "OK",
+                    404 => "Not Found",
+                    500 => "Internal Server Error",
+                    _ => "OK",
+                };
+                let mut head = format!("HTTP/1.1 {status} {reason}\r\n");
+                head.push_str(&format!("Content-Length: {}\r\n", body.len()));
+                head.push_str("Content-Type: application/octet-stream\r\n");
+                head.push_str("Connection: close\r\n\r\n");
+                let _ = stream.write_all(head.as_bytes());
+                let _ = stream.write_all(&body);
+            }
+        });
+        format!("http://{addr}")
     }
 
     /// Minimal fake curl executable (Unix-only): writes a fixed body to stdout
@@ -1030,10 +1294,99 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// M015 (§6.1, §10): a spawn failure keeps the `Unavailable`
+    /// classification **and** now carries the OS cause.
+    ///
+    /// Before this milestone the `io::Error` returned by `Command::spawn()` was
+    /// discarded by a `map_err(|_| …)`, so a missing executable (`ENOENT`), a
+    /// non-executable file (`EACCES`), and a transient resource failure
+    /// (`EAGAIN`) all rendered the identical, cause-free string
+    /// `curl spawn failed for {redacted}`. A hosted CI run failed with exactly
+    /// that message and could not be attributed, because the diagnostic carried
+    /// no way to tell the causes apart.
+    ///
+    /// The expected cause is observed **independently** here — this test
+    /// performs its own spawn of the same missing path and reads the platform's
+    /// own error — so the assertion is not circular with the adapter's
+    /// rendering and does not hard-code a platform-specific errno.
+    ///
+    /// Deterministic by construction: no network, no wall-clock budget, no
+    /// `PATH` dependency, and no real `curl` required.
+    #[test]
+    fn spawn_failure_detail_names_the_os_cause_and_stays_unavailable() {
+        const MISSING: &str = "/nonexistent-eggup-curl-binary-m015";
+        const USERINFO: &str = "S3CR3T-USERINFO-9917";
+        const QUERY: &str = "TOKEN-QUERY-5523";
+        const FRAGMENT: &str = "FRAG-SENTINEL-7788";
+        let url = format!("https://user:{USERINFO}@example.com/x?token={QUERY}#{FRAGMENT}");
+
+        // The platform's own error for this spawn, observed independently.
+        let observed = std::process::Command::new(MISSING)
+            .spawn()
+            .expect_err("spawning a missing executable must fail");
+        let expected_kind = format!("{:?}", observed.kind());
+
+        let t = CurlTransport::with_executable(MISSING, CurlConfig::strict()).unwrap();
+        let err = t
+            .fetch_metadata(&req(&url), limits(), &CancelFlag::new())
+            .unwrap_err();
+
+        // (a) The classification is unchanged: still `Unavailable`, still
+        // eligible for fallback under `CompositionPolicy::UnavailableOnly`.
+        assert!(matches!(err, AcquisitionError::Unavailable(_)));
+        assert!(err.is_unavailable());
+
+        let detail = match &err {
+            AcquisitionError::Unavailable(detail) => detail.clone(),
+            other => panic!("expected Unavailable, got {other:?}"),
+        };
+
+        // (b) The detail now names the OS cause.
+        assert!(
+            detail.contains(&expected_kind),
+            "detail does not name the ErrorKind {expected_kind}: {detail}"
+        );
+        match observed.raw_os_error() {
+            Some(code) => assert!(
+                detail.contains(&format!("os error {code}")),
+                "detail does not carry the raw OS code {code}: {detail}"
+            ),
+            None => assert!(
+                !detail.contains("os error"),
+                "detail carries an OS code the platform did not produce: {detail}"
+            ),
+        }
+        assert!(
+            detail.starts_with("curl spawn failed for "),
+            "detail lost the established prefix: {detail}"
+        );
+
+        // (b') The exact documented format is pinned, so it cannot drift
+        // silently: `curl spawn failed for {redacted}: {kind}[ (os error {code})]`.
+        let redacted = eggup_acquisition::redact_url(&url);
+        let expected_detail = match observed.raw_os_error() {
+            Some(code) => {
+                format!("curl spawn failed for {redacted}: {expected_kind} (os error {code})")
+            }
+            None => format!("curl spawn failed for {redacted}: {expected_kind}"),
+        };
+        assert_eq!(detail, expected_detail);
+
+        // (c) The detail carries no URL or credential material, and the
+        // redaction of the URL is preserved.
+        assert!(!detail.contains(USERINFO), "userinfo leaked: {detail}");
+        assert!(!detail.contains(QUERY), "query leaked: {detail}");
+        assert!(!detail.contains(FRAGMENT), "fragment leaked: {detail}");
+        assert!(detail.contains("<redacted>"), "redaction lost: {detail}");
+
+        // (d) The detail stays bounded by the seam's shared rule.
+        assert!(detail.len() <= 512, "detail is not bounded: {detail}");
+    }
+
     #[test]
     #[cfg(not(windows))]
     fn metadata_success_not_found_and_server_error() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let base = ok_server(b"hello-curl-meta".to_vec());
         let out = t
             .fetch_metadata(&req(&format!("{base}/meta")), limits(), &CancelFlag::new())
@@ -1057,7 +1410,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn artifact_success_not_found_and_server_error() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let body: Vec<u8> = (0..4096).map(|i| (i % 251) as u8).collect();
         let base = ok_server(body.clone());
         let dir = temp_dir("curl-artifact");
@@ -1119,7 +1472,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn truncated_transfer_is_hard_failure_without_promotion() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let body = vec![5u8; 4096];
         let base = serve_once(
             200,
@@ -1146,7 +1499,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn metadata_and_artifact_size_overflow() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let big = vec![9u8; 128 * 1024];
         let base = ok_server(big);
         let err = t
@@ -1177,28 +1530,14 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// Total-phase timeout, proven end to end against a real `curl`.
+    ///
+    /// M013, Defect A, treatment (a): the fixture must exist, so a missing
+    /// `curl` fails loudly instead of reporting a vacuous pass.
     #[test]
     #[cfg(not(windows))]
-    fn connect_and_total_timeouts_are_typed() {
-        let Some(t) = transport() else { return };
-        // Unroutable connect with a short connect ceiling.
-        let short_connect = FetchLimits {
-            max_metadata_bytes: 64 * 1024,
-            max_artifact_bytes: 256 * 1024,
-            connect_timeout: Duration::from_millis(500),
-            total_timeout: Duration::from_secs(10),
-        };
-        let err = t
-            .fetch_metadata(
-                &req("http://10.255.255.1:81/unreachable"),
-                short_connect,
-                &CancelFlag::new(),
-            )
-            .unwrap_err();
-        assert!(
-            matches!(err, AcquisitionError::Timeout { .. }),
-            "expected timeout, got {err}"
-        );
+    fn total_phase_timeout_is_typed_end_to_end() {
+        let t = require_transport();
         // Slow body with a short total ceiling.
         let body = vec![2u8; 1024];
         let base = serve_once(
@@ -1221,7 +1560,114 @@ mod tests {
                 &CancelFlag::new(),
             )
             .unwrap_err();
-        assert!(matches!(err, AcquisitionError::Timeout { phase: "total" }));
+        assert!(
+            matches!(err, AcquisitionError::Timeout { phase: "total" }),
+            "expected a total-phase timeout, got {err}"
+        );
+    }
+
+    /// Connect-phase timeout, proven end to end — **environment-conditional**.
+    ///
+    /// M013, Defect A, treatment (b): this proof needs a host that blackholes
+    /// the route to the probe address so the connect ceiling expires. Most
+    /// hosts and CI runners reject the connection immediately with
+    /// `ENETUNREACH`/`EHOSTUNREACH`, which is an ordinary transport failure,
+    /// not a timeout. The test is therefore marked as ignored with a recorded
+    /// reason and is reported as *ignored*, never as *passed*, and it never
+    /// exits silently: when it is run explicitly it asserts the exact
+    /// connect-phase label. The connect/total **label** is proven
+    /// deterministically, with no subprocess and no network, by
+    /// `classify_curl_result_labels_connect_and_total_without_a_subprocess`.
+    #[test]
+    #[cfg(not(windows))]
+    #[ignore = "environment-conditional: needs a host that blackholes the route to 10.255.255.1:81 so the connect ceiling expires instead of failing fast with ENETUNREACH/EHOSTUNREACH; the connect/total label itself is proven without a network by classify_curl_result_labels_connect_and_total_without_a_subprocess"]
+    fn connect_phase_timeout_is_typed_end_to_end() {
+        let t = require_transport();
+        // Unroutable connect with a short connect ceiling.
+        let short_connect = FetchLimits {
+            max_metadata_bytes: 64 * 1024,
+            max_artifact_bytes: 256 * 1024,
+            connect_timeout: Duration::from_millis(500),
+            total_timeout: Duration::from_secs(10),
+        };
+        let err = t
+            .fetch_metadata(
+                &req("http://10.255.255.1:81/unreachable"),
+                short_connect,
+                &CancelFlag::new(),
+            )
+            .unwrap_err();
+        assert!(
+            matches!(err, AcquisitionError::Timeout { phase: "connect" }),
+            "expected a connect-phase timeout, got {err}"
+        );
+    }
+
+    /// The connect/total timeout label, proven without a subprocess and
+    /// without a network.
+    ///
+    /// M013, Defect A: because the end-to-end connect-phase proof is
+    /// environment-conditional, the *label* is pinned here at the
+    /// `classify_curl_result` layer by injecting `start`. The injected
+    /// elapsed times are whole seconds, so the assertion never depends on a
+    /// sub-second wall-clock budget.
+    #[test]
+    fn classify_curl_result_labels_connect_and_total_without_a_subprocess() {
+        let dir = temp_dir("curl-phase-label");
+        let output = dir.join("body");
+        fs::write(&output, b"partial").unwrap();
+
+        let phase_for = |eff_connect: Duration, eff_total: Duration, elapsed: Duration| {
+            let start = Instant::now() - elapsed;
+            match classify_curl_result(
+                Some(28),
+                b"",
+                &output,
+                "https://example.com/app",
+                start,
+                eff_connect,
+                eff_total,
+                1024,
+            ) {
+                Err(AcquisitionError::Timeout { phase }) => phase,
+                other => panic!("expected a timeout, got {other:?}"),
+            }
+        };
+
+        // A strictly tighter connect ceiling that has expired labels the
+        // failure as a connect timeout.
+        assert_eq!(
+            phase_for(
+                Duration::from_secs(2),
+                Duration::from_secs(20),
+                Duration::from_secs(2),
+            ),
+            "connect",
+            "an expired, strictly tighter connect ceiling must label a connect timeout"
+        );
+        // The same ceilings with the elapsed time past the connect ceiling
+        // label the failure as a total timeout.
+        assert_eq!(
+            phase_for(
+                Duration::from_secs(2),
+                Duration::from_secs(20),
+                Duration::from_secs(5),
+            ),
+            "total",
+            "an elapsed time past the connect ceiling must label a total timeout"
+        );
+        // Coincident ceilings are indistinguishable, so the weaker total
+        // claim is the only honest one.
+        assert_eq!(
+            phase_for(
+                Duration::from_secs(2),
+                Duration::from_secs(2),
+                Duration::from_secs(5),
+            ),
+            "total",
+            "coincident ceilings must not label a total timeout as connect"
+        );
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1266,6 +1712,7 @@ mod tests {
         // is narrowed.
         let https = build_curl_args(
             &cfg,
+            None,
             "https://example.com/artifact",
             1024,
             Duration::from_secs(1),
@@ -1278,6 +1725,7 @@ mod tests {
         // A cleartext request may still be redirected to either scheme.
         let http = build_curl_args(
             &cfg,
+            None,
             "http://example.com/artifact",
             1024,
             Duration::from_secs(1),
@@ -1290,6 +1738,7 @@ mod tests {
         // Scheme comparison is case-insensitive, as URLs are.
         let upper = build_curl_args(
             &cfg,
+            None,
             "HTTPS://example.com/artifact",
             1024,
             Duration::from_secs(1),
@@ -1303,6 +1752,7 @@ mod tests {
         let http_only = CurlConfig::strict().allowed_protocols(vec!["http".to_string()]);
         let denied = build_curl_args(
             &http_only,
+            None,
             "https://example.com/artifact",
             1024,
             Duration::from_secs(1),
@@ -1337,7 +1787,7 @@ mod tests {
             ),
         ];
         for (connect, total, expected_connect, expected_total) in cases {
-            let args = build_curl_args(&cfg, "https://example.com/x", 1024, connect, total)
+            let args = build_curl_args(&cfg, None, "https://example.com/x", 1024, connect, total)
                 .expect("builds");
             let connect_idx = args
                 .iter()
@@ -1354,6 +1804,7 @@ mod tests {
         // than widen to a second.
         let err = build_curl_args(
             &cfg,
+            None,
             "https://example.com/x",
             1024,
             Duration::from_nanos(500),
@@ -1362,6 +1813,105 @@ mod tests {
         assert!(matches!(err, Err(AcquisitionError::InvalidInput(_))));
     }
 
+    /// M012 (§6.2): the deterministic half of the sub-second serialization
+    /// proof.
+    ///
+    /// A sub-second `--max-time` cannot be proven end-to-end, because the
+    /// parent's deadline *is* the effective total ceiling — proving it would
+    /// need a sub-second wall-clock budget. It is proven here instead, at the
+    /// layer where the rule lives: `build_curl_args`, with no subprocess, no
+    /// network, and no wall clock at all. This retains the coverage that
+    /// `build_curl_args_passes_sub_second_deadlines_to_fake_curl` had to give
+    /// up in order to become deterministic.
+    #[test]
+    fn sub_second_deadlines_serialize_truthfully_without_a_subprocess() {
+        let cfg = CurlConfig::strict();
+        let value_after = |args: &[String], flag: &str| -> String {
+            let idx = args.iter().position(|a| a == flag).expect("flag present");
+            args[idx + 1].clone()
+        };
+        let sub_second_pair = FetchLimits {
+            max_metadata_bytes: 64 * 1024,
+            max_artifact_bytes: 256 * 1024,
+            connect_timeout: Duration::from_millis(250),
+            total_timeout: Duration::from_millis(750),
+        };
+
+        // A sub-second connect *and* sub-second total pair serializes to
+        // truthful decimal seconds.
+        let (eff_connect, eff_total) = cfg.effective_timeouts(sub_second_pair);
+        assert_eq!(eff_connect, Duration::from_millis(250));
+        assert_eq!(eff_total, Duration::from_millis(750));
+        let args = build_curl_args(
+            &cfg,
+            None,
+            "https://example.com/x",
+            1024,
+            eff_connect,
+            eff_total,
+        )
+        .expect("builds");
+        assert_eq!(value_after(&args, "--connect-timeout"), "0.25");
+        assert_eq!(value_after(&args, "--max-time"), "0.75");
+
+        // `--max-time` is the *effective* total ceiling, never the raw
+        // request, when the adapter ceiling is the lower of the two.
+        let capped =
+            CurlConfig::strict().timeouts(Duration::from_millis(100), Duration::from_millis(400));
+        let (capped_connect, capped_total) = capped.effective_timeouts(sub_second_pair);
+        assert_eq!(capped_connect, Duration::from_millis(100));
+        assert_eq!(capped_total, Duration::from_millis(400));
+        let capped_args = build_curl_args(
+            &capped,
+            None,
+            "https://example.com/x",
+            1024,
+            capped_connect,
+            capped_total,
+        )
+        .expect("builds");
+        assert_eq!(value_after(&capped_args, "--connect-timeout"), "0.1");
+        assert_eq!(value_after(&capped_args, "--max-time"), "0.4");
+        assert_ne!(
+            value_after(&capped_args, "--max-time"),
+            "0.75",
+            "--max-time must be the effective ceiling, never the raw request"
+        );
+
+        // Sub-microsecond positive durations still fail validation rather
+        // than widen to a second.
+        let err = build_curl_args(
+            &cfg,
+            None,
+            "https://example.com/x",
+            1024,
+            Duration::from_nanos(500),
+            Duration::from_millis(500),
+        );
+        assert!(matches!(err, Err(AcquisitionError::InvalidInput(_))));
+    }
+
+    /// M012 (§6.1): the *asserted* serialization is decoupled from the
+    /// *enforced* wall-clock budget.
+    ///
+    /// The invariant under test is that a sub-second `FetchLimits` deadline is
+    /// serialized truthfully into the spawned child's argv. The former
+    /// version also made those same sub-second values the live parent
+    /// deadline, so the assertion doubled as a claim about host scheduling
+    /// and failed whenever the host was loaded: the parent deadline was the
+    /// only enforcement (the fake child ignores `--connect-timeout` and
+    /// `--max-time`), so a busy host expired the deadline the test was
+    /// trying to succeed inside.
+    ///
+    /// Here the connect deadline stays sub-second and is still proven
+    /// end-to-end through a real spawn, while the total budget is generous,
+    /// so no host scheduling decision can expire it.
+    ///
+    /// A sub-second `--max-time` cannot be proven end-to-end at all: the
+    /// parent's deadline *is* the effective total ceiling, so proving it
+    /// would require a sub-second wall-clock budget. That half is proven
+    /// deterministically, with no subprocess and no wall clock, by
+    /// `sub_second_deadlines_serialize_truthfully_without_a_subprocess`.
     #[cfg(unix)]
     #[test]
     fn build_curl_args_passes_sub_second_deadlines_to_fake_curl() {
@@ -1372,26 +1922,26 @@ mod tests {
             max_metadata_bytes: 64 * 1024,
             max_artifact_bytes: 256 * 1024,
             connect_timeout: Duration::from_millis(250),
-            total_timeout: Duration::from_millis(750),
+            // Generous on purpose: the total budget is not the thing under
+            // test, and a sub-second value here would re-couple the
+            // assertion to the host's scheduler.
+            total_timeout: Duration::from_secs(30),
         };
         t.fetch_metadata(&req("https://example.com/x"), cfg, &CancelFlag::new())
-            .unwrap();
+            .expect("fake curl completes well inside the 30s budget");
         let argv = fs::read_to_string(dir.join("argv")).unwrap();
         assert!(
             argv.contains("--connect-timeout 0.25"),
             "argv missing 0.25: {argv}"
         );
-        assert!(
-            argv.contains("--max-time 0.75"),
-            "argv missing 0.75: {argv}"
-        );
+        assert!(argv.contains("--max-time 30"), "argv missing 30: {argv}");
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     #[cfg(not(windows))]
     fn sub_second_total_timeout_kills_child_promptly() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let body = vec![7u8; 8192];
         let base = serve_once(
             200,
@@ -1419,9 +1969,28 @@ mod tests {
             .unwrap_err();
         let elapsed = started.elapsed();
         assert!(matches!(err, AcquisitionError::Timeout { phase: "total" }));
-        // Far less than the 4-second body stall and well below the previous
-        // one-second truthfulness allowance.
-        assert!(elapsed < Duration::from_millis(750), "elapsed {elapsed:?}");
+
+        // M012 (§6.3): promptness is proven against the deadline and against
+        // the server's stall, not against an absolute wall-clock constant.
+        //
+        // The deadline was actually reached: the fetch did not succeed early.
+        // Without this half, an upper bound alone would also pass if the
+        // fetch failed immediately.
+        assert!(
+            elapsed >= short_total.total_timeout,
+            "elapsed {elapsed:?} is below the {:?} total deadline",
+            short_total.total_timeout
+        );
+
+        // The child was killed rather than left to stall: comfortably inside
+        // the server's 4000 ms body stall. This proves the deadline fired; it
+        // does not claim the OS reaped within a fixed number of
+        // milliseconds, and the headroom absorbs the kill/reap/join latency
+        // that the transport's deadline contract does not govern.
+        assert!(
+            elapsed < Duration::from_secs(2),
+            "elapsed {elapsed:?} is not below the 2 s bound"
+        );
         assert!(!dest.exists());
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
         let _ = fs::remove_dir_all(&dir);
@@ -1429,7 +1998,7 @@ mod tests {
 
     #[test]
     fn cancellation_before_spawn_cleans_temp() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let dir = temp_dir("curl-cancel");
         let dest = dir.join("app");
         let cancel = CancelFlag::new();
@@ -1451,7 +2020,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn cancellation_during_body_stream_kills_and_reaps_child() {
-        let Some(t) = transport() else { return };
+        let t = require_transport();
         let base = serve_once(
             200,
             vec![("Content-Length".into(), "65536".into())],
@@ -1482,7 +2051,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn redirect_follow_and_reject() {
-        let Some(_) = real_curl() else { return };
+        let curl_exe = require_curl_executable();
         let target_body = b"redirect-target".to_vec();
         let target = ok_server(target_body.clone());
         let redirect = serve_once(
@@ -1493,7 +2062,7 @@ mod tests {
             false,
         );
         let follow = CurlTransport::with_executable(
-            real_curl().unwrap(),
+            curl_exe.clone(),
             CurlConfig::strict()
                 .follow_redirects(true)
                 .max_redirects(10),
@@ -1504,11 +2073,9 @@ mod tests {
             .unwrap();
         assert_eq!(out.success().unwrap().bytes(), b"redirect-target");
 
-        let nofollow = CurlTransport::with_executable(
-            real_curl().unwrap(),
-            CurlConfig::strict().follow_redirects(false),
-        )
-        .unwrap();
+        let nofollow =
+            CurlTransport::with_executable(curl_exe, CurlConfig::strict().follow_redirects(false))
+                .unwrap();
         let err = nofollow
             .fetch_metadata(&req(&format!("{redirect}/r")), limits(), &CancelFlag::new())
             .unwrap_err();
@@ -1667,6 +2234,299 @@ mod tests {
             )
             .unwrap();
         assert_eq!(out.success().unwrap().bytes(), b"via-fixture");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// M014 (§6.2, §6.4): a configured `User-Agent` reaches `curl` as a
+    /// literal argv element, positioned before the `--` separator and the URL.
+    ///
+    /// The position matters: `--` is what isolates the URL from the options,
+    /// so an option emitted after it would be read as part of the URL rather
+    /// than as an option.
+    #[test]
+    fn user_agent_is_emitted_as_a_literal_argv_element_before_the_url() {
+        let cfg = CurlConfig::strict();
+        let agent = "eggup-curl-test/1.0 (Macintosh; x86_64)";
+        let args = build_curl_args(
+            &cfg,
+            Some(agent),
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect("builds");
+        let flag = args
+            .iter()
+            .position(|a| a == "--user-agent")
+            .expect("the user agent flag is present");
+        assert_eq!(
+            args[flag + 1],
+            agent,
+            "the value must be the exact element following the flag"
+        );
+        assert_eq!(
+            args.iter().filter(|a| *a == "--user-agent").count(),
+            1,
+            "the flag must appear exactly once"
+        );
+        let separator = args.iter().position(|a| a == "--").expect("separator");
+        let url = args
+            .iter()
+            .position(|a| a == "https://example.com/x")
+            .expect("url");
+        assert!(
+            flag < separator,
+            "--user-agent must be emitted before the -- separator"
+        );
+        assert!(separator < url, "the -- separator must precede the URL");
+        assert_eq!(url, args.len() - 1, "the URL stays the last element");
+    }
+
+    /// M014 (§6.3, R3-R5): a value carrying a control character is rejected
+    /// as `InvalidInput`, and no argv is produced for it.
+    ///
+    /// `curl` does not sanitize `--user-agent`: a `CR LF` inside the value is
+    /// written into the request head verbatim and injects a second header.
+    /// The adapter therefore refuses the value before it can reach the wire.
+    #[test]
+    fn user_agent_rejects_control_characters_without_producing_argv() {
+        let cfg = CurlConfig::strict();
+        let rejected = [
+            "eggup\r\nX-Injected: 1",
+            "eggup\rvalue",
+            "eggup\nvalue",
+            "eggup\u{0}value",
+            "eggup\tvalue",
+            "eggup\u{7F}value",
+            "eggup\u{85}value",
+            "eggup\u{9F}value",
+        ];
+        for bad in rejected {
+            let err = build_curl_args(
+                &cfg,
+                Some(bad),
+                "https://example.com/x",
+                1024,
+                Duration::from_secs(1),
+                Duration::from_secs(2),
+            )
+            .expect_err("a control character must be rejected");
+            assert!(
+                matches!(err, AcquisitionError::InvalidInput(_)),
+                "expected InvalidInput for {bad:?}, got {err:?}"
+            );
+            // The constructor refuses it too, so no transport can carry it.
+            let ctor = CurlTransport::with_executable_and_user_agent(
+                "/usr/bin/curl",
+                CurlConfig::strict(),
+                bad,
+            )
+            .expect_err("a control character must be refused at construction");
+            assert!(
+                matches!(ctor, AcquisitionError::InvalidInput(_)),
+                "expected InvalidInput for {bad:?}, got {ctor:?}"
+            );
+        }
+    }
+
+    /// M014 (§6.3, R1-R2): the empty value and an over-bound value are
+    /// rejected, and a value exactly at the bound is accepted.
+    #[test]
+    fn user_agent_rejects_empty_and_over_bound_values() {
+        let cfg = CurlConfig::strict();
+        let empty = build_curl_args(
+            &cfg,
+            Some(""),
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect_err("an empty value must be rejected");
+        assert!(matches!(empty, AcquisitionError::InvalidInput(_)));
+
+        let at_bound = "a".repeat(MAX_USER_AGENT_BYTES);
+        let ok = build_curl_args(
+            &cfg,
+            Some(&at_bound),
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect("a value exactly at the bound must be accepted");
+        let flag = ok
+            .iter()
+            .position(|a| a == "--user-agent")
+            .expect("the user agent flag is present");
+        assert_eq!(ok[flag + 1], at_bound);
+
+        let over_bound = "a".repeat(MAX_USER_AGENT_BYTES + 1);
+        let err = build_curl_args(
+            &cfg,
+            Some(&over_bound),
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect_err("an over-bound value must be rejected");
+        assert!(matches!(err, AcquisitionError::InvalidInput(_)));
+
+        // The constructor applies the same bound.
+        let ctor = CurlTransport::with_executable_and_user_agent(
+            "/usr/bin/curl",
+            CurlConfig::strict(),
+            over_bound.clone(),
+        )
+        .expect_err("an over-bound value must be refused at construction");
+        assert!(matches!(ctor, AcquisitionError::InvalidInput(_)));
+    }
+
+    /// M014 (§6.5): the default transport sends no `User-Agent`, and its argv
+    /// is element-for-element what it was before the control existed.
+    ///
+    /// The published `eggup-curl 0.1.2` behavior is what a consumer already
+    /// observes on the wire, so the default path must not change silently.
+    #[test]
+    fn default_transport_emits_no_user_agent_and_keeps_the_previous_argv() {
+        let cfg = CurlConfig::strict();
+        let transport = CurlTransport::with_executable("/usr/bin/curl", cfg.clone())
+            .expect("the transport builds");
+        assert_eq!(
+            transport.user_agent(),
+            None,
+            "the default transport must not carry a user agent"
+        );
+
+        let args = build_curl_args(
+            &cfg,
+            None,
+            "https://example.com/x",
+            1024,
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        )
+        .expect("builds");
+        assert!(
+            !args.iter().any(|a| a == "--user-agent"),
+            "the default argv must not carry --user-agent"
+        );
+        assert_eq!(
+            args,
+            vec![
+                "--disable",
+                "--silent",
+                "--show-error",
+                "--no-progress-meter",
+                "--location",
+                "--max-redirs",
+                "10",
+                "--connect-timeout",
+                "1",
+                "--max-time",
+                "2",
+                "--max-filesize",
+                "1024",
+                "--proto",
+                "=http,https",
+                "--proto-redir",
+                "=https",
+                "--noproxy",
+                "*",
+                "--output",
+                "-",
+                "--write-out",
+                "%{stderr}%{http_code}",
+                "--",
+                "https://example.com/x",
+            ],
+            "the default argv must be unchanged"
+        );
+    }
+
+    /// M014 (§6.3): a rejected caller value is a terminal `InvalidInput`, and
+    /// a composed transport does not fall back on it.
+    ///
+    /// `Unavailable` is the only outcome the seam falls back on. A malformed
+    /// caller input must therefore never be classified as `Unavailable`, or a
+    /// composed transport would silently serve the request from another
+    /// adapter.
+    #[test]
+    fn rejected_user_agent_is_a_terminal_invalid_input_not_unavailable() {
+        use eggup_acquisition::{ComposedTransport, CompositionPolicy};
+        let err = CurlTransport::with_executable_and_user_agent(
+            "/usr/bin/curl",
+            CurlConfig::strict(),
+            "bad\rvalue",
+        )
+        .expect_err("a control character must be refused at construction");
+        assert!(matches!(err, AcquisitionError::InvalidInput(_)));
+        assert!(
+            !err.is_unavailable(),
+            "a rejected caller value must never be classified as unavailable"
+        );
+
+        // The same terminality at the composition layer: a curl adapter that
+        // fails with `InvalidInput` is not retried on the secondary transport.
+        let curl = CurlTransport::with_executable_and_user_agent(
+            "/usr/bin/curl",
+            CurlConfig::strict(),
+            "eggup-curl-test/1.0",
+        )
+        .expect("builds");
+        let fixture = FixtureTransport::new();
+        fixture.route(
+            "https://example.com/meta",
+            FixtureResponse::body(b"via-fixture".to_vec()),
+        );
+        let composed = ComposedTransport::new(&curl, &fixture, CompositionPolicy::UnavailableOnly);
+        let bad_limits = FetchLimits {
+            max_metadata_bytes: 0,
+            ..limits()
+        };
+        let composed_err = composed
+            .fetch_metadata(
+                &req("https://example.com/meta"),
+                bad_limits,
+                &CancelFlag::new(),
+            )
+            .expect_err("a terminal failure must not fall back to the fixture");
+        assert!(
+            matches!(composed_err, AcquisitionError::InvalidInput(_)),
+            "the composed transport must surface the terminal failure, got {composed_err:?}"
+        );
+    }
+
+    /// M014 (§6.1): the configured value reaches the wire as the outbound
+    /// `User-Agent` header.
+    ///
+    /// The argv assertions prove what the adapter asks `curl` to do; this
+    /// proves what the peer actually receives.
+    #[cfg(not(windows))]
+    #[test]
+    fn user_agent_reaches_the_wire_as_the_configured_header() {
+        let dir = temp_dir("curl-ua-wire");
+        let record = dir.join("request-head");
+        let base = serve_once_recording_head(200, b"ok".to_vec(), &record);
+        let curl_exe = require_curl_executable();
+        let transport = CurlTransport::with_executable_and_user_agent(
+            curl_exe,
+            CurlConfig::strict(),
+            "eggup-curl-test/1.0",
+        )
+        .expect("builds");
+        assert_eq!(transport.user_agent(), Some("eggup-curl-test/1.0"));
+        let out = transport
+            .fetch_metadata(&req(&format!("{base}/x")), limits(), &CancelFlag::new())
+            .expect("the loopback fetch must succeed");
+        assert_eq!(out.success().unwrap().bytes(), b"ok");
+        let head = fs::read_to_string(&record).expect("the request head was recorded");
+        assert!(
+            head.contains("User-Agent: eggup-curl-test/1.0\r\n"),
+            "the configured user agent must reach the wire; the head was {head:?}"
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 }
