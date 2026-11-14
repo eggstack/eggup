@@ -3,9 +3,8 @@
 //! Demonstrates the supported path:
 //! `InstallPlan -> prepare -> verify_integrity -> validate -> commit(ownership)`.
 //!
-//! This file is the source of the quickstart snippet in `README.md` and
-//! `docs/quickstart.md`, which reproduce it verbatim. Keep the three in sync:
-//! the gate builds and runs this example, so a divergence is a wrong doc.
+//! `docs/quickstart.md` links to this runnable example rather than copying its
+//! source, so the API example has a single source.
 //!
 //! Run with `cargo run -p eggup-core --example one_member`.
 //! Output: `committed: Committed`

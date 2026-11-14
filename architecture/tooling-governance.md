@@ -620,7 +620,7 @@ it restates facts that are owned elsewhere.
 | Document | Owns |
 |---|---|
 | `docs/README.md` | The index, and the rule that this directory is non-normative |
-| `docs/quickstart.md` | The verified walkthrough and the five runnable examples |
+| `docs/quickstart.md` | The verified walkthrough and links to runnable examples |
 | `docs/crates.md` | Which crate to depend on, and each crate's declared boundary |
 | `docs/releases.md` | Published state, the exact-pin cascade, and known limitations of published versions |
 

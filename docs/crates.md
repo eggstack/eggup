@@ -1,138 +1,38 @@
-# Choosing a crate
+# Choose a crate
 
-Eight crates, and you probably need one or two. The workspace version is `0.2.0`;
-only their registry state differs.
+Most consumers need `eggup-core` and, depending on their workflow, one or more
+adapters.
 
-## The short version
+## By use case
 
-| I want to… | Depend on |
+| Use case | Crates |
 |---|---|
-| Stage, verify, and atomically replace local files | `eggup-core` |
-| Fetch bytes over HTTP | `eggup-acquisition` + one adapter |
-| Extract a verified `.tar.gz` / `.zip` | `eggup-archive` |
-| Register or control a system service | `eggup-service` |
+| Stage, verify, and replace local files | `eggup-core` |
+| Fetch over HTTP | `eggup-acquisition` plus `eggup-eggfetch` or `eggup-curl` |
+| Extract a tar.gz or zip archive | `eggup-archive` |
+| Manage a system service | `eggup-service` |
 | Read an Eggpack ReleaseManifest v1 | `eggup-eggpack` |
 
-## The crates
+## Crate roles and boundaries
 
-### `eggup-core` — the local transaction engine
+| Crate | Role and boundary |
+|---|---|
+| [`eggup-core`](https://docs.rs/eggup-core) | Local staging, SHA-256 integrity checks, candidate validation, ownership checks, replacement, rollback, and receipts. No transport or service-manager policy. |
+| [`eggup-acquisition`](https://docs.rs/eggup-acquisition) | Transport-neutral acquisition interface, fetch limits, fixtures, and composition. It does not perform HTTP requests and has no dependencies. |
+| [`eggup-eggfetch`](https://docs.rs/eggup-eggfetch) | Native HTTP adapter with Rustls. Use with `eggup-acquisition`; it does not select releases or install destinations. |
+| [`eggup-curl`](https://docs.rs/eggup-curl) | Adapter that runs an explicitly configured `curl` executable. It has no embedded HTTP or TLS stack, and requires trusting and providing that executable. |
+| [`eggup-archive`](https://docs.rs/eggup-archive) | Bounded, allowlisted local extraction of tar.gz and zip files. It does not provide transport, authenticity checks, or live-installation policy. |
+| [`eggup-service`](https://docs.rs/eggup-service) | Service registration and lifecycle adapters for systemd, launchd, cron, and Windows SCM. It does not elevate privileges automatically. |
+| [`eggup-eggpack`](https://docs.rs/eggup-eggpack) | Optional adapter from Eggpack ReleaseManifest v1 to acquisition and deployment inputs. Release selection, destination choice, ownership, and authenticity remain caller policy. |
+| `eggup-transport-footprint` | Workspace-only fixtures for measuring transport dependencies. It is not published and cannot be used as a crates.io dependency. |
 
-The only crate most consumers need. Owns staging, SHA-256 verification, bounded
-candidate validation, destination-ownership revalidation, locking, replacement,
-rollback, and receipts.
+The HTTP adapters are alternatives. Depend on `eggup-acquisition` and choose
+`eggup-eggfetch` for an in-process HTTP stack or `eggup-curl` to use a host
+`curl` binary. Composition is provided by the acquisition crate, not by either
+adapter.
 
-- **Dependencies:** `sha2`, plus `self-replace` on Windows only (deferred deletion
-  of a replaced running image; the Unix and macOS graphs stay `sha2`-only).
-- **Status:** published at `0.2.0`.
-- **Boundary:** transport, service managers, and Eggpack types stay out. If you
-  need those, take a separate crate.
+`eggup-eggpack` pins its Eggup dependencies exactly. A later fix to one of those
+crates will not reach an existing `eggup-eggpack` release until the adapter is
+republished. See [versions and upgrades](releases.md).
 
-Start with [quickstart.md](quickstart.md).
-
-### `eggup-acquisition` — the transport-neutral seam
-
-Defines `AcquisitionTransport` plus the bounds, cancellation, and redaction
-rules every adapter honours. Includes `FixtureTransport` (deterministic, for
-tests) and `ComposedTransport` (try several transports in order).
-
-- **Dependencies:** **none** — not even `sha2`. This is what lets both adapters
-  and the footprint fixtures depend on it without dragging in an HTTP stack.
-- **Status:** published at `0.2.0` — a source-breaking release.
-  `AcquisitionError::Io(String)` became `Io { operation, source }`, and the enum
-  no longer derives `Clone`, `PartialEq`, or `Eq`. See
-  [releases.md](releases.md) for the migration.
-- **You need an adapter too.** The seam defines the trait; it does not speak
-  HTTP.
-
-### `eggup-eggfetch` — native HTTP adapter
-
-An in-process HTTP/1 + Rustls stack, with no external binary and no ambient
-system trust beyond the platform root store.
-
-- **Dependencies:** `eggup-acquisition`, `eggfetch-core`, `tokio`,
-  `futures-util`.
-- **Status:** published at `0.2.0`.
-- **Trade-off:** the largest dependency footprint in the workspace — roughly 89
-  transitive crates exist to provide TLS and async.
-
-### `eggup-curl` — external-curl adapter
-
-Shells out to a `curl` binary you name explicitly.
-
-- **Dependencies:** `eggup-acquisition` only. No embedded HTTP or TLS stack.
-- **Status:** published at `0.2.0`. Its first publication was `0.1.2`; `0.1.3`
-  was never published, because the seam's source break moved the whole
-  version-lockstep workspace to `0.2.0`.
-- **Trade-off:** a much smaller link footprint, at the cost of requiring `curl`
-  on the host and trusting that binary.
-
-### `eggup-archive` — bounded local extraction
-
-Extracts explicitly declared, regular files from an **already verified**
-tar.gz or zip, into a private staging directory with finite decompression
-budgets and no-clobber writes. Never mutates a live installation.
-
-- **Dependencies:** `flate2`, `fs_at`, `sha2`, `tar`, `zip`.
-- **Status:** published at `0.2.0`.
-- **Boundary:** you still own the trust decision. This crate will not tell you
-  an archive is *authentic*, only that it extracted as declared.
-
-### `eggup-service` — manager-neutral lifecycle
-
-Service registration and lifecycle across systemd, launchd, cron, and the
-Windows SCM, with allowlisted command paths, cleared environments, and
-bounded output. No shell, no `sc.exe`, no ambient `PATH`, no automatic
-elevation.
-
-- **Dependencies:** `eggup-core`, `windows-args` (plus `windows-service` on
-  Windows only).
-- **Status:** published at `0.2.0`. The `0.2.0` line is one lockstep train
-  published from a single source commit; the `0.1.3` release it supersedes is
-  still on crates.io. `0.2.0` is also the first publication that carries the
-  stdin-verdict fix the published `0.1.3` lacks. Read
-  [`crates/eggup-service/CHANGELOG.md`](../crates/eggup-service/CHANGELOG.md)
-  for what is and is not on the registry.
-
-### `eggup-eggpack` — optional ReleaseManifest adapter
-
-Translates an Eggpack ReleaseManifest v1 into caller-bound acquisition requests
-and deployment members. Optional: the core, acquisition, and service crates have
-no Eggpack knowledge.
-
-- **Dependencies:** `eggup-core`, `eggup-archive`, `eggup-acquisition`, plus
-  `eggpack-manifest` from the registry.
-- **Status:** published at `0.2.0`.
-- **Boundary:** archive manifests stop at "extraction required". Release
-  discovery, install roots, ownership, permissions, and authenticity policy stay
-  yours.
-
-### `eggup-transport-footprint` — measurement fixtures
-
-Not a dependency of anything. It measures which transport stack a consumer
-actually links, via three `required-features` binaries (`curl_only`,
-`eggfetch_only`, `dual`).
-
-- **Status:** `publish = false` by design. You cannot depend on it from
-  crates.io; use it from a path dependency in this workspace only.
-
-## Two rules that are easy to break
-
-**The adapters must not know about each other.** `eggup-eggfetch` and
-`eggup-curl` both implement `AcquisitionTransport` and neither may reference the
-other. Composition belongs in the seam. Nothing enforces this automatically —
-`cargo tree --workspace` in review is the check.
-
-**`eggup-eggpack` pins its dependencies exactly** (`=0.2.0`, per
-`crates/eggup-eggpack/Cargo.toml`). Every other crate uses a caret requirement.
-So a fix published to a caret consumer is inherited automatically, while
-`eggup-eggpack 0.2.0` — which is published — carries its own exact pins and
-needs a separate adapter republication to inherit a later seam fix. See
-[releases.md](releases.md).
-
-## More
-
-- [quickstart.md](quickstart.md) — a working first transaction.
-- [`architecture/overview.md`](../architecture/overview.md) — the full
-  dependency graph and module map.
-- [`architecture/tooling-governance.md`](../architecture/tooling-governance.md) —
-  the boundary rules and how they are reviewed.
+For a first local transaction, start with the [quickstart](quickstart.md).

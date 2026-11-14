@@ -3300,14 +3300,7 @@ pub fn cron_remove(
                     out.push('\n');
                 }
             }
-            // Removing the only block from a file that was exactly the block
-            // yields an empty crontab (valid: `crontab -r` equivalent via
-            // `crontab -` with empty input is avoided; caller handles empty
-            // as `crontab -r`? To keep one code path, return empty string and
-            // let the adapter decide between `crontab -` and `crontab -r`.
-            // Here we return the empty string; the adapter writes it via
-            // `crontab -` only when changed (empty write clears the crontab
-            // on most implementations; documented).
+            // The adapter writes empty content via `crontab -` to remove the only managed block.
             Ok((out, true))
         }
         CronOwnership::Foreign => Err(ServiceError::denied(
@@ -5255,17 +5248,6 @@ mod unix_tests {
 
     #[test]
     fn cron_command_adapter_skips_redundant_write() {
-        let fake = FakeExecutor::new();
-        // inspect list
-        fake.expect(&["crontab", "-l"], out(0, ""));
-        // install: list, then write (list #2 for merge, list #3 for race check).
-        // Our install does list → merge → list (race check) → write.
-        // Script: list(empty) [cron_ownership? no, install lists once for merge
-        // input, once for race check]. Actually install calls list twice total
-        // (once for merge input via `current`, once for `fresh`). Plus inspect
-        // in the test calls list once more. Total: inspect(1) + install(2).
-        let _ = fake;
-        // Simpler: test pure idempotency (no executor) plus adapter no-op path.
         let fake = FakeExecutor::new();
         let installed = format!("# BEGIN {MARKER}\n{DESIRED}\n# END {MARKER}\n");
         // inspect

@@ -1961,10 +1961,6 @@ mod tests {
         let spec = service_spec(&install_root);
         let mut manager = TestDoubleManager::new();
         manager.put(spec.clone(), crate::LifecycleState::Running);
-        // Break restoration by making start fail: use a manager wrapper that
-        // fails the post-commit start. Simplest: use EnsureRunning with a
-        // stopped baseline? Instead, use a failing check with RollBack disabled
-        // (KeepInstalled) and assert Committed + post_commit_failure.
         struct FailCheck;
         impl std::fmt::Debug for FailCheck {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -2008,13 +2004,7 @@ mod tests {
     }
 
     #[test]
-    fn recovery_required_suppresses_automatic_starts() {
-        // RecoveryRequired arises from Core when artifact state is uncertain.
-        // Directly assert the restoration mapping used by orchestration: with a
-        // failing check under RollBack that still cannot produce a receipt?
-        // Instead, verify the planner never fabricates starts for Stopped and
-        // that a RollBack check failure quiesces before rollback (covered by
-        // M005 machinery). Here assert Stopped + EnsureStopped stays stopped.
+    fn ensure_stopped_preserves_stopped_service_state() {
         let (_guard, install_root, validated) = setup();
         let spec = service_spec(&install_root);
         let mut manager = TestDoubleManager::new();
