@@ -2,7 +2,7 @@
 
 ## Status
 
-**Conditionally closed — 2026-11-17.** The dependency refresh, code compatibility work, documentation, advisory check, package checks, local macOS gate, and local Rust 1.89 check are complete. Hosted Linux and Windows qualification was not run, and no commit or push was authorized. This record does not claim cross-platform closure or publication.
+**Closed — 2026-11-17; hosted-qualified.** The dependency refresh, code compatibility work, documentation, advisory check, package checks, local macOS gate, and local Rust 1.89 check are complete. Hosted CI run [44022660351](https://github.com/eggstack/eggup/actions/runs/44022660351) passed all five lanes: Stable, MSRV, macOS, Windows, and Linux systemd. M007 was committed and pushed to `origin/main` as `fe763189e4cfe1e0e6d6c62d431717d82b69f9f5` after the user authorized the push to trigger qualification. No crate publication, tag, or release was made.
 
 The workspace remains at package version `0.2.0`. All dependency changes here are local and unpublished. The already-published `eggup-archive 0.2.0` still resolves its original `zip 6.0.0` dependency; consumers receive none of this work until a separate, manually authorized publication milestone.
 
@@ -18,15 +18,21 @@ The workspace remains at package version `0.2.0`. All dependency changes here ar
 | Item | Value |
 |---|---|
 | Branch | `main` |
-| Baseline / HEAD at review | `c789bef156aa09baaf9b349744dac12de2534a0a` |
-| Relationship | HEAD remains exactly at the plan baseline; all M007 work is in the uncommitted worktree |
-| Working tree | Intentionally dirty; no commit, push, tag, release, or publication was made |
+| Plan baseline | `c789bef156aa09baaf9b349744dac12de2534a0a` |
+| M007 implementation commit | `fe763189e4cfe1e0e6d6c62d431717d82b69f9f5` (`deps: refresh workspace security dependencies (M007)`) |
+| Hosted qualification | Run `44022660351`, exact head SHA above; all five jobs succeeded |
+| Relationship | The implementation commit is one commit after the plan baseline and was pushed to `origin/main` after explicit user authorization |
+| Working tree | Clean after the post-qualification documentation reconciliation was committed and pushed; no tag, release, or package publication was made |
 | Host | macOS 26.6.2, Apple Silicon |
 | Rust floor | Rust `1.89.0` checked locally |
 
 ## Implementation commits / PRs
 
-None. The caller authorized local implementation and verification only; changes remain uncommitted.
+| Commit | Subject | Role |
+|---|---|---|
+| `fe763189e4cfe1e0e6d6c62d431717d82b69f9f5` | `deps: refresh workspace security dependencies (M007)` | M007 implementation and plan/registry/closure updates; pushed to `origin/main` after explicit user authorization to trigger hosted qualification |
+
+No pull request was used. No tag, release, or crate publication was made.
 
 ## Executive finding
 
@@ -34,7 +40,7 @@ M007 updates the workspace lock and the direct requirements that prevented the i
 
 The ZIP 6-to-9 API change required one test-helper type migration to `zip::write::SimpleFileOptions`. Eggup's production extraction algorithm remains explicit, allowlisted, bounded, regular-file-only, and does not call ZIP convenience extraction methods. The Eggpack adapter tests pass against manifest 0.1.1. No Eggup public API, workspace package version, dependency boundary, or Rust 1.89 floor changed.
 
-The local macOS gate, the explicit Rust 1.89 workspace check, and both package checks pass. Linux tests and hosted CI lanes were not run. A Windows-target check was attempted but could not compile `ring` because this macOS host lacks the Windows MSVC C toolchain/headers (`assert.h`); this is an environment limitation, not Windows qualification. The milestone is therefore conditionally closed.
+The local macOS gate, the explicit Rust 1.89 workspace check, and both package checks passed. Hosted CI run `44022660351` then passed all five lanes, including the native Windows suite and Linux systemd qualification. A separate Windows-target check attempted from macOS could not compile `ring` because this host lacks the MSVC C toolchain/headers (`assert.h`); that local cross-check limitation is superseded by the successful hosted Windows run. The milestone is closed.
 
 ## Requirement → evidence matrix
 
@@ -49,9 +55,9 @@ The local macOS gate, the explicit Rust 1.89 workspace check, and both package c
 | 7 | Retain Rust 1.89 floor | `cargo +1.89.0 check --workspace --all-targets --locked` on macOS | Passed |
 | 8 | Package the changed crates | `cargo package -p eggup-archive --locked --allow-dirty`; `cargo package -p eggup-eggpack --locked --allow-dirty` | Both passed |
 | 9 | Run the full local gate | `./scripts/check-local.sh` on macOS: format, Clippy, workspace tests, docs, tree review, and docs-truth | Passed on rerun; one pre-existing ignored test in `eggup-curl` |
-| 10 | Preserve the platform qualification record | Local macOS evidence above; hosted Linux and Windows runs were not available/authorized | Conditional; not run |
+| 10 | Preserve the platform qualification record | Hosted run `44022660351` on exact M007 commit `fe763189e4cfe1e0e6d6c62d431717d82b69f9f5`; Stable, MSRV, macOS, Windows, and Linux systemd jobs all succeeded | Passed; all five hosted lanes green |
 | 11 | Record current dependency facts and unpublished state | `AGENTS.md`, `architecture/{overview,tooling-governance,eggpack-adapter}.md`, Eggpack README, both crate changelogs, root changelog, this closure, roadmap, and registry | Updated; publication explicitly not authorized |
-| 12 | Keep the work uncommitted and unpublished | HEAD unchanged at baseline; no git publication action taken | Passed |
+| 12 | Keep the work unpublished | M007 commit `fe763189e4cfe1e0e6d6c62d431717d82b69f9f5` pushed to `origin/main`; package versions remain `0.2.0`; no package publication, tag, or release | Passed |
 
 ## Production implementation evidence
 
@@ -83,6 +89,8 @@ The local macOS gate, the explicit Rust 1.89 workspace check, and both package c
 | `./scripts/check-local.sh` | Passed on macOS after clarifying unpublished/published state in root changelog bullets; fmt, Clippy, tests, docs, dependency tree, and docs-truth all passed |
 | `cargo +1.89.0 check --workspace --all-targets --locked` | Passed on macOS |
 | `cargo +1.89.0 check --workspace --all-targets --target x86_64-pc-windows-msvc --locked` | Could not run to completion: `ring`'s C build failed because `assert.h` was unavailable; Windows MSVC compiler/SDK is absent on this host |
+| `gh run watch 44022660351 --exit-status` | Passed; exit status 0 after all hosted jobs completed |
+| `gh run view 44022660351 --json headSha,status,conclusion,url,jobs` | Passed; exact head `fe763189e4cfe1e0e6d6c62d431717d82b69f9f5`, overall `success`, 5/5 jobs `success` |
 | `git diff --check` | Passed after all documentation and status edits |
 
 The first Eggpack test run exposed the ZIP options lifetime change and failed to compile; after migrating the helper type, the complete Eggpack target passed. The first package attempts refused a dirty tree; the documented reruns used Cargo's explicit `--allow-dirty`. The first full local gate flagged missing per-bullet published-state markers in the newly added root changelog; after correcting those statements, the complete gate passed.
@@ -94,11 +102,14 @@ An unqualified `cargo tree -i webpki-roots` selector was ambiguous because the g
 | Platform/lane | Result |
 |---|---|
 | macOS local | `./scripts/check-local.sh`, archive/Eggpack focused tests, package checks, and Rust 1.89 check passed |
-| Linux | Not run |
-| Windows hosted test lane | Not run; no commit/push was authorized to trigger hosted CI |
+| Linux workspace suite (Stable) | Passed in hosted Stable checks, run `44022660351` |
+| Linux systemd | Passed in hosted qualification, run `44022660351` |
+| Windows native | Passed in hosted Windows lane, run `44022660351`; archive/acquisition/curl and Eggpack tests plus workspace tests and service package check passed |
+| MSRV | Hosted Rust `1.89.0` check passed, run `44022660351` |
+| macOS hosted | Workspace tests and package check passed, run `44022660351` |
 | Windows target graph | Reviewed successfully with `cargo tree --target x86_64-pc-windows-msvc --depth 1` |
-| Windows-target Rust check from macOS | Attempted; blocked in `ring` C compilation by missing MSVC toolchain headers; not platform test evidence |
-| Hosted stable / MSRV / macOS / Windows / Linux systemd | Not run |
+| Windows-target Rust check from macOS | Local cross-check attempt was blocked in `ring` C compilation by missing MSVC headers; native hosted Windows qualification passed |
+| Overall hosted CI | Run `44022660351` completed successfully; all 5/5 jobs green |
 
 ## Invariant, failure, and recovery review
 
@@ -119,19 +130,19 @@ No public Eggup API or runtime behavior changed. Existing archive security fixtu
 
 At baseline, the audit recorded ten RustSec records involving the old Rustls graph and ZIP 6.0.0. After refreshing the graph, `cargo deny check advisories` reported no unresolved advisories. No advisory was suppressed and no cargo-deny policy was added. SHA-256 remains integrity evidence only.
 
-No unresolved code or dependency finding was identified in the checked workspace graph. The remaining qualification condition is that hosted Linux and Windows execution was not run. The Windows-target check attempt is an environment-limited compile attempt only. This condition warrants **conditionally closed**, not fully closed.
+No unresolved code or dependency finding was identified in the checked workspace graph. Hosted qualification is complete: run `44022660351` passed Stable, MSRV, macOS, Windows, and Linux systemd jobs. The Windows-target check attempt from macOS was environment-limited, but native hosted Windows tests passed. No remaining qualification condition blocks closure.
 
 ## Documentation, roadmap, and registry disposition
 
 - Current pin/version facts updated in `AGENTS.md`, `architecture/overview.md`, `architecture/tooling-governance.md`, `architecture/eggpack-adapter.md`, and `crates/eggup-eggpack/README.md`.
 - Unreleased dependency notes added to `crates/eggup-archive/CHANGELOG.md`, `crates/eggup-eggpack/CHANGELOG.md`, and the root `CHANGELOG.md`; all state that the work is unpublished and does not authorize publication or migration. Historical release and plan evidence was left unchanged.
-- This closure is the evidence for `plans/subsystems/archive-extraction-roadmap.md` M007 and the `plans/registry.md` active-control row.
+- This closure is the evidence for `plans/subsystems/archive-extraction-roadmap.md` M007 and the closed M007 control row in `plans/registry.md`.
 - No consumer-facing `docs/` policy was added because public behavior did not change.
 
 ## Roadmap disposition
 
-Record M007 as **conditionally closed** in the archive roadmap. The hosted Linux and Windows qualification remains explicitly `not run`; a later authorized CI run may discharge that condition. No publication, release, commit, or push is part of this milestone.
+Record M007 as **closed; hosted-qualified** in the archive roadmap. Hosted run `44022660351` passed all five CI lanes on commit `fe763189e4cfe1e0e6d6c62d431717d82b69f9f5`. No package publication or release is part of this milestone.
 
 ## Registry update
 
-Update the archive extraction control row in `plans/registry.md` to M007 conditionally closed, identify the affected archive/TLS/Eggpack dependency surfaces, record local advisory/MSRV/package checks as passed, and retain hosted Linux/Windows as not run. Preserve the no-publication and uncommitted state.
+The archive extraction control row in `plans/registry.md` records M007 closed and hosted-qualified in run `44022660351`, the affected archive/TLS/Eggpack dependency surfaces, passing local advisory/MSRV/package checks, and no package publication.

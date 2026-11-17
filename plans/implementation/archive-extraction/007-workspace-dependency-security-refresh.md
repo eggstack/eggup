@@ -67,7 +67,7 @@ The ZIP findings concern general-purpose extraction helpers. Eggup's archive imp
 ### Explicitly out of scope
 
 - Publishing any crate, changing workspace or crate package versions, moving tags, or creating a GitHub release.
-- Committing or pushing changes.
+- Committing or pushing changes without separate explicit user authorization. The user later authorized the M007 commit/push on 2026-11-17 to trigger hosted qualification; see §16.
 - Changing public APIs, extraction policy, TLS features, fallback behavior, or dependency boundaries.
 - Upgrading `sha2` across its 0.10-to-0.11 major boundary or `eggfetch-core` across 0.2-to-0.3 without a separate compatibility rationale.
 - Adding a new cargo-deny policy file, CI job, dependency bot, or release automation.
@@ -89,11 +89,11 @@ The ZIP findings concern general-purpose extraction helpers. Eggup's archive imp
 3. Update the two manifests, migrate any necessary source/test callsites, and resolve `Cargo.lock` with Cargo.
 4. Review `cargo tree` for all workspace and platform-gated edges. Confirm the lockfile has no obsolete vulnerable versions and no forbidden dependency edge.
 5. Run advisory, package, local, MSRV, macOS, and Windows verification; investigate any failure without weakening the contracts.
-6. Update current documentation and `Unreleased` changelog entries, then write the closure record and reconcile the archive roadmap and registry. Do not publish, commit, or push.
+6. Update current documentation and `Unreleased` changelog entries, then write the closure record and reconcile the archive roadmap and registry. Do not publish; commit/push only under separate explicit user authorization (received 2026-11-17 for the M007 qualification run).
 
 ## 8. Failure, cancellation, restart, and contention semantics
 
-This milestone changes build-time dependency resolution and contains no live-installation mutation, service operation, external updater process, or network transport action at runtime. Cargo resolution or compilation failure is a failed work package, not a reason to relax a version requirement or suppress a RustSec record. If the ZIP API migration, Eggpack 0.1.1 API, or any candidate dependency violates the current behavior or Rust 1.89 floor, stop and report the blocker before selecting another version. Revert only files changed by this milestone if abandoning it; do not discard unrelated user changes. No package publication or Git operation is part of this plan.
+This milestone changes build-time dependency resolution and contains no live-installation mutation, service operation, external updater process, or network transport action at runtime. Cargo resolution or compilation failure is a failed work package, not a reason to relax a version requirement or suppress a RustSec record. If the ZIP API migration, Eggpack 0.1.1 API, or any candidate dependency violates the current behavior or Rust 1.89 floor, stop and report the blocker before selecting another version. Revert only files changed by this milestone if abandoning it; do not discard unrelated user changes. Package publication is not part of this plan. Git operations were initially out of scope; see §16 for the later, narrowly scoped authorization to commit and push M007 to trigger hosted qualification.
 
 ## 9. Compatibility and migration
 
@@ -150,7 +150,7 @@ The first command is the stable/macOS workspace test. The next three are Windows
 - The workspace dependency boundaries and target-gated graph remain correct.
 - ZIP and Eggpack package/test checks pass without public API or behavior changes.
 - The local gate and Rust 1.89 check pass. Hosted results are reported separately; missing lanes are `not run`, not inferred.
-- Current documentation and changelogs agree with the manifests. No package version, publication, tag, commit, or push is changed by this milestone.
+- Current documentation and changelogs agree with the manifests. No package version, publication, or tag is changed. The user's later authorization for the M007 commit/push is recorded in §16.
 
 ## 14. Stop conditions
 
@@ -162,4 +162,4 @@ The closure record must include the exact reviewed baseline, all changed depende
 
 ## 16. Handoff notes
 
-The implementation starts from clean `main` at `c789bef156aa09baaf9b349744dac12de2534a0a`. The caller authorized plan creation and local dependency changes only. Leave the result uncommitted and unpublished. A later release task must check current registry state, bump package versions, reconcile Eggpack's exact in-workspace pins, qualify registry-only package graphs, and obtain separate manual publication authorization.
+The implementation started from clean `main` at `c789bef156aa09baaf9b349744dac12de2534a0a`. At plan creation, the caller authorized only plan creation and local dependency changes, so the implementation was initially left uncommitted and unpublished. **Post-plan authorization (2026-11-17):** the caller separately authorized committing and pushing M007 to trigger hosted qualification. Commit `fe763189e4cfe1e0e6d6c62d431717d82b69f9f5` was pushed to `origin/main`; hosted CI run [44022660351](https://github.com/eggstack/eggup/actions/runs/44022660351) passed all five lanes. No package publication was authorized. A later release task must check current registry state, bump package versions, reconcile Eggpack's exact in-workspace pins, qualify registry-only package graphs, and obtain separate manual publication authorization.
