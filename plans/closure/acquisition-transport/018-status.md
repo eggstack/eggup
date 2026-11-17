@@ -23,6 +23,7 @@ spawn/resource failures remain outside scope.
 | Implementation commit | `10e0bd719de95d52e297eb768a468adcbda0a6aa` (`test(curl): use native fake-curl helper`) |
 | Hosted run head SHA | `10e0bd719de95d52e297eb768a468adcbda0a6aa` |
 | Hosted run | [44155438351](https://github.com/eggstack/eggup/actions/runs/44155438351), completed 2026-11-17; overall conclusion `success` |
+| Closure record introduced by | `84d22d4484b04bd76bdc48cf337c2b2dbbea3446` (`plans(acquisition): close M018 native fake-curl fix`) |
 
 ## Implementation commits
 
