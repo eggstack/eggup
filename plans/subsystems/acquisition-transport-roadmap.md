@@ -1,6 +1,6 @@
 # Acquisition Transport Roadmap
 
-Status: M001-M009 closed; M010 eggup-acquisition 0.1.3 published/closed 2026-10-06 (from `bb8fe41`, run `37525705132`); M011 eggup-eggfetch 0.1.3 published/closed 2026-10-06 (from `bd43683`, run `37527706900`); M012 sub-second deadline test-determinism corrective conditionally closed (hosted run `40008039843`); M013 adapter assertion and failure typing corrective closed (hosted run `40008039843`); M014 adapter capability parity corrective closed 2026-10-23 (hosted run `40062299630`); M015 spawn-failure diagnosability corrective closed (hosted run `40008039843`); M016 adapter publication-coupling corrective closed; M017 published `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` 0.2.0 on 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M018 native fake-curl test helper active
+Status: M001-M009 closed; M010 eggup-acquisition 0.1.3 published/closed 2026-10-06 (from `bb8fe41`, run `37525705132`); M011 eggup-eggfetch 0.1.3 published/closed 2026-10-06 (from `bd43683`, run `37527706900`); M012 sub-second deadline test-determinism corrective conditionally closed (hosted run `40008039843`); M013 adapter assertion and failure typing corrective closed (hosted run `40008039843`); M014 adapter capability parity corrective closed 2026-10-23 (hosted run `40062299630`); M015 spawn-failure diagnosability corrective closed (hosted run `40008039843`); M016 adapter publication-coupling corrective closed; M017 published `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` 0.2.0 on 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M018 native fake-curl test helper closed; hosted-qualified in run `44155438351`
 
 Long-term references:
 
@@ -295,16 +295,19 @@ Class: polish / test-qualification corrective.
 
 Plan: `plans/implementation/acquisition-transport/018-native-fake-curl-test-helper.md`.
 
-Status: active; hosted qualification pending.
+Status: closed; hosted-qualified in run `44155438351`; see `plans/closure/acquisition-transport/018-status.md`.
 
 Two attempts of hosted run `44024401775` failed Stable in different curl tests
 with `ExecutableFileBusy (os error 26)` while spawning the temporary
-`#!/bin/sh` fake-curl fixture. M018 replaces that shell-backed test double with
+`#!/bin/sh` fake-curl fixture. M018 replaced that shell-backed test double with
 a native helper, preserving argv/environment/body/status assertions without
 changing production spawn behavior, adding retries, or adding dependencies.
-Registry finding 1 remains open because this only removes the interpreter
-exposure from the curl fake-child tests; the separate Core fixture and general
-host-level spawn/resource failures remain outside scope.
+The focused curl suite, `./scripts/check-local.sh`, and the Rust 1.89 workspace
+check passed locally. Hosted run `44155438351` is green on all five lanes —
+Stable, MSRV, macOS, Windows, and Linux systemd. Registry finding 1 remains open:
+this removes the interpreter exposure from the curl fake-child tests, but the
+separate Core fixture and general host-level spawn/resource failures remain
+outside scope.
 
 ## 8. Cross-cutting requirements
 
@@ -343,4 +346,4 @@ The subsystem's mechanism path is complete through M008 when current-head hosted
 | M015 | closed; hosted-qualified (run `40008039843`) | `plans/implementation/acquisition-transport/015-spawn-failure-diagnosability-corrective.md` | `plans/closure/acquisition-transport/015-status.md` | The `Unavailable` detail now names the `ErrorKind` and the raw OS code (`curl spawn failed for {redacted}: {kind}[ (os error {code})]`), so a spawn failure is attributable instead of cause-free; the variant stays `Unavailable`, so the `ComposedTransport` fallback contract is unchanged. Narrows registry open finding 1 rather than closing it. Hosted-qualified in run `40008039843` (commit `0cb2c53`): all five lanes green — Stable, MSRV, macOS, Windows, Linux systemd. The Windows lane runs a larger set (598 tests in 63 test binaries) than Linux/macOS (483 in 44); that is a platform-set difference, not a coverage gap. Unpublished; `eggup-curl` stays published at `0.1.2` **Published since:** the `0.2.0` train carries this fix — published 2026-10-24 from `b612608`; the published `0.1.x` line still carries the pre-fix state, and registry versions are immutable. |
 | M016 | conditionally closed 2026-10-24 | `plans/implementation/acquisition-transport/016-adapter-publication-coupling-corrective.md` | `plans/closure/acquisition-transport/016-status.md` | Records the seam's `0.2.0` publication coupling and corrects the false "non-breaking `0.1.3`" consequence in the adapters' changelogs. The seam's next release is source-breaking, so both adapters must widen `eggup-acquisition` to `0.2`, `eggup-eggpack` must re-pin to `=0.2.0`, and `eggup-transport-footprint` must widen to `0.2`; the workspace is version-lockstep, so the adapters' next versions are `0.2.0`, not `0.1.3`, and a consumer of the seam inherits the source break. A guard reads the declared next release and every dependent's requirement and fails when a dependent neither accepts it nor records the widening. No manifest, version, or publication; the adapters still cannot be packaged, and the publication milestone owns that |
 | M017 | closed; hosted-qualified (run `40079833945`) | `plans/implementation/acquisition-transport/017-eggup-acquisition-0.2.0-publication.md` | `plans/closure/acquisition-transport/017-status.md` | Published `eggup-acquisition 0.2.0` (`2ef74b4d…299fc3`), `eggup-curl 0.2.0` (`15cf536f…90d3f7`), and `eggup-eggfetch 0.2.0` (`9fc8f648…658721`) from `b612608`, the publication source commit, with `v0.2.0` and release `0.2.0` created. Three registry-only fixtures resolve all three crates from crates.io with no path, git, or patch source; the eggfetch fixture depends only on `eggup-eggfetch` and proves the seam resolves transitively at `0.2.0`, which closes registry finding 17. The seam's `0.2.0` is source-breaking: `AcquisitionError::Io(String)` became `Io { operation, source }` and the enum derives `Debug` only
-| M018 | active; hosted qualification pending | `plans/implementation/acquisition-transport/018-native-fake-curl-test-helper.md` | `plans/closure/acquisition-transport/018-status.md` | Replaces the shell-backed fake-curl child after two Stable attempts in hosted run `44024401775` failed with `ExecutableFileBusy (os error 26)` in different curl tests. The native helper is locally green in the focused suite; full local and hosted qualification pending. Test-only; registry finding 1 remains open pending evidence; no production change, dependency, API, version, or release change | |
+| M018 | closed; hosted-qualified (run `44155438351`) | `plans/implementation/acquisition-transport/018-native-fake-curl-test-helper.md` | `plans/closure/acquisition-transport/018-status.md` | Replaces the shell-backed fake-curl child after two Stable attempts in hosted run `44024401775` failed with `ExecutableFileBusy (os error 26)` in different curl tests. Focused suite, local workspace gate, Rust 1.89 check, and all five hosted lanes pass. Test-only; registry finding 1 remains open because the separate Core fixture and general host-level spawn/resource failures remain outside scope; no production change, dependency, API, version, or release change | |

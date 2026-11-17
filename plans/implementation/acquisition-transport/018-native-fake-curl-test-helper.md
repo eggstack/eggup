@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 018 — native fake-curl test helper
 
-Status: active
+Status: closed; hosted-qualified in run `44155438351`; see `plans/closure/acquisition-transport/018-status.md`
 
 Repository baseline: `63e06b0d0f90cef4477b319dc769c22578e7f8ad`
 
