@@ -1,6 +1,6 @@
 # curl Adapter Deep Dive (`crates/eggup-curl`)
 
-> Source: `crates/eggup-curl/src/lib.rs` (2532 lines, single file, 34 `#[test]`
+> Source: `crates/eggup-curl/src/lib.rs` (2630 lines, single file, 35 `#[test]`
 > functions), `examples/curl_fetch.rs`, `README.md`, `CHANGELOG.md`, `Cargo.toml`.
 > Dependency position: `eggup-curl -> eggup-acquisition` **only** — no HTTP client,
 > no TLS stack, no `tokio`, no `eggup-core`
@@ -228,7 +228,7 @@ two are equal, an elapsed-time test against the connect ceiling would hold for
 *every* curl exit 28, so the classifier reports the weaker, always-true `"total"`
 phase instead of mislabelling a total timeout as a connect timeout
 (`lib.rs:930-942`, test `exit_28_is_labelled_total_when_connect_and_total_
-ceilings_coincide` at `lib.rs:1001`). See `CHANGELOG.md` "Fixed: a mislabelled
+ceilings_coincide` at `lib.rs:1012`). See `CHANGELOG.md` "Fixed: a mislabelled
 timeout phase".
 
 Serialization for the two flags is `duration_decimal_seconds` (`lib.rs:589-613`):
@@ -239,8 +239,8 @@ decrease the value, so curl never receives a longer deadline than the caller
 asked for. Zero and sub-microsecond positive durations are rejected with
 `InvalidInput` rather than silently rounded up to a second — the deliberate
 M008 behavior, pinned by `duration_decimal_seconds_serializes_sub_second_inputs_
-truthfully` (`lib.rs:1665`) and `build_curl_args_passes_decimal_deadlines_never_
-above_ceiling` (`lib.rs:1757`).
+truthfully` (`lib.rs:1772`) and `build_curl_args_passes_decimal_deadlines_never_
+above_ceiling` (`lib.rs:1864`).
 
 ### 4.4 `CurlProxy` and environment handling
 
@@ -582,7 +582,7 @@ never promoted under a status that belongs to a different request. A non-zero
 exit is treated as "the transfer did not complete" **even when curl still
 printed an HTTP code** — the partial body is removed and never promoted
 (`lib.rs:950-958`), which is what `truncated_transfer_is_hard_failure_without_
-promotion` (`lib.rs:1465`) pins.
+promotion` (`lib.rs:1572`) pins.
 
 ## 9. Control flow, step by step
 
@@ -627,7 +627,7 @@ temp's `0600` Unix mode and can never be world-readable; the temp name is then
 unlinked best-effort after commit, and a failure there cannot retroactively turn
 a committed destination into an error
 (`acquisition/src/lib.rs:566-603`). `artifact_temp_is_owner_private_and_no_
-clobber` (`lib.rs:2120`) asserts both the `0600` mode and that a pre-existing
+clobber` (`lib.rs:2227`) asserts both the `0600` mode and that a pre-existing
 destination keeps its `FOREIGN` contents.
 
 ## 10. Errors and redaction
@@ -660,7 +660,7 @@ URLs at 256 bytes with an ellipsis.
 Deliberately excluded from every message: curl's own stderr (the bounded 64-byte
 capture is read and parsed for the status, then dropped), the command line, the
 argv, proxy environment values, the exact URL, and any body bytes.
-`credential_material_is_redacted` (`lib.rs:2168`) asserts that userinfo, query,
+`credential_material_is_redacted` (`lib.rs:2275`) asserts that userinfo, query,
 and fragment sentinels never appear in the `Display` output of a failing fetch.
 
 One asymmetry to keep in mind when reading logs: the redaction covers Eggup's
@@ -673,21 +673,21 @@ diagnostics, while the child process's command line carries the exact URL
 |---|---|---|
 | Executable path empty | `InvalidInput("curl executable path must not be empty")` | `lib.rs:197-201` |
 | Config invalid (zero/out-of-order timeouts, redirects > 50, protocol list 0 or > 8, non-alphanumeric protocol name) | `InvalidInput` at construction, and again at each fetch | `lib.rs:136-165`, called at `:195`, `:337`, `:408` |
-| Caller-supplied `User-Agent` empty, over `MAX_USER_AGENT_BYTES`, or carrying a C0/C1 control character, `DEL`, or a surrounding space | `InvalidInput` at construction (no transport is built) and again at argv-build time (**no argv is produced**); **never** `Unavailable`, so a composed transport does not fall back | `lib.rs:286-327`, `:677-682`; tests `lib.rs:2284`, `:2327`, `:2448` |
+| Caller-supplied `User-Agent` empty, over `MAX_USER_AGENT_BYTES`, or carrying a C0/C1 control character, `DEL`, or a surrounding space | `InvalidInput` at construction (no transport is built) and again at argv-build time (**no argv is produced**); **never** `Unavailable`, so a composed transport does not fall back | `lib.rs:286-327`, `:677-682`; tests `lib.rs:2391`, `:2434`, `:2555` |
 | Caller limits invalid (zero bound, zero timeout, `connect > total`) | `InvalidInput` before staging, spawn, or any filesystem write | `lib.rs:336`, `:407` |
 | `dest` has no parent / parent missing / parent is a symlink | `InvalidInput` (no parent) or `Io` (unreadable parent) | `lib.rs:412-421` |
 | `dest` already exists | `InvalidInput("artifact destination already exists; refusing to overwrite")`; foreign content preserved | `lib.rs:422-426`; race-safe re-check in `__promote_no_clobber` |
-| Cancel already requested | `Cancelled`, no temp left behind | `lib.rs:338-340`, `:409-411`; test `lib.rs:1991` |
-| Executable missing / not executable / spawn failure | `Unavailable` (never `Transport`, never `Io`), with the detail naming the OS cause — the `ErrorKind` and, when present, the raw OS code; no `dest`; temp cleaned by `Guard` | `lib.rs:775-777`; helper `lib.rs:568`; tests `lib.rs:1263`, `lib.rs:1307` |
-| curl exits non-zero (TLS, DNS, connect, proxy, partial body, signal) | `Transport("curl transfer failed (exit N) …")`; temp removed; never promoted | `lib.rs:949-959`; tests `lib.rs:1450`, `:1465` |
-| curl exit 28 (operation timeout) | `Timeout { phase: "connect" \| "total" }` | `lib.rs:930-942`; tests `lib.rs:1001`, `:1575` |
-| Parent wall deadline reached | kill + reap + join, `Timeout { phase: "total" }` | `lib.rs:840-847`; test `lib.rs:1934` |
+| Cancel already requested | `Cancelled`, no temp left behind | `lib.rs:338-340`, `:409-411`; test `lib.rs:2098` |
+| Executable missing / not executable / spawn failure | `Unavailable` (never `Transport`, never `Io`), with the detail naming the OS cause — the `ErrorKind` and, when present, the raw OS code; no `dest`; temp cleaned by `Guard` | `lib.rs:775-777`; helper `lib.rs:568`; tests `lib.rs:1370`, `lib.rs:1414` |
+| curl exits non-zero (TLS, DNS, connect, proxy, partial body, signal) | `Transport("curl transfer failed (exit N) …")`; temp removed; never promoted | `lib.rs:949-959`; tests `lib.rs:1557`, `lib.rs:1572` |
+| curl exit 28 (operation timeout) | `Timeout { phase: "connect" \| "total" }` | `lib.rs:930-942`; tests `lib.rs:1012`, `lib.rs:1682` |
+| Parent wall deadline reached | kill + reap + join, `Timeout { phase: "total" }` | `lib.rs:840-847`; test `lib.rs:2041` |
 | Response exceeds `max_metadata_bytes` / `max_artifact_bytes` | `TooLarge { limit }` from three independent places (curl `--max-filesize` exit 63, the reader's `overflow` flag, the post-join byte count); `dest` never created | `lib.rs:944-947`, `:794-796`, `:821-827`, `:875-877`, `:385-387`, `:470-476` |
-| Cancel observed mid-transfer | kill + reap + join, `Cancelled`, owned temp removed, `dest` untouched | `lib.rs:829-836`; test `lib.rs:2013` |
+| Cancel observed mid-transfer | kill + reap + join, `Cancelled`, owned temp removed, `dest` untouched | `lib.rs:829-836`; test `lib.rs:2227` |
 | `try_wait` error | kill + reap + join, `Io("waiting for curl: …")` | `lib.rs:850-857` |
 | Owned-file write/flush failure, reader thread panic | `Io`; child already reaped or reaped by the teardown | `lib.rs:861-868`, `:869-881` |
 | Status unparseable with exit 0 | `Transport("curl status capture failed …")` — fail closed, never a guessed `NotFound` | `lib.rs:970-975` |
-| Sub-microsecond positive duration | `InvalidInput` rather than a widened second | `lib.rs:596-601`; test `lib.rs:1665` |
+| Sub-microsecond positive duration | `InvalidInput` rather than a widened second | `lib.rs:596-601`; test `lib.rs:1772` |
 | Reader thread blocked on a full stdout pipe | Resolved by the overflow flag plus parent kill within one `POLL_INTERVAL` | `lib.rs:786`, `:794-796`, `:823-830` |
 
 ### Review checklist
@@ -710,14 +710,17 @@ diagnostics, while the child process's command line carries the exact URL
 
 ## 12. Testing approach
 
-34 `#[test]` functions, all in-crate (`lib.rs:979-2523`). No test reaches a
+35 `#[test]` functions, all in-crate (`lib.rs:979-2607`). No test reaches a
 public network: the two harnesses are a loopback `TcpListener`
-(`serve_once`, `lib.rs:1110-1149`) and a fake `curl` shell script
-(`fake_curl_script`, `lib.rs:1210-1239`) that records its own `"$@"` and `env`
-into files so argv and environment can be asserted directly. A third harness,
-`serve_once_recording_head` (`lib.rs:1172-1198`, M014), records the raw request
-head the client sent, so a header the adapter sets can be asserted **on the
-wire** and not only in the child's argv.
+(`serve_once`, `lib.rs:1121-1157`) and a native fake-curl helper
+(`native_fake_curl_helper` / `fake_curl_executable`, `lib.rs:1230-1284`) that
+records the child's argv and environment into files and emits configured body,
+status, and exit values. The helper is compiled once per test process and hard-
+linked into each fixture directory; it has no shebang interpreter or `xxd`
+dependency. A third harness, `serve_once_recording_head`
+(`lib.rs:1183-1207`, M014), records the raw request head the client sent, so a
+header the adapter sets can be asserted **on the wire** and not only in the
+child's argv.
 
 **A test that cannot construct its fixture fails; it never reports a pass.**
 The nine tests that drive a *real* `curl` obtain their executable through
@@ -730,14 +733,14 @@ a curl executable on `PATH`"). The earlier `let Some(t) = transport() else
 mechanically prevented (see the guard suite below).
 
 The one environment-conditional test is
-`connect_phase_timeout_is_typed_end_to_end` (`lib.rs:1575`): it needs a host
+`connect_phase_timeout_is_typed_end_to_end` (`lib.rs:1682`): it needs a host
 that blackholes the route to `10.255.255.1:81` so the connect ceiling expires
 instead of failing fast with `ENETUNREACH`/`EHOSTUNREACH`. It is explicitly
 marked as ignored **with a recorded reason** and is therefore reported as
 *ignored*, never as *passed*; its coverage is **not** claimed. The connect/total
 **label** it would prove is proven deterministically instead, by
 `classify_curl_result_labels_connect_and_total_without_a_subprocess`
-(`lib.rs:1606`), which injects `start` and needs no subprocess, no network, and
+(`lib.rs:1713`), which injects `start` and needs no subprocess, no network, and
 no sub-second wall-clock budget.
 
 **What makes process-based behavior testable here:**
@@ -745,7 +748,7 @@ no sub-second wall-clock budget.
 | Technique | Enables |
 |---|---|
 | `CurlTransport::with_executable(&script, ...)` against a recording fake | Asserting exact argv (`--noproxy`, `--disable`, `--output -`, no temp pathname) and the child environment, without a network |
-| Fake script emits a chosen body on stdout, chosen code on stderr, chosen exit | Covering exit 28 / 35 / 7 / 0 and status 200/302/404/500 without an HTTP server |
+| Native fake-curl helper emits a chosen body on stdout, chosen code on stderr, and chosen exit | Covering exit 28 / 35 / 7 / 0 and status 200/302/404/500 without an HTTP server or a shell interpreter |
 | `discover_in(Some(path))` takes the `PATH` value as an argument | Testing the miss path without mutating process `PATH` from parallel tests |
 | `classify_curl_result` takes `start: Instant` and the temp path as parameters | Unit-testing exit-28 phase labelling with synthetic elapsed time and no process |
 | `include_str!("../src/lib.rs")` in the integration guard suite | Scanning this crate's own source at compile time, with no filesystem discovery and no network |
@@ -754,40 +757,41 @@ no sub-second wall-clock budget.
 
 | Test | Covers | Line |
 |---|---|---|
-| `exit_28_is_labelled_total_when_connect_and_total_ceilings_coincide` | Coincident-ceiling phase attribution, both directions | 1001 |
-| `diagnostic_bound_never_splits_multibyte_code_points` | UTF-8-safe 512-byte truncation | 1046 |
-| `executable_selection_and_discovery_are_explicit` | Empty path, invalid config, discovery hit/miss typed as `Unavailable` | 1241 |
-| `missing_executable_and_spawn_failure_are_unavailable` | `Unavailable` for both operations, no `dest` | 1263 |
-| `spawn_failure_detail_names_the_os_cause_and_stays_unavailable` | still `Unavailable`; the detail names the `ErrorKind` and the raw OS code; no URL or credential material | 1307 |
-| `metadata_success_not_found_and_server_error` | 200 bytes, 404 `NotFound`, 500 `Transport` | 1379 |
-| `artifact_success_not_found_and_server_error` | 4096 bytes byte-exact, 404 leaves no `dest`, 500 no `dest` | 1403 |
-| `tls_like_process_failure_is_transport_not_unavailable` | Exit 35 is `Transport`, not `is_unavailable()` | 1450 |
-| `truncated_transfer_is_hard_failure_without_promotion` | Headers-then-close with a declared `Content-Length` | 1465 |
-| `metadata_and_artifact_size_overflow` | `TooLarge` on both paths, no promotion | 1492 |
-| `total_phase_timeout_is_typed_end_to_end` | Stalled body -> exactly `Timeout { phase: "total" }` | 1530 |
-| `connect_phase_timeout_is_typed_end_to_end` | Unroutable connect -> exactly `Timeout { phase: "connect" }`; **ignored, environment-conditional, reason recorded** | 1575 |
-| `classify_curl_result_labels_connect_and_total_without_a_subprocess` | The connect/total label at the `classify_curl_result` layer, with `start` injected; no subprocess, no network | 1606 |
-| `duration_decimal_seconds_serializes_sub_second_inputs_truthfully` | Exact decimal output, zero and sub-microsecond rejection | 1665 |
-| `https_request_never_allows_a_cleartext_redirect_target` | `--proto` / `--proto-redir` narrowing incl. `HTTPS://` and http-only config | 1695 |
-| `build_curl_args_passes_decimal_deadlines_never_above_ceiling` | Both deadline flags, sub-microsecond rejection | 1757 |
-| `sub_second_deadlines_serialize_truthfully_without_a_subprocess` | 250 ms/750 ms -> `0.25`/`0.75`; `--max-time` is the *effective* ceiling; sub-microsecond rejection; no subprocess, no network, no wall clock | 1818 |
-| `build_curl_args_passes_sub_second_deadlines_to_fake_curl` | argv carries `--connect-timeout 0.25`; the total budget is decoupled from the enforced ceiling (30 s) so the assertion cannot expire for scheduling reasons | 1908 |
-| `sub_second_total_timeout_kills_child_promptly` | 250 ms total vs 4 s stall; elapsed `>=` the short total timeout and `<` 2 s, dir empty | 1934 |
-| `cancellation_before_spawn_cleans_temp` | Early `Cancelled`, no `.part` leftovers | 1991 |
-| `cancellation_during_body_stream_kills_and_reaps_child` | Cancel during an active 64 KiB transfer | 2013 |
-| `redirect_follow_and_reject` | Follow returns target bytes; `follow_redirects(false)` -> `Transport` | 2044 |
-| `proxy_disabled_uses_noproxy_and_cleared_env` | `--noproxy`, `--disable`, `--output -`, no `HTTP_PROXY` in child env | 2078 |
-| `proxy_custom_env_is_explicit` | No `--noproxy`, exact injected pair in child env | 2098 |
-| `artifact_temp_is_owner_private_and_no_clobber` | Promoted mode `0600`; foreign `dest` preserved | 2120 |
-| `credential_material_is_redacted` | userinfo / query / fragment sentinels absent from `Display` | 2168 |
-| `invalid_limits_fail_before_spawn` | Zero metadata bound -> `InvalidInput`, no `dest` | 2185 |
-| `composition_with_fixture_falls_back_from_unavailable_curl` | `Unavailable` -> `ComposedTransport` + `FixtureTransport` under `UnavailableOnly` | 2209 |
-| `user_agent_is_emitted_as_a_literal_argv_element_before_the_url` | The value is the exact element after `--user-agent`, exactly once, **before** the `--` separator and the URL | 2237 |
-| `user_agent_rejects_control_characters_without_producing_argv` | `CR`, `LF`, `NUL`, `HTAB`, `DEL`, and C1 are rejected as `InvalidInput` at both the argv layer and the constructor, and **no** argv is produced | 2283 |
-| `user_agent_rejects_empty_and_over_bound_values` | Empty and over-bound values rejected; a value of exactly `MAX_USER_AGENT_BYTES` accepted | 2326 |
-| `default_transport_emits_no_user_agent_and_keeps_the_previous_argv` | The default transport carries no user agent and its argv is element-for-element the previously observed one | 2383 |
-| `rejected_user_agent_is_a_terminal_invalid_input_not_unavailable` | The rejection is `InvalidInput`, never `Unavailable`; a composed transport does not fall back on it | 2447 |
-| `user_agent_reaches_the_wire_as_the_configured_header` | The configured value is the `User-Agent` header the peer actually receives | 2499 |
+| `exit_28_is_labelled_total_when_connect_and_total_ceilings_coincide` | Coincident-ceiling phase attribution, both directions | 1012 |
+| `diagnostic_bound_never_splits_multibyte_code_points` | UTF-8-safe 512-byte truncation | 1057 |
+| `fake_curl_test_helper_is_native_executable` | The Unix fake child is a native executable, not a shebang script | 1222 |
+| `executable_selection_and_discovery_are_explicit` | Empty path, invalid config, discovery hit/miss typed as `Unavailable` | 1348 |
+| `missing_executable_and_spawn_failure_are_unavailable` | `Unavailable` for both operations, no `dest` | 1370 |
+| `spawn_failure_detail_names_the_os_cause_and_stays_unavailable` | still `Unavailable`; the detail names the `ErrorKind` and the raw OS code; no URL or credential material | 1414 |
+| `metadata_success_not_found_and_server_error` | 200 bytes, 404 `NotFound`, 500 `Transport` | 1486 |
+| `artifact_success_not_found_and_server_error` | 4096 bytes byte-exact, 404 leaves no `dest`, 500 no `dest` | 1510 |
+| `tls_like_process_failure_is_transport_not_unavailable` | Exit 35 is `Transport`, not `is_unavailable()` | 1557 |
+| `truncated_transfer_is_hard_failure_without_promotion` | Headers-then-close with a declared `Content-Length` | 1572 |
+| `metadata_and_artifact_size_overflow` | `TooLarge` on both paths, no promotion | 1599 |
+| `total_phase_timeout_is_typed_end_to_end` | Stalled body -> exactly `Timeout { phase: "total" }` | 1637 |
+| `connect_phase_timeout_is_typed_end_to_end` | Unroutable connect -> exactly `Timeout { phase: "connect" }`; **ignored, environment-conditional, reason recorded** | 1682 |
+| `classify_curl_result_labels_connect_and_total_without_a_subprocess` | The connect/total label at the `classify_curl_result` layer, with `start` injected; no subprocess, no network | 1713 |
+| `duration_decimal_seconds_serializes_sub_second_inputs_truthfully` | Exact decimal output, zero and sub-microsecond rejection | 1772 |
+| `https_request_never_allows_a_cleartext_redirect_target` | `--proto` / `--proto-redir` narrowing incl. `HTTPS://` and http-only config | 1802 |
+| `build_curl_args_passes_decimal_deadlines_never_above_ceiling` | Both deadline flags, sub-microsecond rejection | 1864 |
+| `sub_second_deadlines_serialize_truthfully_without_a_subprocess` | 250 ms/750 ms -> `0.25`/`0.75`; `--max-time` is the *effective* ceiling; sub-microsecond rejection; no subprocess, no network, no wall clock | 1925 |
+| `build_curl_args_passes_sub_second_deadlines_to_fake_curl` | argv carries `--connect-timeout 0.25`; the total budget is decoupled from the enforced ceiling (30 s) so the assertion cannot expire for scheduling reasons | 2015 |
+| `sub_second_total_timeout_kills_child_promptly` | 250 ms total vs 4 s stall; elapsed `>=` the short total timeout and `<` 2 s, dir empty | 2041 |
+| `cancellation_before_spawn_cleans_temp` | Early `Cancelled`, no `.part` leftovers | 2098 |
+| `cancellation_during_body_stream_kills_and_reaps_child` | Cancel during an active 64 KiB transfer | 2120 |
+| `redirect_follow_and_reject` | Follow returns target bytes; `follow_redirects(false)` -> `Transport` | 2151 |
+| `proxy_disabled_uses_noproxy_and_cleared_env` | `--noproxy`, `--disable`, `--output -`, no `HTTP_PROXY` in child env | 2185 |
+| `proxy_custom_env_is_explicit` | No `--noproxy`, exact injected pair in child env | 2205 |
+| `artifact_temp_is_owner_private_and_no_clobber` | Promoted mode `0600`; foreign `dest` preserved | 2227 |
+| `credential_material_is_redacted` | userinfo / query / fragment sentinels absent from `Display` | 2275 |
+| `invalid_limits_fail_before_spawn` | Zero metadata bound -> `InvalidInput`, no `dest` | 2292 |
+| `composition_with_fixture_falls_back_from_unavailable_curl` | `Unavailable` -> `ComposedTransport` + `FixtureTransport` under `UnavailableOnly` | 2316 |
+| `user_agent_is_emitted_as_a_literal_argv_element_before_the_url` | The value is the exact element after `--user-agent`, exactly once, **before** the `--` separator and the URL | 2345 |
+| `user_agent_rejects_control_characters_without_producing_argv` | `CR`, `LF`, `NUL`, `HTAB`, `DEL`, and C1 are rejected as `InvalidInput` at both the argv layer and the constructor, and **no** argv is produced | 2391 |
+| `user_agent_rejects_empty_and_over_bound_values` | Empty and over-bound values rejected; a value of exactly `MAX_USER_AGENT_BYTES` accepted | 2434 |
+| `default_transport_emits_no_user_agent_and_keeps_the_previous_argv` | The default transport carries no user agent and its argv is element-for-element the previously observed one | 2491 |
+| `rejected_user_agent_is_a_terminal_invalid_input_not_unavailable` | The rejection is `InvalidInput`, never `Unavailable`; a composed transport does not fall back on it | 2555 |
+| `user_agent_reaches_the_wire_as_the_configured_header` | The configured value is the `User-Agent` header the peer actually receives | 2607 |
 
 An **integration** suite lives in `tests/` (excluded from the published package
 by `Cargo.toml`'s `exclude`):
@@ -799,8 +803,8 @@ by `Cargo.toml`'s `exclude`):
 **Platform gating.** 17 tests are ungated and run everywhere; 10 are
 `#[cfg(not(windows))]` (live loopback HTTP: status, truncation, bounds,
 timeouts, redirect, active-transfer cancellation, and the on-the-wire
-`User-Agent` header) and 7 are `#[cfg(unix)]`
-(fake-child, `sh` + `xxd`, and Unix mode assertions) — 34 in total. The Windows lane therefore
+`User-Agent` header) and 8 are `#[cfg(unix)]`
+(native fake-child helper and Unix mode assertions) — 35 in total. The Windows lane therefore
 runs the portable adapter, process, and error-path tests only: hosted Windows
 runners refuse connections from spawned curl to the suite's local servers
 (curl exit 7), so **no Windows live-HTTP curl behavior is claimed** anywhere
@@ -815,7 +819,7 @@ exercises the same transport paths through the real `curl.exe` integration tests
 instead. The Windows lane therefore runs a **smaller test set** than the Linux
 and macOS lanes, and the excluded coverage must not be inferred from them.
 
-`cancellation_before_spawn_cleans_temp` (`lib.rs:1991`) is **not**
+`cancellation_before_spawn_cleans_temp` (`lib.rs:2098`) is **not**
 `#[cfg]`-gated, so it runs on Windows too — but it now needs a discoverable
 `curl` there as well, because the fail-loudly treatment applies on every
 platform.

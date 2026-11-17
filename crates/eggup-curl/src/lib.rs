@@ -995,6 +995,8 @@ mod tests {
     use std::net::TcpListener;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+    #[cfg(unix)]
+    use std::sync::OnceLock;
     #[cfg(not(windows))]
     use std::thread;
 
@@ -1206,45 +1208,145 @@ mod tests {
         format!("http://{addr}")
     }
 
-    /// Minimal fake curl executable (Unix-only): writes a fixed body to stdout
-    /// and a fixed HTTP code to stderr. Records
-    /// argv/env for policy assertions.
+    /// Minimal native fake-curl executable (Unix-only): writes a fixed body to
+    /// stdout and a fixed HTTP code to stderr. Records argv/env for assertions.
     ///
-    /// Unix-only because it relies on `sh` + `xxd` and Unix executable-mode
-    /// setup. Windows exercises the same transport paths through the real
-    /// `curl.exe` integration tests and the platform-neutral unit tests below;
-    /// shell-dependent fake-child tests are `#[cfg(unix)]`-gated, never the
-    /// whole module.
+    /// The helper is compiled once per test process, then linked into each
+    /// fixture directory with a separate config file. It has no shebang
+    /// interpreter, avoiding host-level `ETXTBSY` races in shell-backed tests.
+    /// Windows exercises the same transport paths through real `curl.exe`
+    /// integration tests and the platform-neutral unit tests below; fake-child
+    /// tests remain `#[cfg(unix)]`-gated, never the whole module.
     #[cfg(unix)]
-    fn fake_curl_script(body: &[u8], code: &str, exit: i32, record_dir: &Path) -> PathBuf {
-        let dir = record_dir.to_path_buf();
-        let script = dir.join(format!(
-            "fake-curl-{}-{}.sh",
+    #[test]
+    fn fake_curl_test_helper_is_native_executable() {
+        let mut executable =
+            fs::File::open(native_fake_curl_helper()).expect("open fake-curl helper");
+        let mut prefix = [0; 2];
+        executable
+            .read_exact(&mut prefix)
+            .expect("read executable prefix");
+        assert_ne!(prefix, *b"#!", "fake-curl test helper must not be a script");
+    }
+
+    #[cfg(unix)]
+    fn native_fake_curl_helper() -> &'static Path {
+        static HELPER: OnceLock<PathBuf> = OnceLock::new();
+        HELPER
+            .get_or_init(|| {
+                let dir = temp_dir("curl-native-fake-helper");
+                let source = dir.join("fake_curl.rs");
+                let executable = dir.join("fake-curl-helper");
+                fs::write(&source, FAKE_CURL_HELPER_SOURCE).expect("write native fake-curl source");
+
+                let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+                let output = Command::new(rustc)
+                    .arg("--edition=2021")
+                    .arg(&source)
+                    .arg("-o")
+                    .arg(&executable)
+                    .output()
+                    .expect("run rustc to build the native fake-curl helper");
+                assert!(
+                    output.status.success(),
+                    "native fake-curl compilation failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                executable
+            })
+            .as_path()
+    }
+
+    #[cfg(unix)]
+    fn fake_curl_executable(body: &[u8], code: &str, exit: i32, record_dir: &Path) -> PathBuf {
+        let executable = record_dir.join(format!(
+            "fake-curl-{}-{}.native",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_nanos())
                 .unwrap_or(0)
         ));
+        fs::hard_link(native_fake_curl_helper(), &executable)
+            .expect("link native fake-curl executable into fixture directory");
+
         let body_hex: String = body.iter().map(|b| format!("{b:02x}")).collect();
-        let content = format!(
-            "#!/bin/sh\n\
-             echo \"$@\" > \"{rec}/argv\"\n\
-             env > \"{rec}/env\"\n\
-             printf '{hex}' | xxd -r -p\n\\
-             printf '{code}' >&2\n\\
-             exit {exit}\n",
-            rec = dir.display(),
-            hex = body_hex,
-            code = code,
-            exit = exit,
-        );
-        fs::write(&script, content).unwrap();
-        let mut perms = fs::metadata(&script).unwrap().permissions();
-        perms.set_mode(0o700);
-        fs::set_permissions(&script, perms).unwrap();
-        script
+        let mut config = executable.as_os_str().to_os_string();
+        config.push(".config");
+        fs::write(
+            PathBuf::from(config),
+            format!("{body_hex}\n{code}\n{exit}\n"),
+        )
+        .expect("write native fake-curl config");
+        executable
     }
+
+    #[cfg(unix)]
+    const FAKE_CURL_HELPER_SOURCE: &str = r#"
+use std::env;
+use std::fs;
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::process;
+
+fn main() {
+    let mut args = env::args_os();
+    let executable = PathBuf::from(args.next().expect("argv[0]"));
+    let mut config_path = executable.as_os_str().to_os_string();
+    config_path.push(".config");
+    let config = fs::read_to_string(PathBuf::from(config_path)).expect("read fake-curl config");
+    let mut fields = config.splitn(3, '\n');
+    let body_hex = fields.next().unwrap_or_default();
+    let response_code = fields.next().unwrap_or_default();
+    let exit_code = fields
+        .next()
+        .unwrap_or("0")
+        .trim()
+        .parse::<i32>()
+        .expect("parse fake-curl exit code");
+
+    let directory = executable.parent().expect("fake-curl parent directory");
+    let mut argv_record = fs::File::create(directory.join("argv")).expect("create argv record");
+    for (index, arg) in args.enumerate() {
+        if index > 0 {
+            write!(argv_record, " ").expect("write argv separator");
+        }
+        write!(argv_record, "{}", arg.to_string_lossy()).expect("write argv value");
+    }
+    writeln!(argv_record).expect("finish argv record");
+
+    let mut env_record = fs::File::create(directory.join("env")).expect("create env record");
+    for (key, value) in env::vars_os() {
+        writeln!(env_record, "{}={}", key.to_string_lossy(), value.to_string_lossy())
+            .expect("write env record");
+    }
+
+    let body: Vec<u8> = body_hex
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let digit = |byte: u8| match byte {
+                b'0'..=b'9' => byte - b'0',
+                b'a'..=b'f' => byte - b'a' + 10,
+                _ => panic!("invalid fake-curl body hex"),
+            };
+            digit(pair[0]) * 16 + digit(pair[1])
+        })
+        .collect();
+    assert_eq!(body_hex.len() % 2, 0, "odd fake-curl body hex length");
+    {
+        let mut stdout = io::stdout().lock();
+        stdout.write_all(&body).expect("write fake-curl body");
+    }
+    {
+        let mut stderr = io::stderr().lock();
+        stderr
+            .write_all(response_code.as_bytes())
+            .expect("write fake-curl response code");
+    }
+    process::exit(exit_code);
+}
+"#;
 
     #[test]
     fn executable_selection_and_discovery_are_explicit() {
@@ -1458,7 +1560,7 @@ mod tests {
     #[test]
     fn tls_like_process_failure_is_transport_not_unavailable() {
         let dir = temp_dir("curl-tls");
-        let script = fake_curl_script(b"", "", 35, &dir);
+        let script = fake_curl_executable(b"", "", 35, &dir);
         let t =
             CurlTransport::with_executable(&script, CurlConfig::strict()).expect("fake transport");
         let err = t
@@ -1916,7 +2018,7 @@ mod tests {
     #[test]
     fn build_curl_args_passes_sub_second_deadlines_to_fake_curl() {
         let dir = temp_dir("curl-decode-args");
-        let script = fake_curl_script(b"", "200", 0, &dir);
+        let script = fake_curl_executable(b"", "200", 0, &dir);
         let t = CurlTransport::with_executable(&script, CurlConfig::strict()).unwrap();
         let cfg = FetchLimits {
             max_metadata_bytes: 64 * 1024,
@@ -2086,7 +2188,7 @@ mod tests {
     #[test]
     fn proxy_disabled_uses_noproxy_and_cleared_env() {
         let dir = temp_dir("curl-proxy");
-        let script = fake_curl_script(b"ok", "200", 0, &dir);
+        let script = fake_curl_executable(b"ok", "200", 0, &dir);
         let t = CurlTransport::with_executable(&script, CurlConfig::strict()).unwrap();
         let out = t
             .fetch_metadata(&req("http://example.com/x"), limits(), &CancelFlag::new())
@@ -2106,7 +2208,7 @@ mod tests {
     #[test]
     fn proxy_custom_env_is_explicit() {
         let dir = temp_dir("curl-proxy-custom");
-        let script = fake_curl_script(b"ok", "200", 0, &dir);
+        let script = fake_curl_executable(b"ok", "200", 0, &dir);
         let t = CurlTransport::with_executable(
             &script,
             CurlConfig::strict().proxy(CurlProxy::Custom(vec![(
@@ -2128,9 +2230,9 @@ mod tests {
     #[test]
     fn artifact_temp_is_owner_private_and_no_clobber() {
         let dir = temp_dir("curl-perms");
-        let script = fake_curl_script(b"owned-bytes", "200", 0, &dir);
-        // Use a separate work dir for the destination so the fake script dir
-        // (which holds argv/env records) does not interfere.
+        let script = fake_curl_executable(b"owned-bytes", "200", 0, &dir);
+        // Use a separate work dir for the destination so the fake executable
+        // directory (which holds argv/env records) does not interfere.
         let work = temp_dir("curl-perms-work");
         // Fake curl writes directly to the Eggup-owned temp; verify promotion
         // preserves foreign destinations and cleans only owned temps.
@@ -2176,7 +2278,7 @@ mod tests {
     #[test]
     fn credential_material_is_redacted() {
         let dir = temp_dir("curl-redact");
-        let script = fake_curl_script(b"", "", 7, &dir);
+        let script = fake_curl_executable(b"", "", 7, &dir);
         let t = CurlTransport::with_executable(&script, CurlConfig::strict()).unwrap();
         let url = "https://user:S3CR3T-USERINFO-9917@example.com/app?token=TOKEN-QUERY-5523#FRAG-SENTINEL-7788";
         let err = t
@@ -2193,7 +2295,7 @@ mod tests {
     #[test]
     fn invalid_limits_fail_before_spawn() {
         let dir = temp_dir("curl-invalid");
-        let script = fake_curl_script(b"ok", "200", 0, &dir);
+        let script = fake_curl_executable(b"ok", "200", 0, &dir);
         let t = CurlTransport::with_executable(&script, CurlConfig::strict()).unwrap();
         let bad = FetchLimits {
             max_metadata_bytes: 0,
