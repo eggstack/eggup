@@ -101,7 +101,7 @@ review-critical.
 | `eggup-curl` | `eggup-acquisition` | Must not know `eggup-eggfetch` exists; no embedded HTTP/TLS stack |
 | `eggup-archive` | `flate2`, `fs_at`, `sha2`, `tar`, `zip` (+ dev-dep `eggup-core`) | No transport, no authenticity, no live-install policy |
 | `eggup-service` | `eggup-core`, `windows-args` (+ `windows-service` on Windows) | Manager-neutral; `windows-service` is `cfg(windows)`-gated |
-| `eggup-eggpack` | `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggpack-manifest = "=0.1.0"` (no direct runtime `sha2`) | Only crate allowed to touch producer types |
+| `eggup-eggpack` | `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggpack-manifest = "=0.1.1"` (no direct runtime `sha2`) | Only crate allowed to touch producer types |
 | `eggup-transport-footprint` | `eggup-acquisition` (+ optional `eggup-curl` / `eggup-eggfetch`) | Composition lives in the seam, not in an adapter |
 
 Two boundary properties worth naming explicitly because a manifest edit can
@@ -115,7 +115,7 @@ silently break them:
   arrow is one-way, and the test fixtures are what need the transaction types.
 
 **Exact-pin asymmetry.** `eggup-eggpack` pins its in-workspace deps with exact
-requirements (`=0.2.0`) and takes `eggpack-manifest` as `=0.1.0` from the
+requirements (`=0.2.0`) and takes `eggpack-manifest` as `=0.1.1` from the
 registry. Every other crate uses a caret requirement — and every one of them
 now carries the literal `"0.2"`, which matches the workspace version
 `0.2.0` (`eggup-eggfetch` → `eggup-acquisition`, `eggup-curl` →

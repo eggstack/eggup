@@ -73,7 +73,7 @@ Runtime dependencies ([`Cargo.toml`](../crates/eggup-eggpack/Cargo.toml)):
 | `eggup-core` | `=0.2.0` | local path `../eggup-core` |
 | `eggup-archive` | `=0.2.0` | local path `../eggup-archive` |
 | `eggup-acquisition` | `=0.2.0` | local path `../eggup-acquisition` |
-| `eggpack-manifest` | `=0.1.0` | crates.io registry |
+| `eggpack-manifest` | `=0.1.1` | crates.io registry |
 
 The three Eggup edges are exact-pinned so the published crate cannot silently
 resolve a different published seam; the producer edge is registry-only so the
@@ -123,7 +123,7 @@ unless stated otherwise.
 
 | Item | Line | Role |
 |---|---|---|
-| `MAX_MANIFEST_BYTES: usize` | `lib.rs:61` | Maximum accepted UTF-8 JSON document size, re-exported from Eggpack's `MAX_DOCUMENT_BYTES` (`eggpack-manifest 0.1.0` `src/lib.rs:12`, value `1_048_576`, i.e. 1 MiB). The adapter re-exports rather than re-derives the bound, so the two cannot drift. |
+| `MAX_MANIFEST_BYTES: usize` | `lib.rs:61` | Maximum accepted UTF-8 JSON document size, re-exported from Eggpack's `MAX_DOCUMENT_BYTES` (`eggpack-manifest 0.1.1` `src/lib.rs:12`, value `1_048_576`, i.e. 1 MiB). The adapter re-exports rather than re-derives the bound, so the two cannot drift. |
 
 ### Projection data types
 
@@ -253,7 +253,7 @@ as the enforcement point:
 
 - `adapter_pins_registry_eggpack_manifest_and_no_producer_crates`
   ([`tests/interoperability.rs:972`](../crates/eggup-eggpack/tests/interoperability.rs))
-  asserts the manifest contains `eggpack-manifest = "=0.1.0"` and that it
+  asserts the manifest contains `eggpack-manifest = "=0.1.1"` and that it
   contains no `git =`, `rev =`, `branch =`, or `tag =` edge; asserts all three
   Eggup edges stay `=0.2.0` — derived from the adapter's own
   `env!("CARGO_PKG_VERSION")` rather than a hardcoded literal, so the invariant

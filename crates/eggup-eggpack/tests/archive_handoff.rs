@@ -224,7 +224,7 @@ fn build_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
     let mut bytes = Vec::new();
     {
         let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut bytes));
-        let options: zip::write::FileOptions<'_, ()> =
+        let options: zip::write::SimpleFileOptions =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
         for (name, data) in entries {
             zip.start_file(*name, options).unwrap();

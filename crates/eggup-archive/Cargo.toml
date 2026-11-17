@@ -18,7 +18,7 @@ flate2 = { version = "1.1.10", default-features = false, features = ["rust_backe
 fs_at = { version = "0.2.1", default-features = false }
 sha2 = "0.10.9"
 tar = { version = "0.4.46", default-features = false }
-zip = { version = "6.0.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9.6.1", default-features = false, features = ["deflate-flate2"] }
 
 [dev-dependencies]
 eggup-core = { path = "../eggup-core" }

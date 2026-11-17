@@ -65,8 +65,13 @@ evidence only; no authenticity or signature claims.
 
 ## Unreleased
 
-Nothing in this section has been published. `0.2.0` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
+Unpublished dependency maintenance only; package version remains `0.2.0`.
+No publication or consumer migration is authorized by this milestone.
+
+- Update `zip` from `6.0.0` to `9.6.1` with the existing feature selection.
+  Eggup retains explicit entry iteration, allowlisting, bounded streaming, and
+  its own regular-file checks; no ZIP convenience extraction API is introduced.
+  The dependency update does not change the public API or extraction policy.
 
 ## 0.1.3 — 2026-10-06
 

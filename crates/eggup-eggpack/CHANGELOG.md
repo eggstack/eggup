@@ -52,8 +52,12 @@ evidence only.
 
 ## Unreleased
 
-Nothing in this section has been published. `0.2.0` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
+Unpublished dependency maintenance only; package version remains `0.2.0`.
+No publication or consumer migration is authorized by this milestone.
+
+- Advance the exact registry pin for `eggpack-manifest` from `=0.1.0` to
+  `=0.1.1`, and update the test ZIP dependency from `6.0` to `9.6.1`. The
+  adapter API and projected behavior remain unchanged.
 
 ## 0.1.3 — 2026-10-06
 

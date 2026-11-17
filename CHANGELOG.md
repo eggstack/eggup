@@ -405,7 +405,18 @@ claims are made by any of these crates.
 
 Nothing in this section has been published. The current published baselines
 are `0.2.0` for all seven published crates; `eggup-transport-footprint` is
-`publish = false` and has no registry version.
+`publish = false` and has no registry version. This dependency refresh does
+not authorize publication or consumer migration.
+
+- `eggup-archive`: update the ZIP dependency from `6.0.0` to `9.6.1`, keeping
+  explicit bounded extraction behavior and the public API unchanged. This
+  change is not in the published `eggup-archive 0.2.0` package.
+- `eggup-eggpack`: advance the exact `eggpack-manifest` pin from `=0.1.0` to
+  `=0.1.1`; update the test ZIP dependency to `9.6.1`. The adapter API and
+  projected behavior remain unchanged. This change is not in the published
+  `eggup-eggpack 0.2.0` package.
+- Refresh compatible lockfile dependencies, including the patched Rustls,
+  `rustls-webpki`, and `webpki-roots` versions.
 
 ## 0.1.1
 
