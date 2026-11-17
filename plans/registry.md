@@ -523,6 +523,37 @@ against the registry. Finding 17 was registered by Acquisition M016.
     resolves the seam at `0.2.0` from crates.io, and the curl fixture resolves
     both. Closure: `plans/closure/acquisition-transport/017-status.md`.
 
+### Post-0.2.0 findings
+
+18. **A read-only security audit registered two low-severity defect families
+    and three accepted residuals.** Audited at baseline
+    `2516d9e08ad764cce2b5617c8d7f20f15c10e6d4`: source reading of all eight
+    crates plus `cargo audit` (0 vulnerabilities, 0 unmaintained, 0 yanked
+    across 169 locked dependencies). **F-A**: the private stage directory, its
+    intermediates, the backup root, and the mutation-lock record are created
+    with umask-derived permissions and narrowed afterwards by
+    `let _ = fs::set_permissions`, whose failure is discarded;
+    `lock.rs:579` (`restore_claim`) never narrows at all. **F-B**:
+    `AcquisitionRequest`, `CurlProxy::Custom`, and `ProxyDecision::Custom`
+    derive `Debug` over raw URLs and proxy pairs, so `{:?}` prints exactly what
+    `redact_url` exists to hide — contradicting the type's own doc comment and
+    `architecture/acquisition.md` §8. **Severity: low** for both. F-A requires
+    an installation root writable by a second local user; F-B requires a
+    consumer that logs a request or config with `{:?}`. Neither was observable
+    to the existing suite: the mode tests assert only final state, and the
+    redaction tests assert only `Display`. **Core M020 is registered for
+    both** —
+    `plans/implementation/verified-update-core/020-staging-privacy-and-credential-redaction-corrective.md`,
+    `ready for handoff`. Three further audit items are **accepted residuals**
+    with reasons in plan §5 rather than defects this milestone will fix:
+    pathname-based staged/acquired-file proofs (closure needs `O_NOFOLLOW` or
+    `fs_at`, both barred by the core dependency boundary; M020 removes the
+    writable-directory precondition), the permissive
+    `ExistingAsOwnedVerifier` (already documented fixture-only in its rustdoc,
+    `architecture/core-transaction.md:293-296`, and `docs/quickstart.md:47-50`),
+    and the cleartext-HTTP allowance with no authenticity layer (ADR-0003 owns
+    that boundary as caller policy).
+
 ## Active subsystem roadmaps
 
 | Subsystem | Status | Next milestone |
@@ -546,6 +577,7 @@ milestone appears in exactly one table in this registry.
 | Subsystem | Milestone | Status | Plan | Dependencies |
 |---|---|---|---|---|
 | Verified update core | M016 eggup-core contract-doc packaging | ready for handoff | `plans/implementation/verified-update-core/016-eggup-core-contract-doc-packaging.md` | Core M019 closed; target `0.2.1` subject to registry preflight; explicit maintainer upload authorization remains a publication gate |
+| Verified update core | M020 staging privacy and credential redaction corrective | ready for handoff | `plans/implementation/verified-update-core/020-staging-privacy-and-credential-redaction-corrective.md` | Closes finding 18 (**low**): creation-mode privacy for the stage root, stage intermediates, backup root and both lock-record sites, plus manual `Debug` redaction in `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch`. No new dependency, no public API change, no version or publication change; three audit residuals accepted with reasons in plan §5 |
 | Verified update core | M019 eggup-core 0.2.0 publication | closed 2026-10-24 | `plans/implementation/verified-update-core/019-eggup-core-0.2.0-publication.md`; `plans/closure/verified-update-core/019-status.md` | published `eggup-core 0.2.0` (`2c86a0eb…eb23b8`) from `b612608`; hosted run `40079833945` green on all five lanes; the train-order exception in plan §9.1 is the only deviation; registry-only fixture green |
 | Archive extraction | M006 eggup-archive 0.2.0 publication | closed 2026-10-24 | `plans/implementation/archive-extraction/006-eggup-archive-0.2.0-publication.md`; `plans/closure/archive-extraction/006-status.md` | published `eggup-archive 0.2.0` (`ce35edd5…ff57ad`) from `b612608`; run `40079833945` green; registry-only fixture green; the packaged manifest carries no `eggup-core` edge |
 | Acquisition transport | M017 eggup-acquisition 0.2.0 publication | closed 2026-10-24 | `plans/implementation/acquisition-transport/017-eggup-acquisition-0.2.0-publication.md`; `plans/closure/acquisition-transport/017-status.md` | published `eggup-acquisition` (`2ef74b4d…299fc3`), `eggup-curl` (`15cf536f…90d3f7`), `eggup-eggfetch` (`9fc8f648…658721`) 0.2.0 from `b612608`; three registry-only fixtures green; finding 17 closed |
