@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 021 — native bounded-candidate test fixture
 
-Status: active
+Status: implemented
 
 Repository baseline: `ecfe02a1c376db4bbaaabeb057407109ea3c46e1`
 
@@ -75,7 +75,7 @@ The helper is test-only. Failure to create its directory, write source, invoke `
 
 ## 9. Compatibility and migration
 
-No production or consumer-visible behavior changes. Unix bounded-runner tests use the same executable paths and still invoke the real `run_bounded` implementation. The tests remain Unix-gated; Windows behavior and coverage are unchanged. No migration is required.
+No production or consumer-visible behavior changes. Unix bounded-runner tests still invoke staged candidates through the real validators and `run_bounded`; destination basenames are distinct where needed to select deterministic test-helper modes. The tests remain Unix-gated; Windows behavior and coverage are unchanged. No migration is required.
 
 ## 10. Required tests
 
