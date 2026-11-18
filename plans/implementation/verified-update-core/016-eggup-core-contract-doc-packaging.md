@@ -71,7 +71,11 @@ that does not authorize their publication.
   crate. `crates/eggup-eggpack/Cargo.toml` exact-pins its three in-workspace
   dependencies at `=0.2.1` to match local path packages; published
   `eggup-eggpack 0.2.0` remains immutable and keeps its `=0.2.0` pins. The
-  current workspace registry dependency remains `eggpack-manifest = "=0.1.1"`.
+  The M016 baseline's workspace registry dependency was
+  `eggpack-manifest = "=0.1.1"`. The separate Eggpack M008 plan
+  (`plans/implementation/eggpack-manifest-interoperability/008-eggpack-manifest-0.1.2-source-pin-refresh.md`)
+  owns the later adapter-edge refresh; M016 itself does not change or require
+  that dependency edge.
 - `eggup-core`'s runtime dependency surface is `sha2` plus the Windows-only
   `self-replace` dependency. Packaging documentation must not add a dependency
   or change either target's graph.
@@ -145,10 +149,10 @@ that does not authorize their publication.
    retaining `"tests/"` and `"benches/"`.
 3. In `crates/eggup-eggpack/Cargo.toml`, change the three local exact Eggup
    requirements from `=0.2.0` to `=0.2.1` so their path packages match the
-   shared workspace version. Keep the current `eggpack-manifest = "=0.1.1"`
-   registry pin unchanged. This is a source-workspace alignment only; the
-   published `eggup-eggpack 0.2.0` package is immutable and is not rebuilt or
-   uploaded here.
+   shared workspace version. M016 itself does not change the external
+   eggpack-manifest edge; the separate Eggpack M008 plan owns its workspace-source
+   refresh. This is a source-workspace alignment only; the published
+   eggup-eggpack 0.2.0 package is immutable and is not rebuilt or uploaded here.
 4. Refresh only the affected workspace package entries in `Cargo.lock`.
    Review the complete lockfile diff and stop if unrelated registry dependency
    versions change.

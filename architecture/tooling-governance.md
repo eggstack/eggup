@@ -101,7 +101,7 @@ review-critical.
 | `eggup-curl` | `eggup-acquisition` | Must not know `eggup-eggfetch` exists; no embedded HTTP/TLS stack |
 | `eggup-archive` | `flate2`, `fs_at`, `sha2`, `tar`, `zip` (+ dev-dep `eggup-core`) | No transport, no authenticity, no live-install policy |
 | `eggup-service` | `eggup-core`, `windows-args` (+ `windows-service` on Windows) | Manager-neutral; `windows-service` is `cfg(windows)`-gated |
-| `eggup-eggpack` | `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggpack-manifest = "=0.1.1"` (no direct runtime `sha2`) | Only crate allowed to touch producer types |
+| `eggup-eggpack` | `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggpack-manifest = "=0.1.2"` (no direct runtime `sha2`) | Only crate allowed to touch producer types |
 | `eggup-transport-footprint` | `eggup-acquisition` (+ optional `eggup-curl` / `eggup-eggfetch`) | Composition lives in the seam, not in an adapter |
 
 Two boundary properties worth naming explicitly because a manifest edit can
@@ -116,9 +116,9 @@ silently break them:
 
 **Exact-pin asymmetry.** In the current workspace source candidate,
 `eggup-eggpack` pins its in-workspace deps with exact requirements
-(`=0.2.1`) and takes `eggpack-manifest` as `=0.1.1` from the registry. The
-immutable published `eggup-eggpack 0.2.0` still pins those Eggup edges at
-`=0.2.0`. Every other current workspace crate uses a caret requirement,
+(`=0.2.1`) and takes `eggpack-manifest` as `=0.1.2` from the registry. The
+immutable published `eggup-eggpack 0.2.0` still pins its Eggup edges at
+`=0.2.0` and its producer edge at `=0.1.0`. Every other current workspace crate uses a caret requirement,
 `"0.2"`, which resolves against the local path packages at source version
 `0.2.1` (`eggup-eggfetch`/`eggup-curl` → `eggup-acquisition`,
 `eggup-service` → `eggup-core`, and the footprint fixtures). This local
@@ -772,8 +772,9 @@ Ordered by how expensive a miss is.
 - [transport-footprint.md](transport-footprint.md) — the feature-gated binaries
   that `msrv` and `windows-check` do not build (§5.3).
 - [eggpack-adapter.md](eggpack-adapter.md) — the only crate allowed to depend
-  on `eggpack-manifest`; current workspace pins are `=0.2.1`, while the
-  published `0.2.0` artifact retains its `=0.2.0` pins.
+  on `eggpack-manifest`; the workspace-source candidate pins its Eggup edges
+  at `=0.2.1` and its producer edge at `=0.1.2`. Published `0.2.0` retains
+  its Eggup `=0.2.0` and producer `=0.1.0` pins.
 - [ADR-0005](../plans/adrs/ADR-0005-local-archive-extraction-safety-contract.md) —
   the archive safety contract; the ADR to read before touching
   `eggup-archive` boundaries.

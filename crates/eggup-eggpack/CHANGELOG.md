@@ -59,6 +59,10 @@ version `0.2.1`. No Eggpack publication or consumer migration is authorized.
 - Advance the exact registry pin for `eggpack-manifest` from `=0.1.0` to
   `=0.1.1`, and update the test ZIP dependency from `6.0` to `9.6.1`. The
   adapter API and projected behavior remain unchanged.
+- Eggpack M008 separately advances the workspace-source exact registry pin
+  from `=0.1.1` to `=0.1.2`, the latest published release at this source
+  baseline. Its production source is byte-identical to 0.1.1, so the adapter
+  API and projected behavior remain unchanged.
 - Align the three local exact Eggup dependency pins to `=0.2.1` for the
   workspace source version. The published `eggup-eggpack 0.2.0` package keeps
   its original `=0.2.0` pins and is not republished by Core M016.
