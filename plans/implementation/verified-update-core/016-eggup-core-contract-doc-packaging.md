@@ -1,8 +1,8 @@
 # Verified Update Core Milestone 016 — eggup-core contract-doc packaging
 
-Status: ready for handoff
+Status: active
 
-Repository baseline: `a811b3634a48c4c045b467cee70d8d9ccc4144c4`
+Repository baseline: `94f2545ea12fa88ab7fb5e135ba587d0fa6f584c`
 
 Source roadmap:
 - `plans/subsystems/verified-update-core-roadmap.md`
@@ -45,27 +45,33 @@ that does not authorize their publication.
 - Core M019 and the workspace version-lockstep work are closed. The core has no
   in-workspace runtime dependency, so its package can be published on its own
   before any other crate at the new workspace version.
-- At this plan's baseline, `cargo search eggup-core --limit 1` reports `0.2.0`.
-  The implementation must repeat the registry preflight. `0.2.1` is the
-  planned next patch only if that version remains unused.
-- The milestone is ready for implementation handoff. A separate, recorded
-  maintainer authorization is still required before the irreversible
-  `cargo publish` step; authoring this plan does not grant that authorization.
+- Point-in-time preflight on 2026-11-18: crates.io reports `eggup-core 0.2.0`
+  as latest and `0.2.1` unused; none of the listed Core versions is yanked.
+  GitHub has no `v0.2.1` tag or Release. Repeat these checks immediately before
+  any upload; the target remains provisional until then.
+- Implementation is active in the `0.2.1` source candidate. A separate,
+  recorded maintainer authorization is still required before the irreversible
+  `cargo publish` step; this preparation does not grant that authorization.
 
 ## 3. Current implementation evidence
 
-- `crates/eggup-core/Cargo.toml` declares
-  `exclude = ["docs/", "tests/", "benches/"]`. The exclusion is the direct
-  reason the contract documents are absent from the package.
+- The active candidate's `crates/eggup-core/Cargo.toml` now excludes only
+  `tests/` and `benches/`; `docs/` is no longer excluded. A local
+  `cargo package --list --locked --allow-dirty` selected all three contract
+  files and no `tests/` or `benches/` paths. `cargo package`, strict service
+  package verification against registry Core `0.2.0`, and the Core publish
+  dry-run also passed locally; repeat these checks from the final clean commit
+  before any upload. No publication was attempted.
 - `crates/eggup-core/docs/` contains the three normative contract documents
   named in §1. They are already authoritative; this milestone does not edit
   their content.
 - `plans/closure/verified-update-core/019-status.md` records the published
   `eggup-core 0.2.0` package inventory and names M016 as the open follow-on.
-- The root `[workspace.package].version` is `0.2.0`, inherited by every crate.
-  `crates/eggup-eggpack/Cargo.toml` exact-pins its three in-workspace
-  dependencies at `=0.2.0`; those local pins must stay aligned if the shared
-  source version advances.
+- The root `[workspace.package].version` is now `0.2.1`, inherited by every
+  crate. `crates/eggup-eggpack/Cargo.toml` exact-pins its three in-workspace
+  dependencies at `=0.2.1` to match local path packages; published
+  `eggup-eggpack 0.2.0` remains immutable and keeps its `=0.2.0` pins. The
+  current workspace registry dependency remains `eggpack-manifest = "=0.1.1"`.
 - `eggup-core`'s runtime dependency surface is `sha2` plus the Windows-only
   `self-replace` dependency. Packaging documentation must not add a dependency
   or change either target's graph.
@@ -97,6 +103,10 @@ that does not authorize their publication.
 
 - Advance `[workspace.package].version` from `0.2.0` to `0.2.1` and refresh
   `Cargo.lock` without unrelated dependency updates.
+- Update `scripts/check-docs-truth.sh` so it validates workspace-source version
+  claims against the workspace manifest and published-version claims against the
+  subject crate's own changelog, allowing the documented source/registry split
+  before a single-crate publication. Keep the gate network-free.
 - Remove only `"docs/"` from `eggup-core`'s `exclude` list. Keep `tests/` and
   `benches/` excluded.
 - Retarget the three local exact `eggup-eggpack` path pins to `=0.2.1` so the
@@ -135,13 +145,18 @@ that does not authorize their publication.
    retaining `"tests/"` and `"benches/"`.
 3. In `crates/eggup-eggpack/Cargo.toml`, change the three local exact Eggup
    requirements from `=0.2.0` to `=0.2.1` so their path packages match the
-   shared workspace version. Keep `eggpack-manifest = "=0.1.0"` unchanged.
-   This is a source-workspace alignment only; the published `eggup-eggpack
-   0.2.0` package is immutable and is not rebuilt or uploaded here.
+   shared workspace version. Keep the current `eggpack-manifest = "=0.1.1"`
+   registry pin unchanged. This is a source-workspace alignment only; the
+   published `eggup-eggpack 0.2.0` package is immutable and is not rebuilt or
+   uploaded here.
 4. Refresh only the affected workspace package entries in `Cargo.lock`.
    Review the complete lockfile diff and stop if unrelated registry dependency
    versions change.
-5. Do not change any file under `crates/eggup-core/src/**` or any file under
+5. Revise `scripts/check-docs-truth.sh` only as needed to stop equating the
+   workspace source version with every crate's latest registry version; retain
+   per-crate changelog and manifest checks. Update its owning explanation in
+   `architecture/tooling-governance.md` and `.opencode/skills/verify-workflow`.
+6. Do not change any file under `crates/eggup-core/src/**` or any file under
    `crates/eggup-core/docs/**`.
 
 ## 7. Ordered work packages
@@ -160,15 +175,19 @@ that does not authorize their publication.
    appear, with tests and benches still absent.
 4. **W4 — Release notes and current claims.** Add the Core M016 note to the
    core changelog and root changelog. Record the unpublished `eggup-eggpack`
-   local pin alignment in its `Unreleased` section without claiming that
-   `eggup-eggpack 0.2.0` has changed. Update current published/source-version
-   claims in `docs/crates.md`, `docs/releases.md`, `architecture/overview.md`,
-   `architecture/tooling-governance.md`, and `README.md` where applicable.
-   Keep dependency examples at `0.2.0` if they remain intentionally pinned and
-   working; do not edit compiled examples merely to make their version string
-   look newest. Remove the resolved M016 row from the live drift table only
-   after the `0.2.1` package is verified. Update the registry and Core roadmap
-   after qualification and closure, not before evidence exists.
+   local pin alignment in its `Unreleased` section without claiming that the
+   published `eggup-eggpack 0.2.0` changed. Until the registry upload occurs,
+   consumer-facing release docs must show all seven published crates at `0.2.0`
+   and explicitly identify workspace `0.2.1` as an unpublished source candidate.
+   Update `docs/crates.md`, `docs/releases.md`, `architecture/overview.md`,
+   `architecture/tooling-governance.md`, and `README.md` where applicable. Keep
+   the README/quickstart dependency example at `0.2.0` while that remains the
+   latest published package; do not alter compiled examples just to change the
+   version literal. Keep the Core M016 drift open until the published archive
+   proves the fix. Update the registry and Core roadmap to `active` during this
+   implementation; do not record closure or publication evidence before it exists.
+   Update `AGENTS.md` and the release/verification skills where current manifest
+   pins or gate semantics changed.
 5. **W5 — Local qualification.** Run `./scripts/check-local.sh`, inspect
    `cargo tree --workspace --locked`, and review the lockfile and package
    manifest diffs. Require no runtime source or dependency-edge changes.
@@ -250,8 +269,11 @@ crates.io upload, which is irreversible once accepted.
 ## 10. Required tests
 
 No production-code tests are added because the change does not alter Rust
-source. The existing workspace gate remains required. The packaging behavior
-is covered by artifact and consumer evidence:
+source. The existing workspace gate remains required. The documentation-truth gate
+must allow the workspace source version to differ from each crate's latest
+published version, while checking each published-version claim against that
+crate's changelog and manifest. The packaging behavior is covered by artifact
+and consumer evidence:
 
 - The local package file list contains `docs/domain.md`,
   `docs/verification.md`, and `docs/transaction.md`, and no `tests/` or
@@ -273,6 +295,7 @@ ordered local gate; inspect its `cargo tree` output as a human review step.
 
 ```sh
 ./scripts/check-local.sh
+./scripts/check-docs-truth.sh
 cargo tree --workspace --locked
 cargo package -p eggup-core --list --locked
 cargo package -p eggup-core --locked
@@ -322,26 +345,32 @@ package or registry command substitutes for a hosted platform lane.
   unchanged and M016 does not publish it.
 - Root `CHANGELOG.md`: aggregate the Core 0.2.1 package-content change without
   replacing the per-crate release notes.
-- `docs/crates.md` and `docs/releases.md`: distinguish workspace source
-  version `0.2.1` from registry state (Core `0.2.1`; the other published
-  crates remain at `0.2.0` until their own releases). Explain that Core 0.2.0
-  remains immutable and does not contain the three files.
+- `docs/crates.md` and `docs/releases.md`: before publication, state that the
+  seven registry releases remain at `0.2.0` while the workspace source is a
+  `0.2.1` candidate. Do not claim Core `0.2.1` is published. Explain that the
+  immutable Core `0.2.0` package lacks the three files. After a later authorized
+  upload, update only Core's latest published version to `0.2.1`; other crates
+  remain at `0.2.0` unless separately released.
 - `architecture/overview.md` and `architecture/tooling-governance.md` §8:
-  update current workspace/published-version claims, add the Core 0.2.1
-  publication, and preserve the historical 0.2.0 train record. Remove the
-  live Core M016 drift row only after the published archive proves the fix;
-  retain any necessary note that older immutable package versions lack the
-  files.
+  distinguish workspace-source version `0.2.1` from the seven crates still
+  published at `0.2.0`; preserve the historical 0.2.0 train record. Keep the
+  live Core M016 drift row open until the published archive proves the fix.
+- `scripts/check-docs-truth.sh`: do not infer registry publication from the
+  workspace manifest version. Verify published-version claims per crate using
+  its changelog headings and `publish` setting; keep source-version claims
+  tied to the workspace manifest. Update the governance §4.1 description and
+  the verification skill to match.
 - `README.md`: update only any current workspace-version claim. Keep an
   intentionally pinned, compiling dependency example at `0.2.0` if it remains
   a valid example; do not silently change a snippet that must match a checked-in
   example.
 - `plans/registry.md` and
-  `plans/subsystems/verified-update-core-roadmap.md`: during this authoring
-  change, list M016 as ready for handoff with this plan. At closure, replace
-  that status with the closure evidence and record the publication result.
-- `AGENTS.md` and `.opencode/skills/`: no change is required unless this work
-  changes a rule they index; M016 introduces no new rule.
+  `plans/subsystems/verified-update-core-roadmap.md`: mark M016 active while
+  implementation is underway. At closure, replace that status with closure
+  evidence and record only the actual publication result.
+- `AGENTS.md` and `.opencode/skills/`: update indexed current facts when the
+  workspace exact pins and documentation-truth semantics change; do not add a
+  new policy rule there.
 
 ## 13. Acceptance criteria
 

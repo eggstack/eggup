@@ -1,9 +1,11 @@
 # Versions and upgrades
 
-This page is a snapshot checked against crates.io on 2026-11-14. The latest
-published version is **0.2.0** for each of the seven library crates. Check
-crates.io again when choosing a version, since registry state can change
-independently of this repository.
+This page was checked against crates.io on 2026-11-18. The latest published
+version is **0.2.0** for each of the seven library crates. The workspace source
+version is being prepared at `0.2.1`, but that candidate has not been published;
+all seven registry packages remain at `0.2.0`. Check crates.io again when
+choosing a version, since registry state can change independently of this
+repository.
 
 | Crate | Latest published version |
 |---|---|
@@ -22,11 +24,12 @@ remain available. Because Eggup is pre-1.0, a `0.1` requirement does not accept
 ## Exact-pin behavior
 
 The workspace crates generally use caret requirements for their Eggup
-dependencies. `eggup-eggpack` pins its Eggup dependencies exactly to `0.2.0`,
-so a later fix to `eggup-core`,
-`eggup-archive`, or `eggup-acquisition` will not reach an already published
-`eggup-eggpack` until that adapter is republished. Check the resolved dependency
-graph if you depend on `eggup-eggpack`.
+dependencies. The published `eggup-eggpack 0.2.0` pins its Eggup dependencies exactly to
+`0.2.0`, so a later fix to `eggup-core`, `eggup-archive`, or
+`eggup-acquisition` will not reach that published adapter until it is
+republished. The local workspace pins are being aligned to `=0.2.1` for the
+unpublished source candidate; this does not change the registry package. Check
+the resolved dependency graph if you depend on `eggup-eggpack`.
 
 ## Earlier-version limitations
 

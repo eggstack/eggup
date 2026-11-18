@@ -424,8 +424,15 @@ changelogs for changes that cross the boundary.
 
 ## Unreleased
 
-Nothing in this section has been published. `0.2.0` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
+Nothing in this section has been published. `0.2.0` is the latest published
+baseline on crates.io. M016 prepares package content for target version
+`0.2.1`; no explicit upload authorization or publication is recorded.
+
+- **Package-content preparation (M016; target `0.2.1`, unpublished).** Include
+  the existing `docs/domain.md`, `docs/verification.md`, and `docs/transaction.md`
+  in the package. The Rust API, runtime behavior, and dependency graph do not
+  change, and no consumer migration is required. The immutable Core `0.2.0`
+  archive still lacks these files.
 
 ## 0.1.3 — 2026-10-06
 

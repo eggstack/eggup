@@ -62,7 +62,7 @@ absolute paths.
 ## Position in the workspace
 
 ```text
-eggup-core  (sha2 only)
+eggup-core  (sha2; self-replace on Windows)
      ^
      |
 eggup-service   ->  windows-args (=0.2.0)
@@ -75,18 +75,18 @@ eggup-service   ->  windows-args (=0.2.0)
   **Windows-target dependency**, so the Linux/macOS build never links it.
 - `windows-args` is cross-platform and is used for the SCM command-line parser,
   so the ownership tests in `windows_scm.rs` run on every host.
-- **The crate is current with the workspace.** It is on crates.io at
-  `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3`, and `0.2.0`; the `0.1.2` service publication came
-  from `7fb84bc`, after the shared `v0.1.2` tag, which remains the core/archive
-  source tag. Service M011 published the `0.1.3` owned failed-systemd
-  quiescence correction from source `feb6ae5`; its exact checksum and registry
-  qualification are in the M011 closure. Service M017 published `0.2.0` from
-  the train's shared source commit `b612608` — the first publication that
-  carries the stdin-verdict fix the published `0.1.3` lacks; its checksum and
-  registry qualification are in the M017 closure record.
-  `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`,
-  `eggup-eggpack`, and `eggup-curl` are also published at `0.2.0`.
-  `eggup-transport-footprint` is `publish = false`
+- **The crate's registry history.** `eggup-service` is available on crates.io at
+  `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3`, and `0.2.0`. The `0.1.2` service
+  publication came from `7fb84bc`, after the shared `v0.1.2` tag, which remains
+  the core/archive source tag. Service M011 published the `0.1.3` owned
+  failed-systemd quiescence correction from source `feb6ae5`; its exact checksum
+  and registry qualification are in the M011 closure. Service M017 published
+  `0.2.0` from the train's shared source commit `b612608` — the first publication
+  that carries the stdin-verdict fix the published `0.1.3` lacks; its checksum
+  and registry qualification are in the M017 closure record.
+
+  The latest registry version for each of the other six published library crates
+  remains `0.2.0`; `eggup-transport-footprint` is `publish = false`
   ([registry.md](../plans/registry.md)).
 - Dependency order position: 5th deepest in
   [overview.md's dependency graph](overview.md#dependency-graph). It is a leaf

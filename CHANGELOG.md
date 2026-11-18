@@ -403,10 +403,12 @@ claims are made by any of these crates.
 
 ## Unreleased
 
-Nothing in this section has been published. The current published baselines
-are `0.2.0` for all seven published crates; `eggup-transport-footprint` is
-`publish = false` and has no registry version. This dependency refresh does
-not authorize publication or consumer migration.
+Nothing in this section has been published. The latest published version is
+`0.2.0` for all seven publishable crates; `eggup-transport-footprint` is
+`publish = false` and has no registry version. This section includes M007
+dependency maintenance and M016 preparation of an `eggup-core 0.2.1` package
+candidate. Neither records explicit upload authorization or a publication, and
+no consumer migration has occurred.
 
 - `eggup-archive`: update the ZIP dependency from `6.0.0` to `9.6.1`, keeping
   explicit bounded extraction behavior and the public API unchanged. This
@@ -417,6 +419,13 @@ not authorize publication or consumer migration.
   `eggup-eggpack 0.2.0` package.
 - Refresh compatible lockfile dependencies, including the patched Rustls,
   `rustls-webpki`, and `webpki-roots` versions.
+- `eggup-core` M016: prepare the `0.2.1` package to include the three existing
+  authoritative contract documents. This is package-content-only; the Core
+  `0.2.0` registry artifact remains unchanged, and the candidate is not yet published.
+- `eggup-eggpack`: align the three local exact pins to workspace source version
+  `=0.2.1`. The published `eggup-eggpack 0.2.0` archive and its `=0.2.0` pins
+  are unchanged; the `0.2.1` source candidate is not yet published, and no
+  Eggpack publication is authorized.
 
 ## 0.1.1
 

@@ -52,12 +52,16 @@ evidence only.
 
 ## Unreleased
 
-Unpublished dependency maintenance only; package version remains `0.2.0`.
-No publication or consumer migration is authorized by this milestone.
+Unpublished dependency maintenance and workspace pin alignment only. The
+latest published `eggup-eggpack` remains `0.2.0`; local source uses workspace
+version `0.2.1`. No Eggpack publication or consumer migration is authorized.
 
 - Advance the exact registry pin for `eggpack-manifest` from `=0.1.0` to
   `=0.1.1`, and update the test ZIP dependency from `6.0` to `9.6.1`. The
   adapter API and projected behavior remain unchanged.
+- Align the three local exact Eggup dependency pins to `=0.2.1` for the
+  workspace source version. The published `eggup-eggpack 0.2.0` package keeps
+  its original `=0.2.0` pins and is not republished by Core M016.
 
 ## 0.1.3 — 2026-10-06
 
