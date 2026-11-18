@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Milestone 008 — eggpack-manifest 0.1.2 source-pin refresh
 
-Status: active
+Status: closed
 
 Repository baseline: 47b202b5f35fe8dd05d5bd9c2b456b08688f3b4d
 
