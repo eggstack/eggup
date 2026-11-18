@@ -7,7 +7,7 @@
 # writes, never fetches, and never needs elevated privileges.
 #
 # Usage:
-#   ./scripts/check-docs-truth.sh                  # assertions 1-5 and 8
+#   ./scripts/check-docs-truth.sh                  # assertions 1-5, 8, and 9
 #   ./scripts/check-docs-truth.sh --baseline <ref> # also assertion 7, scoped to <ref>
 #
 # Assertion 6 (the transport-footprint dependency counts) is a `cargo tree`
@@ -250,19 +250,16 @@ for path in ALL_SURFACES:
         offset += len(line) + 1
 
 # ---------------------------------------------------------------- assertion 2
-# The published-state claims in the checked surfaces must name the current
-# workspace version.
+# Workspace-source version claims are anchored to the workspace manifest.
+# Published-version claims are checked per crate against its own released
+# changelog headings in assertion 8b; a single-crate release preparation may
+# legitimately make source and registry versions differ.
 #   - a "workspace version" paragraph must not name any other version
-#   - "published at `X`" must name the current version, except in docs/crates.md,
-#     which is the one surface that records each crate's published history and
-#     may name an older version as a crate's first publication
-#   - "=X" (an exact pin) may survive only where it states the eggpack
+#   - "=X" exact pins may survive only where they state the eggpack
 #     exact-pin policy
 #
-# Re-based from the `0.1.2` literal when the `0.2.0` train landed, and made
-# version-agnostic against WORKSPACE_VERSION so the next train needs no further
-# edit of this clause. The shape of the rule is unchanged; only the version it
-# is anchored to moved.
+# The assertion is manifest-anchored, so future workspace version changes need
+# no edit of this clause.
 CURRENT = WORKSPACE_VERSION
 
 if not CURRENT:
@@ -278,22 +275,6 @@ for path in DOC_FILES + ["README.md", "AGENTS.md"]:
             if literal != CURRENT:
                 fail("2", "%s: a 'workspace version' paragraph names %s, not the current %s"
                      % (path, literal, CURRENT))
-
-published_hits = []
-for path in DOC_FILES:
-    for number, line in enumerate(lines(path), 1):
-        for match in re.finditer(r"published at `(0\.\d+\.\d+)`", line):
-            published_hits.append((path, number, line, match.group(1)))
-for path, number, line, literal in published_hits:
-    if literal == CURRENT:
-        continue
-    if path != "docs/crates.md":
-        fail("2", "%s:%d: 'published at `%s`' names a version other than the current %s, "
-                  "and only docs/crates.md may record an older published version"
-             % (path, number, literal, CURRENT))
-    if literal not in KNOWN_VERSIONS:
-        fail("2", "%s:%d: 'published at `%s`' names a version outside the known set %s"
-             % (path, number, literal, sorted(KNOWN_VERSIONS)))
 
 for path in DOC_FILES + ["README.md", "AGENTS.md", "architecture/overview.md",
                          "architecture/tooling-governance.md"]:

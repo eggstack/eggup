@@ -90,6 +90,93 @@ mod tests {
         ExistingAsOwnedVerifier
     }
 
+    #[cfg(unix)]
+    struct NativeBoundedTestHelper {
+        _root: InstallationRoot,
+        executable: std::path::PathBuf,
+    }
+
+    #[cfg(unix)]
+    fn native_bounded_test_helper() -> &'static Path {
+        static HELPER: std::sync::OnceLock<NativeBoundedTestHelper> = std::sync::OnceLock::new();
+        HELPER
+            .get_or_init(|| {
+                let root = InstallationRoot::new().expect("create native-helper root");
+                let source = root.path().join("bounded_test_helper.rs");
+                let executable = root.path().join("bounded-test-helper");
+                fs::write(&source, BOUNDED_TEST_HELPER_SOURCE)
+                    .expect("write native bounded-test helper source");
+
+                let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+                let output = std::process::Command::new(rustc)
+                    .arg("--edition=2021")
+                    .arg(&source)
+                    .arg("-o")
+                    .arg(&executable)
+                    .output()
+                    .expect("run rustc to build the native bounded-test helper");
+                assert!(
+                    output.status.success(),
+                    "native bounded-test helper compilation failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+
+                NativeBoundedTestHelper {
+                    _root: root,
+                    executable,
+                }
+            })
+            .executable
+            .as_path()
+    }
+
+    #[cfg(unix)]
+    fn bounded_test_helper_copy(root: &InstallationRoot, name: &str) -> std::path::PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = root.path().join(name);
+        fs::copy(native_bounded_test_helper(), &path)
+            .expect("copy native helper into private fixture root");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+            .expect("set native helper executable permissions");
+        path
+    }
+
+    #[cfg(unix)]
+    const BOUNDED_TEST_HELPER_SOURCE: &str = r#"
+use std::env;
+use std::io::{self, Write};
+use std::path::Path;
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let executable = env::args_os().next().expect("argv[0]");
+    let name = Path::new(&executable)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .expect("UTF-8 helper mode name");
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    match name {
+        "identity-main" => output.write_all(b"eggup 1.2.3\n").expect("write identity"),
+        "secret" => {
+            let inherited = env::var_os("PATH").is_some()
+                || env::var_os("EGGUP_SECRET").is_some();
+            output
+                .write_all(if inherited { b"present" } else { b"unset" })
+                .expect("write environment result");
+        }
+        "timeout" => thread::sleep(Duration::from_secs(2)),
+        "noisy" => output.write_all(b"1234567890").expect("write noisy output"),
+        "bundle-main" | "bundle-helper" => {
+            output.write_all(b"bundle 9\n").expect("write bundle identity");
+        }
+        other => panic!("unknown bounded-test helper mode: {other}"),
+    }
+}
+"#;
+
     fn commit_verified(
         prepared: super::PreparedTransaction,
         verifier: &dyn OwnershipVerifier,
@@ -1299,19 +1386,25 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn bounded_candidates_are_exact_and_environment_is_cleared() {
-        use std::os::unix::fs::PermissionsExt;
+    fn bounded_runner_test_helper_is_native_executable() {
+        let executable = fs::read(native_bounded_test_helper()).expect("read native helper");
+        assert!(
+            !executable.starts_with(b"#!"),
+            "bounded-test helper must not be a script"
+        );
+    }
 
+    #[cfg(unix)]
+    #[test]
+    fn bounded_candidates_are_exact_and_environment_is_cleared() {
         let inputs = InstallationRoot::new().unwrap();
         let install = InstallationRoot::new().unwrap();
-        let script = inputs
-            .write_file("main", b"#!/bin/sh\nprintf 'eggup 1.2.3\\n'\n")
-            .unwrap();
-        fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+        let script = bounded_test_helper_copy(&inputs, "identity-main");
         let digest = super::hash_file(&script).unwrap();
-        let member = ArtifactMember::new(MemberId::new("main").unwrap(), script, "bin/main")
-            .unwrap()
-            .with_integrity(super::IntegrityRequirement::Sha256(digest));
+        let member =
+            ArtifactMember::new(MemberId::new("main").unwrap(), script, "bin/identity-main")
+                .unwrap()
+                .with_integrity(super::IntegrityRequirement::Sha256(digest));
         fs::create_dir_all(install.path().join("bin")).unwrap();
         let verified = InstallPlan::new(
             ProductId::new("eggup").unwrap(),
@@ -1336,13 +1429,7 @@ mod tests {
             TransactionDisposition::Committed
         );
 
-        let secret_script = inputs
-            .write_file(
-                "secret",
-                b"#!/bin/sh\nprintf '%s' \"${EGGUP_SECRET-unset}\"\n",
-            )
-            .unwrap();
-        fs::set_permissions(&secret_script, fs::Permissions::from_mode(0o755)).unwrap();
+        let secret_script = bounded_test_helper_copy(&inputs, "secret");
         let output = super::run_bounded(&super::CommandSpec::new(secret_script)).unwrap();
         assert!(output.success(), "bounded candidate output: {output:?}");
         assert_eq!(output.stdout(), b"unset");
@@ -1351,18 +1438,9 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn bounded_runner_kills_timeouts_and_limits_output() {
-        use std::os::unix::fs::PermissionsExt;
-
         let fixture = InstallationRoot::new().unwrap();
-        let timeout_script = fixture
-            .write_file("timeout", b"#!/bin/sh\nsleep 2\n")
-            .unwrap();
-        let noisy_script = fixture
-            .write_file("noisy", b"#!/bin/sh\nprintf '1234567890'\n")
-            .unwrap();
-        for path in [&timeout_script, &noisy_script] {
-            fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        let timeout_script = bounded_test_helper_copy(&fixture, "timeout");
+        let noisy_script = bounded_test_helper_copy(&fixture, "noisy");
         let timed_out = super::run_bounded(
             &super::CommandSpec::new(timeout_script).timeout(Duration::from_millis(20)),
         )
@@ -1378,19 +1456,10 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn cross_member_identity_requires_bundle_agreement() {
-        use std::os::unix::fs::PermissionsExt;
-
         let inputs = InstallationRoot::new().unwrap();
         let install = InstallationRoot::new().unwrap();
-        let main = inputs
-            .write_file("main", b"#!/bin/sh\nprintf 'bundle 9\\n'\n")
-            .unwrap();
-        let helper = inputs
-            .write_file("helper", b"#!/bin/sh\nprintf 'bundle 9\\n'\n")
-            .unwrap();
-        for path in [&main, &helper] {
-            fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        let main = bounded_test_helper_copy(&inputs, "bundle-main");
+        let helper = bounded_test_helper_copy(&inputs, "bundle-helper");
         let main_digest = super::hash_file(&main).unwrap();
         let helper_digest = super::hash_file(&helper).unwrap();
         let verified = InstallPlan::new(
@@ -1398,12 +1467,16 @@ mod tests {
             ReleaseId::new("r9").unwrap(),
             install.path(),
             ArtifactSet::new(vec![
-                ArtifactMember::new(MemberId::new("main").unwrap(), main, "bin/main")
+                ArtifactMember::new(MemberId::new("main").unwrap(), main, "bin/bundle-main")
                     .unwrap()
                     .with_integrity(super::IntegrityRequirement::Sha256(main_digest)),
-                ArtifactMember::new(MemberId::new("helper").unwrap(), helper, "bin/helper")
-                    .unwrap()
-                    .with_integrity(super::IntegrityRequirement::Sha256(helper_digest)),
+                ArtifactMember::new(
+                    MemberId::new("helper").unwrap(),
+                    helper,
+                    "bin/bundle-helper",
+                )
+                .unwrap()
+                .with_integrity(super::IntegrityRequirement::Sha256(helper_digest)),
             ])
             .unwrap(),
         )

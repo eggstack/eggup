@@ -55,7 +55,7 @@ dependency of one crate silently activate in another.
 `[workspace.package]` (`Cargo.toml:14-19`) declares exactly five keys:
 
 ```toml
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.89"
 license = "MIT"
@@ -95,13 +95,13 @@ review-critical.
 
 | Crate | Dependencies | Boundary rule |
 |---|---|---|
-| `eggup-core` | `sha2 = "0.10"` | Sole dep. No transport, no service manager, no Eggpack |
+| `eggup-core` | `sha2 = "0.10"`; Windows-only `self-replace = "1.5"` | Non-Windows graph remains `sha2` only; no transport, service manager, or Eggpack |
 | `eggup-acquisition` | *(none)* | Zero-dependency seam |
 | `eggup-eggfetch` | `eggup-acquisition`, `eggfetch-core`, `tokio`, `futures-util` | Must not know `eggup-curl` exists |
 | `eggup-curl` | `eggup-acquisition` | Must not know `eggup-eggfetch` exists; no embedded HTTP/TLS stack |
 | `eggup-archive` | `flate2`, `fs_at`, `sha2`, `tar`, `zip` (+ dev-dep `eggup-core`) | No transport, no authenticity, no live-install policy |
 | `eggup-service` | `eggup-core`, `windows-args` (+ `windows-service` on Windows) | Manager-neutral; `windows-service` is `cfg(windows)`-gated |
-| `eggup-eggpack` | `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggpack-manifest = "=0.1.1"` (no direct runtime `sha2`) | Only crate allowed to touch producer types |
+| `eggup-eggpack` | `eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggpack-manifest = "=0.1.2"` (no direct runtime `sha2`) | Only crate allowed to touch producer types |
 | `eggup-transport-footprint` | `eggup-acquisition` (+ optional `eggup-curl` / `eggup-eggfetch`) | Composition lives in the seam, not in an adapter |
 
 Two boundary properties worth naming explicitly because a manifest edit can
@@ -114,16 +114,18 @@ silently break them:
   (`crates/eggup-archive/Cargo.toml`). Core does not depend on archive; the
   arrow is one-way, and the test fixtures are what need the transaction types.
 
-**Exact-pin asymmetry.** `eggup-eggpack` pins its in-workspace deps with exact
-requirements (`=0.2.0`) and takes `eggpack-manifest` as `=0.1.1` from the
-registry. Every other crate uses a caret requirement — and every one of them
-now carries the literal `"0.2"`, which matches the workspace version
-`0.2.0` (`eggup-eggfetch` → `eggup-acquisition`, `eggup-curl` →
-`eggup-acquisition`, `eggup-service` → `eggup-core`, and all three in
-`eggup-transport-footprint`). These resolve correctly through the path
-dependencies, so the build is not broken. The pin style still differs by crate
-for no stated reason, which means a version bump has to be reasoned about
-per-crate rather than applied uniformly.
+**Exact-pin asymmetry.** In the current workspace source candidate,
+`eggup-eggpack` pins its in-workspace deps with exact requirements
+(`=0.2.1`) and takes `eggpack-manifest` as `=0.1.2` from the registry. The
+immutable published `eggup-eggpack 0.2.0` still pins its Eggup edges at
+`=0.2.0` and its producer edge at `=0.1.0`. Every other current workspace crate uses a caret requirement,
+`"0.2"`, which resolves against the local path packages at source version
+`0.2.1` (`eggup-eggfetch`/`eggup-curl` → `eggup-acquisition`,
+`eggup-service` → `eggup-core`, and the footprint fixtures). This local
+alignment does not make the other six crates `0.2.1` registry releases; only
+Core is in M016's publication scope. The distinct exact-pin behavior is
+intentional for the adapter;
+review downstream version coupling per release plan.
 
 **The `0.2.0` widening was load-bearing, not cosmetic.** The seam's
 `0.2.0` is source-breaking (`AcquisitionError::Io(String)` became
@@ -249,7 +251,7 @@ and with `plans/registry.md`:
 | Assertion | What it checks |
 |---|---|
 | 1 | No checked surface (`docs/`, `README.md`, `AGENTS.md`, `architecture/*.md`) states a version literal outside the known set — the registry history unioned with the version the manifests declare. A literal the same clause explicitly disclaims ("not a `0.1.4`") is not a claim |
-| 2 | No checked surface states the current version as a version other than the one the manifests declare — a "workspace version" paragraph must not name another version, "published at `X`" must name the current version (except in `docs/crates.md`, which records each crate's published history), and an exact pin `=X` may survive only where it states the eggpack exact-pin policy. The clause is anchored to the manifest version, so the next train needs no edit of it |
+| 2 | Workspace-source version claims must match the manifest. Published-version claims are validated per crate against that crate's released changelog headings and `publish` flag, so a single-crate release preparation may legitimately have source `0.2.1` while the registry still has `0.2.0`. Exact pins are allowed where they describe the Eggpack pin policy |
 | 3 | No `docs/` file and no `architecture/*.md` deep dive states a normative rule without linking the contract that owns it. The owning deep dive is exempt: it is the owner, not a leak |
 | 4 | The root `CHANGELOG.md` `Unreleased` section does not contradict the published section. The published set is derived from the crate changelogs' version headings rather than a literal, so the clause keeps policing the next train without another edit |
 | 5 | No milestone carries two statuses in `plans/registry.md` — three-cell tables included, not only the four-cell ones — and the registry names its authoritative table |
@@ -448,17 +450,18 @@ Entry point `plans/README.md`. Normative process document:
 |---|---|---|
 | Canonical long-term documents | 4 | `plans/000`–`003` |
 | Accepted ADRs | 5 | `plans/adrs/ADR-0001`…`0005` |
-| Subsystem roadmaps | 7 | `plans/subsystems/*-roadmap.md` |
-| Implementation plans | 62 | `plans/implementation/<subsystem>/NNN-*.md` |
-| Closure records | 61 | `plans/closure/<subsystem>/NNN-status.md` |
-| Closure directories | 8 | 7 subsystems plus `planning-closure-hygiene-corrective` |
+| Subsystem roadmaps | 8 | `plans/subsystems/*-roadmap.md` |
+| Implementation plans | 101 | `plans/implementation/<subsystem>/NNN-*.md` (README excluded) |
+| Closure records | 99 | `plans/closure/<subsystem>/NNN-status.md` |
+| Closure directories | 9 | 8 subsystems plus `planning-closure-hygiene-corrective` |
 
 The subsystem set is: `verified-update-core`, `acquisition-transport`,
 `archive-extraction`, `service-lifecycle`, `distribution-bootstrap`,
-`consumer-adoption`, `eggpack-manifest-interoperability`. The eighth closure
-directory, `planning-closure-hygiene-corrective`, is a docs-only workstream that
-holds plans `001`–`012` and has no subsystem roadmap — it exists to reconcile
-the registry and closure records against reality.
+`consumer-adoption`, `eggpack-manifest-interoperability`, and
+`transport-footprint`. The ninth closure directory,
+`planning-closure-hygiene-corrective`, is a docs-only workstream that holds
+plans `001`–`015` and has no subsystem roadmap — it exists to reconcile the
+registry and closure records against reality.
 
 ### 6.2 Normative documents and their mutability
 
@@ -655,24 +658,26 @@ Releases are manual, and this is recorded as a deliberate design decision in the
 registry: the M009 core/archive publication row states "manual only, no release
 CI added."
 
-| Crate | Workspace version | On crates.io | Note |
-|---|---|---|---|
-| `eggup-core` | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Sole dep `sha2`; transaction mechanics |
-| `eggup-archive` | 0.2.0 | 0.1.2, 0.1.3, **0.2.0** | Bounded extraction |
-| `eggup-acquisition` | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Zero-dependency seam |
-| `eggup-eggfetch` | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Native HTTP adapter |
-| `eggup-curl` | 0.2.0 | 0.1.2, **0.2.0** | External-curl adapter |
-| `eggup-eggpack` | 0.2.0 | 0.1.2, 0.1.3, **0.2.0** | Only crate touching producer types; pins `=0.2.0` |
-| `eggup-service` | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Carries the stdin-verdict fix the published `0.1.3` lacks |
-| `eggup-transport-footprint` | 0.2.0 | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
+| Crate | Workspace source version | Latest published | Published versions | Note |
+|---|---|---|---|---|
+| `eggup-core` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Non-Windows runtime graph is `sha2`; Windows also uses `self-replace`; M016 prepares contract-doc packaging |
+| `eggup-archive` | 0.2.1 | 0.2.0 | 0.1.2, 0.1.3, **0.2.0** | Bounded extraction; current dependency refresh remains unpublished |
+| `eggup-acquisition` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Zero-dependency seam |
+| `eggup-eggfetch` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Native HTTP adapter |
+| `eggup-curl` | 0.2.1 | 0.2.0 | 0.1.2, **0.2.0** | External-curl adapter |
+| `eggup-eggpack` | 0.2.1 | 0.2.0 | 0.1.2, 0.1.3, **0.2.0** | Only crate touching producer types; source candidate pins `=0.2.1`; published `0.2.0` retains `=0.2.0` |
+| `eggup-service` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Carries the stdin-verdict fix the published `0.1.3` lacks |
+| `eggup-transport-footprint` | 0.2.1 | — | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
-All 8 crates share workspace version `0.2.0`; all seven library crates are on
-crates.io at `0.2.0`. The 0.2.0 line is one lockstep train, published in
-dependency order — the seam, then the adapters, then the leaf — because a
-crate is published only after every in-workspace dependency it names is on the
-registry. `eggup-curl` skipped `0.1.3` entirely: its next release after
-`0.1.2` is `0.2.0`, because the seam's source break forced the whole
-version-lockstep workspace forward.
+All 8 crates share workspace source version `0.2.1`; crates.io still reports
+`0.2.0` as the latest published version for all seven publishable crates. The
+`0.2.1` source is an unpublished preparation candidate, not a registry release.
+The `0.2.0` line is one historical lockstep train, published in dependency
+order — the seam, then the adapters, then the leaf — because a crate is
+published only after every in-workspace dependency it names is on the registry.
+`eggup-curl` skipped `0.1.3` entirely: its next release after `0.1.2` is
+`0.2.0`, because the seam's source break forced the whole version-lockstep
+workspace forward.
 
 **The `0.1.x` line stays on crates.io.** No published version is withdrawn
 and no tag is moved; `v0.1.1`, `v0.1.2`, and `v0.1.3` remain where they are,
@@ -702,11 +707,14 @@ Ordered by how expensive a miss is.
    `eggup-eggfetch` and `eggup-curl`?
 4. **ADR-0004 classification** — is this work that belongs to Eggup, or producer
    work that belongs to Eggpack? `distribution-bootstrap` stays archived.
-5. **Run `./scripts/check-local.sh`** and treat all 5 lines as gates, including
-   reading the `cargo tree` output rather than skimming past it (§4.2).
+5. **Run `./scripts/check-local.sh`** and require every command to pass. The
+   script executes five Cargo commands plus the network-free documentation
+   check; `cargo tree` resolves the graph, but boundary compliance still needs
+   human review of its output (§4.2).
 6. **Feature-gated change?** If the change lives behind a feature flag, check
-   which CI lane actually compiles it. Non-default features are built only by
-   `stable` and `macos` (§5.3) — not by `msrv`, not on Windows.
+   which CI lane actually compiles it. `stable` and `macos` build the three
+   footprint configurations; `msrv` checks all three at Rust 1.89; no Windows
+   lane builds them (§5.3).
 7. **Platform-sensitive change?** Do not infer Windows or macOS behavior from a
    local Linux run. Confirm the relevant lane ran, and if the change is outside
    the curated Windows subset, treat Windows evidence as `not run` and say so.
@@ -723,8 +731,9 @@ Ordered by how expensive a miss is.
 11. **Registry updated** — status transitions, blockers, and next dependency
     transitions only; no plan detail duplicated. Roadmap status table reconciled.
 12. **If publishing** — confirm it is a tracked publication milestone, that
-    `cargo package`/dry-run was qualified, that downstream exact pins
-    (`eggup-eggpack` → `=0.2.0`) are accounted for, and that CI still does not
+    `cargo package`/dry-run was qualified, that the downstream exact pins in the
+    current source and published adapter are accounted for (workspace `=0.2.1`;
+    published `eggup-eggpack 0.2.0` still uses `=0.2.0`), and that CI still does not
     publish. See the `release-workflow` skill.
 13. **Did the prose move with the code?** If the change touched an enum, a
     variant, a CI lane, a dependency edge, a command, or a publication status,
@@ -749,8 +758,9 @@ Ordered by how expensive a miss is.
 - [`../docs/`](../docs/README.md) — user-facing adoption guidance
   (quickstart, crate choice, releases). Non-normative; points at the contracts
   rather than restating them (§7.4).
-- [core-transaction.md](core-transaction.md) — the crate whose sole `sha2`
-  dependency makes the boundary in §2.4 checkable.
+- [core-transaction.md](core-transaction.md) — the crate whose non-Windows
+  dependency graph contains only `sha2` and whose Windows graph also includes
+  `self-replace`; the target-specific boundary is in §2.4.
 - [acquisition.md](acquisition.md) — the zero-dependency seam both adapters and
   the footprint fixtures depend on.
 - [eggfetch-adapter.md](eggfetch-adapter.md), [curl-adapter.md](curl-adapter.md)
@@ -762,7 +772,9 @@ Ordered by how expensive a miss is.
 - [transport-footprint.md](transport-footprint.md) — the feature-gated binaries
   that `msrv` and `windows-check` do not build (§5.3).
 - [eggpack-adapter.md](eggpack-adapter.md) — the only crate allowed to depend
-  on `eggpack-manifest` and to pin `=0.2.0` exactly.
+  on `eggpack-manifest`; the workspace-source candidate pins its Eggup edges
+  at `=0.2.1` and its producer edge at `=0.1.2`. Published `0.2.0` retains
+  its Eggup `=0.2.0` and producer `=0.1.0` pins.
 - [ADR-0005](../plans/adrs/ADR-0005-local-archive-extraction-safety-contract.md) —
   the archive safety contract; the ADR to read before touching
   `eggup-archive` boundaries.
@@ -828,14 +840,11 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | The same pass reconciled all seven roadmap **status tables** correctly but missed the milestone **bodies** and header `Status:` lines: acquisition M010 and core M012 read `Status: ready.`, archive M004 read `Status: blocked on Acquisition M010`, Eggpack M005 read `Status: blocked on Acquisition M010, Core M013, and Archive M004` | Each body entry reconciled to its closure record, and the acquisition/core headers — which still advertised M010/M011 and M012/M013 as open — rewritten. The asymmetry was real and within single files: M011 and M013 bodies were updated by the closing commit while M010 and M012 in the *same* files were missed. A drift class was added for reconciling a summary table while leaving its prose behind |
 | `consumer-adoption-roadmap.md` held Gregg M004 and EggPool M007 as `blocked` in both prose and status-table rows, gated on "Core M012 + M013; Acquisition M010" | All four gates closed 2026-10-06. Both rows now read `authorable`, with the published `eggup-core 0.1.3` / `eggup-acquisition 0.1.3` named as the satisfied evidence. They stay *intentionally unwritten* — no plan file exists, which is a separate fact from being blocked |
 
-### Open — code-level, needs a milestone, not a doc edit
+### Open — tracked residuals and ongoing corrections
 
 | Location | Drift | Why it is not fixed here |
 |---|---|---|
-| `crates/eggup-transport-footprint/Cargo.toml:16,24,29` | **Closed 2026-10-24.** The pins were `"0.1.0"` for `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` while `[workspace.package] version` was `0.1.3` | Resolved by the `0.2.0` publication train: all three are now `"0.2"`, matching the workspace `0.2.0`. The seam's `0.2.0` is source-breaking, so the caret had to widen or a consumer's lockfile could resolve a seam the adapters cannot compile against |
-| `plans/implementation/**` | 14 of 62 plans ship fewer than 16 sections and 17 omit a `Repository baseline:` line; `Primary class:` is frequently outside the template enum (only 2 of 62 use a single template value verbatim) | Historical records. The template is `plans/implementation/README.md`; conforming old plans is not worth rewriting evidence. New plans should follow the template exactly |
-| `crates/eggup-service/Cargo.toml:24` and the footprint manifest | **Closed 2026-10-24.** Both required peers at caret `0.1.0` while the workspace was at `0.1.3`, so they did **not** participate in the exact-pin cascade that §8 describes for `eggup-eggpack` | The service manifest now requires `eggup-core = "0.2"`. That widening was load-bearing, not cosmetic: leaving it at `^0.1.0` would let a consumer's lockfile resolve `eggup-core 0.1.3`, which lacks `stdin_data` and cannot compile `eggup-service 0.2.0`. The footprint manifest's three requirements moved to `"0.2"` for the same reason. The exact-pin style that §8 describes for `eggup-eggpack` is unchanged and still applies to it alone |
-| `architecture/transport-footprint.md` §"Testing approach" and the CI matrix in §5 | **Closed 2026-10-24.** No CI job built the isolated single-adapter configurations (`--no-default-features --features curl`, `--features eggfetch`): every lane that built the bins built only the dual configuration, so the claim "links no Eggfetch code" was never verified by CI. The crate also had no `plans/subsystems/` roadmap | Both halves are now done. The `stable` lane builds all three isolated configurations (`ci.yml:26-28`), the `msrv` lane checks all three at the 1.89 floor (`ci.yml:52-54`), and the `macos` lane builds the `curl` and `eggfetch` configurations (`ci.yml:97-98`), so "links no Eggfetch code" is machine-checked on every lane that carries it. `plans/subsystems/transport-footprint-roadmap.md` exists and owns the crate. Registry finding 12 was closed by **Transport Footprint M001** (`plans/closure/transport-footprint/001-status.md`), and this row had simply not been reconciled to that closure |
-| `crates/eggup-core/Cargo.toml:15-19` (`exclude = ["docs/", …]`) | `crates/eggup-core/docs/{domain,verification,transaction}.md` — the crate's authoritative contract docs — are excluded from the published package, so a consumer on crates.io or docs.rs never receives the contract it is bound to | Removing `"docs/"` from `exclude` is a manifest change with no consumer effect until `eggup-core` is republished — **and that republication has now happened**: the published `eggup-core 0.2.0` ships *with* the exclusion, so the consumer impact is live for the current published line, not hypothetical. Owned by **Verified Update Core M016 — `eggup-core` contract-doc packaging** (`plans/subsystems/verified-update-core-roadmap.md`): it must remove `"docs/"` from `exclude`, qualify `cargo package -p eggup-core --list`, and authorize the republication that delivers the docs. Recorded as open finding 14 and named as the follow-on of planning C013 at `plans/closure/planning-closure-hygiene-corrective/013-status.md` |
+| `plans/implementation/**` | Some older plans predate or do not fully match the current 16-section template | Historical records. The template is `plans/implementation/README.md`; conforming old plans is not worth rewriting evidence. New plans should follow the template exactly |
+| `crates/eggup-core/Cargo.toml` package selection | `crates/eggup-core/docs/{domain,verification,transaction}.md` are the authoritative contract docs. The active `0.2.1` source candidate no longer excludes `docs/`, but package-list and artifact proofs are still pending; the immutable published `eggup-core 0.2.0` package still lacks them | Owned by **Verified Update Core M016** (`plans/implementation/verified-update-core/016-eggup-core-contract-doc-packaging.md`). Finding 14 remains open until a published artifact and registry readback prove the documents are present. Explicit maintainer upload authorization is still required. |
 | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | Still asserts `git log 39ff626..HEAD -- crates/` **is empty**; it now returns 4 commits | Deliberate. The record is an immutable 2026-10-01 snapshot, and rewriting it would edit historical evidence. The `registry.md` line that made the same claim *as a live status statement* is corrected; the closure record is not |
 | `plans/archive/` | Holds only its own `README.md`; no superseded material has ever been moved there, though `plans/README.md` describes it as retained-for-traceability | A policy directory with no content is not wrong. Pruning it would remove a documented mechanism; populating it is a separate authoring decision |

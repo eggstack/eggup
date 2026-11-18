@@ -31,8 +31,9 @@ to ship in seam → adapter → leaf order.
 
 ## The exact-pin cascade
 
-`eggup-eggpack` pins its Eggup dependencies exactly (`=0.2.0`). Every other
-crate uses a caret requirement. Consequence:
+The current `eggup-eggpack` workspace source pins its Eggup dependencies
+exactly to `=0.2.1`; the published `eggup-eggpack 0.2.0` remains pinned to
+`=0.2.0`. Every other workspace crate uses a caret requirement. Consequence:
 
 - A fix published to a caret consumer (`eggup-curl`, `eggup-eggfetch`,
   `eggup-service`) is inherited automatically on the next resolve — **within the

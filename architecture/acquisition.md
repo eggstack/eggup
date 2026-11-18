@@ -46,11 +46,13 @@ Crates that depend on it:
 |---|---|---|
 | `eggup-eggfetch` | `0.2` (caret) + path | native HTTP adapter; implements `AcquisitionTransport` |
 | `eggup-curl` | `0.2` (caret) + path | external-process adapter; implements `AcquisitionTransport` |
-| `eggup-eggpack` | `=0.2.0` exact pin + path | `use eggup_acquisition::{AcquisitionRequest, FetchLimits}` only (`eggup-eggpack/src/lib.rs:6`) — binds requests, never transports |
+| `eggup-eggpack` | workspace source `=0.2.1` exact pin + path; published `0.2.0` retains `=0.2.0` | `use eggup_acquisition::{AcquisitionRequest, FetchLimits}` only (`eggup-eggpack/src/lib.rs:6`) — binds requests, never transports |
 | `eggup-transport-footprint` | `0.2` (caret) + path | `curl_only.rs` / `eggfetch_only.rs` use `AcquisitionRequest` + `FetchLimits`; `dual.rs` uses `ComposedTransport` + `CompositionPolicy` |
 
 The caret/exact-pin split is deliberate: adapters inherit a seam fix on the next
-resolve, `eggup-eggpack` does not
+resolve; the published `eggup-eggpack 0.2.0` exact pin does not. The workspace
+source candidate has moved its local pin to `=0.2.1`, but that does not update
+the immutable published package.
 ([acquisition-transport-roadmap.md](../plans/subsystems/acquisition-transport-roadmap.md#m010--eggup-acquisition-013-publication),
 M010). The `0.1.0` caret became `0.2` in the `0.2.0` publication train
 (Acquisition Transport M017): the seam's `0.2.0` is source-breaking
@@ -589,8 +591,9 @@ caller set a `User-Agent`; that is the claim, and it is what M014 delivers.
 It is explicitly **not** placement parity: the two controls live in different
 types and are deliberately not aligned. `eggup-eggfetch`'s control lives in
 `EggfetchConfig`, whose `user_agent` is a public field of a public,
-non-`#[non_exhaustive]` struct in a crate published at `0.2.0`; moving it
-would be a source break for published consumers. `eggup-curl`'s control lives
+non-`#[non_exhaustive]` struct in the `eggup-eggfetch 0.2.0` registry release;
+moving it would be a source break for published consumers. `eggup-curl`'s
+control lives
 on `CurlTransport` because `CurlConfig`'s fields are public and **not**
 `#[non_exhaustive]` (`curl/src/lib.rs:58-76`), so adding a field there would
 be source-breaking for every external struct-literal construction. Each

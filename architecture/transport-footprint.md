@@ -52,13 +52,13 @@ separately exposed — the crate's *only* public feature surface is `curl`,
 
 | Crate | Manifest requirement | Resolved version | Note |
 |---|---|---|---|
-| `eggup-acquisition` | `"0.2"` (path) | `0.2.0` | The seam, and the only unconditional dependency |
-| `eggup-curl` | `"0.2"` (path, optional) | `0.2.0` | External-process adapter |
-| `eggup-eggfetch` | `"0.2"` (path, optional) | `0.2.0` | Native in-process HTTP/TLS adapter |
+| `eggup-acquisition` | `"0.2"` (path) | `0.2.1` | The seam, and the only unconditional dependency |
+| `eggup-curl` | `"0.2"` (path, optional) | `0.2.1` | External-process adapter |
+| `eggup-eggfetch` | `"0.2"` (path, optional) | `0.2.1` | Native in-process HTTP/TLS adapter |
 
 The requirement literals above are the ones in
 [`crates/eggup-transport-footprint/Cargo.toml`](../crates/eggup-transport-footprint/Cargo.toml);
-the resolved versions are the current workspace version (`0.2.0`). The manifest
+the resolved versions are the current workspace source version (`0.2.1`). The manifest
 is authoritative and is not changed by this document.
 
 It inherits the 5 shared workspace keys (`version`, `edition`, `rust-version`,
@@ -97,10 +97,12 @@ until it lands in a consumer's dependency graph and binary size. These binaries
 are the fixture that makes the cost visible.
 
 Measured on this workspace at commit `ae9b47a` (macOS, `debug` profile, exact
-commands in [Verification](#verification)). The workspace version has since
-advanced to `0.2.0`; the counts below are the dated capture and are
-not re-derived — the commands in [Verification](#verification) reproduce them at
-the current baseline.
+commands in [Verification](#verification)). The current workspace source
+candidate is `0.2.1`; the counts and version labels below remain the dated
+capture and are not re-derived. The commands in [Verification](#verification)
+reproduce the build configurations at the current baseline, but may not produce
+the same counts or binary sizes; the displayed dependency-tree labels describe
+the captured `0.2.0` graph.
 
 | Configuration | Unique crates in the resolved tree | `curl_only` / `eggfetch_only` / `dual` binary size |
 |---|---|---|

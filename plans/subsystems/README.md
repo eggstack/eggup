@@ -36,5 +36,6 @@ Roadmaps MUST preserve completed history and MUST link active milestones to impl
 - `distribution-bootstrap-roadmap.md` (archived/transferred)
 - `consumer-adoption-roadmap.md`
 - `eggpack-manifest-interoperability-roadmap.md`
+- `transport-footprint-roadmap.md`
 
 Do not create new subsystems merely to split files. Create one when ownership, dependencies, or closure criteria are meaningfully distinct.

@@ -221,9 +221,9 @@ dependencies = [
 
 [[package]]
 name = "eggpack-manifest"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "352c3e327159615b763298e911e239f1decc4a2c9e28c28be8ddd28e50515e37"
+checksum = "4bbbe8d12026adf7c8e8ddaecbed0c6ac403a5621d4dd1ac9949f8daf8149a09"
 dependencies = [
  "serde",
  "serde_json",
@@ -231,11 +231,11 @@ dependencies = [
 
 [[package]]
 name = "eggup-acquisition"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "eggup-archive"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eggup-core",
  "flate2",
@@ -247,7 +247,7 @@ dependencies = [
 
 [[package]]
 name = "eggup-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "self-replace",
  "sha2",
@@ -255,14 +255,14 @@ dependencies = [
 
 [[package]]
 name = "eggup-curl"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eggup-acquisition",
 ]
 
 [[package]]
 name = "eggup-eggfetch"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eggfetch-core",
  "eggup-acquisition",
@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "eggup-eggpack"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eggpack-manifest",
  "eggup-acquisition",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "eggup-service"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eggup-core",
  "windows-args",
@@ -298,7 +298,7 @@ dependencies = [
 
 [[package]]
 name = "eggup-transport-footprint"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "eggup-acquisition",
  "eggup-curl",

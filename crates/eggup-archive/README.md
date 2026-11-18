@@ -74,8 +74,8 @@ the foreign replacement stays untouched. Member handles are single-owner and
 move-only: never clone a bound handle and assume an independent cursor.
 Supported order is stage, then close/consume handles, then handle-authorized
 cleanup. A failed bound stage copy never reopens the recorded path as
-fallback. Egress M006 and Eggpack M002 stay blocked until M001d closes with
-hosted qualification.
+fallback. Egress M006 and Eggpack M002 are closed: M001d delivered the handle-backed
+source handoff, with hosted qualification recorded in their closure records.
 
 This crate performs no network access, authenticity policy, external process
 invocation, live installation mutation, metadata restoration, or service

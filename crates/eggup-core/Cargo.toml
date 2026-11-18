@@ -13,7 +13,6 @@ authors = ["David Bowman"]
 keywords = ["update", "installer", "integrity", "rollback", "deployment"]
 categories = ["os", "filesystem"]
 exclude = [
-    "docs/",
     "tests/",
     "benches/",
 ]
