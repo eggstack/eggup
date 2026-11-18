@@ -18,13 +18,11 @@ use std::time::Duration;
 
 const LINUX_TARGET: &str = "x86_64-unknown-linux-gnu";
 const ALIAS_TARGET: &str = "linux-x64";
-// Producer-source identity for the registry pin below. The adapter pins the
-// exact crates.io release of Eggpack's manifest schema; see the registry
-// promotion evidence at `eggstack/eggpack: plans/closure/release-manifest/003-status.md`.
-// `PROMOTED_EGGPACK_REV` preserves the source revision qualified by the original
-// 0.1.0 promotion; the dependency itself is now advanced to 0.1.1.
+// Historical source identity for Eggpack's original 0.1.0 registry promotion.
+// The exact registry pin below tracks the current qualified producer schema;
+// 0.1.2's published production source matches 0.1.1.
 const PROMOTED_EGGPACK_REV: &str = "678bbf04f5a02827003a1d9ab83ba4f0e6360e41";
-const PROMOTED_EGGPACK_CRATE_VERSION: &str = "=0.1.1";
+const PROMOTED_EGGPACK_CRATE_VERSION: &str = "=0.1.2";
 
 const DIRECT_MANIFEST: &str = include_str!("fixtures/direct-manifest.json");
 const DIRECT_PROJECTION_JSON: &str = include_str!("fixtures/projection-direct.json");
@@ -978,7 +976,7 @@ fn adapter_pins_registry_eggpack_manifest_and_no_producer_crates() {
         )),
         "eggpack-manifest must be the exact registry dependency \
          eggpack-manifest = \"{PROMOTED_EGGPACK_CRATE_VERSION}\" (crates.io \
-         version of the source at {PROMOTED_EGGPACK_REV})"
+         original source baseline {PROMOTED_EGGPACK_REV})"
     );
     for forbidden in [
         "git =",

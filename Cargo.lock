@@ -221,9 +221,9 @@ dependencies = [
 
 [[package]]
 name = "eggpack-manifest"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "352c3e327159615b763298e911e239f1decc4a2c9e28c28be8ddd28e50515e37"
+checksum = "4bbbe8d12026adf7c8e8ddaecbed0c6ac403a5621d4dd1ac9949f8daf8149a09"
 dependencies = [
  "serde",
  "serde_json",
