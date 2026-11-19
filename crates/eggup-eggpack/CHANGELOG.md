@@ -52,20 +52,23 @@ evidence only.
 
 ## Unreleased
 
-Unpublished dependency maintenance and workspace pin alignment only. The
-latest published `eggup-eggpack` remains `0.2.0`; local source uses workspace
-version `0.2.1`. No Eggpack publication or consumer migration is authorized.
+No additional changes.
 
-- Advance the exact registry pin for `eggpack-manifest` from `=0.1.0` to
-  `=0.1.1`, and update the test ZIP dependency from `6.0` to `9.6.1`. The
-  adapter API and projected behavior remain unchanged.
-- Eggpack M008 separately advances the workspace-source exact registry pin
-  from `=0.1.1` to `=0.1.2`, the latest published release at this source
-  baseline. Its production source is byte-identical to 0.1.1, so the adapter
-  API and projected behavior remain unchanged.
-- Align the three local exact Eggup dependency pins to `=0.2.1` for the
-  workspace source version. The published `eggup-eggpack 0.2.0` package keeps
-  its original `=0.2.0` pins and is not republished by Core M016.
+## 0.2.1 — 2026-11-19
+
+This release keeps the adapter's Rust implementation, public API, and projected
+behavior unchanged while refreshing its exact registry dependency set.
+
+- Re-pin `eggup-core`, `eggup-archive`, and `eggup-acquisition` to `=0.2.1`.
+  The immutable `eggup-eggpack 0.2.0` package retains its original `=0.2.0`
+  pins; consumers select this version to receive the aligned 0.2.1 set.
+- Advance the exact producer-schema dependency to version 0.1.2, qualified
+  separately by Eggpack M008.
+- Raise the test-only ZIP dependency to `9.6.1`; this is a dev-dependency and
+  does not add a runtime dependency edge.
+- No adapter API or consumer migration is required. Existing publication
+  boundaries remain unchanged: the adapter selects no release, establishes no
+  authenticity, and authorizes no filesystem destination.
 
 ## 0.1.3 — 2026-10-06
 

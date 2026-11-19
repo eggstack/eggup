@@ -1,6 +1,6 @@
 # Archive Extraction Milestone 008 — eggup-archive 0.2.1 publication
 
-Status: ready for handoff
+Status: closed — see `plans/closure/archive-extraction/008-status.md`.
 
 Repository baseline: b5a989a72dc185b30cd8c0cb67b5110ed03acd86
 

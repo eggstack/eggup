@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication closed 2026-10-06; M005 cleanup-authority corrective closed; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M007 workspace dependency security refresh closed 2026-11-17 (hosted run `44022660351` green on all five CI lanes); M008 eggup-archive 0.2.1 publication ready for handoff
+Status: active; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication closed 2026-10-06; M005 cleanup-authority corrective closed; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M007 workspace dependency security refresh closed 2026-11-17 (hosted run `44022660351` green on all five CI lanes); M008 published `eggup-archive 0.2.1` 2026-11-19 from `5a04f68` (checksum `b841216d…bf61d80`), registry-verified and hosted-qualified in run `44591516672`
 
 Long-term references:
 
@@ -244,7 +244,7 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M005 cleanup contract truthfulness and member-write deduplication | closed; hosted-qualified (run `40008039843`) | `plans/implementation/archive-extraction/005-cleanup-contract-and-member-write-corrective.md` | `plans/closure/archive-extraction/005-status.md` | Closes registry open finding 4 (**high**). All four public `cleanup()` entry points now share one truthful contract with a reachable `Ok` path; the crate still never removes the root directory or traverses the root pathname, and the duplicated tar/zip member-write body is now one shared helper. Behaviour change: the `Ok` path is reachable, so a caller that wrote `cleanup().unwrap_err()` must now match on the result. The downstream `eggup-eggpack` test-helper migration was applied by the parent session. Unpublished: `eggup-eggpack`'s `=0.1.3` archive pin blocks propagation. Hosted-qualified in run `40008039843` (commit `0cb2c53`): all five lanes green — Stable, MSRV, macOS, Windows, Linux systemd. Its only remaining condition was the outstanding hosted qualification, and that condition is discharged. **Published since:** the `0.2.0` train carries this fix — published 2026-10-24 from `b612608`; the published `0.1.x` line still carries the pre-fix state, and registry versions are immutable. |
 | M006 | closed; hosted-qualified (run `40079833945`) | `plans/implementation/archive-extraction/006-eggup-archive-0.2.0-publication.md` | `plans/closure/archive-extraction/006-status.md` | Published `eggup-archive 0.2.0` (`ce35edd5…ff57ad`) from `b612608`, the publication source commit, with `v0.2.0` and release `0.2.0` created. The registry-only fixture resolves `eggup-archive 0.2.0` from crates.io, asserts the extracted member's byte count and SHA-256, and calls `cleanup()` matching the result rather than unwrapping it. The packaged manifest carries **no** `eggup-core` edge: that dependency is a path-only dev-dependency and is stripped at packaging
 | M007 workspace dependency security refresh | closed; hosted-qualified (run `44022660351`) | `plans/implementation/archive-extraction/007-workspace-dependency-security-refresh.md` | `plans/closure/archive-extraction/007-status.md` | All five hosted CI lanes green; no package publication authorized by M007 |
-| M008 eggup-archive 0.2.1 publication | ready for handoff | `plans/implementation/archive-extraction/008-eggup-archive-0.2.1-publication.md` | `plans/closure/archive-extraction/008-status.md` | Eggpack's current exact =0.2.1 pin requires registry availability; package checks and hosted qualification required |
+| M008 eggup-archive 0.2.1 publication | closed; registry-verified; hosted-qualified (run `44591516672`) | `plans/implementation/archive-extraction/008-eggup-archive-0.2.1-publication.md` | `plans/closure/archive-extraction/008-status.md` | Published from `5a04f68`; registry SHA-256 `b841216d…bf61d80`; normalized manifest has five normal dependencies and no Eggup edge; registry-only fixture passes |
 
 ### M007 — Workspace dependency security refresh
 
@@ -256,8 +256,17 @@ Status: closed 2026-11-17; see `plans/closure/archive-extraction/007-status.md`.
 
 Class: infrastructure / package promotion.
 
-Status: ready for handoff; publication must follow the exact registry, package, and hosted gates in the source plan.
+Status: closed 2026-11-19; registry-verified and hosted-qualified in run `44591516672`. See the closure record for checksums, package contents, commands,
+registry-only fixture evidence, and the reconciliation trail.
 
 Plan: `plans/implementation/archive-extraction/008-eggup-archive-0.2.1-publication.md`.
 
-Publish only `eggup-archive 0.2.1`, carrying M007's qualified ZIP dependency refresh. The package has no normal Eggup dependency; Eggpack's exact `=0.2.1` archive pin is the downstream reason to publish. Preserve all archive safety invariants, do not move `v0.2.1`, and do not publish Eggpack before Archive M008 is closed and registry-visible.
+Archive M008 published only `eggup-archive 0.2.1` from source commit
+`5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Crates.io readback confirmed
+publisher `dbowm91`, `yanked=false`, checksum
+`b841216d7c0495885c6fe21b1aa353a4415d04139018f68f08d76e101bf61d80`, and a
+normalized manifest with five normal dependencies and no Eggup runtime edge.
+The registry-only fixture passes. The release carries M007's ZIP dependency
+refresh without changing the public API or extraction behavior. It satisfies
+Eggpack's exact `=0.2.1` archive pin. The existing `v0.2.1` tag remains on
+Core's publication source; no tag was moved or created.

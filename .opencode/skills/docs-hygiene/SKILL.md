@@ -64,8 +64,9 @@ Each has occurred at least once — check for them explicitly:
    `eggup-service` diagnostic tests are three steps. The MSRV lane runs a
    workspace check and the packaged-service step; it does not run tests, and
    that step's registry-resolved compile is strict too.
-2. **Publication status.** `eggup-core 0.2.1` was published 2026-11-18; the
-   other six publishable crates remain at `0.2.0`.
+2. **Publication status.** `eggup-core 0.2.1` was published 2026-11-18;
+   `eggup-archive 0.2.1` and `eggup-acquisition 0.2.1` on 2026-11-19. The
+   other four publishable crates remain at `0.2.0`.
    `eggup-transport-footprint` is not published at all. Check crates.io rather
    than inferring from a `publish = false` key or a plan.
 3. **Enum tables lagging the source.** `architecture/core-transaction.md` once

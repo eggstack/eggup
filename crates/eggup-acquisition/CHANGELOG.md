@@ -2,7 +2,11 @@
 
 ## 0.2.1 — 2026-11-19
 
-This package version is the zero-dependency acquisition seam targeted by the workspace's Eggpack 0.2.1 exact pin. It makes no production source, public API, runtime behavior, or dependency changes from 0.2.0; direct consumers need no migration. Registry publication evidence is recorded in Acquisition M019.
+Published to crates.io on 2026-11-19 as Acquisition M019. This package remains
+the zero-dependency transport-neutral seam and has no production source, public
+API, runtime behavior, or dependency change from 0.2.0. Direct consumers need no
+migration; the version satisfies Eggpack 0.2.1's exact =0.2.1 seam pin. Registry
+evidence is recorded in plans/closure/acquisition-transport/019-status.md.
 
 ## 0.2.0 — 2026-10-24
 

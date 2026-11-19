@@ -46,16 +46,20 @@ Derived from the `crates/*/Cargo.toml` manifests. Arrows point from dependent to
 dependency (compile-time direction). All 8 crates carry workspace version
 `0.2.1`.
 
-M016 published only `eggup-core 0.2.1`; the other six published library
+Core M016 published `eggup-core 0.2.1`; Archive M008 and Acquisition M019
+separately published `eggup-archive 0.2.1` and `eggup-acquisition 0.2.1` from
+`5a04f68f60c8c3ad6392036fa314ed2749fa572c`. The other four published library
 crates remain at `0.2.0`. All eight source crates share workspace version
 `0.2.1`. The Core `0.2.1` package includes the three existing contract docs;
 the immutable Core `0.2.0` package does not. The earlier `0.2.0` line remains
 one lockstep train published from a single source commit because
 `eggup-acquisition`'s next release is source-breaking and the workspace shares
 one version. Publication and registry-only evidence are in the closure records
-under `plans/closure/`. The `v0.2.1` tag and Release point to
-`b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; no existing tag was moved.
-`eggup-transport-footprint` is `publish = false`.
+under `plans/closure/`. The `v0.2.1` tag and Release still point to Core source
+commit `b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; Archive and Acquisition
+publications did not move that tag. `eggup-transport-footprint` is
+`publish = false`.
+
 
 ```text
                          eggup-transport-footprint   (publish = false, 3 bins)

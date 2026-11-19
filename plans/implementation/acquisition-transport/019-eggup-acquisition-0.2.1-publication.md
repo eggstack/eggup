@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 019 — eggup-acquisition 0.2.1 publication
 
-Status: ready for handoff
+Status: closed — see `plans/closure/acquisition-transport/019-status.md`.
 
 Repository baseline: b5a989a72dc185b30cd8c0cb67b5110ed03acd86
 

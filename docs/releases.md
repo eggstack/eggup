@@ -1,27 +1,29 @@
 # Versions and upgrades
 
-This page was checked against crates.io on 2026-11-18. The latest published
-version is **0.2.1** for `eggup-core` and **0.2.0** for the other six library
-crates. M016 published only Core `0.2.1` from source commit
-`b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; all eight workspace crates still
-share source version `0.2.1`. The `v0.2.1` tag and GitHub Release point at that
-source. The immutable Core `0.2.0` package remains unchanged and lacks the
+This page was checked against crates.io on 2026-11-19. The latest published
+version is **0.2.1** for `eggup-core`, `eggup-archive`, and
+`eggup-acquisition`, and **0.2.0** for the other four library crates. Core M016
+published `eggup-core 0.2.1` from
+`b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; Archive M008 and Acquisition
+M019 separately published `eggup-archive 0.2.1` and
+`eggup-acquisition 0.2.1` from
+`5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Acquisition remains the
+zero-dependency seam with no source or API change. All eight workspace crates
+share source version `0.2.1`. The `v0.2.1` tag and GitHub Release still point
+at Core's source commit; the Archive and Acquisition publications did not move
+the tag. The immutable Core `0.2.0` package remains unchanged and lacks the
 three contract documents. Check crates.io again when choosing a version, since
 registry state can change independently of this repository.
 
 | Crate | Latest published version |
 |---|---|
 | [`eggup-core`](https://crates.io/crates/eggup-core) | `0.2.1` |
-| [`eggup-acquisition`](https://crates.io/crates/eggup-acquisition) | `0.2.0` |
+| [`eggup-acquisition`](https://crates.io/crates/eggup-acquisition) | `0.2.1` |
 | [`eggup-eggfetch`](https://crates.io/crates/eggup-eggfetch) | `0.2.0` |
 | [`eggup-curl`](https://crates.io/crates/eggup-curl) | `0.2.0` |
-| [`eggup-archive`](https://crates.io/crates/eggup-archive) | `0.2.0` |
+| [`eggup-archive`](https://crates.io/crates/eggup-archive) | `0.2.1` |
 | [`eggup-eggpack`](https://crates.io/crates/eggup-eggpack) | `0.2.0` |
 | [`eggup-service`](https://crates.io/crates/eggup-service) | `0.2.0` |
-
-`eggup-transport-footprint` is not published. The earlier `0.1.x` releases
-remain available. Because Eggup is pre-1.0, a `0.1` requirement does not accept
-`0.2.1`; update your dependency requirement when upgrading.
 
 ## Exact-pin behavior
 

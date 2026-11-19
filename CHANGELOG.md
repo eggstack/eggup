@@ -1,20 +1,37 @@
 # Changelog
 
-## 0.2.1 — 2026-11-18, completed 2026-11-18
+## 0.2.1 — 2026-11-18–19, completed 2026-11-19
 
-This is a selective single-crate publication, not a new lockstep train.
-`eggup-core 0.2.1` was published from source commit
+This version has three selective single-crate publications, not a new lockstep
+train. `eggup-core 0.2.1` was published on 2026-11-18 from source commit
 `b5a989a72dc185b30cd8c0cb67b5110ed03acd86` as Verified Update Core M016; its
 registry checksum is
 `3841a8390f8c7b1be0207156e5c895aa4b6c0eec8b05772ac8331d3e43e7ef88`. The
 package adds the three existing authoritative contract documents, without a
 production API, runtime, or dependency change. The same source commit includes
-M021's separately planned test-only native fixture helper under `#[cfg(test)}`;
-that change is not part of M016's package-content work. The annotated
-`v0.2.1` tag and GitHub Release point at the publication source. The other six
-publishable crates remain at `0.2.0`, and their packages are unchanged. The
-immutable Core `0.2.0` package does not gain these documents. See
-`plans/closure/verified-update-core/016-status.md`.
+M021's separately planned test-only native fixture helper under `#[cfg(test)]`;
+that change is not part of M016's package-content work.
+
+Archive M008 separately published `eggup-archive 0.2.1` on 2026-11-19 from
+source commit `5a04f68f60c8c3ad6392036fa314ed2749fa572c`; its registry checksum
+is `b841216d7c0495885c6fe21b1aa353a4415d04139018f68f08d76e101bf61d80`. It
+carries M007's ZIP dependency refresh without changing the public API or
+extraction behavior.
+
+Acquisition M019 separately published `eggup-acquisition 0.2.1` on 2026-11-19
+from the same source commit `5a04f68f60c8c3ad6392036fa314ed2749fa572c`; its
+registry checksum is
+`8832b13c4488a59ec4dc8920aea610ba5a1c50434e9cd1e5209c35e7235d7f7d`. The
+zero-dependency seam has no source, API, or runtime change; its publication
+satisfies Eggpack's exact pin. Published curl and eggfetch use `^0.2` and do
+not require republication.
+
+The annotated `v0.2.1` tag and GitHub Release still point at Core's publication
+source. The other four publishable crates remain at `0.2.0`. The immutable Core
+`0.2.0` package does not gain the contract docs. See
+`plans/closure/verified-update-core/016-status.md`,
+`plans/closure/archive-extraction/008-status.md`, and
+`plans/closure/acquisition-transport/019-status.md`.
 
 ## 0.2.0 — 2026-10-24, completed 2026-10-24
 
@@ -420,24 +437,19 @@ claims are made by any of these crates.
 ## Unreleased
 
 Nothing in this section has been published. The latest published version is
-`0.2.1` for `eggup-core` and `0.2.0` for the other six publishable crates;
-`eggup-transport-footprint` is `publish = false` and has no registry version.
-The remaining entries describe unpublished dependency maintenance and local
-source-pin alignment; they do not record another authorized publication. No
-consumer migration is required for the Core package-content change.
+`0.2.1` for `eggup-core`, `eggup-archive`, and `eggup-acquisition`, and
+`0.2.0` for the other four publishable crates; `eggup-transport-footprint` is `publish = false` and has no
+registry version. The remaining entries describe unpublished dependency
+maintenance and local source-pin alignment; they are not additional published
+versions. No consumer migration is required for the Core, Archive, or Acquisition
+0.2.1 changes.
 
-- `eggup-archive`: update the ZIP dependency from `6.0.0` to `9.6.1`, keeping
-  explicit bounded extraction behavior and the public API unchanged. This
-  change is not in the published `eggup-archive 0.2.0` package.
 - `eggup-eggpack`: advance the exact `eggpack-manifest` pin from `=0.1.0` to
-  `=0.1.1`; update the test ZIP dependency to `9.6.1`. The adapter API and
-  projected behavior remain unchanged. This change is not in the published
-  `eggup-eggpack 0.2.0` package.
+  `=0.1.2`; update the test ZIP dependency to `9.6.1`. The adapter API and
+  projected behavior remain unchanged. This workspace-source pin update is
+  not in the published `eggup-eggpack 0.2.0` package.
 - Refresh compatible lockfile dependencies, including the patched Rustls,
   `rustls-webpki`, and `webpki-roots` versions.
-- `eggup-core` M016: prepare the `0.2.1` package to include the three existing
-  authoritative contract documents. This is package-content-only; the Core
-  `0.2.0` registry artifact remains unchanged, and the candidate is not yet published.
 - `eggup-eggpack`: align the three local exact pins to workspace source version
   `=0.2.1`. The published `eggup-eggpack 0.2.0` archive and its `=0.2.0` pins
   are unchanged; the `0.2.1` source candidate is not yet published, and no

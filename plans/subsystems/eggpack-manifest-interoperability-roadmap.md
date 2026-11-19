@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability Roadmap
 
-Status: active; M001–M008 closed; M006 canonical-digest-reuse corrective closed; M007 published `eggup-eggpack 0.2.0` 2026-10-24 from `b612608`, re-pinning all three in-workspace dependencies at `=0.2.0` (hosted run `40079833945` green on all five lanes); M008 workspace-source pin refresh closed 2026-11-18 (hosted run `44348100277` green on all five lanes)
+Status: active; M001–M008 closed; M006 canonical-digest-reuse corrective closed; M007 published `eggup-eggpack 0.2.0` 2026-10-24 from `b612608`, re-pinning all three in-workspace dependencies at `=0.2.0` (hosted run `40079833945` green on all five lanes); M008 workspace-source pin refresh closed 2026-11-18 (hosted run `44348100277` green on all five lanes); M009 eggup-eggpack 0.2.1 publication active, pending local/hosted qualification and separate immediate crates.io confirmation
 
 Long-term references:
 
@@ -254,6 +254,12 @@ Publish the existing member-identity cross-check that fixes the positional archi
 binding defect in registry 0.1.2, and move the adapter's exact Eggup dependency
 pins coherently to `=0.1.3`. No adapter policy/API change.
 
+### M009 — eggup-eggpack 0.2.1 publication
+
+Status: active. The exact Core, Archive, and Acquisition 0.2.1 pins are now registry-visible, and Eggpack M008's exact eggpack-manifest 0.1.2 pin is qualified. Publish only eggup-eggpack 0.2.1 after package, local, hosted, and registry checks plus a separate immediate maintainer confirmation. No adapter production source/API change is in scope; preserve the existing v0.2.1 tag at Core's commit and extend only the existing release notes.
+
+Implementation plan: plans/implementation/eggpack-manifest-interoperability/009-eggup-eggpack-0.2.1-publication.md.
+
 ## 8. Cross-cutting requirements
 
 - Rust 1.89 baseline;
@@ -312,3 +318,4 @@ The subsystem is mature when at least one real Eggup consumer can consume Eggpac
 | M006 canonical digest reuse | closed; hosted-qualified (run `40008039843`) | `plans/implementation/eggpack-manifest-interoperability/006-canonical-digest-reuse-corrective.md` | `plans/closure/eggpack-manifest-interoperability/006-status.md` | Closes registry open finding 9 (**medium**). The adapter's inline digest loop duplicated `eggup_core::hash_file`, and the direct `sha2 = "0.10.9"` runtime dependency existed solely for that one call site in a crate that already depends on `eggup-core = "=0.1.3"`; the adapter now delegates to `eggup_core::hash_file`, the direct runtime `sha2` edge is gone, and `sha2` remains a dev-dependency only. No pin cascade was required. Hosted-qualified in run `40008039843` (commit `0cb2c53`): all five lanes green — Stable, MSRV, macOS, Windows, Linux systemd. `Cargo.lock` is unchanged and the resolved `sha2` is still `0.10.9`. Unpublished; `v0.1.3` must not move. **Published since:** the `0.2.0` train carries this fix — published 2026-10-24 from `b612608`; the published `0.1.x` line still carries the pre-fix state, and registry versions are immutable. |
 | M007 | closed; hosted-qualified (run `40079833945`) | `plans/implementation/eggpack-manifest-interoperability/007-eggup-eggpack-0.2.0-publication.md` | `plans/closure/eggpack-manifest-interoperability/007-status.md` | Published `eggup-eggpack 0.2.0` (`33dc1da4…14f1f6`) from `b612608`, the publication source commit, with `v0.2.0` and release `0.2.0` created. Published last, because the crate exact-pins all three of its in-workspace dependencies at `=0.2.0`. The registry-only fixture depends only on `eggup-eggpack` and resolves `eggup-core`, `eggup-archive`, and `eggup-acquisition` at `0.2.0` from crates.io, which is the proof that the re-pin delivers the workspace's fixes to adapter consumers. The adapter's own public API is unchanged; the source break arrives transitively through the seam's retyped `AcquisitionError` |
 | M008 eggpack-manifest 0.1.2 source-pin refresh | closed; hosted-qualified (run `44348100277`) | `plans/implementation/eggpack-manifest-interoperability/008-eggpack-manifest-0.1.2-source-pin-refresh.md` | `plans/closure/eggpack-manifest-interoperability/008-status.md` | Advance only the unpublished workspace adapter's exact producer pin; no API/behavior change or package publication; local gate and all five hosted lanes passed on implementation commit `31af43f` |
+| M009 eggup-eggpack 0.2.1 publication | active; pending qualification and separate upload confirmation | `plans/implementation/eggpack-manifest-interoperability/009-eggup-eggpack-0.2.1-publication.md` | pending | Publish only the exact-pin leaf after Core/Archive/Acquisition 0.2.1 are registry-visible; Curl/Eggfetch/Service caret consumers need no republication; preserve the existing `v0.2.1` tag |
