@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+No additional changes.
+
+## 0.2.1 — 2026-11-19
+
+Published to crates.io as Eggpack Manifest Interoperability M009 from source commit ccb2bfcbbe7645541d43bb4f5fcb801339c319ed; registry SHA-256 492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795.
+
+This release keeps the adapter's Rust implementation, public API, and projected
+behavior unchanged while refreshing its exact registry dependency set.
+
+- Re-pin `eggup-core`, `eggup-archive`, and `eggup-acquisition` to `=0.2.1`.
+  The immutable `eggup-eggpack 0.2.0` package retains its original `=0.2.0`
+  pins; consumers select this version to receive the aligned 0.2.1 set.
+- Advance the exact producer-schema dependency to version 0.1.2, qualified
+  separately by Eggpack M008.
+- Raise the test-only ZIP dependency to `9.6.1`; this is a dev-dependency and
+  does not add a runtime dependency edge.
+- No adapter API or consumer migration is required. Existing publication
+  boundaries remain unchanged: the adapter selects no release, establishes no
+  authenticity, and authorizes no filesystem destination.
+
 ## 0.2.0 — 2026-10-24
 
 Published to crates.io (`plans/closure/eggpack-manifest-interoperability/007-status.md`).
@@ -49,26 +71,6 @@ evidence only.
 - **Unchanged boundaries.** The adapter still selects no release, verifies no
   authenticity, and authorizes no filesystem destination. SHA-256 is integrity
   evidence only.
-
-## Unreleased
-
-No additional changes.
-
-## 0.2.1 — 2026-11-19
-
-This release keeps the adapter's Rust implementation, public API, and projected
-behavior unchanged while refreshing its exact registry dependency set.
-
-- Re-pin `eggup-core`, `eggup-archive`, and `eggup-acquisition` to `=0.2.1`.
-  The immutable `eggup-eggpack 0.2.0` package retains its original `=0.2.0`
-  pins; consumers select this version to receive the aligned 0.2.1 set.
-- Advance the exact producer-schema dependency to version 0.1.2, qualified
-  separately by Eggpack M008.
-- Raise the test-only ZIP dependency to `9.6.1`; this is a dev-dependency and
-  does not add a runtime dependency edge.
-- No adapter API or consumer migration is required. Existing publication
-  boundaries remain unchanged: the adapter selects no release, establishes no
-  authenticity, and authorizes no filesystem destination.
 
 ## 0.1.3 — 2026-10-06
 

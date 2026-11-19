@@ -2,7 +2,7 @@
 
 Status: active
 
-Last release source baseline reviewed: `5a04f68f60c8c3ad6392036fa314ed2749fa572c` (Archive M008 and Acquisition M019; `eggup-archive 0.2.1` checksum `b841216d…bf61d80` and `eggup-acquisition 0.2.1` checksum `8832b13c…7235d7f7d`, both registry-read back and hosted-qualified in run `44591516672`). Core M016's `eggup-core 0.2.1` publication, tag, and GitHub Release remain recorded below. Downstream handoff refreshed 2026-10-09 against `dbowm91/wg-basic@ff40f85`.
+Last release source baseline reviewed: `ccb2bfcbbe7645541d43bb4f5fcb801339c319ed` (Eggpack M009; `eggup-eggpack 0.2.1` checksum `492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795`, registry-read back and byte/provenance verified; hosted run `44610409556` passed all five lanes). Core M016, Archive M008, and Acquisition M019 remain recorded below. Downstream handoff refreshed 2026-10-09 against `dbowm91/wg-basic@ff40f85`.
 
 This file is the compact control surface for active Eggup planning. Detailed requirements live in the linked plans and roadmaps.
 
@@ -39,7 +39,7 @@ Eggpack's producer evidence is a separate upstream publication: `eggpack-manifes
 | Acquisition transport | M001-M019 closed; M012 conditionally closed; M017 published `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch` 0.2.0 (2026-10-24) from `b612608`; M018 hosted-qualified in run `44155438351`; M019 published `eggup-acquisition 0.2.1` 2026-11-19 from `5a04f68` (checksum `8832b13c…7235d7f7d`, run `44591516672`) | `plans/closure/acquisition-transport/` |
 | Service lifecycle | M001-M017 closed; `eggup-service 0.2.0` published 2026-10-24 from `b612608`, carrying the stdin-verdict fix the published `0.1.3` lacks | `plans/closure/service-lifecycle/` |
 | Archive extraction | M001 lineage + M001d + M005 + M006 closed; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608`; M007 closed; M008 published `eggup-archive 0.2.1` 2026-11-19 from `5a04f68` (checksum `b841216d…bf61d80`, hosted run `44591516672`) | `plans/closure/archive-extraction/` |
-| Eggpack manifest interoperability | M001-M007 all closed; M007 published `eggup-eggpack 0.2.0` 2026-10-24 from `b612608`, re-pinning all three in-workspace deps at `=0.2.0` | `plans/closure/eggpack-manifest-interoperability/` |
+| Eggpack manifest interoperability | M001-M009 closed; M007 published `eggup-eggpack 0.2.0` from `b612608`; M009 published `eggup-eggpack 0.2.1` 2026-11-19 from `ccb2bfcb` (checksum `492271d5…6fded795`, registry-verified and hosted-qualified in run `44610409556`) | `plans/closure/eggpack-manifest-interoperability/` |
 | Transport footprint | M001 closed; the three isolated transport configurations are built or checked in the `stable`, `msrv`, and `macos` lanes | `plans/closure/transport-footprint/` |
 | Distribution/bootstrap (archived/transferred) | M001-M004 | `plans/closure/distribution-bootstrap/` |
 | Consumer adoption | M001 eggsact + M002 stegoeggo + M003 eggsearch + M005 CodeGG + M006 Egress (closed 2026-09-29) | `plans/closure/consumer-adoption/` |
@@ -102,31 +102,18 @@ publication source commit; the `v0.1.1`/`v0.1.2`/`v0.1.3` tags and the published
 `0.1.x` versions were not moved or withdrawn. `eggup-transport-footprint`
 remains `publish = false`.
 
-`0.2.1` selective releases — Core M016, Archive M008, and Acquisition M019
-(published 2026-11-18 and 2026-11-19):
+`0.2.1` selective releases — Core M016, Archive M008, Acquisition M019, and Eggpack M009 (published 2026-11-18 and 2026-11-19):
 
 | Package | Published from | Registry checksum | Publisher |
 |---|---|---|---|
 | `eggup-core 0.2.1` | `b5a989a72dc185b30cd8c0cb67b5110ed03acd86` | `3841a8390f8c7b1be0207156e5c895aa4b6c0eec8b05772ac8331d3e43e7ef88` | `dbowm91` |
 | `eggup-archive 0.2.1` | `5a04f68f60c8c3ad6392036fa314ed2749fa572c` | `b841216d7c0495885c6fe21b1aa353a4415d04139018f68f08d76e101bf61d80` | `dbowm91` |
 | `eggup-acquisition 0.2.1` | `5a04f68f60c8c3ad6392036fa314ed2749fa572c` | `8832b13c4488a59ec4dc8920aea610ba5a1c50434e9cd1e5209c35e7235d7f7d` | `dbowm91` |
+| `eggup-eggpack 0.2.1` | `ccb2bfcbbe7645541d43bb4f5fcb801339c319ed` | `492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795` | `dbowm91` |
 
-Core, Archive, and Acquisition were published as three separate selective
-releases; the other four publishable crates remain at `0.2.0`. The Core
-`0.2.1` archive contains `docs/domain.md`, `docs/verification.md`, and
-`docs/transaction.md`. Archive `0.2.1` carries M007's ZIP dependency refresh
-without changing the public API or extraction behavior. Acquisition `0.2.1`
-remains a zero-dependency seam with no source, API, or runtime change. Published
-curl and eggfetch use `^0.2` and need no republication. Core `0.2.0` and the
-exact `=0.2.0` pins in published `eggup-eggpack 0.2.0` remain unchanged.
-Annotated tag `v0.2.1` still peels to Core's publication source commit, and
-GitHub Release [`v0.2.1`](https://github.com/eggstack/eggup/releases/tag/v0.2.1)
-retains that source target and now records the separate Archive and Acquisition
-publications. The Core source also includes M021's separately qualified
-`#[cfg(test)]` fixture change; it is not an M016 production change. See
-`plans/closure/verified-update-core/016-status.md`,
-`plans/closure/archive-extraction/008-status.md`, and
-`plans/closure/acquisition-transport/019-status.md`.
+These are four separate selective releases, not a new lockstep train. The other three publishable crates (Curl, Eggfetch, and Service) remain at `0.2.0`; eggup-transport-footprint remains `publish = false`. The Core `0.2.1` archive contains `docs/domain.md`, `docs/verification.md`, and `docs/transaction.md`. Archive `0.2.1` carries M007's ZIP dependency refresh without changing the public API or extraction behavior. Acquisition `0.2.1` remains a zero-dependency seam with no source, API, or runtime change. Eggpack `0.2.1` changes only the published exact dependency set: eggup-core, eggup-archive, and eggup-acquisition are pinned at `=0.2.1`, and eggpack-manifest at `=0.1.2`; its API and behavior are unchanged. The immutable Core `0.2.0` and Eggpack `0.2.0` artifacts remain unchanged, with Eggpack 0.2.0 retaining its original exact pins.
+
+Annotated tag `v0.2.1` still peels to Core's publication source commit, and GitHub Release [`v0.2.1`](https://github.com/eggstack/eggup/releases/tag/v0.2.1) retains that Core target while its existing notes record the Archive, Acquisition, and Eggpack publications. The Core source also includes M021's separately qualified `#[cfg(test)]` fixture change; it is not an M016 production change. See `plans/closure/verified-update-core/016-status.md`, `plans/closure/archive-extraction/008-status.md`, `plans/closure/acquisition-transport/019-status.md`, and `plans/closure/eggpack-manifest-interoperability/009-status.md`.
 
 
 One line differs between the published packages and this repository. The seven
@@ -598,7 +585,7 @@ against the registry. Finding 17 was registered by Acquisition M016.
 | Service lifecycle | M001–M017 closed; M012/M013/M014/M015 hosted-qualified; M017 published `eggup-service 0.2.0` 2026-10-24 from `b612608`, run `40079833945` green | no further service-lifecycle milestone is registered. The `SystemExecutor` consolidation that M012 deferred is closed by M015, and finding 16's strict packaged-service step was restored in `2d6e089` |
 | Archive extraction | M001 lineage + M004 closed; M005 closed 2026-10-23 and hosted-qualified in run `40008039843`; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608`; M007 closed 2026-11-17, hosted-qualified in run `44022660351`; M008 published `eggup-archive 0.2.1` 2026-11-19 from `5a04f68`, registry checksum `b841216d…bf61d80`, hosted run `44591516672` green | No further Archive publication is registered; the Eggpack `=0.2.1` pin is now satisfied |
 | Distribution/bootstrap | archived/transferred; M001-M004 closed | no further Eggup producer work |
-| Eggpack manifest interoperability | M001–M008 closed; `eggup-eggpack 0.1.3` carries the member-identity cross-check; M006 closed 2026-10-23 and hosted-qualified in run `40008039843`; M007 published `eggup-eggpack 0.2.0` 2026-10-24 from `b612608`; M008 workspace-source pin refresh closed 2026-11-18 and hosted-qualified in run `44348100277` (all five lanes), with no package publication; M009 `eggup-eggpack 0.2.1` publication active | M009: publish only the exact-pin leaf after registry and hosted qualification, then close its registry-only fixture; no Curl/Eggfetch/Service republication needed |
+| Eggpack manifest interoperability | M001–M009 closed; M007 published `eggup-eggpack 0.2.0` 2026-10-24 from `b612608`; M008 workspace-source pin refresh closed 2026-11-18 and hosted-qualified in run `44348100277`; M009 published `eggup-eggpack 0.2.1` 2026-11-19 from `ccb2bfcb` (checksum `492271d5…6fded795`, hosted run `44610409556` green) | No Eggpack republication is currently registered; the registry-only M009 fixture proves all exact pins resolve. Curl, Eggfetch, and Service remain at 0.2.0 because their published caret dependencies already accept the 0.2.1 dependencies. |
 | Consumer adoption | simple, eggsearch, CodeGG M005, Egress M006 closed | **Gregg M004 and EggPool M007 are now authorable** — every versioned handoff they were gated on (acquisition 0.1.3, Core 0.1.3) is published, and the 0.2.0 line is published on top of it |
 
 ## Dependency-ready implementation work
@@ -613,7 +600,7 @@ milestone appears in exactly one table in this registry.
 | Verified update core | M016 eggup-core contract-doc packaging | closed 2026-11-18; hosted-qualified (post-publication run `44391076419`) | `plans/implementation/verified-update-core/016-eggup-core-contract-doc-packaging.md`; `plans/closure/verified-update-core/016-status.md` | Published only `eggup-core 0.2.1` from `b5a989a`; checksum `3841a839…e7ef88`; registry archive and registry-only fixture pass; `v0.2.1` and GitHub Release verified |
 | Verified update core | M021 native bounded-candidate test fixture | closed; hosted-qualified (run `44380404044`) | `plans/implementation/verified-update-core/021-native-bounded-candidate-test-fixture.md`; `plans/closure/verified-update-core/021-status.md` | Test-only fix at `5f7f074baa491f62a5e372d0caacaacea5148716`; both push run `44380404044` and PR run `44380418766` passed all five lanes on that SHA. M016 later published the merged source at `b5a989a`; the source retains this separately scoped `#[cfg(test)]` change. |
 | Eggpack manifest interoperability | M008 eggpack-manifest 0.1.2 source-pin refresh | closed; hosted-qualified (run `44348100277`) | `plans/implementation/eggpack-manifest-interoperability/008-eggpack-manifest-0.1.2-source-pin-refresh.md`; `plans/closure/eggpack-manifest-interoperability/008-status.md` | Exact 0.1.2 workspace pin qualified on implementation commit `31af43f`; all five hosted lanes passed; no API/behavior change or package publication |
-| Eggpack manifest interoperability | M009 eggup-eggpack 0.2.1 publication | active; awaiting package/local/hosted qualification and exact upload confirmation | `plans/implementation/eggpack-manifest-interoperability/009-eggup-eggpack-0.2.1-publication.md` | Core, Archive, and Acquisition 0.2.1 plus eggpack-manifest 0.1.2 are registry prerequisites; only Eggpack needs publication because the other published consumers use `^0.2`; preserve the existing `v0.2.1` tag |
+| Eggpack manifest interoperability | M009 eggup-eggpack 0.2.1 publication | closed 2026-11-19; registry-verified; hosted-qualified (run `44610409556`) | `plans/implementation/eggpack-manifest-interoperability/009-eggup-eggpack-0.2.1-publication.md`; `plans/closure/eggpack-manifest-interoperability/009-status.md` | Published from `ccb2bfcb`; checksum `492271d5…6fded795`; exact registry pins and byte-identical artifact are verified; registry-only fixture passes; existing `v0.2.1` tag remains on Core's source commit |
 | Archive extraction | M008 eggup-archive 0.2.1 publication | closed 2026-11-19; registry-verified; hosted-qualified (run `44591516672`) | `plans/implementation/archive-extraction/008-eggup-archive-0.2.1-publication.md`; `plans/closure/archive-extraction/008-status.md` | Published from `5a04f68`; checksum `b841216d…bf61d80`; normalized manifest has five normal dependencies and no Eggup edge; registry-only fixture passes. |
 | Acquisition transport | M019 eggup-acquisition 0.2.1 publication | closed 2026-11-19; registry-verified; hosted-qualified (run `44591516672`) | `plans/implementation/acquisition-transport/019-eggup-acquisition-0.2.1-publication.md`; `plans/closure/acquisition-transport/019-status.md` | Published from `5a04f68`; checksum `8832b13c…7235d7f7d`; published dependencies empty; registry-only exact-pin fixture passes; v0.2.1 remains on Core's source commit. |
 | Verified update core | M020 staging privacy and credential redaction corrective | ready for handoff | `plans/implementation/verified-update-core/020-staging-privacy-and-credential-redaction-corrective.md` | Closes finding 18 (**low**): creation-mode privacy for the stage root, stage intermediates, backup root and both lock-record sites, plus manual `Debug` redaction in `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch`. No new dependency, no public API change, no version or publication change; three audit residuals accepted with reasons in plan §5 |

@@ -31,9 +31,11 @@ to ship in seam → adapter → leaf order.
 
 ## The exact-pin cascade
 
-The current `eggup-eggpack` workspace source pins its Eggup dependencies
-exactly to `=0.2.1`; the published `eggup-eggpack 0.2.0` remains pinned to
-`=0.2.0`. Every other workspace crate uses a caret requirement. Consequence:
+The current workspace source and published `eggup-eggpack 0.2.1` each pin
+Eggup dependencies exactly to `=0.2.1`; the published `eggup-eggpack 0.2.0`
+remains immutable with its original `=0.2.0` pins. Eggpack 0.2.1 also pins
+`eggpack-manifest =0.1.2`. Every other workspace crate uses a caret
+requirement. Consequence:
 
 - A fix published to a caret consumer (`eggup-curl`, `eggup-eggfetch`,
   `eggup-service`) is inherited automatically on the next resolve — **within the
@@ -42,8 +44,10 @@ exactly to `=0.2.1`; the published `eggup-eggpack 0.2.0` remains pinned to
   both the seam and an adapter inherits the seam's source break only after the
   adapter's own requirement is widened. Widening a requirement is a manifest
   change that belongs to the publication milestone, not to the fix milestone.
-- The same fix **cannot** reach `eggup-eggpack 0.2.0` consumers. The adapter
-  needs a **separate republication** to inherit a seam fix.
+- An exact-pin update cannot reach consumers of an older immutable Eggpack
+  release: both `eggup-eggpack 0.2.0` and `0.2.1` keep their respective exact
+  dependency sets. A later seam fix needs a **separate Eggpack republication**
+  with a new exact pin.
 
 So a single seam fix can become a two-publication event. Name that follow-on
 explicitly in the plan and in the registry, or it will be discovered late.

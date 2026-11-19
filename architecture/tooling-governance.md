@@ -114,19 +114,19 @@ silently break them:
   (`crates/eggup-archive/Cargo.toml`). Core does not depend on archive; the
   arrow is one-way, and the test fixtures are what need the transaction types.
 
-**Exact-pin asymmetry.** In the current workspace source candidate,
-`eggup-eggpack` pins its in-workspace deps with exact requirements
-(`=0.2.1`) and takes `eggpack-manifest` as `=0.1.2` from the registry. The
-immutable published `eggup-eggpack 0.2.0` still pins its Eggup edges at
-`=0.2.0` and its producer edge at `=0.1.0`. Every other current workspace crate uses a caret requirement,
-`"0.2"`, which resolves against the local path packages at source version
-`0.2.1` (`eggup-eggfetch`/`eggup-curl` → `eggup-acquisition`,
-`eggup-service` → `eggup-core`, and the footprint fixtures). This local alignment does not make every workspace crate a `0.2.1` registry
-release: Core M016 published Core, Archive M008 and Acquisition M019 later
-published their crates, and the other four publishable crates remain at
-`0.2.0`. The distinct exact-pin behavior is
-intentional for the adapter;
-review downstream version coupling per release plan.
+**Exact-pin asymmetry.** The current workspace source and published
+`eggup-eggpack 0.2.1` pin its in-workspace dependencies exactly to `=0.2.1`
+and take `eggpack-manifest` as `=0.1.2` from the registry. The immutable
+published `eggup-eggpack 0.2.0` still pins its Eggup edges at `=0.2.0` and
+its producer edge at `=0.1.0`. Every other current workspace crate uses a
+caret requirement, `0.2`, which resolves against the local path packages at
+source version `0.2.1` (`eggup-eggfetch`/`eggup-curl` → `eggup-acquisition`,
+`eggup-service` → `eggup-core`, and the footprint fixtures). This local
+alignment does not make every workspace crate a `0.2.1` registry release: Core
+M016, Archive M008, Acquisition M019, and Eggpack M009 published their 0.2.1
+packages; the other three publishable crates remain at `0.2.0`. The exact-pin
+behavior is intentional for the adapter: a later dependency update still needs
+a new Eggpack publication. Review downstream version coupling per release plan.
 
 **The `0.2.0` widening was load-bearing, not cosmetic.** The seam's
 `0.2.0` is source-breaking (`AcquisitionError::Io(String)` became
@@ -670,14 +670,15 @@ CI added."
 
 | `eggup-eggfetch` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Native HTTP adapter |
 | `eggup-curl` | 0.2.1 | 0.2.0 | 0.1.2, **0.2.0** | External-curl adapter |
-| `eggup-eggpack` | 0.2.1 | 0.2.0 | 0.1.2, 0.1.3, **0.2.0** | Only crate touching producer types; source candidate pins `=0.2.1`; published `0.2.0` retains `=0.2.0` |
+| `eggup-eggpack` | 0.2.1 | 0.2.1 | 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Only crate touching producer types; published 0.2.1 exact-pins Eggup dependencies at `=0.2.1` and eggpack-manifest at `=0.1.2`; immutable 0.2.0 retains its original pins |
 | `eggup-service` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Carries the stdin-verdict fix the published `0.1.3` lacks |
 | `eggup-transport-footprint` | 0.2.1 | — | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
 All 8 crates share workspace source version `0.2.1`. Crates.io reports
-`eggup-core 0.2.1`, `eggup-archive 0.2.1`, and
-`eggup-acquisition 0.2.1` as latest; the other four publishable crates remain
-at `0.2.0`. Core M016 published from source commit
+`eggup-core 0.2.1`, `eggup-archive 0.2.1`, `eggup-acquisition 0.2.1`, and
+`eggup-eggpack 0.2.1` as latest; the other three publishable crates
+(`eggup-curl`, `eggup-eggfetch`, and `eggup-service`) remain at `0.2.0`.
+Core M016 published from source commit
 `b5a989a72dc185b30cd8c0cb67b5110ed03acd86` (checksum
 `3841a8390f8c7b1be0207156e5c895aa4b6c0eec8b05772ac8331d3e43e7ef88`); its
 archive includes the three contract docs while immutable Core `0.2.0` does
@@ -685,15 +686,20 @@ not. Archive M008 published `eggup-archive 0.2.1` (checksum
 `b841216d7c0495885c6fe21b1aa353a4415d04139018f68f08d76e101bf61d80`), and
 Acquisition M019 published `eggup-acquisition 0.2.1` (checksum
 `8832b13c4488a59ec4dc8920aea610ba5a1c50434e9cd1e5209c35e7235d7f7d`), both
-from source commit `5a04f68f60c8c3ad6392036fa314ed2749fa572c`. The
-`v0.2.1` tag and GitHub Release still point at Core's source commit; neither
-follow-on publication moved the tag.
-The `0.2.0` line remains
-one historical lockstep train, published in dependency order — seam, adapters,
-then leaf — because a crate is published only after every in-workspace
-dependency it names is on the registry. `eggup-curl` skipped `0.1.3` entirely:
-its next release after `0.1.2` was `0.2.0`, because the seam's source break
-forced the whole version-lockstep workspace forward.
+from source commit `5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Eggpack M009
+published `eggup-eggpack 0.2.1` from source commit
+`ccb2bfcbbe7645541d43bb4f5fcb801339c319ed` (checksum
+`492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795`).
+Its published manifest exact-pins Core, Archive, and Acquisition at `=0.2.1`
+and eggpack-manifest at `=0.1.2`; the old Eggpack `0.2.0` artifact remains
+immutable and retains its former pins. The `v0.2.1` tag and GitHub Release
+still target Core's source commit; Archive, Acquisition, and Eggpack are
+separate follow-on publications. The `0.2.0` line remains one historical
+lockstep train, published in dependency order — seam, adapters, then leaf —
+because a crate is published only after every in-workspace dependency it names
+is on the registry. `eggup-curl` skipped `0.1.3` entirely: its next release
+after `0.1.2` was `0.2.0`, because the seam's source break forced the whole
+version-lockstep workspace forward.
 
 **Published artifacts and tags are immutable.** No published version was
 withdrawn and no existing tag was moved. `v0.1.1`, `v0.1.2`, `v0.1.3`, and

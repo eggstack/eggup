@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability M009 — eggup-eggpack 0.2.1 publication
 
-Status: active
+Status: closed — see `plans/closure/eggpack-manifest-interoperability/009-status.md`.
 
 Repository baseline: 5a04f68f60c8c3ad6392036fa314ed2749fa572c
 

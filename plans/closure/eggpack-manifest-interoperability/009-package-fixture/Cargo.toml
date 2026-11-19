@@ -1,0 +1,10 @@
+[package]
+name = "eggup-eggpack-0-2-1-registry-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+eggup-eggpack = "=0.2.1"
