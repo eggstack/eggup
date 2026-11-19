@@ -75,7 +75,7 @@ whole workspace:
 8. `cargo test --workspace --all-targets --locked --no-fail-fast`
 9. `cargo package -p eggup-service --locked` — packages the service crate on
    Windows and **verifies** it. The verification is **strict**: the packaged sources are
-   compiled against the registry copy of `eggup-core 0.2.0`. The step ran in the
+   compiled against the registry copy of `eggup-core 0.2.1`. The step ran in the
    `--no-verify` form while the source line used core capabilities (Core M014, M017) the
    published `eggup-core 0.1.3` did not carry; the `0.2.0` publication train put
    `eggup-core 0.2.0` on crates.io and the strict form was restored in commit `2d6e089`

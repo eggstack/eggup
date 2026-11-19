@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1 — 2026-11-18
+
+Published to crates.io as Verified Update Core M016. The package now includes
+the existing authoritative `docs/domain.md`, `docs/verification.md`, and
+`docs/transaction.md` contract documents. Only `eggup-core` was published; the
+other workspace crates and the immutable Core `0.2.0` archive are unchanged.
+M016 changes package selection only: no production API, runtime, or dependency
+change, and no consumer migration is required. The publication source also
+contains M021's separately planned native fixture helper under `#[cfg(test)]`;
+that test-only source change is not a production behavior change. See
+`plans/closure/verified-update-core/016-status.md` for registry, artifact, CI,
+and tag evidence.
+
 ## 0.2.0 — 2026-10-24
 
 Published to crates.io (`plans/closure/verified-update-core/019-status.md`) as
@@ -424,15 +437,7 @@ changelogs for changes that cross the boundary.
 
 ## Unreleased
 
-Nothing in this section has been published. `0.2.0` is the latest published
-baseline on crates.io. M016 prepares package content for target version
-`0.2.1`; no explicit upload authorization or publication is recorded.
-
-- **Package-content preparation (M016; target `0.2.1`, unpublished).** Include
-  the existing `docs/domain.md`, `docs/verification.md`, and `docs/transaction.md`
-  in the package. The Rust API, runtime behavior, and dependency graph do not
-  change, and no consumer migration is required. The immutable Core `0.2.0`
-  archive still lacks these files.
+No unpublished Core changes are currently recorded in this section.
 
 ## 0.1.3 — 2026-10-06
 

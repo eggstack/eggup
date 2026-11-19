@@ -1,6 +1,6 @@
 # Verified Update Core Milestone 016 — eggup-core contract-doc packaging
 
-Status: active
+Status: closed — see `plans/closure/verified-update-core/016-status.md`.
 
 Repository baseline: `94f2545ea12fa88ab7fb5e135ba587d0fa6f584c`
 
@@ -26,11 +26,15 @@ crate package: `docs/domain.md`, `docs/verification.md`, and
 the package list, dry-run, workspace gate, hosted CI, and registry-only proof
 are qualified.
 
-This is a package-content change only. The contract documents' contents, Rust
-source, public API, runtime behavior, and dependency graph remain unchanged.
-Only `eggup-core` is uploaded by this milestone. The other workspace crates
-will declare source version `0.2.1` because they inherit the workspace version;
-that does not authorize their publication.
+M016 changes package selection only: it adds the existing contract documents
+to the `eggup-core 0.2.1` crate archive. It does not change the documents'
+content, production Rust, public API, runtime behavior, or dependency graph.
+The publication source commit also includes M021's separately planned native
+fixture change under `#[cfg(test)]` in `crates/eggup-core/src/lib.rs`. That
+test-only source delta is not attributed to M016 and is distinguished in the
+closure record. Only `eggup-core` is uploaded by this milestone. The other
+workspace crates inherit source version `0.2.1`; that does not authorize their
+publication.
 
 ## 2. Why this milestone is ready
 
@@ -45,23 +49,23 @@ that does not authorize their publication.
 - Core M019 and the workspace version-lockstep work are closed. The core has no
   in-workspace runtime dependency, so its package can be published on its own
   before any other crate at the new workspace version.
-- Point-in-time preflight on 2026-11-18: crates.io reports `eggup-core 0.2.0`
-  as latest and `0.2.1` unused; none of the listed Core versions is yanked.
-  GitHub has no `v0.2.1` tag or Release. Repeat these checks immediately before
-  any upload; the target remains provisional until then.
-- Implementation is active in the `0.2.1` source candidate. A separate,
-  recorded maintainer authorization is still required before the irreversible
-  `cargo publish` step; this preparation does not grant that authorization.
+- Point-in-time preflight on 2026-11-18: crates.io reported `eggup-core 0.2.0`
+  as latest and `0.2.1` unused; none of the listed Core versions was yanked.
+  GitHub had no `v0.2.1` tag or Release. These checks were repeated immediately
+  before upload; the final results are recorded in the closure.
+- At plan authoring, implementation was active in the `0.2.1` source
+  candidate and an explicit maintainer authorization was still required. The
+  user authorized the M016 release before upload; see the closure record for
+  its scope and the successful publication readback.
 
 ## 3. Current implementation evidence
 
-- The active candidate's `crates/eggup-core/Cargo.toml` now excludes only
-  `tests/` and `benches/`; `docs/` is no longer excluded. A local
-  `cargo package --list --locked --allow-dirty` selected all three contract
-  files and no `tests/` or `benches/` paths. `cargo package`, strict service
-  package verification against registry Core `0.2.0`, and the Core publish
-  dry-run also passed locally; repeat these checks from the final clean commit
-  before any upload. No publication was attempted.
+- The publication source's `crates/eggup-core/Cargo.toml` excludes only
+  `tests/` and `benches/`; `docs/` is included. The package list selects all
+  three contract files and no `tests/` or `benches/` paths. `cargo package`,
+  strict service-package verification, and the Core publish dry-run passed on
+  the publication source. Only Core was published after authorization; the
+  registry and artifact readback are recorded in the closure.
 - `crates/eggup-core/docs/` contains the three normative contract documents
   named in §1. They are already authoritative; this milestone does not edit
   their content.
@@ -91,8 +95,11 @@ that does not authorize their publication.
 - `eggup-core` remains policy-neutral, transport-neutral, and free of service
   manager or Eggpack dependencies. SHA-256 remains integrity evidence only;
   no authenticity or signature claim is introduced.
-- No file under `crates/eggup-core/src/**` changes. No public type, signature,
-  enum variant, error classification, or runtime behavior changes.
+- M016 changes no file under `crates/eggup-core/src/**`. The shared
+  publication source does contain M021's separately planned test-only change
+  in `crates/eggup-core/src/lib.rs` under `#[cfg(test)]`; the closure records
+  that source delta separately. No production public type, signature, enum
+  variant, error classification, or runtime behavior changes.
 - `tests/` and `benches/` remain excluded from the published package. Only the
   `docs/` exclusion is removed.
 - The shared workspace version and all local exact path requirements remain
@@ -384,7 +391,9 @@ package or registry command substitutes for a hosted platform lane.
 2. `cargo package -p eggup-core --list --locked` lists all three contract
    documents and excludes tests and benches.
 3. The normalized `eggup-core` package adds no dependency, path, git, or patch
-   edge and contains no source delta under `crates/eggup-core/src/**`.
+   edge. The release source's only `src/**` delta relative to the M016 plan
+   baseline is M021's separately qualified `#[cfg(test)]` fixture-helper
+   change; there is no production-code or public-API delta.
 4. `./scripts/check-local.sh`, package build, and publish dry-run pass on the
    publication source commit, with the dependency tree reviewed.
 5. All five hosted CI lanes pass on that exact commit both before publication
@@ -432,7 +441,9 @@ The closure record must include:
   `blocked`, plus the plan, roadmap, exact reviewed baseline, and source commit.
 - A requirement-to-evidence matrix for every acceptance criterion.
 - The before/after `Cargo.toml` and `Cargo.lock` diffs; the full package file
-  list; and evidence that `src/**`, dependencies, and API surface are unchanged.
+  list; and evidence that the only `src/**` delta in the publication source is
+  M021's separately planned test-only change, with dependencies and production
+  API surface unchanged.
 - Exact results for `./scripts/check-local.sh`, package-list, package,
   publish-dry-run, `cargo tree`, and all five hosted lanes before and after
   publication. Mark unrun lanes `not run`; do not infer them.

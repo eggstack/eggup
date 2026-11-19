@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-11-19
+
+This package version is the zero-dependency acquisition seam targeted by the workspace's Eggpack 0.2.1 exact pin. It makes no production source, public API, runtime behavior, or dependency changes from 0.2.0; direct consumers need no migration. Registry publication evidence is recorded in Acquisition M019.
+
 ## 0.2.0 — 2026-10-24
 
 Published to crates.io from the workspace `0.2.0` source version
@@ -101,8 +105,7 @@ The crate still has **zero `[dependencies]`**, before and after.
 
 ## Unreleased
 
-Nothing in this section has been published. `0.2.0` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
+No unreleased behavior, API, or dependency changes are recorded.
 
 ## 0.1.3 — 2026-10-06
 

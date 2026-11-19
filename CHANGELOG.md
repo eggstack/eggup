@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.1 — 2026-11-18, completed 2026-11-18
+
+This is a selective single-crate publication, not a new lockstep train.
+`eggup-core 0.2.1` was published from source commit
+`b5a989a72dc185b30cd8c0cb67b5110ed03acd86` as Verified Update Core M016; its
+registry checksum is
+`3841a8390f8c7b1be0207156e5c895aa4b6c0eec8b05772ac8331d3e43e7ef88`. The
+package adds the three existing authoritative contract documents, without a
+production API, runtime, or dependency change. The same source commit includes
+M021's separately planned test-only native fixture helper under `#[cfg(test)}`;
+that change is not part of M016's package-content work. The annotated
+`v0.2.1` tag and GitHub Release point at the publication source. The other six
+publishable crates remain at `0.2.0`, and their packages are unchanged. The
+immutable Core `0.2.0` package does not gain these documents. See
+`plans/closure/verified-update-core/016-status.md`.
+
 ## 0.2.0 — 2026-10-24, completed 2026-10-24
 
 The 0.2.0 source version was published to crates.io as one lockstep train.
@@ -404,11 +420,11 @@ claims are made by any of these crates.
 ## Unreleased
 
 Nothing in this section has been published. The latest published version is
-`0.2.0` for all seven publishable crates; `eggup-transport-footprint` is
-`publish = false` and has no registry version. This section includes M007
-dependency maintenance and M016 preparation of an `eggup-core 0.2.1` package
-candidate. Neither records explicit upload authorization or a publication, and
-no consumer migration has occurred.
+`0.2.1` for `eggup-core` and `0.2.0` for the other six publishable crates;
+`eggup-transport-footprint` is `publish = false` and has no registry version.
+The remaining entries describe unpublished dependency maintenance and local
+source-pin alignment; they do not record another authorized publication. No
+consumer migration is required for the Core package-content change.
 
 - `eggup-archive`: update the ZIP dependency from `6.0.0` to `9.6.1`, keeping
   explicit bounded extraction behavior and the public API unchanged. This

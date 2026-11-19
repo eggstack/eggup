@@ -51,9 +51,9 @@ explicitly in the plan and in the registry, or it will be discovered late.
 ## Never
 
 - Do not re-publish a version that already exists on crates.io. A fix needs a new
-  version (`0.1.3` → `0.1.4`, or `0.2.0` → `0.2.1`).
-- Do not move `v0.1.1` / `v0.1.2` / `v0.1.3` / `v0.2.0` tags. Extend release
-  notes instead.
+  version (`0.1.3` → `0.1.4`, or `0.2.1` → `0.2.2`).
+- Do not move existing `v0.1.1` / `v0.1.2` / `v0.1.3` / `v0.2.0` /
+  `v0.2.1` tags. Extend release notes instead.
 - Do not publish `eggup-transport-footprint` — it is `publish = false`.
 - Do not publish `eggup-service` without explicit maintainer authorization for
   the next service milestone. It is published through `0.2.0` (Service M017,

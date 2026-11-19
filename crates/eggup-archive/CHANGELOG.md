@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — 2026-11-19
+
+This package version carries the ZIP dependency refresh qualified by Archive M007 and is the archive version targeted by Eggpack 0.2.1's exact pin. The public API and extraction behavior are unchanged from 0.2.0; no consumer migration is required. Registry publication evidence is recorded in Archive M008.
+
+- Update the ZIP requirement from 6.0.0 to 9.6.1, retaining default-features = false and the deflate-flate2 feature.
+- The published dependency graph still carries no Eggup runtime dependency; eggup-core remains dev-only and is stripped at packaging.
+
 ## 0.2.0 — 2026-10-24
 
 Published to crates.io (`plans/closure/archive-extraction/006-status.md`).
@@ -65,13 +72,7 @@ evidence only; no authenticity or signature claims.
 
 ## Unreleased
 
-Unpublished dependency maintenance only; package version remains `0.2.0`.
-No publication or consumer migration is authorized by this milestone.
-
-- Update `zip` from `6.0.0` to `9.6.1` with the existing feature selection.
-  Eggup retains explicit entry iteration, allowlisting, bounded streaming, and
-  its own regular-file checks; no ZIP convenience extraction API is introduced.
-  The dependency update does not change the public API or extraction policy.
+No additional unreleased package changes are recorded.
 
 ## 0.1.3 — 2026-10-06
 

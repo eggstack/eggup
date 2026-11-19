@@ -331,8 +331,11 @@ republication, and commit `2d6e089` restored the strict step in all four
 lanes that carry it; hosted run `40100087952` on that commit is green on all
 five lanes. The step still validates the manifest and the packaged file list,
 and the compile of the packaged sources is now additionally checked against
-the registry copy of `eggup-core 0.2.0` rather than only against the
-workspace path dependency.
+the registry copy of `eggup-core 0.2.0` at that time, rather than only
+against the workspace path dependency. Since M016 published Core `0.2.1`,
+post-publication run `44391076419` attempt 2 passed the strict packaged-service
+step in Stable, MSRV, macOS, and Windows against registry Core `0.2.1`; see
+`plans/closure/verified-update-core/016-status.md`.
 
 The widening has already paid for itself. Turning on
 `cargo test --workspace` exposed
@@ -660,7 +663,7 @@ CI added."
 
 | Crate | Workspace source version | Latest published | Published versions | Note |
 |---|---|---|---|---|
-| `eggup-core` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Non-Windows runtime graph is `sha2`; Windows also uses `self-replace`; M016 prepares contract-doc packaging |
+| `eggup-core` | 0.2.1 | 0.2.1 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Non-Windows runtime graph is `sha2`; Windows also uses `self-replace`; M016 packages all three contract docs |
 | `eggup-archive` | 0.2.1 | 0.2.0 | 0.1.2, 0.1.3, **0.2.0** | Bounded extraction; current dependency refresh remains unpublished |
 | `eggup-acquisition` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Zero-dependency seam |
 | `eggup-eggfetch` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Native HTTP adapter |
@@ -669,21 +672,24 @@ CI added."
 | `eggup-service` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Carries the stdin-verdict fix the published `0.1.3` lacks |
 | `eggup-transport-footprint` | 0.2.1 | — | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
-All 8 crates share workspace source version `0.2.1`; crates.io still reports
-`0.2.0` as the latest published version for all seven publishable crates. The
-`0.2.1` source is an unpublished preparation candidate, not a registry release.
-The `0.2.0` line is one historical lockstep train, published in dependency
-order — the seam, then the adapters, then the leaf — because a crate is
-published only after every in-workspace dependency it names is on the registry.
-`eggup-curl` skipped `0.1.3` entirely: its next release after `0.1.2` is
-`0.2.0`, because the seam's source break forced the whole version-lockstep
-workspace forward.
+All 8 crates share workspace source version `0.2.1`. Crates.io reports
+`eggup-core 0.2.1` as latest; the other six publishable crates remain at
+`0.2.0`. M016 published only Core from source commit
+`b5a989a72dc185b30cd8c0cb67b5110ed03acd86` (checksum
+`3841a8390f8c7b1be0207156e5c895aa4b6c0eec8b05772ac8331d3e43e7ef88`); its
+archive includes the three contract docs while immutable Core `0.2.0` does not.
+The tag and GitHub Release point at that source commit. The `0.2.0` line remains
+one historical lockstep train, published in dependency order — seam, adapters,
+then leaf — because a crate is published only after every in-workspace
+dependency it names is on the registry. `eggup-curl` skipped `0.1.3` entirely:
+its next release after `0.1.2` was `0.2.0`, because the seam's source break
+forced the whole version-lockstep workspace forward.
 
-**The `0.1.x` line stays on crates.io.** No published version is withdrawn
-and no tag is moved; `v0.1.1`, `v0.1.2`, and `v0.1.3` remain where they are,
-and `v0.2.0` is created only after the registry-only proofs pass, pointing at
-the exact publication source commit. Package provenance is carried by
-`.cargo_vcs_info.json`.
+**Published artifacts and tags are immutable.** No published version was
+withdrawn and no existing tag was moved. `v0.1.1`, `v0.1.2`, `v0.1.3`, and
+`v0.2.0` remain at their original commits; `v0.2.1` points at the exact Core
+publication source commit, after registry and post-publication CI evidence.
+Package provenance is carried by `.cargo_vcs_info.json`.
 
 `CHANGELOG.md` discipline follows the same separation: every published crate
 keeps an `Unreleased` section (7 of 8 crates have a CHANGELOG; the fixture
@@ -845,6 +851,5 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | Location | Drift | Why it is not fixed here |
 |---|---|---|
 | `plans/implementation/**` | Some older plans predate or do not fully match the current 16-section template | Historical records. The template is `plans/implementation/README.md`; conforming old plans is not worth rewriting evidence. New plans should follow the template exactly |
-| `crates/eggup-core/Cargo.toml` package selection | `crates/eggup-core/docs/{domain,verification,transaction}.md` are the authoritative contract docs. The active `0.2.1` source candidate no longer excludes `docs/`, but package-list and artifact proofs are still pending; the immutable published `eggup-core 0.2.0` package still lacks them | Owned by **Verified Update Core M016** (`plans/implementation/verified-update-core/016-eggup-core-contract-doc-packaging.md`). Finding 14 remains open until a published artifact and registry readback prove the documents are present. Explicit maintainer upload authorization is still required. |
 | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | Still asserts `git log 39ff626..HEAD -- crates/` **is empty**; it now returns 4 commits | Deliberate. The record is an immutable 2026-10-01 snapshot, and rewriting it would edit historical evidence. The `registry.md` line that made the same claim *as a live status statement* is corrected; the closure record is not |
 | `plans/archive/` | Holds only its own `README.md`; no superseded material has ever been moved there, though `plans/README.md` describes it as retained-for-traceability | A policy directory with no content is not wrong. Pruning it would remove a documented mechanism; populating it is a separate authoring decision |

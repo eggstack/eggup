@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication closed 2026-10-06; M005 cleanup-authority corrective closed; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M007 workspace dependency security refresh closed 2026-11-17 (hosted run `44022660351` green on all five CI lanes)
+Status: active; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication closed 2026-10-06; M005 cleanup-authority corrective closed; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M007 workspace dependency security refresh closed 2026-11-17 (hosted run `44022660351` green on all five CI lanes); M008 eggup-archive 0.2.1 publication ready for handoff
 
 Long-term references:
 
@@ -243,10 +243,21 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M004 eggup-archive 0.1.3 correctness publication | closed 2026-10-06 | `plans/implementation/archive-extraction/004-eggup-archive-0.1.3-correctness-publication.md` | `plans/closure/archive-extraction/004-status.md` | published from `bd43683` (run `37527706900` green); registry-only fixture 6/6 and fails the device-alias case against 0.1.2 |
 | M005 cleanup contract truthfulness and member-write deduplication | closed; hosted-qualified (run `40008039843`) | `plans/implementation/archive-extraction/005-cleanup-contract-and-member-write-corrective.md` | `plans/closure/archive-extraction/005-status.md` | Closes registry open finding 4 (**high**). All four public `cleanup()` entry points now share one truthful contract with a reachable `Ok` path; the crate still never removes the root directory or traverses the root pathname, and the duplicated tar/zip member-write body is now one shared helper. Behaviour change: the `Ok` path is reachable, so a caller that wrote `cleanup().unwrap_err()` must now match on the result. The downstream `eggup-eggpack` test-helper migration was applied by the parent session. Unpublished: `eggup-eggpack`'s `=0.1.3` archive pin blocks propagation. Hosted-qualified in run `40008039843` (commit `0cb2c53`): all five lanes green — Stable, MSRV, macOS, Windows, Linux systemd. Its only remaining condition was the outstanding hosted qualification, and that condition is discharged. **Published since:** the `0.2.0` train carries this fix — published 2026-10-24 from `b612608`; the published `0.1.x` line still carries the pre-fix state, and registry versions are immutable. |
 | M006 | closed; hosted-qualified (run `40079833945`) | `plans/implementation/archive-extraction/006-eggup-archive-0.2.0-publication.md` | `plans/closure/archive-extraction/006-status.md` | Published `eggup-archive 0.2.0` (`ce35edd5…ff57ad`) from `b612608`, the publication source commit, with `v0.2.0` and release `0.2.0` created. The registry-only fixture resolves `eggup-archive 0.2.0` from crates.io, asserts the extracted member's byte count and SHA-256, and calls `cleanup()` matching the result rather than unwrapping it. The packaged manifest carries **no** `eggup-core` edge: that dependency is a path-only dev-dependency and is stripped at packaging
-| M007 workspace dependency security refresh | closed; hosted-qualified (run `44022660351`) | `plans/implementation/archive-extraction/007-workspace-dependency-security-refresh.md` | `plans/closure/archive-extraction/007-status.md` | All five hosted CI lanes green; no package publication authorized |
+| M007 workspace dependency security refresh | closed; hosted-qualified (run `44022660351`) | `plans/implementation/archive-extraction/007-workspace-dependency-security-refresh.md` | `plans/closure/archive-extraction/007-status.md` | All five hosted CI lanes green; no package publication authorized by M007 |
+| M008 eggup-archive 0.2.1 publication | ready for handoff | `plans/implementation/archive-extraction/008-eggup-archive-0.2.1-publication.md` | `plans/closure/archive-extraction/008-status.md` | Eggpack's current exact =0.2.1 pin requires registry availability; package checks and hosted qualification required |
 
 ### M007 — Workspace dependency security refresh
 
 Plan: `plans/implementation/archive-extraction/007-workspace-dependency-security-refresh.md`.
 
-Status: closed 2026-11-17; see `plans/closure/archive-extraction/007-status.md`. The archive ZIP requirement is now `9.6.1`, Eggpack exact-pins `eggpack-manifest = "=0.1.1"`, and the compatible lockfile refresh resolves the patched TLS graph. The macOS local gate, Rust 1.89 check, advisory check, and both package checks passed. Hosted run `44022660351` passed all five lanes: Stable, MSRV, macOS, Windows, and Linux systemd. No package publication was authorized.
+Status: closed 2026-11-17; see `plans/closure/archive-extraction/007-status.md`. The archive ZIP requirement is now `9.6.1`, Eggpack exact-pins `eggpack-manifest = "=0.1.1"`, and the compatible lockfile refresh resolves the patched TLS graph. The macOS local gate, Rust 1.89 check, advisory check, and both package checks passed. Hosted run `44022660351` passed all five lanes: Stable, MSRV, macOS, Windows, and Linux systemd. No package publication was authorized by M007. The follow-on publication is separately authorized by Archive M008; M007's closure remains unchanged.
+
+### M008 — eggup-archive 0.2.1 publication
+
+Class: infrastructure / package promotion.
+
+Status: ready for handoff; publication must follow the exact registry, package, and hosted gates in the source plan.
+
+Plan: `plans/implementation/archive-extraction/008-eggup-archive-0.2.1-publication.md`.
+
+Publish only `eggup-archive 0.2.1`, carrying M007's qualified ZIP dependency refresh. The package has no normal Eggup dependency; Eggpack's exact `=0.2.1` archive pin is the downstream reason to publish. Preserve all archive safety invariants, do not move `v0.2.1`, and do not publish Eggpack before Archive M008 is closed and registry-visible.

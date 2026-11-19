@@ -46,14 +46,16 @@ Derived from the `crates/*/Cargo.toml` manifests. Arrows point from dependent to
 dependency (compile-time direction). All 8 crates carry workspace version
 `0.2.1`.
 
-The seven published library crates still have latest registry version `0.2.0`;
-this branch prepares Core M016 only, and no `0.2.1` package is published. The
-`0.2.0` line is one lockstep train published from a single source commit,
-because `eggup-acquisition`'s next release is source-breaking and the
-workspace shares one version; per-crate checksums, package dependency graphs,
-and the registry-only fixture results are recorded in the five publication
-closure records under `plans/closure/`. The `v0.1.1`, `v0.1.2`, and `v0.1.3`
-tags were not moved. `eggup-transport-footprint` is `publish = false`.
+M016 published only `eggup-core 0.2.1`; the other six published library
+crates remain at `0.2.0`. All eight source crates share workspace version
+`0.2.1`. The Core `0.2.1` package includes the three existing contract docs;
+the immutable Core `0.2.0` package does not. The earlier `0.2.0` line remains
+one lockstep train published from a single source commit because
+`eggup-acquisition`'s next release is source-breaking and the workspace shares
+one version. Publication and registry-only evidence are in the closure records
+under `plans/closure/`. The `v0.2.1` tag and Release point to
+`b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; no existing tag was moved.
+`eggup-transport-footprint` is `publish = false`.
 
 ```text
                          eggup-transport-footprint   (publish = false, 3 bins)
@@ -261,12 +263,13 @@ Contract-level detail that belongs to no single crate:
 - [ADRs](../plans/adrs/README.md) — accepted decisions, superseded not rewritten
 - [closure records](../plans/closure/README.md) — requirement → evidence matrices
 
-Registry snapshot: the latest published version for each of the seven library
-crates (`eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-curl`,
-`eggup-eggfetch`, `eggup-eggpack`, and `eggup-service`) remains `0.2.0`. The
-`0.2.0` line is one lockstep train from a single source commit; checksums and
-registry-only qualification are in the five publication closure records under
-`plans/closure/`. The `v0.1.1`, `v0.1.2`, and `v0.1.3` tags were not moved.
-`eggup-transport-footprint` is `publish = false` by design and has no registry
-version. CI never publishes; releases are manual — see
+Registry snapshot checked 2026-11-18: `eggup-core 0.2.1` is the latest Core
+release; `eggup-archive`, `eggup-acquisition`, `eggup-curl`, `eggup-eggfetch`,
+`eggup-eggpack`, and `eggup-service` remain at `0.2.0`. M016's registry proof
+and checksum are recorded in
+[`016-status.md`](../plans/closure/verified-update-core/016-status.md); the
+other `0.2.0` package and dependency evidence remains in their own closures.
+The `v0.2.1` tag points at the Core publication source, and the older tags were
+not moved. `eggup-transport-footprint` is `publish = false` by design and has
+no registry version. CI never publishes; releases are manual — see
 [tooling-governance.md](tooling-governance.md) §8.
