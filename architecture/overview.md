@@ -71,7 +71,7 @@ Acquisition, and Eggpack publications did not move that tag.
                             |            |
         +-------------------+            +----------------+
         |                                         |
-   eggup-curl  ------\                    eggup-eggfetch  (eggfetch-core 0.2 + tokio)
+   eggup-curl  ------\                    eggup-eggfetch  (eggfetch-core 0.3 + tokio)
                      >-- eggup-acquisition <-----/         (zero dependencies)
                      |   (seam + fixture + composition)
    eggup-eggpack ----+        |         +----- eggup-transport-footprint

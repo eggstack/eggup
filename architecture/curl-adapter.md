@@ -841,7 +841,7 @@ temp/promotion helpers. The differences a consumer actually pays for:
 
 | Dimension | `eggup-curl` | `eggup-eggfetch` |
 |---|---|---|
-| Dependencies | `eggup-acquisition` only (`Cargo.toml:23-24`) | `eggfetch-core 0.2` (`http1`,`tls-rustls`,`tls-native-roots`,`proxy`) + `tokio` + `futures-util` |
+| Dependencies | `eggup-acquisition` only (`Cargo.toml:23-24`) | `eggfetch-core 0.3` (`http1`,`tls-rustls`,`tls-native-roots`,`proxy`) + `tokio` + `futures-util` |
 | Binary size (M005, Darwin) | `curl_only` 417 KiB / 346 KiB stripped | `eggfetch_only` 1.9 MiB / 1.6 MiB stripped |
 | External requirement | a `curl` executable must exist at the chosen path | none beyond the binary itself |
 | TLS behavior | whatever the host `curl` links (e.g. libcurl/SecureTransport on macOS); no crate-side trust-root control | Rustls with native roots, decided at compile time |

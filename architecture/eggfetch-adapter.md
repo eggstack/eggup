@@ -38,11 +38,12 @@ Crate attributes: `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`
 ## 2. Position in the workspace
 
 ```text
-eggup-eggfetch ──> eggup-acquisition (zero deps)   +   eggfetch-core 0.2 + tokio + futures-util
+eggup-eggfetch ──> eggup-acquisition (zero deps)   +   eggfetch-core 0.3 + tokio + futures-util
 ```
 
-Manifest: `crates/eggup-eggfetch/Cargo.toml`. `eggfetch-core` is pinned to
-`0.2.0` with `default-features = false` and exactly four features:
+Manifest: `crates/eggup-eggfetch/Cargo.toml`. `eggfetch-core` has requirement
+`0.3.0` (Cargo caret; lockfile resolves 0.3.0) with `default-features = false`
+and exactly four features:
 `http1`, `tls-rustls`, `tls-native-roots`, `proxy` — no compression, cookies,
 retry, or JSON. `tokio` is likewise narrowed to `rt`, `time`, `fs`, `io-util`,
 `net`. `futures-util` is narrowed to `alloc`. Dev-dependencies add `url = "2"`

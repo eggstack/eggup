@@ -100,8 +100,11 @@ at `0.1.3` and is unchanged in this release.
 
 ## Unreleased
 
-Nothing in this section has been published. `0.2.0` is the published baseline on
-crates.io, and no publication milestone authorizes these entries.
+Nothing in this section has been published. M020 now authorizes this candidate;
+`0.2.0` remains the latest published baseline until registry verification
+succeeds.
+
+- Upgrade the implementation dependency from `eggfetch-core 0.2` to `eggfetch-core 0.3.0`, retaining the four existing features. The wrapper API and acquisition policy remain unchanged.
 
 ## 0.1.3 — 2026-10-06
 

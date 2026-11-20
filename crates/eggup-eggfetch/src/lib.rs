@@ -215,7 +215,7 @@ impl EggfetchTransport {
     /// Returns the exact Eggfetch dependency version used.
     pub fn eggfetch_version() -> &'static str {
         // Recorded at qualification time; updated when the dependency changes.
-        "eggfetch-core 0.2.0 (http1,tls-rustls,tls-native-roots,proxy; no compression/cookies/retry/json)"
+        "eggfetch-core 0.3.0 (http1,tls-rustls,tls-native-roots,proxy; no compression/cookies/retry/json)"
     }
 
     fn block_on<F, T>(&self, fut: F) -> Result<T, AcquisitionError>
@@ -657,7 +657,7 @@ mod tests {
         assert_eq!(t.config().total_timeout, DEFAULT_TOTAL_TIMEOUT);
         assert_eq!(
             EggfetchTransport::eggfetch_version(),
-            "eggfetch-core 0.2.0 (http1,tls-rustls,tls-native-roots,proxy; no compression/cookies/retry/json)"
+            "eggfetch-core 0.3.0 (http1,tls-rustls,tls-native-roots,proxy; no compression/cookies/retry/json)"
         );
     }
 
