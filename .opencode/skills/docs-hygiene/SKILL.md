@@ -66,8 +66,8 @@ Each has occurred at least once — check for them explicitly:
    that step's registry-resolved compile is strict too.
 2. **Publication status.** `eggup-core 0.2.1` was published 2026-11-18;
    `eggup-archive`, `eggup-acquisition`, and `eggup-eggpack 0.2.1` were
-   published on 2026-11-19. The other three publishable crates
-   (`eggup-curl`, `eggup-eggfetch`, and `eggup-service`) remain at `0.2.0`.
+   published on 2026-11-19. Eggfetch M020 published `eggup-eggfetch 0.2.1`
+   on 2026-11-20; only `eggup-curl` and `eggup-service` remain at `0.2.0`.
    `eggup-transport-footprint` is not published at all. Check crates.io rather
    than inferring from a `publish = false` key or a plan.
 3. **Enum tables lagging the source.** `architecture/core-transaction.md` once

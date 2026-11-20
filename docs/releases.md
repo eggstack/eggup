@@ -1,9 +1,9 @@
 # Versions and upgrades
 
-This page was checked against crates.io on 2026-11-19. The latest published
+This page was checked against crates.io on 2026-11-20. The latest published
 version is **0.2.1** for `eggup-core`, `eggup-archive`, `eggup-acquisition`,
-and `eggup-eggpack`; the other three library crates (`eggup-curl`,
-`eggup-eggfetch`, and `eggup-service`) remain at **0.2.0**. Core M016
+`eggup-eggpack`, and `eggup-eggfetch`; only `eggup-curl` and `eggup-service`
+remain at **0.2.0**. Core M016
 published `eggup-core 0.2.1` from
 `b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; Archive M008 and Acquisition
 M019 separately published `eggup-archive 0.2.1` and
@@ -14,7 +14,12 @@ M019 separately published `eggup-archive 0.2.1` and
 `492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795`).
 Eggpack's published 0.2.1 package exact-pins Core, Archive, and Acquisition
 at `=0.2.1` and eggpack-manifest at `=0.1.2`; its API and behavior are
-unchanged. All eight workspace crates share source version `0.2.1`. The
+unchanged. Acquisition Transport M020 published `eggup-eggfetch 0.2.1` from
+source commit `2a33cfe4712dfb88a823614ee6f6a439ecdf792e` with checksum
+`2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`; it
+updates the implementation dependency to `eggfetch-core 0.3.0` without a
+public API or acquisition-policy change. See
+`plans/closure/acquisition-transport/020-status.md`. All eight workspace crates share source version `0.2.1`. The
 `v0.2.1` tag and GitHub Release still point at Core's source commit; these
 selective publications did not move the tag. The immutable Core `0.2.0`
 package lacks the contract documents, and Eggpack `0.2.0` remains unchanged.
@@ -25,7 +30,7 @@ independently of this repository.
 |---|---|
 | [`eggup-core`](https://crates.io/crates/eggup-core) | `0.2.1` |
 | [`eggup-acquisition`](https://crates.io/crates/eggup-acquisition) | `0.2.1` |
-| [`eggup-eggfetch`](https://crates.io/crates/eggup-eggfetch) | `0.2.0` |
+| [`eggup-eggfetch`](https://crates.io/crates/eggup-eggfetch) | `0.2.1` |
 | [`eggup-curl`](https://crates.io/crates/eggup-curl) | `0.2.0` |
 | [`eggup-archive`](https://crates.io/crates/eggup-archive) | `0.2.1` |
 | [`eggup-eggpack`](https://crates.io/crates/eggup-eggpack) | `0.2.1` |

@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 020 — eggup-eggfetch 0.2.1 publication with eggfetch-core 0.3.0
 
-Status: active
+Status: closed 2026-11-20; published eggup-eggfetch 0.2.1 from qualified source 2a33cfe4712dfb88a823614ee6f6a439ecdf792e; registry SHA-256 2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc; hosted run 44698883796 passed all five lanes; closure: plans/closure/acquisition-transport/020-status.md
 
 Repository baseline: bf63aaefab0bcb84c134e831455c065df0dd4c76
 

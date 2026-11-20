@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+No unpublished Eggfetch changes are currently recorded. This section does not
+imply publication or a consumer migration.
+
+## 0.2.1 — 2026-11-20
+
+Published to crates.io from source commit `2a33cfe4712dfb88a823614ee6f6a439ecdf792e` as Acquisition Transport M020; see `plans/closure/acquisition-transport/020-status.md`. The crates.io SHA-256 is `2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`.
+
+The adapter now requires `eggfetch-core ^0.3.0`, retaining the four enabled features `http1`, `tls-rustls`, `tls-native-roots`, and `proxy`. This is an implementation dependency update: the public adapter API and acquisition policy remain unchanged, no consumer migration is required, and the upstream-version diagnostic now reports 0.3.0.
+
 ## 0.2.0 — 2026-10-24
 
 Published to crates.io (`plans/closure/acquisition-transport/017-status.md`).
@@ -97,14 +108,6 @@ adapter gained the same capability in M014 (see its changelog), so the two
 adapters are now capability-parity. Placement parity is deliberately not
 claimed: this adapter's control stays in `EggfetchConfig`, which was published
 at `0.1.3` and is unchanged in this release.
-
-## Unreleased
-
-Nothing in this section has been published. M020 now authorizes this candidate;
-`0.2.0` remains the latest published baseline until registry verification
-succeeds.
-
-- Upgrade the implementation dependency from `eggfetch-core 0.2` to `eggfetch-core 0.3.0`, retaining the four existing features. The wrapper API and acquisition policy remain unchanged.
 
 ## 0.1.3 — 2026-10-06
 

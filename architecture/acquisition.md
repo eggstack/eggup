@@ -583,7 +583,7 @@ makes:
 
 | Adapter | User-agent surface | Default | Placement |
 |---|---|---|---|
-| `eggup-eggfetch` | Caller-settable: `EggfetchConfig::user_agent` (`eggfetch/src/lib.rs:52-87`) | `DEFAULT_USER_AGENT` (`eggup-eggfetch`) | `EggfetchConfig` (published `0.2.0`) |
+| `eggup-eggfetch` | Caller-settable: `EggfetchConfig::user_agent` (`eggfetch/src/lib.rs:52-87`) | `DEFAULT_USER_AGENT` (`eggup-eggfetch`) | `EggfetchConfig` (published `0.2.1`) |
 | `eggup-curl` | Caller-settable: `CurlTransport::with_executable_and_user_agent` (`curl/src/lib.rs:238-257`) | **none sent**; curl's own default applies | `CurlTransport` (private field, `curl/src/lib.rs:174-179`) |
 
 **Parity means capability parity, not placement parity.** Both adapters let a
@@ -591,7 +591,7 @@ caller set a `User-Agent`; that is the claim, and it is what M014 delivers.
 It is explicitly **not** placement parity: the two controls live in different
 types and are deliberately not aligned. `eggup-eggfetch`'s control lives in
 `EggfetchConfig`, whose `user_agent` is a public field of a public,
-non-`#[non_exhaustive]` struct in the `eggup-eggfetch 0.2.0` registry release;
+non-`#[non_exhaustive]` struct in the `eggup-eggfetch 0.2.1` registry release;
 moving it would be a source break for published consumers. `eggup-curl`'s
 control lives
 on `CurlTransport` because `CurlConfig`'s fields are public and **not**

@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.2.1 — 2026-11-18–19, completed 2026-11-19
+## 0.2.1 — 2026-11-18–20, completed 2026-11-20
 
-This version has four selective single-crate publications, not a new lockstep
+This version has five selective single-crate publications, not a new lockstep
 train. `eggup-core 0.2.1` was published on 2026-11-18 from source commit
 `b5a989a72dc185b30cd8c0cb67b5110ed03acd86` as Verified Update Core M016; its
 registry checksum is
@@ -23,8 +23,9 @@ from the same source commit `5a04f68f60c8c3ad6392036fa314ed2749fa572c`; its
 registry checksum is
 `8832b13c4488a59ec4dc8920aea610ba5a1c50434e9cd1e5209c35e7235d7f7d`. The
 zero-dependency seam has no source, API, or runtime change; its publication
-satisfies Eggpack's exact pin. Published curl and eggfetch use `^0.2` and do
-not require republication.
+satisfies Eggpack's exact pin. At M019's close, the then-published curl and
+eggfetch 0.2.0 packages already accepted seam 0.2.1; Eggfetch was later
+republished by M020 for the separate eggfetch-core dependency update.
 
 Eggpack M009 separately published `eggup-eggpack 0.2.1` on 2026-11-19 from
 source commit `ccb2bfcbbe7645541d43bb4f5fcb801339c319ed`; its registry checksum
@@ -33,8 +34,17 @@ normalized package exact-pins eggup-core, eggup-archive, and eggup-acquisition
 at `=0.2.1` and eggpack-manifest at `=0.1.2`. The adapter API and behavior
 are unchanged; its published archive matches the qualified local package.
 
+Acquisition Transport M020 separately published `eggup-eggfetch 0.2.1` on
+2026-11-20 from source commit `2a33cfe4712dfb88a823614ee6f6a439ecdf792e`;
+its registry checksum is
+`2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`. The
+adapter's implementation dependency is now `eggfetch-core 0.3.0`; its four
+features, public API, and acquisition policy remain unchanged. Its
+registry-only fixture resolves the adapter and core from crates.io. See
+`plans/closure/acquisition-transport/020-status.md`.
+
 The annotated `v0.2.1` tag and GitHub Release still point at Core's publication
-source. The other three publishable crates (curl, eggfetch, and service) remain
+source. The other two publishable crates (curl and service) remain
 at `0.2.0`; the immutable Eggpack `0.2.0` package retains its original exact
 `=0.2.0` pins. The immutable Core `0.2.0` package does not gain the contract
 docs. See `plans/closure/verified-update-core/016-status.md`,
@@ -447,12 +457,12 @@ claims are made by any of these crates.
 
 The remaining entry describes unpublished lockfile maintenance, not an
 additional package publication. The latest published version is `0.2.1` for
-`eggup-core`, `eggup-archive`, `eggup-acquisition`, and `eggup-eggpack`; the
-other three publishable crates (`eggup-curl`, `eggup-eggfetch`, and
-`eggup-service`) remain at `0.2.0`. `eggup-transport-footprint` is
+`eggup-core`, `eggup-archive`, `eggup-acquisition`, `eggup-eggpack`, and
+`eggup-eggfetch`; only `eggup-curl` and `eggup-service` remain at `0.2.0`.
+`eggup-transport-footprint` is
 `publish = false` and has no registry version. No consumer migration is
-required for the Core, Archive, Acquisition, or Eggpack 0.2.1 updates; Eggpack's
-API and behavior remain unchanged.
+required for the Core, Archive, Acquisition, Eggfetch, or Eggpack 0.2.1 updates;
+Eggfetch's and Eggpack's APIs and behavior remain unchanged.
 
 - Refresh compatible lockfile dependencies, including the patched Rustls,
   `rustls-webpki`, and `webpki-roots` versions.

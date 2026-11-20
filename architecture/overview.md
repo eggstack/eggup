@@ -51,9 +51,12 @@ separately published `eggup-archive 0.2.1` and `eggup-acquisition 0.2.1` from
 `5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Eggpack M009 separately
 published `eggup-eggpack 0.2.1` from
 `ccb2bfcbbe7645541d43bb4f5fcb801339c319ed` (checksum
-`492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795`). The
-other three published library crates remain at `0.2.0`. All eight source
-crates share workspace version `0.2.1`. Eggpack 0.2.1 exact-pins the three
+`492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795`). Eggfetch
+M020 separately published `eggup-eggfetch 0.2.1` from
+`2a33cfe4712dfb88a823614ee6f6a439ecdf792e` (checksum
+`2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`) with
+`eggfetch-core 0.3.0`; only `eggup-curl` and `eggup-service` remain at `0.2.0`.
+All eight source crates share workspace version `0.2.1`. Eggpack 0.2.1 exact-pins the three
 Eggup dependencies at `=0.2.1` and eggpack-manifest at `=0.1.2`; its API and
 behavior are unchanged. The Core 0.2.1 package includes the three existing
 contract docs; immutable Core 0.2.0 does not. The earlier 0.2.0 line remains
