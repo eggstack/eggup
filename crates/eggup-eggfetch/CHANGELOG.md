@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-No unpublished Eggfetch changes are currently recorded. This section does not
-imply publication or a consumer migration.
+### Changed
+
+- The current workspace source upgrades its implementation dependency to `eggfetch-core ^0.4.0`, retaining the same four features, adapter API, and acquisition policy. The published `eggup-eggfetch 0.2.1` artifact remains on `eggfetch-core ^0.3.0`; this source candidate is not published and implies no consumer migration.
 
 ## 0.2.1 — 2026-11-20
 
