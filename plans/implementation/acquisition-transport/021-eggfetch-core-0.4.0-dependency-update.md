@@ -1,6 +1,6 @@
 # Acquisition Transport Milestone 021 — eggfetch-core 0.4.0 dependency update
 
-Status: active (workspace implementation; no publication)
+Status: closed 2026-11-21; hosted-qualified on all five CI lanes at implementation SHA 8af7db87cf188859ee8b3222aed8f4a6c9b74ed7 (run 44879536834); see plans/closure/acquisition-transport/021-status.md
 
 Repository baseline: 9800d55fc7b7701747b4d4002af3f8e9e766eeab
 
@@ -71,8 +71,8 @@ Set the manifest requirement to 0.4.0 while preserving its explicit feature list
 2. Update the dependency manifest and resolve/inspect the lockfile; update the source diagnostic and its test.
 3. Update the crate changelog and current-source architecture summaries, preserving the historical/published 0.3.0 claim for Eggfetch 0.2.1.
 4. Run focused adapter tests and clippy, docs truth, the full local gate, and manual dependency-boundary review.
-5. Commit and push the locally qualified implementation candidate as explicitly requested; wait for Stable, MSRV, service-systemd, macOS, and Windows-check to pass on that exact implementation SHA. Do not publish.
-6. Write closure evidence only after the hosted results are read back; leave the milestone open if any required lane fails or is missing.
+5. Committed and pushed implementation SHA 8af7db87cf188859ee8b3222aed8f4a6c9b74ed7; all five hosted lanes passed in run 44879536834. No publication was performed.
+6. Recorded closure evidence in plans/closure/acquisition-transport/021-status.md and reconciled the roadmap and registry.
 
 ## 8. Failure, cancellation, restart, and contention semantics
 
@@ -126,4 +126,4 @@ Record the exact reviewed and implementation SHAs, changed files, focused test/c
 
 ## 16. Handoff notes
 
-The current published adapter remains eggup-eggfetch 0.2.1 with eggfetch-core ^0.3.0. This milestone only updates workspace source to 0.4.0. Any later publication needs its own authorized release scope, package-version decision, exact-SHA hosted qualification, and registry verification. The user explicitly authorized commit/push for hosted qualification and closure; do not publish.
+The current published adapter remains eggup-eggfetch 0.2.1 with eggfetch-core ^0.3.0. This milestone only updates workspace source to 0.4.0. Any later publication needs its own authorized release scope, package-version decision, exact-SHA hosted qualification, and registry verification. Implementation commit 8af7db87cf188859ee8b3222aed8f4a6c9b74ed7 is pushed to origin/main and hosted-qualified in run 44879536834. The milestone is closed; no package was published.

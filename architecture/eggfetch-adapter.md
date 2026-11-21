@@ -45,10 +45,13 @@ Manifest: `crates/eggup-eggfetch/Cargo.toml`. Current workspace source has an
 `eggfetch-core` requirement of `0.4.0` (Cargo caret; lockfile resolves 0.4.0)
 with `default-features = false` and exactly four features: `http1`,
 `tls-rustls`, `tls-native-roots`, `proxy` — no compression, cookies, retry,
-or JSON. M021 is not published: registry `eggup-eggfetch 0.2.1` still requires
-`eggfetch-core ^0.3.0`. `tokio` is likewise narrowed to `rt`, `time`, `fs`, `io-util`,
-`net`. `futures-util` is narrowed to `alloc`. Dev-dependencies add `url = "2"`
-and fuller `tokio` features.
+or JSON. M021 is closed and hosted-qualified on implementation SHA
+`8af7db87cf188859ee8b3222aed8f4a6c9b74ed7` (run
+[44879536834](https://github.com/eggstack/eggup/actions/runs/44879536834)), but is
+not a package publication; the published `eggup-eggfetch 0.2.1` still requires
+`eggfetch-core ^0.3.0`. `tokio` is likewise narrowed to `rt`, `time`, `fs`,
+`io-util`, `net`. `futures-util` is narrowed to `alloc`. Dev-dependencies add
+`url = "2"` and fuller `tokio` features.
 
 This is one of **two interchangeable adapters**; the other is
 `eggup-curl` ([curl-adapter.md](curl-adapter.md)). Neither may know the other

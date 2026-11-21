@@ -56,9 +56,11 @@ M020 separately published `eggup-eggfetch 0.2.1` from
 `2a33cfe4712dfb88a823614ee6f6a439ecdf792e` (checksum
 `2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`) with
 `eggfetch-core 0.3.0`; only `eggup-curl` and `eggup-service` remain at `0.2.0`.
-M021 is an active workspace-source update: only eggup-eggfetch's eggfetch-core
-requirement moves to 0.4.0; the published 0.2.1 package still uses 0.3.0. No
-Eggup package version or published artifact changes in M021. All eight source
+M021 updated only the workspace eggup-eggfetch dependency to 0.4.0 and is
+hosted-qualified on implementation commit `8af7db87cf188859ee8b3222aed8f4a6c9b74ed7`
+(run [44879536834](https://github.com/eggstack/eggup/actions/runs/44879536834));
+the published 0.2.1 package remains on 0.3.0. No Eggup package version or
+published artifact changed. All eight source
 crates share workspace version `0.2.1`. Eggpack 0.2.1 exact-pins the three
 Eggup dependencies at `=0.2.1` and eggpack-manifest at `=0.1.2`; its API and
 behavior are unchanged. The Core 0.2.1 package includes the three existing

@@ -668,7 +668,7 @@ CI added."
 | `eggup-archive` | 0.2.1 | 0.2.1 | 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Bounded extraction; M008 publishes M007's ZIP dependency refresh; no API/runtime change |
 | `eggup-acquisition` | 0.2.1 | 0.2.1 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Zero-dependency seam; M019 published with no source/API/dependency change |
 
-| `eggup-eggfetch` | 0.2.1 | 0.2.1 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Native HTTP adapter; M020 published against eggfetch-core 0.3.0; active M021 workspace candidate uses 0.4.0 without changing the public API or policy |
+| `eggup-eggfetch` | 0.2.1 | 0.2.1 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Native HTTP adapter; M020 published against eggfetch-core 0.3.0; M021 source update to 0.4.0 hosted-qualified on `8af7db87` (run `44879536834`), not published; API/policy unchanged |
 | `eggup-curl` | 0.2.1 | 0.2.0 | 0.1.2, **0.2.0** | External-curl adapter |
 | `eggup-eggpack` | 0.2.1 | 0.2.1 | 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Only crate touching producer types; published 0.2.1 exact-pins Eggup dependencies at `=0.2.1` and eggpack-manifest at `=0.1.2`; immutable 0.2.0 retains its original pins |
 | `eggup-service` | 0.2.1 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Carries the stdin-verdict fix the published `0.1.3` lacks |
