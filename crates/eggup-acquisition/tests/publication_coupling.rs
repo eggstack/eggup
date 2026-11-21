@@ -1,11 +1,11 @@
 //! M016 — the publication-coupling guard.
 //!
-//! The seam's **published** version is the version every in-workspace
-//! dependent must resolve. `cargo package` resolves a dependency from the
-//! **registry**, so an adapter whose requirement was never widened does not
-//! compile against the published seam, and a manifest that was never widened
-//! does not resolve at all once the seam's version moves. The coupling is
-//! expensive to rediscover, so it is enforced mechanically here.
+//! Every registry package must resolve the seam's **published** version. A
+//! source candidate may instead exact-pin the matching unpublished workspace
+//! version, but only when its `Unreleased` changelog records that exact pin;
+//! this documents the publication ordering without treating the candidate as
+//! registry-qualified. The coupling is expensive to rediscover, so it is
+//! enforced mechanically here.
 //!
 //! These tests read the seam's own `CHANGELOG.md`, the in-workspace
 //! dependents' `Cargo.toml` manifests, and the dependents' `CHANGELOG.md`
@@ -427,6 +427,33 @@ fn widening_is_recorded(dependent: &Dependent, published: Version) -> Result<boo
     Ok(false)
 }
 
+/// True when an unpublished dependent exact-pins the seam's workspace version
+/// and records that same requirement in its `Unreleased` changelog section.
+/// This makes the exact-pin publication prerequisite explicit without making
+/// the pre-publication candidate pass as a registry package.
+fn exact_candidate_pin_is_recorded(dependent: &Dependent, raw_requirement: &str) -> bool {
+    let candidate_pin = format!("={}", env!("CARGO_PKG_VERSION"));
+    if raw_requirement != candidate_pin
+        || !dependent
+            .manifest
+            .lines()
+            .any(|line| line.trim() == "version.workspace = true")
+    {
+        return false;
+    }
+    let Some(changelog) = dependent.changelog else {
+        return false;
+    };
+    sections(changelog).into_iter().any(|section| {
+        section.heading.trim() == UNRELEASED
+            && section.body.lines().any(|line| {
+                recorded_requirements(line, DEPENDENCY)
+                    .iter()
+                    .any(|recorded| recorded == &candidate_pin)
+            })
+    })
+}
+
 /// The republication versions a changelog's current sections claim are
 /// non-breaking while their dependency range excludes the seam's published
 /// release.
@@ -470,7 +497,8 @@ fn seam_changelog_declares_exactly_one_unreleased_section_with_a_next_release() 
 }
 
 /// Every in-workspace dependent either already accepts the seam's published
-/// version, or a changelog records the widening it requires.
+/// version, records the widening it requires, or documents an exact-pin source
+/// candidate matching the workspace version in its `Unreleased` section.
 #[test]
 fn dependent_requirements_accept_the_next_release_or_record_the_widening() {
     let published = seam_published_version();
@@ -483,7 +511,7 @@ fn dependent_requirements_accept_the_next_release_or_record_the_widening() {
         });
         let requirement =
             Requirement::parse(&raw).unwrap_or_else(|error| panic!("{}: {error}", dependent.name));
-        if requirement.accepts(published) {
+        if requirement.accepts(published) || exact_candidate_pin_is_recorded(dependent, &raw) {
             continue;
         }
         let recorded = widening_is_recorded(dependent, published)

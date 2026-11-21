@@ -1,6 +1,6 @@
 # Versions and upgrades
 
-This page was checked against crates.io on 2026-11-20. The latest published
+This page was checked against the crates.io API on 2026-11-21. The latest published
 version is **0.2.1** for `eggup-core`, `eggup-archive`, `eggup-acquisition`,
 `eggup-eggpack`, and `eggup-eggfetch`; only `eggup-curl` and `eggup-service`
 remain at **0.2.0**. Core M016
@@ -18,8 +18,8 @@ unchanged. Acquisition Transport M020 published `eggup-eggfetch 0.2.1` from
 source commit `2a33cfe4712dfb88a823614ee6f6a439ecdf792e` with checksum
 `2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`; it
 updates the implementation dependency to `eggfetch-core 0.3.0` without a
-public API or acquisition-policy change. See
-`plans/closure/acquisition-transport/020-status.md`. All eight workspace crates share source version `0.2.1`. The
+public API or acquisition-policy change. M021 later moved only the workspace source to eggfetch-core 0.4.0; the published 0.2.1 artifact remains on 0.3.0. M022 moves the shared source version to 0.2.2 without publication. See
+`plans/closure/acquisition-transport/020-status.md`. All eight workspace crates now share source candidate version `0.2.2`; this is not published. The
 `v0.2.1` tag and GitHub Release still point at Core's source commit; these
 selective publications did not move the tag. The immutable Core `0.2.0`
 package lacks the contract documents, and Eggpack `0.2.0` remains unchanged.
@@ -44,8 +44,7 @@ and eggup-acquisition exactly to `=0.2.1`, plus eggpack-manifest `=0.1.2`.
 The immutable published `eggup-eggpack 0.2.0` retains its original exact pins
 to the 0.2.0 Eggup set and eggpack-manifest 0.1.0. A later exact-pin update
 will not flow through either immutable adapter version; consumers must select a
-new Eggpack publication to receive a later dependency set. The local workspace
-pins are aligned to `=0.2.1`. M016's contract documents are published in Core
+new Eggpack publication to receive a later dependency set. The current workspace-source pins are `=0.2.2`; published Eggpack 0.2.1 remains at `=0.2.1`, and immutable 0.2.0 remains at `=0.2.0`. M016's contract documents are published in Core
 0.2.1; the immutable Eggpack 0.2.0 package still resolves Core 0.2.0 and does
 not carry those documents. Check the resolved dependency graph if you depend
 on `eggup-eggpack`.

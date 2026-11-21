@@ -70,14 +70,15 @@ Runtime dependencies ([`Cargo.toml`](../crates/eggup-eggpack/Cargo.toml)):
 
 | Dependency | Constraint | Source |
 |---|---|---|
-| `eggup-core` | `=0.2.1` | local path `../eggup-core` |
-| `eggup-archive` | `=0.2.1` | local path `../eggup-archive` |
-| `eggup-acquisition` | `=0.2.1` | local path `../eggup-acquisition` |
+| `eggup-core` | `=0.2.2` | local path `../eggup-core` |
+| `eggup-archive` | `=0.2.2` | local path `../eggup-archive` |
+| `eggup-acquisition` | `=0.2.2` | local path `../eggup-acquisition` |
 | `eggpack-manifest` | `=0.1.2` | crates.io registry |
 
-The workspace-source candidate pins its three Eggup edges to `=0.2.1`; the
-published `eggup-eggpack 0.2.0` artifact remains unchanged and pins `=0.2.0`.
-The producer edge is registry-only so the published crate has no VCS source
+The workspace-source candidate pins its three Eggup edges to `=0.2.2`; the
+published `eggup-eggpack 0.2.1` artifact remains unchanged and pins `=0.2.1`.
+The older published `0.2.0` artifact retains its original `=0.2.0` Eggup pins
+and `=0.1.0` producer pin. The producer edge is registry-only so the published crate has no VCS source
 requirement. Both facts are asserted as tests, not just comments — see
 [Testing approach](#testing-approach).
 
@@ -257,7 +258,7 @@ as the enforcement point:
   contains no `git =`, `rev =`, `branch =`, or `tag =` edge; asserts all three
   Eggup edges match the adapter's own `env!("CARGO_PKG_VERSION")` rather than a
   hardcoded literal, so the invariant is "pinned to *our* version" and survives
-  future workspace bumps (currently `=0.2.1` in this unpublished source
+  future workspace bumps (currently `=0.2.2` in this unpublished source
   candidate); and asserts
   `eggpack-core`, `eggpack-contract`, and `eggpack-bootstrap` appear nowhere.
 - `adapter_source_claims_no_producer_or_service_authority`

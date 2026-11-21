@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-The workspace-only Eggfetch adapter candidate now requires `eggfetch-core ^0.4.0`, retaining its explicit feature set and public policy. This is not published; `eggup-eggfetch 0.2.1` on crates.io remains unchanged at `^0.3.0`, and no Eggup package version or consumer migration is implied.
+The workspace-only Eggfetch adapter candidate requires `eggfetch-core ^0.4.0`, preserving its explicit features, API, and policy. M022 increments all eight workspace package source versions to `0.2.2` and updates Eggpack's local exact pins; neither change is published. The crates.io `eggup-eggfetch 0.2.1` artifact remains on `^0.3.0`; there is no consumer-facing change or migration.
 
 ## 0.2.1 — 2026-11-18–20, completed 2026-11-20
 

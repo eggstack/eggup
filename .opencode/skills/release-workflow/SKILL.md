@@ -31,9 +31,7 @@ to ship in seam → adapter → leaf order.
 
 ## The exact-pin cascade
 
-The current workspace source and published `eggup-eggpack 0.2.1` each pin
-Eggup dependencies exactly to `=0.2.1`; the published `eggup-eggpack 0.2.0`
-remains immutable with its original `=0.2.0` pins. Eggpack 0.2.1 also pins
+The current workspace-source Eggpack candidate is 0.2.2 and pins its Eggup dependencies exactly to `=0.2.2`. Published `eggup-eggpack 0.2.1` remains immutable with `=0.2.1` pins; published 0.2.0 remains immutable with `=0.2.0` pins. Eggpack 0.2.1 also pins
 `eggpack-manifest =0.1.2`. Every other workspace crate uses a caret
 requirement. Consequence:
 

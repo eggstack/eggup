@@ -46,13 +46,13 @@ Crates that depend on it:
 |---|---|---|
 | `eggup-eggfetch` | `0.2` (caret) + path | native HTTP adapter; implements `AcquisitionTransport` |
 | `eggup-curl` | `0.2` (caret) + path | external-process adapter; implements `AcquisitionTransport` |
-| `eggup-eggpack` | workspace source `=0.2.1` exact pin + path; published `0.2.0` retains `=0.2.0` | `use eggup_acquisition::{AcquisitionRequest, FetchLimits}` only (`eggup-eggpack/src/lib.rs:6`) — binds requests, never transports |
+| `eggup-eggpack` | workspace source candidate `=0.2.2` exact pin + path; published `0.2.1` retains `=0.2.1` (`0.2.0` retains `=0.2.0`) | `use eggup_acquisition::{AcquisitionRequest, FetchLimits}` only (`eggup-eggpack/src/lib.rs:6`) — binds requests, never transports |
 | `eggup-transport-footprint` | `0.2` (caret) + path | `curl_only.rs` / `eggfetch_only.rs` use `AcquisitionRequest` + `FetchLimits`; `dual.rs` uses `ComposedTransport` + `CompositionPolicy` |
 
 The caret/exact-pin split is deliberate: adapters inherit a seam fix on the next
-resolve; the published `eggup-eggpack 0.2.0` exact pin does not. The workspace
-source candidate has moved its local pin to `=0.2.1`, but that does not update
-the immutable published package.
+resolve; the published Eggpack `0.2.1` exact pin does not. The workspace source
+candidate pins its local Eggup dependencies to `=0.2.2`; published Eggpack
+`0.2.1` remains at `=0.2.1`, while immutable `0.2.0` retains `=0.2.0`.
 ([acquisition-transport-roadmap.md](../plans/subsystems/acquisition-transport-roadmap.md#m010--eggup-acquisition-013-publication),
 M010). The `0.1.0` caret became `0.2` in the `0.2.0` publication train
 (Acquisition Transport M017): the seam's `0.2.0` is source-breaking

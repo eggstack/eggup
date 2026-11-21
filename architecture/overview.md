@@ -44,7 +44,7 @@ manager, and producer concerns.
 
 Derived from the `crates/*/Cargo.toml` manifests. Arrows point from dependent to
 dependency (compile-time direction). All 8 crates carry workspace version
-`0.2.1`.
+`0.2.2` in the uncommitted source candidate.
 
 Core M016 published `eggup-core 0.2.1`; Archive M008 and Acquisition M019
 separately published `eggup-archive 0.2.1` and `eggup-acquisition 0.2.1` from
@@ -59,11 +59,12 @@ M020 separately published `eggup-eggfetch 0.2.1` from
 M021 updated only the workspace eggup-eggfetch dependency to 0.4.0 and is
 hosted-qualified on implementation commit `8af7db87cf188859ee8b3222aed8f4a6c9b74ed7`
 (run [44879536834](https://github.com/eggstack/eggup/actions/runs/44879536834));
-the published 0.2.1 package remains on 0.3.0. No Eggup package version or
-published artifact changed. All eight source
-crates share workspace version `0.2.1`. Eggpack 0.2.1 exact-pins the three
-Eggup dependencies at `=0.2.1` and eggpack-manifest at `=0.1.2`; its API and
-behavior are unchanged. The Core 0.2.1 package includes the three existing
+the published 0.2.1 package remains on 0.3.0. M021 changed no Eggup package
+version or published artifact. M022's uncommitted source candidate advances all
+eight workspace crates to `0.2.2`; it is not a registry release. The source
+Eggpack candidate exact-pins its three Eggup dependencies at `=0.2.2` and
+eggpack-manifest at `=0.1.2`. Published Eggpack 0.2.1 remains immutable with
+`=0.2.1` pins; older 0.2.0 retains its original pins. The Core 0.2.1 package includes the three existing
 contract docs; immutable Core 0.2.0 does not. The earlier 0.2.0 line remains
 one lockstep train published from a single source commit because
 `eggup-acquisition`'s next release is source-breaking and the workspace shares
@@ -98,7 +99,7 @@ In plain dependency order, deepest first:
 4. **`eggup-curl`** → `eggup-acquisition` only. External-process adapter, no HTTP/TLS stack.
 5. **`eggup-service`** → `eggup-core` + `windows-args` (+ `windows-service` on Windows). Lifecycle adapters.
 6. **`eggup-archive`** → `tar`, `zip`, `flate2`, `fs_at`, `sha2` (dev-dep `eggup-core`). Bounded local extraction.
-7. **`eggup-eggpack`** → `eggup-core` + `eggup-archive` + `eggup-acquisition` (`=0.2.1` in the workspace source candidate) + `eggpack-manifest =0.1.2`. Leaf producer adapter.
+7. **`eggup-eggpack`** → `eggup-core` + `eggup-archive` + `eggup-acquisition` (`=0.2.2` in the workspace source candidate; published Eggpack 0.2.1 retains `=0.2.1`) + `eggpack-manifest =0.1.2`. Leaf producer adapter.
 8. **`eggup-transport-footprint`** → `eggup-acquisition` + optional `eggup-curl` / `eggup-eggfetch`. **Non-published** footprint fixtures.
 
 Two consequences worth knowing before reviewing anything:
@@ -280,12 +281,13 @@ Contract-level detail that belongs to no single crate:
 - [ADRs](../plans/adrs/README.md) — accepted decisions, superseded not rewritten
 - [closure records](../plans/closure/README.md) — requirement → evidence matrices
 
-Registry snapshot checked 2026-11-18: `eggup-core 0.2.1` is the latest Core
-release; `eggup-archive`, `eggup-acquisition`, `eggup-curl`, `eggup-eggfetch`,
-`eggup-eggpack`, and `eggup-service` remain at `0.2.0`. M016's registry proof
-and checksum are recorded in
-[`016-status.md`](../plans/closure/verified-update-core/016-status.md); the
-other `0.2.0` package and dependency evidence remains in their own closures.
+Registry snapshot checked against crates.io on 2026-11-21: `eggup-core`,
+`eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`, and `eggup-eggpack`
+are latest at `0.2.1`; `eggup-curl` and `eggup-service` remain at `0.2.0`.
+M022's uncommitted workspace source candidate is `0.2.2`, not a published
+release. M016's registry proof and checksum are recorded in
+[`016-status.md`](../plans/closure/verified-update-core/016-status.md);
+publication evidence for the other packages remains in their own closures.
 The `v0.2.1` tag points at the Core publication source, and the older tags were
 not moved. `eggup-transport-footprint` is `publish = false` by design and has
 no registry version. CI never publishes; releases are manual — see

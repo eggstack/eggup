@@ -4,7 +4,7 @@
 
 ### Changed
 
-- The current workspace source upgrades its implementation dependency to `eggfetch-core ^0.4.0`, retaining the same four features, adapter API, and acquisition policy. The published `eggup-eggfetch 0.2.1` artifact remains on `eggfetch-core ^0.3.0`; this source candidate is not published and implies no consumer migration.
+- M021 upgrades the workspace implementation dependency to `eggfetch-core ^0.4.0`, retaining the same four features, adapter API, and acquisition policy. M022 sets all workspace source package versions to `0.2.2`. Neither change is published: crates.io `eggup-eggfetch 0.2.1` remains on `eggfetch-core ^0.3.0`, with no consumer change or migration.
 
 ## 0.2.1 — 2026-11-20
 

@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-No additional changes.
+### Changed
+
+- M022 updates this unpublished source candidate to 0.2.2 and pins `eggup-core`, `eggup-archive`, and `eggup-acquisition` at `=0.2.2`; `eggpack-manifest` remains `=0.1.2`.
+- The staged manifest requirement is recorded as `eggup-acquisition = "=0.2.2"`. Published `eggup-acquisition 0.2.1` does not satisfy it, so Eggpack package qualification and publication must follow availability of the three Eggup 0.2.2 dependencies on crates.io. Published Eggpack 0.2.1 retains its `=0.2.1` pins, and 0.2.0 retains its earlier pins. This metadata update does not publish a package or require consumer migration.
 
 ## 0.2.1 — 2026-11-19
 

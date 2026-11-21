@@ -17,9 +17,9 @@ categories = ["development-tools"]
 workspace = true
 
 [dependencies]
-eggup-core = { version = "=0.2.1", path = "../eggup-core" }
-eggup-archive = { version = "=0.2.1", path = "../eggup-archive" }
-eggup-acquisition = { version = "=0.2.1", path = "../eggup-acquisition" }
+eggup-core = { version = "=0.2.2", path = "../eggup-core" }
+eggup-archive = { version = "=0.2.2", path = "../eggup-archive" }
+eggup-acquisition = { version = "=0.2.2", path = "../eggup-acquisition" }
 eggpack-manifest = "=0.1.2"
 
 [dev-dependencies]
