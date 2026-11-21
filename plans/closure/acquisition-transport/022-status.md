@@ -1,19 +1,19 @@
 # Acquisition Transport M022 Closure — Workspace 0.2.2 release-readiness preparation
 
-Status: conditionally closed 2026-11-21 — source preparation is locally qualified; hosted CI and registry publication qualification remain separate gates.
+Status: closed 2026-11-21 — source-preparation qualification passed locally and in hosted CI on the exact candidate SHA; Eggpack registry packaging remains a separate publication-order gate.
 
 Source plan: plans/implementation/acquisition-transport/022-workspace-0.2.2-release-readiness.md
 Source roadmap: plans/subsystems/acquisition-transport-roadmap.md
 
 Reviewed repository baseline (HEAD before M022 changes): 6371a7131f0f5eb42b9d8a151d7872f5a33e7ee1.
 
-Implementation commit/PR: none. M022 changes remain uncommitted and unpushed, as required by the plan; no M022 hosted run exists.
+Implementation commit: 74aadfe36ef0d3742fadf2d0e84b6a0aeb8e018a on branch m022-workspace-0.2.2-release-readiness, pushed under explicit user authorization after the plan was drafted. No PR was opened. Hosted run [44925918931](https://github.com/eggstack/eggup/actions/runs/44925918931) passed all five lanes on this exact SHA.
 
 ## Executive finding
 
-The shared source version is 0.2.2 for all eight workspace members, including the non-published footprint fixture. Eggpack's three source exact pins now match =0.2.2; eggpack-manifest =0.1.2 and Eggfetch's default-features = false plus its four explicit features are preserved. Current-source and release-facing documentation distinguishes this uncommitted candidate from registry releases.
+The shared source version is 0.2.2 for all eight workspace members, including the non-published footprint fixture. Eggpack's three source exact pins now match =0.2.2; eggpack-manifest =0.1.2 and Eggfetch's default-features = false plus its four explicit features are preserved. Current-source and release-facing documentation distinguishes the 0.2.2 source candidate from published registry releases.
 
-The local macOS verification gate passes. eggup-eggfetch 0.2.2 packages and verifies against registry dependencies. eggup-eggpack 0.2.2 cannot yet be prepared for registry upload because crates.io does not have the exact-pinned Eggup 0.2.2 dependencies; this is the expected dependency-order gate, not a reason to bypass registry resolution. Hosted CI was not run. No crate was published or yanked, and no tag or GitHub Release was created, moved, or edited.
+The local macOS verification gate passes, and hosted CI run [44925918931](https://github.com/eggstack/eggup/actions/runs/44925918931) passed Stable, MSRV, Linux systemd, macOS, and Windows on the exact candidate SHA. eggup-eggfetch 0.2.2 packages and verifies against registry dependencies. eggup-eggpack 0.2.2 cannot yet be prepared for registry upload because crates.io does not have the exact-pinned Eggup 0.2.2 dependencies; this remains a release-order gate, not a reason to bypass registry resolution. No crate was published or yanked, and no tag or GitHub Release was created, moved, or edited; only the authorized source branch was pushed.
 
 ## Requirement-to-evidence matrix
 
@@ -25,7 +25,7 @@ The local macOS verification gate passes. eggup-eggfetch 0.2.2 packages and veri
 | Reconcile documentation with source and published state | AGENTS.md, changelogs, Eggpack README, docs/releases.md, architecture, release-workflow skill, M022 plan; direct crates.io API snapshot dated 2026-11-21 | Pass |
 | Keep local checks green | ./scripts/check-local.sh, ./scripts/check-docs-truth.sh, git diff --check | Pass on macOS |
 | Check registry packaging | Eggfetch package command passes; Eggpack package command fails because registry has no eggup-acquisition 0.2.2 matching the exact pin (available candidates include 0.2.1, 0.2.0, 0.1.3) | Eggfetch pass; Eggpack expected external prerequisite remains |
-| Qualify the exact candidate in hosted CI | No commit/push or hosted run for M022 | Not run |
+| Qualify the exact candidate in hosted CI | [GitHub Actions run 44925918931](https://github.com/eggstack/eggup/actions/runs/44925918931), exact SHA 74aadfe36ef0d3742fadf2d0e84b6a0aeb8e018a; all five lanes passed | Pass |
 | Preserve registry/tag/release state | No publish/yank/tag/GitHub Release action taken | Pass |
 
 ## Production implementation evidence
@@ -53,13 +53,13 @@ Cargo.lock changes are limited to the eight workspace package records moving fro
 | Platform/lane | Evidence |
 |---|---|
 | macOS local | Full local gate passed on the current macOS workstation. |
-| Linux stable | Hosted M022 CI not run. |
-| Rust 1.89 MSRV | Hosted M022 CI not run. |
-| Linux systemd | Hosted M022 qualification not run. |
-| macOS hosted | Hosted M022 CI not run; no hosted result inferred from the local run. |
-| Windows | Hosted M022 CI not run. |
+| Linux stable | Hosted run 44925918931 passed. |
+| Rust 1.89 MSRV | Hosted run 44925918931 passed. |
+| Linux systemd | Hosted run 44925918931 passed. |
+| macOS hosted | Hosted run 44925918931 passed. |
+| Windows | Hosted run 44925918931 passed, including the live SCM fixture and full workspace suite. |
 
-The successful M021 run 44879536834 qualifies only M021's implementation SHA and is not evidence for this M022 worktree.
+The successful M022 run [44925918931](https://github.com/eggstack/eggup/actions/runs/44925918931) qualifies the exact candidate SHA 74aadfe36ef0d3742fadf2d0e84b6a0aeb8e018a; the earlier M021 run is separate evidence.
 
 ## Invariant review
 
@@ -70,7 +70,7 @@ The successful M021 run 44879536834 qualifies only M021's implementation SHA and
 
 ## Failure, rollback, and recovery review
 
-This is a source metadata, test-guard, and documentation change. It performs no installation, live filesystem promotion, registry mutation, or remote repository update. There is no runtime rollback/recovery path to qualify. The first local gate attempt exposed the guard's outdated assumption that every source dependent must accept the last published seam version; the guard was narrowly updated to require explicit Unreleased evidence for the matching exact-pin candidate, then the focused test and full gate passed.
+This is a source metadata, test-guard, and documentation change. It performs no installation, live filesystem promotion, or registry mutation. The authorized commit and branch push changed remote source state solely to obtain exact-SHA hosted qualification; no runtime rollback/recovery path applies. The first local gate attempt exposed the guard's outdated assumption that every source dependent must accept the last published seam version; the guard was narrowly updated to require explicit Unreleased evidence for the matching exact-pin candidate, then the focused test and full gate passed.
 
 ## Compatibility and migration review
 
@@ -84,18 +84,17 @@ No runtime code or authority boundary changed. The additional acquisition test g
 
 Updated current-source claims in architecture/tooling-governance.md, architecture/overview.md, architecture/acquisition.md, architecture/eggpack-adapter.md, and architecture/transport-footprint.md; release snapshots, changelogs, Eggpack README, root index, release-workflow skill, plan, roadmap, and registry distinguish source 0.2.2 from published versions. Historical publication evidence and tags were not rewritten.
 
-## Unresolved gates (not M022 product defects)
+## Remaining publication gates (outside M022 source-preparation closure)
 
 - Eggpack's exact-pinned registry package check must be rerun after all required Eggup 0.2.2 dependencies are published; no path/git workaround is accepted.
-- Hosted CI has not qualified the M022 candidate SHA. If hosted qualification becomes a prerequisite for release, it must run on the exact pushed SHA before release qualification is claimed.
 - Publication of eggup-service remains behind explicit maintainer authorization; the release set/order requires its own plan.
 
 No medium-or-higher M022 code finding remains open. The release gates above are explicitly not represented as passed.
 
 ## Roadmap disposition
 
-M022 is conditionally closed as a locally qualified source-preparation milestone. This does not certify publication readiness; the Eggpack registry package check and hosted qualification remain open release gates.
+M022 is closed as a locally and hosted-qualified source-preparation milestone. This closure does not certify publication readiness: Eggpack's registry package check remains blocked until its exact-pinned Eggup 0.2.2 dependencies are available, and any resulting crate publication requires its own authorized release plan.
 
 ## Registry updates
 
-The acquisition-transport roadmap and plans/registry.md record M022 as conditionally closed and point to this record. No registry artifact, tag, or GitHub Release changed.
+The acquisition-transport roadmap and plans/registry.md record M022 as closed and hosted-qualified and point to this record. No registry artifact, tag, or GitHub Release changed; the candidate branch is pushed at 74aadfe36ef0d3742fadf2d0e84b6a0aeb8e018a.

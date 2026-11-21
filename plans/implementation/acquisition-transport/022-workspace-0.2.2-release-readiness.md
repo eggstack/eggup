@@ -1,6 +1,8 @@
 # Acquisition Transport Milestone 022 — Workspace 0.2.2 release-readiness preparation
 
-Status: conditionally closed 2026-11-21; local source-preparation qualification passed; hosted CI and registry publication qualification remain separate gates.
+Status: closed 2026-11-21 — source-preparation qualification passed locally and in hosted CI on the exact candidate SHA; Eggpack registry packaging remains a separate publication-order gate.
+
+Execution amendment (2026-11-21): After this plan was drafted with commit/push out of scope, the user authorized committing and pushing the M022 candidate solely for exact-SHA hosted qualification. Commit 74aadfe36ef0d3742fadf2d0e84b6a0aeb8e018a was pushed to branch m022-workspace-0.2.2-release-readiness; GitHub Actions run 44925918931 passed all five lanes. This narrow authorization supersedes the original prohibition only for this candidate. No PR, publication, yank, tag, or GitHub Release action was authorized or performed.
 
 Repository baseline: 6371a7131f0f5eb42b9d8a151d7872f5a33e7ee1
 
@@ -20,7 +22,7 @@ Primary class: infrastructure
 
 ## 1. Objective
 
-Prepare the source workspace for the next patch version by changing the shared Eggup package version from 0.2.1 to 0.2.2, updating Eggpack's source-only exact pins, and reconciling release-facing docs with current source and crates.io state. This is release preparation only: do not publish, yank, tag, create or edit a GitHub Release, commit, or push.
+Prepare the source workspace for the next patch version by changing the shared Eggup package version from 0.2.1 to 0.2.2, updating Eggpack's source-only exact pins, and reconciling release-facing docs with current source and crates.io state. This is release preparation only: no publication, yank, tag, or GitHub Release action is in scope. The initial no-commit/no-push restriction was later superseded only by the explicit user authorization recorded in the execution amendment, for an exact-SHA CI branch.
 
 ## 2. Why this milestone is ready
 
@@ -43,7 +45,7 @@ Prepare the source workspace for the next patch version by changing the shared E
 - Keep Eggpack's three source exact pins aligned to =0.2.2 and keep eggpack-manifest =0.1.2.
 - Preserve all runtime APIs, dependency boundaries, Rust MSRV, and Eggfetch's four explicit features with default-features = false.
 - Published versions, checksums, provenance, tags, and GitHub Releases are immutable historical facts; do not rewrite them as 0.2.2.
-- No package publication, yank, tag creation/move, GitHub Release edit, commit, or push is in scope.
+- No package publication, yank, tag creation/move, or GitHub Release edit is in scope. Commit/push was initially out of scope and was later authorized only as recorded in the execution amendment.
 
 ## 5. Scope
 
@@ -60,7 +62,7 @@ Prepare the source workspace for the next patch version by changing the shared E
 - Publishing any crate or deciding the final package set/order for a later release milestone.
 - Editing historical plans/closures to retrofit the 0.2.2 source state.
 - Changing Rust production source, public APIs, behavior, external dependencies, or the Eggfetch feature set.
-- Creating/moving tags, changing GitHub Releases, or pushing/committing this candidate.
+- Publishing/yanking crates; creating/moving tags; or changing GitHub Releases. Commit/push was initially out of scope and was later authorized only as recorded in the execution amendment.
 
 ## 6. Required production changes
 
@@ -72,7 +74,7 @@ No Rust production-source change is expected. Set workspace.package.version to 0
 2. Bump Cargo.toml and the three Eggpack pins; refresh and review Cargo.lock.
 3. Reconcile AGENTS.md, root and crate changelogs, Eggpack README, docs/releases.md, the current-source architecture claims, and release-workflow skill. Preserve published package history and tag/release statements.
 4. Run the docs-truth gate, full local gate, manual dependency-tree review, and a registry-based package check for the Eggfetch candidate. Confirm the Eggpack exact-pin package check is blocked only by the not-yet-published 0.2.2 dependency set; do not work around this with path or git dependencies.
-5. Record local evidence and keep hosted qualification/publication explicitly separate; neither is authorized by this plan.
+5. Record local evidence; obtain hosted qualification only under explicit later authorization; keep registry package qualification and publication separate.
 
 ## 8. Failure, cancellation, restart, and contention semantics
 
@@ -112,15 +114,15 @@ Update the workspace-source version in architecture/tooling-governance.md §2.2/
 - Eggpack source pins Core, Archive, and Acquisition at =0.2.2 and retains eggpack-manifest =0.1.2.
 - Source-vs-published claims agree across docs, architecture, README, changelogs, and skill; crates.io published-version facts are verified as of 2026-11-21.
 - Documentation-truth and the full local gate pass; the cargo tree is manually reviewed.
-- No registry artifact, tag, GitHub Release, commit, or push is changed.
+- No registry artifact, tag, or GitHub Release is changed. Source commit/push is limited to the later explicit authorization recorded above for hosted qualification.
 
 ## 14. Stop conditions
 
-Stop if the shared version is not 0.2.1 at the reviewed baseline, if the user-requested increment would collide with a published version, if crates.io state differs from the verified snapshot, if the source exact-pin invariant cannot be preserved, if unrelated Cargo.lock dependency versions move, or if any required local gate fails. Do not publish or push.
+Stop if the shared version is not 0.2.1 at the reviewed baseline, if the user-requested increment would collide with a published version, if crates.io state differs from the verified snapshot, if the source exact-pin invariant cannot be preserved, if unrelated Cargo.lock dependency versions move, or if any required local gate fails. Do not publish or yank, change tags/releases, or push without explicit user authorization; the specific hosted-qualification push for M022 is documented above and does not authorize publication.
 
 ## 15. Closure evidence required
 
-Record the exact reviewed SHA, manifest/lockfile diff, changed documentation surfaces, crates.io version snapshot, docs-truth and local-gate results, package-check outcomes, and manual dependency-tree review. State hosted CI as not run for the unpushed M022 worktree; the M021 run does not qualify this candidate. State that publication, tags, and GitHub Releases were not changed. Keep the milestone active if hosted qualification is required before closure.
+Record the reviewed source SHA, manifest/lockfile diff, changed documentation surfaces, crates.io version snapshot, docs-truth and local-gate results, package-check outcomes, manual dependency-tree review, and exact-SHA hosted CI run 44925918931 (all five lanes passed on 74aadfe36ef0d3742fadf2d0e84b6a0aeb8e018a). State that the authorized branch push is documented and no publication, yank, tag, or GitHub Release changed. Close M022 as source preparation only; do not claim full publication readiness while Eggpack's registry package check awaits its exact-pinned Eggup 0.2.2 dependencies.
 
 ## 16. Handoff notes
 
