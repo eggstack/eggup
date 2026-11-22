@@ -664,7 +664,7 @@ CI added."
 | Crate | Workspace source version | Latest published | Published versions | Note |
 |---|---|---|---|---|
 | `eggup-core` | 0.2.2 | 0.2.2 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, 0.2.1, **0.2.2** | Non-Windows runtime graph is `sha2`; Windows also uses `self-replace`; M016/M022 package all three contract docs |
-| `eggup-archive` | 0.2.2 | 0.2.1 | 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Bounded extraction; M008 publishes M007's ZIP dependency refresh; no API/runtime change |
+| `eggup-archive` | 0.2.2 | 0.2.2 | 0.1.2, 0.1.3, 0.2.0, 0.2.1, **0.2.2** | Bounded extraction; M009 is a package promotion for Eggpack's exact pin; no source/API/extraction/runtime change |
 | `eggup-acquisition` | 0.2.2 | 0.2.1 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Zero-dependency seam; M019 published with no source/API/dependency change |
 
 | `eggup-eggfetch` | 0.2.2 | 0.2.1 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Native HTTP adapter; M020 published against eggfetch-core 0.3.0; M021 source update to 0.4.0 hosted-qualified on `8af7db87` (run `44879536834`), not published; API/policy unchanged |
@@ -674,11 +674,11 @@ CI added."
 | `eggup-transport-footprint` | 0.2.2 | — | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
 All 8 crates share workspace source version `0.2.2`; publication remains selective. The
-exact-version crates.io API was checked on 2026-11-22: Core is at `0.2.2`; Archive, Acquisition,
+exact-version crates.io API was checked on 2026-11-22: Core and Archive are at `0.2.2`; Acquisition,
 Eggpack, and Eggfetch are at `0.2.1`; Curl and Service are at `0.2.0`. Core M022 published only
 `eggup-core 0.2.2` from source SHA `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (checksum
 `a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`); its registry archive matches
-the qualified local package, and `.cargo_vcs_info.json` records the same source SHA. Core M016
+the qualified local package, and `.cargo_vcs_info.json` records the same source SHA. Archive M009 published `eggup-archive 0.2.2` from source SHA `4e8779ed37ca35f3f11857dbcc4aa008e386bf21` (checksum `67ab697e3af41b3cd3d1ed140f821c68739ec446d2a7782fa26ca4960edc882b`); the registry archive matches the local package and `.cargo_vcs_info.json` records that SHA. Its five normal dependencies have no Eggup runtime edge, and production source/API/extraction behavior is unchanged. Core M016
 published from source commit
 `b5a989a72dc185b30cd8c0cb67b5110ed03acd86` (checksum
 `3841a8390f8c7b1be0207156e5c895aa4b6c0eec8b05772ac8331d3e43e7ef88`); its
@@ -697,7 +697,7 @@ immutable and retains its former pins. Eggfetch M020 published `eggup-eggfetch 0
 `2a33cfe4712dfb88a823614ee6f6a439ecdf792e` (checksum
 `2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`),
 upgrading eggfetch-core to 0.3.0. The `v0.2.1` tag and GitHub Release
-still target Core's source commit; Archive, Acquisition, Eggpack, and Eggfetch
+still target Core's source commit; Acquisition, Eggpack, and Eggfetch
 are separate follow-on publications. M020 appended Eggfetch notes to the existing
 Release without changing its target. The `0.2.0` line remains one historical
 lockstep train, published in dependency order — seam, adapters, then leaf —

@@ -18,7 +18,7 @@ Hard dependencies, all registry-visible and unyanked before package verification
 Publish only eggup-eggpack 0.2.2 after its three exact Eggup dependencies at =0.2.2 are available. The schema dependency remains exactly eggpack-manifest 0.1.2. This release delivers the prepared consumer-side pin update; it does not republish Eggpack producer crates.
 
 ## 2. Why this milestone is ready
-Eggpack M009 and schema pin M008 are closed. M022 prepared workspace 0.2.2 and exact pins, and hosted CI passed runs 44925918931 and 44926808222, but registry packaging was correctly left blocked. The 2026-11-21 registry read shows Eggpack 0.2.1 latest, 0.2.2 absent, and eggpack-manifest 0.1.2 current; recheck dependencies before package. The user explicitly authorized the release. No tags/releases/PRs are in scope.
+Eggpack M009 and schema pin M008 are closed. M022 prepared workspace 0.2.2 and exact pins, and hosted CI passed runs 44925918931 and 44926808222, but registry packaging was correctly left blocked. The 2026-11-21 registry read shows Eggpack 0.2.1 latest, 0.2.2 absent, and eggpack-manifest 0.1.2 current; recheck dependencies before package. The user explicitly authorized the release. Core M022 and Archive M009 are now closed and registry-verified; Acquisition M023 remains the outstanding Eggup exact-pin prerequisite. No tags/releases/PRs are in scope.
 
 ## 3. Current implementation evidence
 Baseline is 3be567e9839b555d7d9d5e6e43f14de4a13c901d. Eggpack src is unchanged from M009 source ccb2bfcbbe7645541d43bb4f5fcb801339c319ed. Its manifest pins Core/Archive/Acquisition exactly to 0.2.2 and eggpack-manifest exactly to 0.1.2. Preserve the exact Acquisition pin in Unreleased until the coupling guard is no longer needed. M022's package failure is an expected registry prerequisite, not permission to bypass registry resolution.
@@ -68,4 +68,4 @@ Stop if any dependency is unavailable/yanked, Eggpack 0.2.2 exists, guard fails,
 Record source/baseline SHAs, commit, per-lane hosted results, commands, package inventory and normalized manifest, immediate dependency registry reads, publisher/time/checksum, downloaded bytes/VCS provenance, fixture lock/tree/metadata/results, compatibility/security review, and registry/roadmap updates.
 
 ## 16. Handoff notes
-This leaf closes the registry packaging blocker left by M022 only after the three exact-pinned Eggup 0.2.2 dependencies are published and verified. Eggpack 0.1.2 producer release and eggpack-manifest 0.1.2 are separate and unchanged.
+This leaf closes the registry packaging blocker left by M022 only after the three exact-pinned Eggup 0.2.2 dependencies are published and verified. Core M022 and Archive M009 are closed; Acquisition M023 remains the required Eggup dependency publication. Eggpack 0.1.2 producer release and eggpack-manifest 0.1.2 are separate and unchanged.

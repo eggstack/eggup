@@ -4,16 +4,13 @@
 
 No additional package changes beyond the selective 0.2.2 publication sequence are recorded here.
 
-## 0.2.2 — selective publication in progress (2026-11-22)
+## 0.2.2 — selective publications in progress (2026-11-22)
 
-Only `eggup-core 0.2.2` is published so far, by Verified Update Core M022 from source SHA
+`eggup-core 0.2.2` and `eggup-archive 0.2.2` are published so far as separate milestones. Core M022 published from source SHA
 `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (registry checksum
-`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`). Archive, Acquisition, Eggfetch,
-and Eggpack remain pending their separate publication milestones. Curl and Service are outside this
-selective release, and `eggup-transport-footprint` remains non-publishable. All eight workspace
-crates share source version `0.2.2`; that does not imply that each package has been published. The
-workspace Eggfetch candidate uses `eggfetch-core ^0.4.0`; the published Eggfetch 0.2.1 artifact
-remains on `^0.3.0`. No tags, GitHub Releases, or PRs were changed.
+`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`). Archive M009 published only `eggup-archive` from source SHA
+`4e8779ed37ca35f3f11857dbcc4aa008e386bf21` (registry checksum
+`67ab697e3af41b3cd3d1ed140f821c68739ec446d2a7782fa26ca4960edc882b`); its registry artifact matches the qualified local package and its Cargo provenance records that SHA. Archive's production source, public API, extraction behavior, and runtime dependencies are unchanged. Acquisition, Eggfetch, and Eggpack remain pending their separate publication milestones. Curl and Service are outside this selective release, and `eggup-transport-footprint` remains non-publishable. All eight workspace crates share source version `0.2.2`; that does not imply that each package has been published. The workspace Eggfetch candidate uses `eggfetch-core ^0.4.0`; the published Eggfetch 0.2.1 artifact remains on `^0.3.0`. No tags, GitHub Releases, or PRs were changed.
 
 ## 0.2.1 — 2026-11-18–20, completed 2026-11-20
 

@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-Prepare `eggup-archive 0.2.2` as the exact-pin target for Eggpack M010. No public API or extraction behavior change; the package carries no runtime Eggup dependency and requires no consumer migration. Publication is gated by Archive M009.
+No unreleased Archive changes are recorded.
+
+## 0.2.2 — 2026-11-22
+
+Published to crates.io on 2026-11-22 as Archive M009 from source SHA `4e8779ed37ca35f3f11857dbcc4aa008e386bf21`; registry checksum `67ab697e3af41b3cd3d1ed140f821c68739ec446d2a7782fa26ca4960edc882b`. The package makes Eggpack M010's exact `=0.2.2` pin available. Production source, public API, extraction behavior, and runtime dependencies are unchanged; no consumer migration is required. The registry archive matches the qualified local package, and Cargo VCS provenance names the source SHA. See `plans/closure/archive-extraction/009-status.md`.
 
 ## 0.2.1 — 2026-11-19
 
@@ -73,10 +77,6 @@ evidence only; no authenticity or signature claims.
 - No new dependency, no public API change, and no migration is required
   beyond the `cleanup()` result handling described above. Integrity remains
   SHA-256 checksum evidence only; no authenticity or signature claims.
-
-## Unreleased
-
-Prepare eggup-archive 0.2.2 as a registry-visible exact-pin target for Eggpack 0.2.2. No production source, public API, extraction behavior, or dependency changes; no migration.
 
 ## 0.1.3 — 2026-10-06
 

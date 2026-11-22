@@ -1,16 +1,19 @@
 # Versions and upgrades
 
-This page was checked against the exact-version crates.io API on 2026-11-22. `eggup-core
-0.2.2` is the latest published Core version and is unyanked; Archive, Acquisition,
-Eggpack, and Eggfetch remain at `0.2.1`, while Curl and Service remain at `0.2.0`. Core
-M022 published only `eggup-core 0.2.2` from source SHA
+This page was checked against the exact-version crates.io API on 2026-11-22. `eggup-core` and
+`eggup-archive` are at `0.2.2` and unyanked; Acquisition, Eggpack, and Eggfetch remain at `0.2.1`,
+while Curl and Service remain at `0.2.0`. Core M022 published only `eggup-core 0.2.2` from source SHA
 `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff`; its registry checksum is
-`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`. Core production
-source, API, runtime behavior, and dependencies are unchanged, and the archive retains
-the three contract documents. The release satisfies Eggpack M010's exact Core pin but
-does not update the immutable Eggpack 0.2.1 pins. The other 0.2.2 publications are
-separate milestones and remain pending. See
-`plans/closure/verified-update-core/022-status.md`.
+`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`. Core production source, API,
+runtime behavior, and dependencies are unchanged, and the archive retains the three contract
+documents. Archive M009 published only `eggup-archive 0.2.2` from source SHA
+`4e8779ed37ca35f3f11857dbcc4aa008e386bf21`; its registry checksum is
+`67ab697e3af41b3cd3d1ed140f821c68739ec446d2a7782fa26ca4960edc882b`. Its production source, API,
+extraction behavior, and runtime dependencies are unchanged, and its normalized manifest has no
+Eggup runtime edge. Acquisition M023, Eggpack M010, and the Eggfetch publication remain separate
+steps; Acquisition must precede Eggfetch, and Eggpack remains last. No tags, GitHub Releases, or PRs
+were changed. See `plans/closure/verified-update-core/022-status.md` and
+`plans/closure/archive-extraction/009-status.md`.
 
 Archive M008 and Acquisition M019 separately published `eggup-archive 0.2.1` and
 `eggup-acquisition 0.2.1` from `5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Eggpack M009
@@ -35,7 +38,7 @@ independently of this repository.
 | [`eggup-acquisition`](https://crates.io/crates/eggup-acquisition) | `0.2.1` |
 | [`eggup-eggfetch`](https://crates.io/crates/eggup-eggfetch) | `0.2.1` |
 | [`eggup-curl`](https://crates.io/crates/eggup-curl) | `0.2.0` |
-| [`eggup-archive`](https://crates.io/crates/eggup-archive) | `0.2.1` |
+| [`eggup-archive`](https://crates.io/crates/eggup-archive) | `0.2.2` |
 | [`eggup-eggpack`](https://crates.io/crates/eggup-eggpack) | `0.2.1` |
 | [`eggup-service`](https://crates.io/crates/eggup-service) | `0.2.0` |
 

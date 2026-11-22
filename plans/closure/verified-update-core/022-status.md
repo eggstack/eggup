@@ -136,3 +136,7 @@ This evidence is for the exact publication source. The hosted lanes are not infe
 Core M022 is closed as the Core exact-pin prerequisite. Archive M009 is next; Acquisition M023 follows Archive and must publish Acquisition before Eggfetch; Eggpack M010 remains the final exact-pin consumer. The immutable published Eggpack 0.2.1 continues to pin its three Eggup dependencies at `=0.2.1` and is unchanged. Curl, Service, and `eggup-transport-footprint` are outside this publication set.
 
 The registry, Core roadmap, Core M022 plan, Core changelog, root changelog, architecture overview and governance release table, `docs/releases.md`, `AGENTS.md`, and docs-hygiene/verification skills are reconciled to the read-back. The closure-documentation commit is separately qualified on its exact pushed SHA before Archive M009 proceeds; the original publication SHA and artifact provenance above remain unchanged.
+
+### Subsequent release handoff — 2026-11-22
+
+Archive M009 has since published `eggup-archive 0.2.2` and closed its registry gate; see `plans/closure/archive-extraction/009-status.md` for the exact checksum, VCS provenance, registry-only fixture, and post-publication hosted run. Acquisition M023 is now next and must publish Acquisition before Eggfetch; Eggpack M010 remains the final exact-pin consumer. This dated handoff does not alter Core M022's original source SHA or closure evidence.

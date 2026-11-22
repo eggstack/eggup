@@ -48,8 +48,9 @@ dependency (compile-time direction). All 8 crates share workspace source version
 
 Core M016 published `eggup-core 0.2.1`; Core M022 later published only `eggup-core 0.2.2` from
 source SHA `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (checksum
-`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`). Archive M008 and Acquisition
-M019 separately published `eggup-archive 0.2.1` and `eggup-acquisition 0.2.1` from
+`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`). Archive M009 later published only `eggup-archive 0.2.2` from source SHA
+`4e8779ed37ca35f3f11857dbcc4aa008e386bf21` (checksum
+`67ab697e3af41b3cd3d1ed140f821c68739ec446d2a7782fa26ca4960edc882b`); the registry artifact matches the qualified local package and its Cargo provenance records that SHA. Production source, API, extraction behavior, and runtime dependencies are unchanged. Archive M008 and Acquisition M019 separately published `eggup-archive 0.2.1` and `eggup-acquisition 0.2.1` from
 `5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Eggpack M009 separately published `eggup-eggpack 0.2.1`
 from `ccb2bfcbbe7645541d43bb4f5fcb801339c319ed` (checksum
 `492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795`). Eggfetch M020 separately
@@ -60,8 +61,8 @@ dependency to 0.4.0 and is hosted-qualified on implementation commit
 `8af7db87cf188859ee8b3222aed8f4a6c9b74ed7` (run
 [44879536834](https://github.com/eggstack/eggup/actions/runs/44879536834)); the published 0.2.1
 package remains on 0.3.0. M021 changed no Eggup package version or published artifact. The `0.2.2`
-source version is shared by all eight workspace crates, but only Core M022 has published so far;
-Archive, Acquisition, Eggfetch, and Eggpack remain gated by their separate closures. The source
+source version is shared by all eight workspace crates, but Core M022 and Archive M009 have published so far;
+Acquisition M023, Eggfetch, and Eggpack remain gated by their separate closures. The source
 Eggpack candidate exact-pins its three Eggup dependencies at `=0.2.2` and eggpack-manifest at
 `=0.1.2`. Published Eggpack 0.2.1 remains immutable with `=0.2.1` pins; older 0.2.0 retains its
 original pins. The Core 0.2.1 and 0.2.2 packages include the three existing contract docs; immutable

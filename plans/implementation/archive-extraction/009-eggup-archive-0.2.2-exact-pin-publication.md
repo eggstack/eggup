@@ -1,6 +1,6 @@
 # Archive Extraction M009 — eggup-archive 0.2.2 exact-pin publication
 
-Status: active; Core M022 is published and registry-verified; Archive M009 is preparing its exact-SHA candidate.
+Status: closed 2026-11-22; Archive M009 published, registry-verified, and hosted-qualified; see the closure record.
 Repository baseline: 3be567e9839b555d7d9d5e6e43f14de4a13c901d
 Source roadmap: plans/subsystems/archive-extraction-roadmap.md
 Affected roadmap: plans/subsystems/eggpack-manifest-interoperability-roadmap.md
@@ -12,7 +12,7 @@ Primary class: infrastructure.
 Publish only eggup-archive 0.2.2 as the registry prerequisite for Eggpack 0.2.2, whose Archive edge is exact-pinned to =0.2.2. Production source and runtime dependency surface are unchanged from Archive 0.2.1.
 
 ## 2. Why this milestone is ready
-Archive M008 and Core M022 are closed. Core 0.2.2 is published and unyanked; its closure commit `abdae619a4b00ac0f20ee9b7918c30f1fbca14c3` passed all five hosted lanes in run `44982351142`. The exact Archive 0.2.2 endpoint returned 404 on 2026-11-22, and Archive 0.2.1 is unyanked; recheck immediately before upload. The user authorized this selective publication. No tag, GitHub Release, or PR action is in scope.
+Archive M008 and Core M022 are closed. Core 0.2.2 is published and unyanked; its closure commit `abdae619a4b00ac0f20ee9b7918c30f1fbca14c3` passed all five hosted lanes in run `44982351142`. The exact Archive 0.2.2 endpoint returned 404 before upload on 2026-11-22; the upload then succeeded and exact-version readback confirmed 0.2.2 unyanked. Archive 0.2.1 remains unyanked; see the closure record for the full readback. The user authorized this selective publication. No tag, GitHub Release, or PR action is in scope.
 
 ## 3. Current implementation evidence
 Baseline is 3be567e9839b555d7d9d5e6e43f14de4a13c901d. Archive src is unchanged from M008 source SHA 5a04f68f60c8c3ad6392036fa314ed2749fa572c. The manifest retains five external normal dependencies; eggup-core is dev-only and must not appear in the normalized published dependency manifest.
@@ -24,7 +24,7 @@ Extraction stays local, bounded, allowlisted, regular-file-only, no-clobber, and
 In scope: Unreleased exact-pin note, package, publish, and registry verification for only eggup-archive 0.2.2. Out of scope: Rust/API/extraction/dependency changes; other crate publications; tags, GitHub Releases, PRs, yanks, overwrites, or release CI.
 
 ## 6. Required production changes
-None. Only changelog and plan/closure evidence change. Keep src, manifest dependencies, and Cargo.lock unchanged; package normalization must strip the dev-only Core edge.
+None. Archive src and its dependency declarations remain unchanged; the workspace Cargo.lock carries the shared 0.2.2 version promotion and M021's unrelated eggfetch-core/eggfetch-http-connect 0.4.0 update. Those lock entries do not change Archive's dependency graph. Only the Archive changelog and plan/closure evidence change for this package promotion. Package normalization must strip the dev-only Core edge.
 
 ## 7. Ordered work packages
 1. Confirm Archive 0.2.2 absent and prior versions unyanked. 2. Prepare Unreleased note and registry-only fixture. 3. Run local gate, package checks, and five-lane hosted CI on exact SHA. 4. Review package inventory and normalized manifest. 5. Publish once and read back metadata, checksum, and VCS SHA. 6. Pass registry-only fixture before dependent releases.
