@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-11-22
+
+Published to crates.io as Acquisition Transport M023 from source commit `cf6fcc1706f353a0c5e4c4d3e0071c482993f974`; registry SHA-256 `4000935b1d4d384eaba066c9742e70f91d5cb3dd12618ac3aa79d654e2aab865`. The package remains the zero-dependency, transport-neutral seam; production source, public API, runtime behavior, and dependencies are unchanged. No consumer migration is required. The publication satisfies Eggpack M010's exact `=0.2.2` seam pin. See `plans/closure/acquisition-transport/023-status.md`.
+
 ## 0.2.1 — 2026-11-19
 
 Published to crates.io on 2026-11-19 as Acquisition M019. This package remains
@@ -110,10 +114,6 @@ The crate still has **zero `[dependencies]`**, before and after.
 ## Unreleased
 
 No unpublished package changes.
-
-## 0.2.2 — 2026-11-22
-
-Published to crates.io as Acquisition Transport M023 from source commit `cf6fcc1706f353a0c5e4c4d3e0071c482993f974`; registry SHA-256 `4000935b1d4d384eaba066c9742e70f91d5cb3dd12618ac3aa79d654e2aab865`. The package remains the zero-dependency, transport-neutral seam; production source, public API, runtime behavior, and dependencies are unchanged. No consumer migration is required. The publication satisfies Eggpack M010's exact `=0.2.2` seam pin. See `plans/closure/acquisition-transport/023-status.md`.
 
 ## 0.1.3 — 2026-10-06
 
