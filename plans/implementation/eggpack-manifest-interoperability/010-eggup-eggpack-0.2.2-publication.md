@@ -1,6 +1,6 @@
 # Eggpack Manifest Interoperability M010 — eggup-eggpack 0.2.2 publication
 
-Status: active; publication authorized 2026-11-21, not yet performed.
+Status: active; publication authorized 2026-11-21; Core M022, Archive M009, and Acquisition M023 are closed and registry-verified. Eggpack 0.2.2 remains unpublished pending M010 qualification and release.
 Repository baseline: 3be567e9839b555d7d9d5e6e43f14de4a13c901d
 Source roadmap: plans/subsystems/eggpack-manifest-interoperability-roadmap.md
 Affected roadmaps: verified-update-core, archive-extraction, acquisition-transport.
@@ -18,7 +18,7 @@ Hard dependencies, all registry-visible and unyanked before package verification
 Publish only eggup-eggpack 0.2.2 after its three exact Eggup dependencies at =0.2.2 are available. The schema dependency remains exactly eggpack-manifest 0.1.2. This release delivers the prepared consumer-side pin update; it does not republish Eggpack producer crates.
 
 ## 2. Why this milestone is ready
-Eggpack M009 and schema pin M008 are closed. M022 prepared workspace 0.2.2 and exact pins, and hosted CI passed runs 44925918931 and 44926808222, but registry packaging was correctly left blocked. The 2026-11-21 registry read shows Eggpack 0.2.1 latest, 0.2.2 absent, and eggpack-manifest 0.1.2 current; recheck dependencies before package. The user explicitly authorized the release. Core M022 and Archive M009 are now closed and registry-verified; Acquisition M023 remains the outstanding Eggup exact-pin prerequisite. No tags/releases/PRs are in scope.
+Eggpack M009 and schema pin M008 are closed. M022 prepared workspace 0.2.2 and exact pins, and hosted CI passed runs 44925918931 and 44926808222, but registry packaging was correctly left blocked. The 2026-11-21 registry read shows Eggpack 0.2.1 latest, 0.2.2 absent, and eggpack-manifest 0.1.2 current; recheck dependencies before package. The user explicitly authorized the release. Core M022, Archive M009, and Acquisition M023 are closed and registry-verified; all three exact Eggup dependencies and `eggpack-manifest 0.1.2` are available and unyanked. Recheck current registry state and Eggpack 0.2.2 absence before packaging. No tags/releases/PRs are in scope.
 
 ## 3. Current implementation evidence
 Baseline is 3be567e9839b555d7d9d5e6e43f14de4a13c901d. Eggpack src is unchanged from M009 source ccb2bfcbbe7645541d43bb4f5fcb801339c319ed. Its manifest pins Core/Archive/Acquisition exactly to 0.2.2 and eggpack-manifest exactly to 0.1.2. Preserve the exact Acquisition pin in Unreleased until the coupling guard is no longer needed. M022's package failure is an expected registry prerequisite, not permission to bypass registry resolution.
@@ -33,7 +33,7 @@ In scope: retain Unreleased exact-pin evidence; package, dry-run, publish, and v
 None. Do not change src or dependency policy. Only changelog and plan/closure evidence change.
 
 ## 7. Ordered work packages
-1. Close and verify Core M022, Archive M009, and Acquisition M023 seam publication; verify schema 0.1.2. 2. Recheck Eggpack 0.2.2 absent. 3. Run local gate, exact-SHA five-lane CI, strict package and dry-run. 4. Review normalized manifest/inventory. 5. Publish once and verify metadata, archive checksum, and VCS SHA. 6. Run registry-only fixture and same-SHA post-publication CI.
+1. Verify closed Core M022, Archive M009, and Acquisition M023 publication readbacks plus schema 0.1.2. 2. Recheck Eggpack 0.2.2 absent. 3. Run local gate, exact-SHA five-lane CI, strict package and dry-run. 4. Review normalized manifest/inventory. 5. Publish once and verify metadata, archive checksum, and VCS SHA. 6. Run registry-only fixture and same-SHA post-publication CI.
 
 ## 8. Failure, cancellation, restart, and contention semantics
 If any exact dependency is absent, yanked, mismatched, or unverifiable, stop before Eggpack packaging. Any failed check blocks upload. On ambiguous upload, query crates.io before any retry. If artifact/checksum differs, stop; never yank/overwrite and do not claim rollback. No user installation state is touched.

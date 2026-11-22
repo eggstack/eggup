@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-### Changed
+No unpublished package changes.
 
-- M021 upgrades the workspace implementation dependency to `eggfetch-core ^0.4.0`, retaining the same four features, adapter API, and acquisition policy. M022 sets all workspace source package versions to `0.2.2`. Neither change is published: crates.io `eggup-eggfetch 0.2.1` remains on `eggfetch-core ^0.3.0`, with no consumer change or migration.
+## 0.2.2 — 2026-11-22
+
+Published to crates.io as Acquisition Transport M023 from source commit `cf6fcc1706f353a0c5e4c4d3e0071c482993f974`; registry SHA-256 `f683e0c3b377a1713a5af4a64257f785da24f17771a927c07508b0d73ad35df1`. This publication carries the already-qualified `eggfetch-core ^0.4.0` implementation update with the same four features (`http1`, `tls-rustls`, `tls-native-roots`, and `proxy`), public adapter API, and acquisition policy. No consumer migration is required. The normalized manifest has no Curl edge. See `plans/closure/acquisition-transport/023-status.md`.
 
 ## 0.2.1 — 2026-11-20
 

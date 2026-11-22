@@ -60,9 +60,12 @@ published `eggup-eggfetch 0.2.1` from `2a33cfe4712dfb88a823614ee6f6a439ecdf792e`
 dependency to 0.4.0 and is hosted-qualified on implementation commit
 `8af7db87cf188859ee8b3222aed8f4a6c9b74ed7` (run
 [44879536834](https://github.com/eggstack/eggup/actions/runs/44879536834)); the published 0.2.1
-package remains on 0.3.0. M021 changed no Eggup package version or published artifact. The `0.2.2`
-source version is shared by all eight workspace crates, but Core M022 and Archive M009 have published so far;
-Acquisition M023, Eggfetch, and Eggpack remain gated by their separate closures. The source
+package remains on 0.3.0. M021 changed no Eggup package version or published artifact. The `0.2.2` source version is shared by all eight workspace crates, but publication is selective.
+Core M022 and Archive M009 published Core and Archive. Acquisition Transport M023 published Acquisition
+and Eggfetch 0.2.2 from source SHA `cf6fcc1706f353a0c5e4c4d3e0071c482993f974` (checksums
+`4000935b1d4d384eaba066c9742e70f91d5cb3dd12618ac3aa79d654e2aab865` and
+`f683e0c3b377a1713a5af4a64257f785da24f17771a927c07508b0d73ad35df1`). Eggpack M010 remains the final
+package publication and requires its own qualification; only Curl and Service remain at `0.2.0`. The source
 Eggpack candidate exact-pins its three Eggup dependencies at `=0.2.2` and eggpack-manifest at
 `=0.1.2`. Published Eggpack 0.2.1 remains immutable with `=0.2.1` pins; older 0.2.0 retains its
 original pins. The Core 0.2.1 and 0.2.2 packages include the three existing contract docs; immutable

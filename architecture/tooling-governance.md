@@ -665,20 +665,27 @@ CI added."
 |---|---|---|---|---|
 | `eggup-core` | 0.2.2 | 0.2.2 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, 0.2.1, **0.2.2** | Non-Windows runtime graph is `sha2`; Windows also uses `self-replace`; M016/M022 package all three contract docs |
 | `eggup-archive` | 0.2.2 | 0.2.2 | 0.1.2, 0.1.3, 0.2.0, 0.2.1, **0.2.2** | Bounded extraction; M009 is a package promotion for Eggpack's exact pin; no source/API/extraction/runtime change |
-| `eggup-acquisition` | 0.2.2 | 0.2.1 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Zero-dependency seam; M019 published with no source/API/dependency change |
+| `eggup-acquisition` | 0.2.2 | 0.2.2 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, 0.2.1, **0.2.2** | Zero-dependency seam; M019 and M023 package-only promotions; M023 has no production source/API/runtime/dependency change |
 
-| `eggup-eggfetch` | 0.2.2 | 0.2.1 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Native HTTP adapter; M020 published against eggfetch-core 0.3.0; M021 source update to 0.4.0 hosted-qualified on `8af7db87` (run `44879536834`), not published; API/policy unchanged |
+| `eggup-eggfetch` | 0.2.2 | 0.2.2 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, 0.2.1, **0.2.2** | Native HTTP adapter; M023 publishes M021's qualified `eggfetch-core 0.4.0` update with the same four features and no API/policy change |
 | `eggup-curl` | 0.2.2 | 0.2.0 | 0.1.2, **0.2.0** | External-curl adapter |
-| `eggup-eggpack` | 0.2.2 | 0.2.1 | 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Only crate touching producer types; current source pins Eggup dependencies at `=0.2.2`; published 0.2.1 keeps `=0.2.1` and eggpack-manifest `=0.1.2`; immutable 0.2.0 retains its original pins |
+| `eggup-eggpack` | 0.2.2 | 0.2.1 | 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Only crate touching producer types; M010 source pins Eggup dependencies at `=0.2.2`; M023 has made all three exact Eggup dependencies registry-visible; published 0.2.1 keeps `=0.2.1` and `eggpack-manifest =0.1.2` |
 | `eggup-service` | 0.2.2 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Carries the stdin-verdict fix the published `0.1.3` lacks |
 | `eggup-transport-footprint` | 0.2.2 | — | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
-All 8 crates share workspace source version `0.2.2`; publication remains selective. The
-exact-version crates.io API was checked on 2026-11-22: Core and Archive are at `0.2.2`; Acquisition,
-Eggpack, and Eggfetch are at `0.2.1`; Curl and Service are at `0.2.0`. Core M022 published only
+All 8 crates share workspace source version `0.2.2`; publication remains selective. The exact-version crates.io API
+was checked on 2026-11-22: Core, Archive, Acquisition, and Eggfetch are at `0.2.2`; Eggpack is at
+`0.2.1`; Curl and Service are at `0.2.0`. Core M022 published only
 `eggup-core 0.2.2` from source SHA `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (checksum
 `a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`); its registry archive matches
-the qualified local package, and `.cargo_vcs_info.json` records the same source SHA. Archive M009 published `eggup-archive 0.2.2` from source SHA `4e8779ed37ca35f3f11857dbcc4aa008e386bf21` (checksum `67ab697e3af41b3cd3d1ed140f821c68739ec446d2a7782fa26ca4960edc882b`); the registry archive matches the local package and `.cargo_vcs_info.json` records that SHA. Its five normal dependencies have no Eggup runtime edge, and production source/API/extraction behavior is unchanged. Core M016
+the qualified local package, and `.cargo_vcs_info.json` records the same source SHA. Archive M009 published `eggup-archive 0.2.2` from source SHA `4e8779ed37ca35f3f11857dbcc4aa008e386bf21` (checksum `67ab697e3af41b3cd3d1ed140f821c68739ec446d2a7782fa26ca4960edc882b`); the registry archive matches the local package and `.cargo_vcs_info.json` records that SHA. Its five normal dependencies have no Eggup runtime edge, and production source/API/extraction behavior is unchanged. Acquisition Transport M023 then published `eggup-acquisition 0.2.2` (checksum
+`4000935b1d4d384eaba066c9742e70f91d5cb3dd12618ac3aa79d654e2aab865`) followed by
+`eggup-eggfetch 0.2.2` (checksum
+`f683e0c3b377a1713a5af4a64257f785da24f17771a927c07508b0d73ad35df1`) from source SHA
+`cf6fcc1706f353a0c5e4c4d3e0071c482993f974`. Both registry archives match their qualified packages and carry
+Cargo provenance for that SHA; post-publication hosted run `44985695980` attempt 2 passed all five lanes.
+Acquisition remains zero-dependency; Eggfetch carries the qualified 0.4.0 implementation dependency update.
+Eggpack M010 remains the last planned package promotion. Core M016
 published from source commit
 `b5a989a72dc185b30cd8c0cb67b5110ed03acd86` (checksum
 `3841a8390f8c7b1be0207156e5c895aa4b6c0eec8b05772ac8331d3e43e7ef88`); its

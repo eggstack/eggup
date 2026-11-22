@@ -65,13 +65,13 @@ Each has occurred at least once — check for them explicitly:
    workspace check and the packaged-service step; it does not run tests, and
    that step's registry-resolved compile is strict too.
 2. **Publication status.** Core M016 published `eggup-core 0.2.1` on
-   2026-11-18; Core M022 published `eggup-core 0.2.2` on 2026-11-22.
-   Archive is now latest at `0.2.2`; Acquisition, Eggpack, and Eggfetch remain
-   latest at `0.2.1`; Curl
-   and Service remain at `0.2.0`; `eggup-transport-footprint` is not published.
-   The 0.2.2 workspace source version does not imply that every crate has been
-   released. Check crates.io rather than inferring from a `publish = false` key
-   or a plan.
+   2026-11-18; Core M022 and Archive M009 published `0.2.2` on 2026-11-22.
+   Acquisition M023 published `eggup-acquisition 0.2.2` and
+   `eggup-eggfetch 0.2.2` on 2026-11-22; Eggpack remains latest at `0.2.1`;
+   Curl and Service remain at `0.2.0`;
+   `eggup-transport-footprint` is not published. The 0.2.2 workspace source
+   version does not imply that every crate has been released. Check crates.io
+   rather than inferring from a `publish = false` key or a plan.
 3. **Enum tables lagging the source.** `architecture/core-transaction.md` once
    described a whole earlier generation of `eggup-core`'s enums. When a variant
    is added, renamed, or removed, update every table that lists variants.

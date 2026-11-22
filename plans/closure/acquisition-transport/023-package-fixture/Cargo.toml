@@ -1,0 +1,14 @@
+[package]
+name = "eggup-acquisition-eggfetch-0-2-2-registry-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+eggup-acquisition = "=0.2.2"
+eggup-eggfetch = "=0.2.2"
+# Existing adapters remain compatible through their 0.2 caret requirements.
+eggup-curl = "=0.2.0"
+eggup-service = "=0.2.0"

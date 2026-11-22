@@ -1,6 +1,6 @@
 # Acquisition Transport M023 — eggup-acquisition and eggup-eggfetch 0.2.2 publications
 
-Status: active; publication authorized 2026-11-21, uploads not yet performed.
+Status: closed 2026-11-22; Acquisition and Eggfetch 0.2.2 published in dependency order, registry-verified, fixture-tested, and hosted-qualified; see `plans/closure/acquisition-transport/023-status.md`.
 Repository baseline: 3be567e9839b555d7d9d5e6e43f14de4a13c901d
 Source roadmap: plans/subsystems/acquisition-transport-roadmap.md
 Affected roadmaps: archive-extraction and eggpack-manifest-interoperability.
@@ -12,7 +12,7 @@ Primary class: infrastructure.
 Publish eggup-acquisition 0.2.2 first as the zero-dependency seam required by Eggpack's =0.2.2 exact pin, then publish eggup-eggfetch 0.2.2 to deliver the already-qualified eggfetch-core 0.4.0 dependency update. This is a selective two-package milestone, not a seven-crate train.
 
 ## 2. Why this milestone is ready
-Acquisition M019 and Eggfetch M020 are closed. M021's Eggfetch 0.4.0 workspace dependency update passed run 44879536834. M022 source preparation passed runs 44925918931 and 44926808222. The 2026-11-21 registry reads show Acquisition and Eggfetch 0.2.1 latest and no 0.2.2; recheck both before upload. Eggpack requires Acquisition 0.2.2. The current user explicitly authorized publication. Core M022 and Archive M009 are closed; Archive 0.2.2 has a verified registry readback and satisfies the Archive prerequisite. No tags/releases/PRs are in scope.
+Acquisition M019 and Eggfetch M020 are closed. M021's Eggfetch 0.4.0 workspace dependency update passed run 44879536834. M022 source preparation passed runs 44925918931 and 44926808222. Pre-upload registry checks confirmed both 0.2.2 versions absent, previous versions unyanked, and required upstream versions available. The user authorized publication. Core M022 and Archive M009 were closed; Acquisition was published first to satisfy Eggpack's exact pin, then Eggfetch followed. Both packages are registry-verified and M023 is closed. No tags/releases/PRs were in scope.
 
 ## 3. Current implementation evidence
 Baseline is 3be567e9839b555d7d9d5e6e43f14de4a13c901d. Acquisition src is unchanged from 0.2.1 and its dependency table remains empty. Eggfetch carries M021's 0.4.0 dependency and diagnostic update; two source lines changed, with no public API/policy change and the same four explicit features. The M022 coupling guard requires Eggpack's exact pin to remain in its Unreleased changelog until its publication. Published Curl 0.2.0 and Service 0.2.0 use caret requirements and are not republished.
