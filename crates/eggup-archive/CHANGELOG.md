@@ -72,7 +72,7 @@ evidence only; no authenticity or signature claims.
 
 ## Unreleased
 
-No additional unreleased package changes are recorded.
+Prepare eggup-archive 0.2.2 as a registry-visible exact-pin target for Eggpack 0.2.2. No production source, public API, extraction behavior, or dependency changes; no migration.
 
 ## 0.1.3 — 2026-10-06
 

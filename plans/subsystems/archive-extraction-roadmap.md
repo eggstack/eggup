@@ -1,6 +1,6 @@
 # Archive Extraction Roadmap
 
-Status: active; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication closed 2026-10-06; M005 cleanup-authority corrective closed; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M007 workspace dependency security refresh closed 2026-11-17 (hosted run `44022660351` green on all five CI lanes); M008 published `eggup-archive 0.2.1` 2026-11-19 from `5a04f68` (checksum `b841216d…bf61d80`), registry-verified and hosted-qualified in run `44591516672`
+Status: active; M009 eggup-archive 0.2.2 exact-pin publication active after Core M022; M001 lineage closed; M002 Egress adoption closed; M003 Eggpack handoff closed; M004 eggup-archive 0.1.3 correctness publication closed 2026-10-06; M005 cleanup-authority corrective closed; M006 published `eggup-archive 0.2.0` 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M007 workspace dependency security refresh closed 2026-11-17 (hosted run `44022660351` green on all five CI lanes); M008 published `eggup-archive 0.2.1` 2026-11-19 from `5a04f68` (checksum `b841216d…bf61d80`), registry-verified and hosted-qualified in run `44591516672`
 
 Long-term references:
 
@@ -198,6 +198,10 @@ Publish the already-implemented Windows reserved-device validation,
 truthful-residue reporting, and hostile-entry regression coverage without API or
 extraction-policy change.
 
+### M009 — eggup-archive 0.2.2 exact-pin publication
+
+Status: active; see plans/implementation/archive-extraction/009-eggup-archive-0.2.2-exact-pin-publication.md. Publish only Archive 0.2.2 after exact-SHA qualification; production source and extraction behavior are unchanged. The registry artifact is required by Eggpack M010. No existing tags, GitHub Releases, or PRs are to be changed.
+
 ## 8. Cross-cutting requirements
 
 - Rust 1.89 baseline;
@@ -245,6 +249,7 @@ The subsystem is mature when M001b cleanup, M001c materialization write authorit
 | M006 | closed; hosted-qualified (run `40079833945`) | `plans/implementation/archive-extraction/006-eggup-archive-0.2.0-publication.md` | `plans/closure/archive-extraction/006-status.md` | Published `eggup-archive 0.2.0` (`ce35edd5…ff57ad`) from `b612608`, the publication source commit, with `v0.2.0` and release `0.2.0` created. The registry-only fixture resolves `eggup-archive 0.2.0` from crates.io, asserts the extracted member's byte count and SHA-256, and calls `cleanup()` matching the result rather than unwrapping it. The packaged manifest carries **no** `eggup-core` edge: that dependency is a path-only dev-dependency and is stripped at packaging
 | M007 workspace dependency security refresh | closed; hosted-qualified (run `44022660351`) | `plans/implementation/archive-extraction/007-workspace-dependency-security-refresh.md` | `plans/closure/archive-extraction/007-status.md` | All five hosted CI lanes green; no package publication authorized by M007 |
 | M008 eggup-archive 0.2.1 publication | closed; registry-verified; hosted-qualified (run `44591516672`) | `plans/implementation/archive-extraction/008-eggup-archive-0.2.1-publication.md` | `plans/closure/archive-extraction/008-status.md` | Published from `5a04f68`; registry SHA-256 `b841216d…bf61d80`; normalized manifest has five normal dependencies and no Eggup edge; registry-only fixture passes |
+| M009 | active; authorized publication; not yet published | plans/implementation/archive-extraction/009-eggup-archive-0.2.2-exact-pin-publication.md | plans/closure/archive-extraction/009-status.md (pending) | Core M022 source qualification; exact-pin prerequisite for Eggpack M010. |
 
 ### M007 — Workspace dependency security refresh
 

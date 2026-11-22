@@ -437,7 +437,7 @@ changelogs for changes that cross the boundary.
 
 ## Unreleased
 
-No unpublished Core changes are currently recorded in this section.
+Prepare eggup-core 0.2.2 as a registry-visible exact-pin target for Eggpack 0.2.2. No production source, public API, runtime behavior, or dependency changes; no migration.
 
 ## 0.1.3 — 2026-10-06
 

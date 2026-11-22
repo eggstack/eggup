@@ -109,7 +109,7 @@ The crate still has **zero `[dependencies]`**, before and after.
 
 ## Unreleased
 
-No unreleased behavior, API, or dependency changes are recorded.
+Prepare the zero-dependency eggup-acquisition 0.2.2 package to satisfy Eggpack 0.2.2's exact seam pin. No production source, public API, runtime behavior, or dependency changes; no migration.
 
 ## 0.1.3 — 2026-10-06
 
