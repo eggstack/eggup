@@ -1,6 +1,6 @@
 # Archive Extraction M009 — eggup-archive 0.2.2 exact-pin publication
 
-Status: active; publication authorized 2026-11-21, not yet performed.
+Status: active; Core M022 is published and registry-verified; Archive M009 is preparing its exact-SHA candidate.
 Repository baseline: 3be567e9839b555d7d9d5e6e43f14de4a13c901d
 Source roadmap: plans/subsystems/archive-extraction-roadmap.md
 Affected roadmap: plans/subsystems/eggpack-manifest-interoperability-roadmap.md
@@ -12,7 +12,7 @@ Primary class: infrastructure.
 Publish only eggup-archive 0.2.2 as the registry prerequisite for Eggpack 0.2.2, whose Archive edge is exact-pinned to =0.2.2. Production source and runtime dependency surface are unchanged from Archive 0.2.1.
 
 ## 2. Why this milestone is ready
-Archive M008 and M022 source preparation are closed; M022's exact candidate passed all five hosted lanes in runs 44925918931 and 44926808222. The 2026-11-21 crates.io read reports Archive 0.2.1 latest and no 0.2.2; recheck before upload. The user explicitly authorized this release. No tag, GitHub Release, or PR action is in scope.
+Archive M008 and Core M022 are closed. Core 0.2.2 is published and unyanked; its closure commit `abdae619a4b00ac0f20ee9b7918c30f1fbca14c3` passed all five hosted lanes in run `44982351142`. The exact Archive 0.2.2 endpoint returned 404 on 2026-11-22, and Archive 0.2.1 is unyanked; recheck immediately before upload. The user authorized this selective publication. No tag, GitHub Release, or PR action is in scope.
 
 ## 3. Current implementation evidence
 Baseline is 3be567e9839b555d7d9d5e6e43f14de4a13c901d. Archive src is unchanged from M008 source SHA 5a04f68f60c8c3ad6392036fa314ed2749fa572c. The manifest retains five external normal dependencies; eggup-core is dev-only and must not appear in the normalized published dependency manifest.

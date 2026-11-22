@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+Prepare `eggup-archive 0.2.2` as the exact-pin target for Eggpack M010. No public API or extraction behavior change; the package carries no runtime Eggup dependency and requires no consumer migration. Publication is gated by Archive M009.
+
 ## 0.2.1 — 2026-11-19
 
 Published to crates.io on 2026-11-19 as Archive M008. This package carries the ZIP dependency refresh qualified by Archive M007 and is the archive version selected by Eggpack 0.2.1's exact pin. The public API and extraction behavior are unchanged from 0.2.0; no consumer migration is required. Registry evidence is recorded in plans/closure/archive-extraction/008-status.md.
