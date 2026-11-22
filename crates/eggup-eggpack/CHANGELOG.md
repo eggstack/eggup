@@ -2,10 +2,11 @@
 
 ## Unreleased
 
-### Changed
+No unpublished package changes.
 
-- M022 updates this unpublished source candidate to 0.2.2 and pins `eggup-core`, `eggup-archive`, and `eggup-acquisition` at `=0.2.2`; `eggpack-manifest` remains `=0.1.2`.
-- Acquisition M023 published `eggup-acquisition 0.2.2`; all three exact-pinned Eggup dependencies and `eggpack-manifest 0.1.2` are now registry-visible and unyanked. Eggpack M010's package qualification and publication remain pending. Published Eggpack 0.2.1 retains its `=0.2.1` pins, and 0.2.0 retains its earlier pins. This metadata update does not publish a package or require consumer migration.
+## 0.2.2 — 2026-11-22
+
+Published to crates.io as Eggpack Manifest Interoperability M010 from source commit `c9a7ac0af7ea3f0a090d19fe1fffa817235f0081`; registry SHA-256 `f24df78cf088e665dd69db1b319d7168007175ebc1ec5d2df76a069e31242e49`. Its normalized manifest exact-pins `eggup-core`, `eggup-archive`, and `eggup-acquisition` at `=0.2.2` and `eggpack-manifest` at `=0.1.2`. Core M022, Archive M009, and Acquisition M023 made all prerequisites registry-visible and unyanked before this upload. The M022 pin preparation and M023 dependency handoff are now complete. This is package-only: no Rust source, public API, runtime behavior, or consumer migration beyond selecting 0.2.2. Immutable Eggpack 0.2.1 keeps its `=0.2.1` pins; 0.2.0 keeps its earlier pins. See `plans/closure/eggpack-manifest-interoperability/010-status.md`.
 
 ## 0.2.1 — 2026-11-19
 

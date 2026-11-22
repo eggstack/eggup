@@ -75,10 +75,10 @@ Runtime dependencies ([`Cargo.toml`](../crates/eggup-eggpack/Cargo.toml)):
 | `eggup-acquisition` | `=0.2.2` | local path `../eggup-acquisition` |
 | `eggpack-manifest` | `=0.1.2` | crates.io registry |
 
-The workspace-source candidate pins its three Eggup edges to `=0.2.2`; the
-published `eggup-eggpack 0.2.1` artifact remains unchanged and pins `=0.2.1`.
-The older published `0.2.0` artifact retains its original `=0.2.0` Eggup pins
-and `=0.1.0` producer pin. The producer edge is registry-only so the published crate has no VCS source
+The workspace source and published `eggup-eggpack 0.2.2` pin their three Eggup
+edges to `=0.2.2` and the producer schema to `=0.1.2`. The immutable published
+`0.2.1` artifact retains `=0.2.1` Eggup pins; published `0.2.0` retains its
+original `=0.2.0` Eggup pins and `=0.1.0` producer pin. The producer edge is registry-only so the published crate has no VCS source
 requirement. Both facts are asserted as tests, not just comments — see
 [Testing approach](#testing-approach).
 

@@ -67,8 +67,8 @@ Each has occurred at least once — check for them explicitly:
 2. **Publication status.** Core M016 published `eggup-core 0.2.1` on
    2026-11-18; Core M022 and Archive M009 published `0.2.2` on 2026-11-22.
    Acquisition M023 published `eggup-acquisition 0.2.2` and
-   `eggup-eggfetch 0.2.2` on 2026-11-22; Eggpack remains latest at `0.2.1`;
-   Curl and Service remain at `0.2.0`;
+   `eggup-eggfetch 0.2.2` on 2026-11-22; Eggpack M010 published
+   `eggup-eggpack 0.2.2` that day; Curl and Service remain at `0.2.0`;
    `eggup-transport-footprint` is not published. The 0.2.2 workspace source
    version does not imply that every crate has been released. Check crates.io
    rather than inferring from a `publish = false` key or a plan.

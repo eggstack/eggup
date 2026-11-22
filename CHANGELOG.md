@@ -4,7 +4,7 @@
 
 No additional package changes beyond the selective 0.2.2 publication sequence are recorded here.
 
-## 0.2.2 — selective publications in progress (2026-11-22)
+## 0.2.2 — selective publications completed 2026-11-22
 
 `eggup-core 0.2.2` and `eggup-archive 0.2.2` remain separate publications. Core M022 published from source SHA
 `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (registry checksum
@@ -20,11 +20,16 @@ Acquisition Transport M023 published `eggup-acquisition 0.2.2` (checksum
 source SHA `cf6fcc1706f353a0c5e4c4d3e0071c482993f974`. Both registry archives match their qualified local
 packages and their Cargo provenance records that SHA. Acquisition remains zero-dependency and unchanged;
 Eggfetch carries the qualified `eggfetch-core 0.4.0` update without API, feature, or policy change.
-Post-publication hosted run `44985695980` attempt 2 passed all five lanes on the publication SHA. Eggpack
-M010 remains the final publication gate; its exact dependencies are registry-visible. Curl and Service are
-outside this selective release, and `eggup-transport-footprint` remains non-publishable. All eight
-workspace crates share source version `0.2.2`; this does not imply every package is published. No tags,
-GitHub Releases, or PRs were changed.
+Post-publication hosted run `44985695980` attempt 2 passed all five lanes on the publication SHA. Eggpack M010 then published only `eggup-eggpack 0.2.2` from source SHA
+`c9a7ac0af7ea3f0a090d19fe1fffa817235f0081` (registry checksum
+`f24df78cf088e665dd69db1b319d7168007175ebc1ec5d2df76a069e31242e49`). Its registry archive is
+byte-identical to the qualified local package, Cargo provenance records that SHA and
+`crates/eggup-eggpack`, and its normalized manifest exact-pins Core, Archive, and Acquisition at
+`=0.2.2` plus `eggpack-manifest =0.1.2`. The registry-only consumer fixture passed; post-publication
+run `44988995059` attempt 2 passed all five hosted lanes on the same source SHA. This completes the
+selective 0.2.2 publications: Curl and Service remain at 0.2.0, and `eggup-transport-footprint` remains
+non-publishable. All eight workspace crates share source version `0.2.2`; this does not imply every
+package is published. No tags, GitHub Releases, or PRs were changed.
 
 ## 0.2.1 — 2026-11-18–20, completed 2026-11-20
 

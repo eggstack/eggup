@@ -64,11 +64,14 @@ package remains on 0.3.0. M021 changed no Eggup package version or published art
 Core M022 and Archive M009 published Core and Archive. Acquisition Transport M023 published Acquisition
 and Eggfetch 0.2.2 from source SHA `cf6fcc1706f353a0c5e4c4d3e0071c482993f974` (checksums
 `4000935b1d4d384eaba066c9742e70f91d5cb3dd12618ac3aa79d654e2aab865` and
-`f683e0c3b377a1713a5af4a64257f785da24f17771a927c07508b0d73ad35df1`). Eggpack M010 remains the final
-package publication and requires its own qualification; only Curl and Service remain at `0.2.0`. The source
-Eggpack candidate exact-pins its three Eggup dependencies at `=0.2.2` and eggpack-manifest at
-`=0.1.2`. Published Eggpack 0.2.1 remains immutable with `=0.2.1` pins; older 0.2.0 retains its
-original pins. The Core 0.2.1 and 0.2.2 packages include the three existing contract docs; immutable
+`f683e0c3b377a1713a5af4a64257f785da24f17771a927c07508b0d73ad35df1`). Eggpack M010 then published only `eggup-eggpack 0.2.2` from source SHA
+`c9a7ac0af7ea3f0a090d19fe1fffa817235f0081` (checksum
+`f24df78cf088e665dd69db1b319d7168007175ebc1ec5d2df76a069e31242e49`). The registry archive matches
+the qualified local package and Cargo provenance records that SHA. Its normalized manifest exact-pins
+Core, Archive, and Acquisition at `=0.2.2` and eggpack-manifest at `=0.1.2`; the registry-only
+consumer fixture passed, and post-publication run `44988995059` attempt 2 passed all five hosted lanes.
+Published Eggpack 0.2.1 remains immutable with `=0.2.1` pins; older 0.2.0 retains its original pins.
+Only Curl and Service remain at `0.2.0`. The Core 0.2.1 and 0.2.2 packages include the three existing contract docs; immutable
 Core 0.2.0 does not. The earlier 0.2.0 line remains one lockstep train published from a single
 source commit because `eggup-acquisition`'s next release is source-breaking and the workspace shares
 one version. Publication and registry-only evidence are in the closure records under
@@ -101,7 +104,7 @@ In plain dependency order, deepest first:
 4. **`eggup-curl`** → `eggup-acquisition` only. External-process adapter, no HTTP/TLS stack.
 5. **`eggup-service`** → `eggup-core` + `windows-args` (+ `windows-service` on Windows). Lifecycle adapters.
 6. **`eggup-archive`** → `tar`, `zip`, `flate2`, `fs_at`, `sha2` (dev-dep `eggup-core`). Bounded local extraction.
-7. **`eggup-eggpack`** → `eggup-core` + `eggup-archive` + `eggup-acquisition` (`=0.2.2` in the workspace source candidate; published Eggpack 0.2.1 retains `=0.2.1`) + `eggpack-manifest =0.1.2`. Leaf producer adapter.
+7. **`eggup-eggpack`** → `eggup-core` + `eggup-archive` + `eggup-acquisition` (published 0.2.2 and current workspace source both pin `=0.2.2`; immutable published 0.2.1 retains `=0.2.1`) + `eggpack-manifest =0.1.2`. Leaf producer adapter.
 8. **`eggup-transport-footprint`** → `eggup-acquisition` + optional `eggup-curl` / `eggup-eggfetch`. **Non-published** footprint fixtures.
 
 Two consequences worth knowing before reviewing anything:

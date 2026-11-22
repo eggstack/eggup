@@ -114,18 +114,17 @@ silently break them:
   (`crates/eggup-archive/Cargo.toml`). Core does not depend on archive; the
   arrow is one-way, and the test fixtures are what need the transaction types.
 
-**Exact-pin asymmetry.** The current workspace-source Eggpack candidate pins its three in-workspace
-Eggup dependencies exactly to `=0.2.2` and takes `eggpack-manifest` as `=0.1.2` from the registry.
-Published `eggup-eggpack 0.2.1` is immutable and retains its `=0.2.1` Eggup pins; the older
-published `eggup-eggpack 0.2.0` retains its Eggup `=0.2.0` pins and producer edge at `=0.1.0`. Every
-other current workspace crate uses a caret requirement, `0.2`, which resolves against the local path
-packages at source version `0.2.2` (`eggup-eggfetch`/`eggup-curl` → `eggup-acquisition`,
-`eggup-service` → `eggup-core`, and the footprint fixtures). This local alignment does not make
-every workspace crate a `0.2.2` registry release: `eggup-core` is published at `0.2.2`;
-`eggup-archive`, `eggup-acquisition`, `eggup-eggpack`, and `eggup-eggfetch` remain at `0.2.1`; only
-`eggup-curl` and `eggup-service` remain at `0.2.0`. The exact-pin behavior is intentional for the
-adapter: a later dependency update still needs a new Eggpack publication. Review downstream version
-coupling per release plan.
+**Exact-pin asymmetry.** The workspace-source Eggpack manifest and published
+`eggup-eggpack 0.2.2` both pin their three in-workspace Eggup dependencies exactly to `=0.2.2`
+and `eggpack-manifest` to `=0.1.2`. Immutable published `eggup-eggpack 0.2.1` retains its
+`=0.2.1` Eggup pins; published `0.2.0` retains its Eggup `=0.2.0` pins and producer edge at
+`=0.1.0`. Every other current workspace crate uses a caret requirement, `0.2`, which resolves
+against local path packages at source version `0.2.2` (`eggup-eggfetch`/`eggup-curl` →
+`eggup-acquisition`, `eggup-service` → `eggup-core`, and the footprint fixtures). This local
+alignment does not make every workspace crate a `0.2.2` registry release: Core, Archive, Acquisition,
+Eggfetch, and Eggpack are published at `0.2.2`; only Curl and Service remain at `0.2.0`. The exact-pin
+behavior is intentional for the adapter: a later dependency update still needs a new Eggpack
+publication. Review downstream version coupling per release plan.
 
 **The `0.2.0` widening was load-bearing, not cosmetic.** The seam's
 `0.2.0` is source-breaking (`AcquisitionError::Io(String)` became
@@ -669,13 +668,13 @@ CI added."
 
 | `eggup-eggfetch` | 0.2.2 | 0.2.2 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.2.0, 0.2.1, **0.2.2** | Native HTTP adapter; M023 publishes M021's qualified `eggfetch-core 0.4.0` update with the same four features and no API/policy change |
 | `eggup-curl` | 0.2.2 | 0.2.0 | 0.1.2, **0.2.0** | External-curl adapter |
-| `eggup-eggpack` | 0.2.2 | 0.2.1 | 0.1.2, 0.1.3, 0.2.0, **0.2.1** | Only crate touching producer types; M010 source pins Eggup dependencies at `=0.2.2`; M023 has made all three exact Eggup dependencies registry-visible; published 0.2.1 keeps `=0.2.1` and `eggpack-manifest =0.1.2` |
+| `eggup-eggpack` | 0.2.2 | 0.2.2 | 0.1.2, 0.1.3, 0.2.0, 0.2.1, **0.2.2** | Only crate touching producer types; M010 published package-only from `c9a7ac0` (checksum `f24df78c…42e49`) with exact pins to Eggup `=0.2.2` and `eggpack-manifest =0.1.2` |
 | `eggup-service` | 0.2.2 | 0.2.0 | 0.1.0, 0.1.1, 0.1.2, 0.1.3, **0.2.0** | Carries the stdin-verdict fix the published `0.1.3` lacks |
 | `eggup-transport-footprint` | 0.2.2 | — | none (`publish = false`) | Binary-only fixture crate, non-publishable by design |
 
 All 8 crates share workspace source version `0.2.2`; publication remains selective. The exact-version crates.io API
-was checked on 2026-11-22: Core, Archive, Acquisition, and Eggfetch are at `0.2.2`; Eggpack is at
-`0.2.1`; Curl and Service are at `0.2.0`. Core M022 published only
+was checked on 2026-11-22: Core, Archive, Acquisition, Eggfetch, and Eggpack are at
+`0.2.2`; Curl and Service are at `0.2.0`. Core M022 published only
 `eggup-core 0.2.2` from source SHA `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (checksum
 `a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`); its registry archive matches
 the qualified local package, and `.cargo_vcs_info.json` records the same source SHA. Archive M009 published `eggup-archive 0.2.2` from source SHA `4e8779ed37ca35f3f11857dbcc4aa008e386bf21` (checksum `67ab697e3af41b3cd3d1ed140f821c68739ec446d2a7782fa26ca4960edc882b`); the registry archive matches the local package and `.cargo_vcs_info.json` records that SHA. Its five normal dependencies have no Eggup runtime edge, and production source/API/extraction behavior is unchanged. Acquisition Transport M023 then published `eggup-acquisition 0.2.2` (checksum
@@ -685,7 +684,14 @@ the qualified local package, and `.cargo_vcs_info.json` records the same source 
 `cf6fcc1706f353a0c5e4c4d3e0071c482993f974`. Both registry archives match their qualified packages and carry
 Cargo provenance for that SHA; post-publication hosted run `44985695980` attempt 2 passed all five lanes.
 Acquisition remains zero-dependency; Eggfetch carries the qualified 0.4.0 implementation dependency update.
-Eggpack M010 remains the last planned package promotion. Core M016
+Eggpack M010 then published `eggup-eggpack 0.2.2` from source SHA
+`c9a7ac0af7ea3f0a090d19fe1fffa817235f0081` (checksum
+`f24df78cf088e665dd69db1b319d7168007175ebc1ec5d2df76a069e31242e49`). The downloaded registry archive
+is byte-identical to the qualified local package; Cargo provenance records the source SHA and
+`crates/eggup-eggpack`. Its registry-only consumer fixture resolved 80 metadata packages (the fixture
+plus 79 registry packages), with no path or Git sources, and passed locked checks. Post-publication
+hosted run `44988995059` attempt 2 passed all five lanes on the publication SHA. This package-only
+promotion made the exact `=0.2.2` pin set available through the published adapter. Core M016
 published from source commit
 `b5a989a72dc185b30cd8c0cb67b5110ed03acd86` (checksum
 `3841a8390f8c7b1be0207156e5c895aa4b6c0eec8b05772ac8331d3e43e7ef88`); its
@@ -766,9 +772,9 @@ Ordered by how expensive a miss is.
     transitions only; no plan detail duplicated. Roadmap status table reconciled.
 12. **If publishing** — confirm it is a tracked publication milestone, that
     `cargo package`/dry-run was qualified, that the downstream exact pins in the
-    current source and published adapters are accounted for (workspace
-    `eggup-eggpack` candidate `=0.2.2`; published Eggpack `0.2.1` retains
-    `=0.2.1`, and `0.2.0`
+    current source and published adapters are accounted for (the workspace source
+    and published `eggup-eggpack 0.2.2` pin the three Eggup dependencies at
+    `=0.2.2`; immutable published `0.2.1` retains `=0.2.1`, and `0.2.0`
     retains `=0.2.0`), and that CI still does not publish. See the
     `release-workflow` skill.
 13. **Did the prose move with the code?** If the change touched an enum, a
@@ -808,10 +814,10 @@ Ordered by how expensive a miss is.
 - [transport-footprint.md](transport-footprint.md) — the feature-gated binaries
   that `msrv` and `windows-check` do not build (§5.3).
 - [eggpack-adapter.md](eggpack-adapter.md) — the only crate allowed to depend
-  on `eggpack-manifest`; the workspace-source candidate pins its Eggup edges
-  at `=0.2.2` and its producer edge at `=0.1.2`. Published `0.2.1` retains
-  Eggup `=0.2.1` pins; published `0.2.0` retains Eggup `=0.2.0` and producer
-  `=0.1.0` pins.
+  on `eggpack-manifest`; workspace source and published `eggup-eggpack 0.2.2`
+  pin the three Eggup edges at `=0.2.2` and the producer edge at `=0.1.2`.
+  Immutable published `0.2.1` retains Eggup `=0.2.1` pins; published `0.2.0`
+  retains Eggup `=0.2.0` and producer `=0.1.0` pins.
 - [ADR-0005](../plans/adrs/ADR-0005-local-archive-extraction-safety-contract.md) —
   the archive safety contract; the ADR to read before touching
   `eggup-archive` boundaries.
@@ -884,3 +890,4 @@ Corrected in the doc-hygiene pass recorded in the workspace history:
 | `plans/implementation/**` | Some older plans predate or do not fully match the current 16-section template | Historical records. The template is `plans/implementation/README.md`; conforming old plans is not worth rewriting evidence. New plans should follow the template exactly |
 | `plans/closure/eggpack-manifest-interoperability/004a-status.md` | Still asserts `git log 39ff626..HEAD -- crates/` **is empty**; it now returns 4 commits | Deliberate. The record is an immutable 2026-10-01 snapshot, and rewriting it would edit historical evidence. The `registry.md` line that made the same claim *as a live status statement* is corrected; the closure record is not |
 | `plans/archive/` | Holds only its own `README.md`; no superseded material has ever been moved there, though `plans/README.md` describes it as retained-for-traceability | A policy directory with no content is not wrong. Pruning it would remove a documented mechanism; populating it is a separate authoring decision |
+| Published `eggup-eggpack 0.2.2` README/CHANGELOG | The immutable archive includes the publication-source README's pre-upload statement that 0.2.2 was not yet published and the CHANGELOG's pending M010 notes; repository copies are corrected | Documentation-only and low severity. Published versions are immutable; correcting the registry artifact requires a later Eggpack version. No API, runtime, or dependency impact. |

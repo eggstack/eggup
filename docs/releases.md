@@ -1,7 +1,7 @@
 # Versions and upgrades
 
-This page was checked against exact-version crates.io API reads on 2026-11-22. Core, Archive, Acquisition, and
-Eggfetch are at `0.2.2` and unyanked; Eggpack remains at `0.2.1`; Curl and Service remain at `0.2.0`.
+This page was checked against exact-version crates.io API reads on 2026-11-22. Core, Archive, Acquisition,
+Eggfetch, and Eggpack are at `0.2.2` and unyanked; Curl and Service remain at `0.2.0`.
 Core M022 published only `eggup-core 0.2.2` from source SHA
 `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (checksum
 `a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`). Archive M009 published only
@@ -11,12 +11,20 @@ published `eggup-acquisition 0.2.2` (checksum
 `4000935b1d4d384eaba066c9742e70f91d5cb3dd12618ac3aa79d654e2aab865`) and `eggup-eggfetch 0.2.2`
 (checksum `f683e0c3b377a1713a5af4a64257f785da24f17771a927c07508b0d73ad35df1`) from source SHA
 `cf6fcc1706f353a0c5e4c4d3e0071c482993f974`; registry archives and Cargo provenance match.
-Post-publication hosted run `44985695980` attempt 2 passed all five lanes. Eggpack M010 is the remaining
-selective publication and must pass its own qualification; its three exact Eggup dependencies and
-`eggpack-manifest 0.1.2` are now registry-visible and unyanked. No tags, GitHub Releases, or PRs were
-changed. See `plans/closure/verified-update-core/022-status.md`,
-`plans/closure/archive-extraction/009-status.md`, and
-`plans/closure/acquisition-transport/023-status.md`.
+Post-publication hosted run `44985695980` attempt 2 passed all five lanes. Eggpack M010 then published
+only `eggup-eggpack 0.2.2` from source SHA `c9a7ac0af7ea3f0a090d19fe1fffa817235f0081` (crates.io
+SHA-256 `f24df78cf088e665dd69db1b319d7168007175ebc1ec5d2df76a069e31242e49`). The downloaded registry
+archive matches the qualified local package byte-for-byte and Cargo provenance records that source SHA.
+The normalized manifest exact-pins Core, Archive, and Acquisition at `=0.2.2`, plus
+`eggpack-manifest =0.1.2`; the independent registry-only consumer fixture passes. Post-publication
+hosted run `44988995059` attempt 2 passed all five lanes on the publication SHA. The immutable 0.2.2
+archive also carries the pre-publication README and CHANGELOG from that source SHA: the README says the
+source update was not yet published, and the CHANGELOG leaves M010 under Unreleased. The repository copies are
+now reconciled; correcting the already-published archive docs would require a future Eggpack version. This
+documentation-only limitation does not affect API, runtime behavior, or dependency resolution. No tags, GitHub Releases, or PRs were changed. See `plans/closure/verified-update-core/022-status.md`,
+`plans/closure/archive-extraction/009-status.md`,
+`plans/closure/acquisition-transport/023-status.md`, and
+`plans/closure/eggpack-manifest-interoperability/010-status.md`.
 
 Archive M008 and Acquisition M019 separately published `eggup-archive 0.2.1` and
 `eggup-acquisition 0.2.1` from `5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Eggpack M009
@@ -42,21 +50,23 @@ independently of this repository.
 | [`eggup-eggfetch`](https://crates.io/crates/eggup-eggfetch) | `0.2.2` |
 | [`eggup-curl`](https://crates.io/crates/eggup-curl) | `0.2.0` |
 | [`eggup-archive`](https://crates.io/crates/eggup-archive) | `0.2.2` |
-| [`eggup-eggpack`](https://crates.io/crates/eggup-eggpack) | `0.2.1` |
+| [`eggup-eggpack`](https://crates.io/crates/eggup-eggpack) | `0.2.2` |
 | [`eggup-service`](https://crates.io/crates/eggup-service) | `0.2.0` |
 
 ## Exact-pin behavior
 
 The workspace crates generally use caret requirements for their Eggup
-dependencies. Published `eggup-eggpack 0.2.1` pins eggup-core, eggup-archive,
-and eggup-acquisition exactly to `=0.2.1`, plus eggpack-manifest `=0.1.2`.
-The immutable published `eggup-eggpack 0.2.0` retains its original exact pins
-to the 0.2.0 Eggup set and eggpack-manifest 0.1.0. A later exact-pin update
-will not flow through either immutable adapter version; consumers must select a
-new Eggpack publication to receive a later dependency set. The current workspace-source pins are `=0.2.2`; published Eggpack 0.2.1 remains at `=0.2.1`, and immutable 0.2.0 remains at `=0.2.0`. M016's contract documents are published in Core
-0.2.1; the immutable Eggpack 0.2.0 package still resolves Core 0.2.0 and does
-not carry those documents. Check the resolved dependency graph if you depend
-on `eggup-eggpack`.
+dependencies. Published `eggup-eggpack 0.2.2` pins eggup-core, eggup-archive,
+and eggup-acquisition exactly to `=0.2.2`, plus eggpack-manifest `=0.1.2`.
+The immutable published `eggup-eggpack 0.2.1` retains `=0.2.1` Eggup pins
+and eggpack-manifest `=0.1.2`; published `eggup-eggpack 0.2.0` retains its
+original exact pins to the 0.2.0 Eggup set and eggpack-manifest 0.1.0. A later
+exact-pin update will not flow through an older immutable adapter; consumers
+must select a new Eggpack publication to receive a later dependency set. The
+current workspace-source pins are also `=0.2.2`. M016's contract documents
+are published in Core 0.2.1; the immutable Eggpack 0.2.0 package still resolves
+Core 0.2.0 and does not carry those documents. Check the resolved dependency
+graph if you depend on `eggup-eggpack`.
 
 ## Earlier-version limitations
 
