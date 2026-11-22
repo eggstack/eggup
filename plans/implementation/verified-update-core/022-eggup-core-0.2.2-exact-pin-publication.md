@@ -1,6 +1,8 @@
 # Verified Update Core M022 — eggup-core 0.2.2 exact-pin publication
 
-Status: active; publication authorized 2026-11-21, not yet performed.
+Status: closed 2026-11-22; `eggup-core 0.2.2` published, registry-verified, and hosted-qualified
+from `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff`; see
+`plans/closure/verified-update-core/022-status.md`.
 Repository baseline: 3be567e9839b555d7d9d5e6e43f14de4a13c901d
 Source roadmap: plans/subsystems/verified-update-core-roadmap.md
 Affected roadmap: plans/subsystems/eggpack-manifest-interoperability-roadmap.md

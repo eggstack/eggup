@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+No unreleased Core changes. No publication or consumer migration is implied by this section.
+
+## 0.2.2 — 2026-11-22
+
+Published to crates.io as Verified Update Core M022. This is an exact-pin package-version release
+for Eggpack M010: production source, public API, runtime behavior, and dependency surface are
+unchanged. The package continues to include the three authoritative contract documents. No consumer
+migration is required; other Eggup 0.2.2 packages publish only through their own milestones. See
+`plans/closure/verified-update-core/022-status.md` for registry, artifact, provenance, fixture, and
+hosted-CI evidence.
+
 ## 0.2.1 — 2026-11-18
 
 Published to crates.io as Verified Update Core M016. The package now includes
@@ -434,10 +447,6 @@ signature claims. Self-update selects no release and infers no version.
 
 The `eggup-archive` and `eggup-service` crates consume this crate; see their
 changelogs for changes that cross the boundary.
-
-## Unreleased
-
-Prepare eggup-core 0.2.2 as a registry-visible exact-pin target for Eggpack 0.2.2. No production source, public API, runtime behavior, or dependency changes; no migration.
 
 ## 0.1.3 — 2026-10-06
 

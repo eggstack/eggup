@@ -262,7 +262,12 @@ Implementation plan: plans/implementation/eggpack-manifest-interoperability/009-
 
 ### M010 — eggup-eggpack 0.2.2 publication
 
-Status: active; see plans/implementation/eggpack-manifest-interoperability/010-eggup-eggpack-0.2.2-publication.md. Publish only Eggpack 0.2.2 after Core, Archive, and Acquisition 0.2.2 are registry-visible and verified. Keep the producer schema pin at eggpack-manifest 0.1.2. No producer publication, tag, GitHub Release, or PR edit is in scope.
+Status: active; see
+plans/implementation/eggpack-manifest-interoperability/010-eggup-eggpack-0.2.2-publication.md. Core
+M022 has published and verified Core 0.2.2. Publish only Eggpack 0.2.2 after Archive M009 and
+Acquisition M023 have made the exact-pinned dependencies registry-visible and verified. Keep the
+producer schema pin at eggpack-manifest 0.1.2. No producer publication, tag, GitHub Release, or PR
+edit is in scope.
 
 ## 8. Cross-cutting requirements
 

@@ -43,7 +43,21 @@ gaps are in [`architecture/tooling-governance.md`](architecture/tooling-governan
 
 Focused runs: `cargo test -p eggup-core`, `cargo test -p eggup-core <name>`, `cargo clippy -p <crate> --all-targets --locked -- -D warnings`.
 
-CI (`.github/workflows/ci.yml`) adds what the script lacks: `stable` (fmt/clippy/test/doc plus the packaged-service step on Linux), `msrv` (workspace `cargo check` and the packaged-service step on 1.89.0), `service-systemd` (registry-only published 0.1.2 negative controls, current real-systemd fixtures, and published registry-only 0.1.3 positive quiescence and ownership controls), `macos` (full `cargo test` plus the packaged-service step), and `windows-check` — which runs ten `cargo test` steps, then `cargo package -p eggup-service --locked`. The packaged-service step verifies the packaged service crate against the **registry**, strictly: its `eggup-core = "^0.2"` requirement resolves against the published `eggup-core 0.2.1`, and the packaged sources are compiled. Windows tests cover acquisition/archive/curl, eggpack, three named service diagnostic tests, SCM, the live SCM fixture, Core `current_executable` and `stale_lock_recovery`, then the full workspace. Core M010/M011 self-replacement and lock-race fixtures execute natively, not merely compile. Neither `msrv` nor `windows-check` passes `--all-features` on its workspace check, but `msrv` checks the three feature-gated footprint configurations by dedicated steps, so the footprint binaries are built by `stable` and `macos` and checked at the 1.89 floor by `msrv`; only `windows-check` builds none of them. CI never publishes; releases are manual.
+CI (`.github/workflows/ci.yml`) adds what the script lacks: `stable` (fmt/clippy/test/doc plus the
+packaged-service step on Linux), `msrv` (workspace `cargo check` and the packaged-service step on
+1.89.0), `service-systemd` (registry-only published 0.1.2 negative controls, current real-systemd
+fixtures, and published registry-only 0.1.3 positive quiescence and ownership controls), `macos`
+(full `cargo test` plus the packaged-service step), and `windows-check` — which runs ten `cargo
+test` steps, then `cargo package -p eggup-service --locked`. The packaged-service step verifies the
+packaged service crate against the **registry**, strictly: its `eggup-core = "^0.2"` requirement
+resolves against the published `eggup-core 0.2.2`, and the packaged sources are compiled. Windows
+tests cover acquisition/archive/curl, eggpack, three named service diagnostic tests, SCM, the live
+SCM fixture, Core `current_executable` and `stale_lock_recovery`, then the full workspace. Core
+M010/M011 self-replacement and lock-race fixtures execute natively, not merely compile. Neither
+`msrv` nor `windows-check` passes `--all-features` on its workspace check, but `msrv` checks the
+three feature-gated footprint configurations by dedicated steps, so the footprint binaries are built
+by `stable` and `macos` and checked at the 1.89 floor by `msrv`; only `windows-check` builds none of
+them. CI never publishes; releases are manual.
 
 ## Where to look
 

@@ -59,17 +59,18 @@ Each has occurred at least once — check for them explicitly:
 1. **CI lane understatement.** Windows runs ten `cargo test` steps
    (`ci.yml:116-136`) plus the packaged-service step, whose registry-resolved
    compile is **strict** — the packaged sources are compiled against the
-   registry copy of `eggup-core 0.2.1`. There is also a privileged Linux
+   registry copy of `eggup-core 0.2.2`. There is also a privileged Linux
    `service-systemd` lane. Count commands, not bullets: three named
    `eggup-service` diagnostic tests are three steps. The MSRV lane runs a
    workspace check and the packaged-service step; it does not run tests, and
    that step's registry-resolved compile is strict too.
-2. **Publication status.** `eggup-core 0.2.1` was published 2026-11-18;
-   `eggup-archive`, `eggup-acquisition`, and `eggup-eggpack 0.2.1` were
-   published on 2026-11-19. Eggfetch M020 published `eggup-eggfetch 0.2.1`
-   on 2026-11-20; only `eggup-curl` and `eggup-service` remain at `0.2.0`.
-   `eggup-transport-footprint` is not published at all. Check crates.io rather
-   than inferring from a `publish = false` key or a plan.
+2. **Publication status.** Core M016 published `eggup-core 0.2.1` on
+   2026-11-18; Core M022 published `eggup-core 0.2.2` on 2026-11-22.
+   Archive, Acquisition, Eggpack, and Eggfetch remain latest at `0.2.1`; Curl
+   and Service remain at `0.2.0`; `eggup-transport-footprint` is not published.
+   The 0.2.2 workspace source version does not imply that every crate has been
+   released. Check crates.io rather than inferring from a `publish = false` key
+   or a plan.
 3. **Enum tables lagging the source.** `architecture/core-transaction.md` once
    described a whole earlier generation of `eggup-core`'s enums. When a variant
    is added, renamed, or removed, update every table that lists variants.

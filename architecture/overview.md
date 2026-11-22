@@ -43,36 +43,34 @@ manager, and producer concerns.
 ## Dependency graph
 
 Derived from the `crates/*/Cargo.toml` manifests. Arrows point from dependent to
-dependency (compile-time direction). All 8 crates carry workspace version
-`0.2.2` in the uncommitted source candidate.
+dependency (compile-time direction). All 8 crates share workspace source version
+`0.2.2`; publication is selective and recorded per milestone.
 
-Core M016 published `eggup-core 0.2.1`; Archive M008 and Acquisition M019
-separately published `eggup-archive 0.2.1` and `eggup-acquisition 0.2.1` from
-`5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Eggpack M009 separately
-published `eggup-eggpack 0.2.1` from
-`ccb2bfcbbe7645541d43bb4f5fcb801339c319ed` (checksum
-`492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795`). Eggfetch
-M020 separately published `eggup-eggfetch 0.2.1` from
-`2a33cfe4712dfb88a823614ee6f6a439ecdf792e` (checksum
-`2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`) with
-`eggfetch-core 0.3.0`; only `eggup-curl` and `eggup-service` remain at `0.2.0`.
-M021 updated only the workspace eggup-eggfetch dependency to 0.4.0 and is
-hosted-qualified on implementation commit `8af7db87cf188859ee8b3222aed8f4a6c9b74ed7`
-(run [44879536834](https://github.com/eggstack/eggup/actions/runs/44879536834));
-the published 0.2.1 package remains on 0.3.0. M021 changed no Eggup package
-version or published artifact. M022's uncommitted source candidate advances all
-eight workspace crates to `0.2.2`; it is not a registry release. The source
-Eggpack candidate exact-pins its three Eggup dependencies at `=0.2.2` and
-eggpack-manifest at `=0.1.2`. Published Eggpack 0.2.1 remains immutable with
-`=0.2.1` pins; older 0.2.0 retains its original pins. The Core 0.2.1 package includes the three existing
-contract docs; immutable Core 0.2.0 does not. The earlier 0.2.0 line remains
-one lockstep train published from a single source commit because
-`eggup-acquisition`'s next release is source-breaking and the workspace shares
-one version. Publication and registry-only evidence are in the closure records
-under `plans/closure/`. The `v0.2.1` tag and Release still point to Core source
-commit `b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; selective Archive,
-Acquisition, and Eggpack publications did not move that tag.
-`eggup-transport-footprint` is `publish = false`.
+Core M016 published `eggup-core 0.2.1`; Core M022 later published only `eggup-core 0.2.2` from
+source SHA `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (checksum
+`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`). Archive M008 and Acquisition
+M019 separately published `eggup-archive 0.2.1` and `eggup-acquisition 0.2.1` from
+`5a04f68f60c8c3ad6392036fa314ed2749fa572c`. Eggpack M009 separately published `eggup-eggpack 0.2.1`
+from `ccb2bfcbbe7645541d43bb4f5fcb801339c319ed` (checksum
+`492271d54d9529fcef74bcf354466c1971e102c261e7ceac696ea3746fded795`). Eggfetch M020 separately
+published `eggup-eggfetch 0.2.1` from `2a33cfe4712dfb88a823614ee6f6a439ecdf792e` (checksum
+`2ca53436f6f12ca3ae0a9d194e81a6af6bf04fadf2d90b49d866359ab9eab2dc`) with `eggfetch-core 0.3.0`; only
+`eggup-curl` and `eggup-service` remain at `0.2.0`. M021 updated only the workspace eggup-eggfetch
+dependency to 0.4.0 and is hosted-qualified on implementation commit
+`8af7db87cf188859ee8b3222aed8f4a6c9b74ed7` (run
+[44879536834](https://github.com/eggstack/eggup/actions/runs/44879536834)); the published 0.2.1
+package remains on 0.3.0. M021 changed no Eggup package version or published artifact. The `0.2.2`
+source version is shared by all eight workspace crates, but only Core M022 has published so far;
+Archive, Acquisition, Eggfetch, and Eggpack remain gated by their separate closures. The source
+Eggpack candidate exact-pins its three Eggup dependencies at `=0.2.2` and eggpack-manifest at
+`=0.1.2`. Published Eggpack 0.2.1 remains immutable with `=0.2.1` pins; older 0.2.0 retains its
+original pins. The Core 0.2.1 and 0.2.2 packages include the three existing contract docs; immutable
+Core 0.2.0 does not. The earlier 0.2.0 line remains one lockstep train published from a single
+source commit because `eggup-acquisition`'s next release is source-breaking and the workspace shares
+one version. Publication and registry-only evidence are in the closure records under
+`plans/closure/`. The `v0.2.1` tag and Release still point to Core source commit
+`b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; selective Archive, Acquisition, and Eggpack publications
+did not move that tag. `eggup-transport-footprint` is `publish = false`.
 
 
 ```text
@@ -281,14 +279,12 @@ Contract-level detail that belongs to no single crate:
 - [ADRs](../plans/adrs/README.md) — accepted decisions, superseded not rewritten
 - [closure records](../plans/closure/README.md) — requirement → evidence matrices
 
-Registry snapshot checked against crates.io on 2026-11-21: `eggup-core`,
-`eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`, and `eggup-eggpack`
-are latest at `0.2.1`; `eggup-curl` and `eggup-service` remain at `0.2.0`.
-M022's uncommitted workspace source candidate is `0.2.2`, not a published
-release. M016's registry proof and checksum are recorded in
-[`016-status.md`](../plans/closure/verified-update-core/016-status.md);
-publication evidence for the other packages remains in their own closures.
-The `v0.2.1` tag points at the Core publication source, and the older tags were
-not moved. `eggup-transport-footprint` is `publish = false` by design and has
-no registry version. CI never publishes; releases are manual — see
-[tooling-governance.md](tooling-governance.md) §8.
+Registry snapshot checked against the exact-version crates.io API on 2026-11-22: `eggup-core 0.2.2`
+is published and unyanked; `eggup-archive`, `eggup-acquisition`, `eggup-eggfetch`, and
+`eggup-eggpack` remain at `0.2.1`; `eggup-curl` and `eggup-service` remain at `0.2.0`. Core M022's
+registry proof and checksum are recorded in
+[`022-status.md`](../plans/closure/verified-update-core/022-status.md); M016's earlier proof remains
+in [`016-status.md`](../plans/closure/verified-update-core/016-status.md). The `v0.2.1` tag still
+points at the Core 0.2.1 publication source; no tag or GitHub Release was changed for M022.
+`eggup-transport-footprint` is `publish = false` by design and has no registry version. CI never
+publishes; releases are manual — see [tooling-governance.md](tooling-governance.md) §8.

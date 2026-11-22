@@ -1,6 +1,17 @@
 # Verified Update Core Roadmap
 
-Status: active; M001-M019 and M021 closed; M013 `eggup-core 0.1.3` published 2026-10-06 from `bd43683`; M014/M015/M017/M018 correctives hosted-qualified; M019 published `eggup-core 0.2.0` 2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M016 published only `eggup-core 0.2.1` on 2026-11-18 from `b5a989a` (post-publication run `44391076419` attempt 2 green on all five lanes); M020 staging-privacy/credential-redaction corrective remains ready for handoff; M021 native bounded-candidate fixture corrective is closed and hosted-qualified in run `44380404044` on implementation commit `5f7f074baa491f62a5e372d0caacaacea5148716`; PR run `44380418766` also passed all five lanes; M022 Core 0.2.2 exact-pin publication is active for Eggpack M010.
+Status: active; M001-M019 and M021 closed; M013 `eggup-core 0.1.3` published 2026-10-06 from
+`bd43683`; M014/M015/M017/M018 correctives hosted-qualified; M019 published `eggup-core 0.2.0`
+2026-10-24 from `b612608` (hosted run `40079833945` green on all five lanes); M016 published only
+`eggup-core 0.2.1` on 2026-11-18 from `b5a989a` (post-publication run `44391076419` attempt 2 green
+on all five lanes); M020 staging-privacy/credential-redaction corrective remains ready for handoff;
+M021 native bounded-candidate fixture corrective is closed and hosted-qualified in run `44380404044`
+on implementation commit `5f7f074baa491f62a5e372d0caacaacea5148716`; PR run `44380418766` also
+passed all five lanes; M022 published only Core 0.2.2 from
+`cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (checksum
+`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`), registry-verified and
+hosted-qualified in run `44978544558` attempt 2; Archive M009 and Acquisition M023 remain follow-ons
+before Eggpack M010.
 
 Long-term references:
 
@@ -427,7 +438,11 @@ is the versioned Core gate for authoring Gregg M004 and EggPool M007.
 
 ### M022 — eggup-core 0.2.2 exact-pin publication
 
-Status: active; see plans/implementation/verified-update-core/022-eggup-core-0.2.2-exact-pin-publication.md. Publish only Core 0.2.2 after exact-SHA qualification; production source and dependency surface are unchanged. This is the registry prerequisite for Eggpack M010. No existing tags, GitHub Releases, or PRs are to be changed.
+Status: closed 2026-11-22; see `plans/closure/verified-update-core/022-status.md`. Only Core 0.2.2
+was published, from source SHA `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff` (checksum
+`a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`); the registry artifact,
+exact-pin fixture, and post-publication hosted rerun passed. Production source and dependency
+surface are unchanged. No tag, GitHub Release, or PR was changed.
 
 ## 8. Cross-cutting requirements
 
@@ -510,4 +525,4 @@ publication/tag is reopened.
 | M016 | closed; hosted-qualified (post-publication run `44391076419`) | `plans/implementation/verified-update-core/016-eggup-core-contract-doc-packaging.md` | `plans/closure/verified-update-core/016-status.md` | Published only `eggup-core 0.2.1` from `b5a989a72dc185b30cd8c0cb67b5110ed03acd86`; checksum `3841a839…e7ef88`; package and registry-only fixture contain/resolve the three docs; all five post-publication CI lanes passed; `v0.2.1` and GitHub Release point at the source SHA. Finding 14 closed; M021's test-only `#[cfg(test)]` delta is separately attributed |
 | M020 | ready for handoff | `plans/implementation/verified-update-core/020-staging-privacy-and-credential-redaction-corrective.md` | — | Closes registry finding 18 (**low**) at baseline `2516d9e`: creation-mode privacy for the stage root, stage intermediates, backup root and both lock-record sites, plus manual `Debug` redaction in `eggup-acquisition`, `eggup-curl`, and `eggup-eggfetch`. No new dependency, no public API change, no publication. Three audit items are accepted residuals with reasons in plan §5; the acquisition boundary is named as an affected roadmap, not a second primary |
 | M021 | closed; hosted-qualified (run `44380404044`) | `plans/implementation/verified-update-core/021-native-bounded-candidate-test-fixture.md` | `plans/closure/verified-update-core/021-status.md` | Replaces six Core shell fixtures with a native helper; implementation commit `5f7f074baa491f62a5e372d0caacaacea5148716` passed all five hosted lanes, and PR run `44380418766` also passed. Test-only; no production, API, dependency, version, or publication change. Registry finding 1 remains open for broader host-level spawn/resource failures |
-| M022 | active; authorized publication; not yet published | plans/implementation/verified-update-core/022-eggup-core-0.2.2-exact-pin-publication.md | plans/closure/verified-update-core/022-status.md (pending) | Exact-pin prerequisite for Eggpack M010; no production source change. |
+| M022 | closed 2026-11-22; registry-verified; hosted-qualified (run `44978544558` attempt 2) | plans/implementation/verified-update-core/022-eggup-core-0.2.2-exact-pin-publication.md | plans/closure/verified-update-core/022-status.md | Published only Core 0.2.2 from `cdfe0bf0452d64c50da00a9e21c62ad2a0140bff`; checksum `a0b0dba6035ec7d403ddf0298f1021a5bd544764f9bb4e3011cb31b2dacd614b`; byte-identical registry artifact and exact-version consumer pass. |
